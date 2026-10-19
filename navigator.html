@@ -181,7 +181,16 @@ const MAP_STYLES = {
   night:     { id: 'base-v4-dark',    label: 'Ночная' },
   toner:     { id: 'toner-v2',        label: 'Тонер' },
   dataviz:   { id: 'dataviz-v4',      label: 'Данные' },
-  osm:       { id: 'openstreetmap',   label: 'OSM' }
+  osm:       { id: 'openstreetmap',   label: 'OSM' },
+  yandex_sat: {
+    label: 'Яндекс.Спутник',
+    // Keyless-тайлы Яндекса отдаются без ключа и с CORS, но в эллипсоидном
+    // Меркаторе (EPSG:3395), а MapLibre рисует Web Mercator (EPSG:3857).
+    // Поэтому картинка может быть смещена относительно GPS и маршрутов.
+    tiles: ['https://core-sat.maps.yandex.net/tiles?l=sat&x={x}&y={y}&z={z}'],
+    attribution: '© <a href="https://yandex.ru/maps">Яндекс</a>',
+    warn: 'Тайлы Яндекса в другой проекции — возможен сдвиг относительно GPS.'
+  }
 };
 
 // Дополнительные слои поверх любой подложки.
@@ -821,8 +830,27 @@ function checkSpeedAlert(speed) {
 }
 
 function maptilerStyleUrl(type) {
-    const style = (MAP_STYLES[type] || MAP_STYLES.scheme).id;
-    return `https://api.maptiler.com/maps/${style}/style.json?key=${encodeURIComponent(MAPTILER_KEY)}`;
+    const st = MAP_STYLES[type] || MAP_STYLES.scheme;
+    if (st.tiles) {
+        const srcId = 'osm-yandex-base';
+        return {
+            version: 8,
+            sources: {
+                [srcId]: { type: 'raster', tiles: st.tiles, tileSize: 256, attribution: st.attribution }
+            },
+            layers: [{ id: srcId, type: 'raster', source: srcId }]
+        };
+    }
+    return `https://api.maptiler.com/maps/${st.id}/style.json?key=${encodeURIComponent(MAPTILER_KEY)}`;
+}
+
+function updateMapStyleNote() {
+    const note = $('mapStyleNote');
+    if (!note) return;
+    const st = MAP_STYLES[APP._mapStyle];
+    const warn = st && st.warn;
+    note.textContent = warn ? '⚠️ ' + warn : '';
+    note.classList.toggle('hidden', !warn);
 }
 
 function saveMapPrefs() {
@@ -873,12 +901,14 @@ function renderMapSettings() {
             list.appendChild(row);
         });
     }
+    updateMapStyleNote();
 }
 
 function syncMapStyleButtons() {
     document.querySelectorAll('.map-style-btn').forEach(btn => {
         btn.classList.toggle('active', btn.dataset.style === APP._mapStyle);
     });
+    updateMapStyleNote();
 }
 
 function setMapType(type) {
@@ -2088,6 +2118,7 @@ if (typeof maplibregl === 'undefined' || typeof MAPTILER_KEY === 'undefined' || 
             <div class="settings-group">
                 <div class="settings-label">Вид карты</div>
                 <div id="mapStyleGrid" class="map-style-grid"></div>
+                <div id="mapStyleNote" class="map-style-note hidden"></div>
                 <div class="settings-sublabel">Дополнительные слои</div>
                 <div id="mapOverlayList" class="map-overlay-list"></div>
                 <button type="button" class="map-reset-btn" onclick="resetMapLayers()">Сбросить слои</button>
