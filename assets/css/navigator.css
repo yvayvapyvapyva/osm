@@ -97,7 +97,7 @@ html, body {
     background: var(--glass-bg);
     color: #ffffff;
     cursor: pointer;
-    transition: background 0.15s;
+    transition: background 0.15s, opacity 0.25s, visibility 0.25s;
     font-size: 15px;
     font-weight: 600;
     outline: none;
@@ -109,6 +109,12 @@ html, body {
 #instructionBtn:active {
     transform: translateX(-50%) scale(0.95);
     background: rgba(80, 80, 80, 0.6);
+}
+
+#instructionBtn.is-hidden {
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
 }
 
 .android-app #instructionBtn {

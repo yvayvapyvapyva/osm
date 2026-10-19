@@ -1698,6 +1698,7 @@ if (typeof maplibregl === 'undefined' || typeof MAPTILER_KEY === 'undefined' || 
     });
 
     document.getElementById('map').addEventListener('click', () => {
+        $('instructionBtn').classList.add('is-hidden');
         stopDrive();
         APP._simMode = false;
         updateTiltState();
