@@ -1020,6 +1020,11 @@ function resetMapLayers() {
 /* ---------- Дополнительные слои карты ---------- */
 const TERRAIN_SOURCE_ID = 'osm-terrain-dem';
 const RAIN_SOURCE_ID = 'osm-rain';
+const BUILDINGS_SOURCE_ID = 'osm-buildings';
+const BUILDINGS_LAYER_ID = 'osm-3d-buildings';
+// Векторный тайлсет MapTiler со слоем building (render_height/render_min_height).
+// Нужен, чтобы рисовать 3D-здания поверх растровых подложек без векторных данных.
+const BUILDINGS_TILES_URL = `https://api.maptiler.com/tiles/v3/tiles.json?key=${encodeURIComponent(MAPTILER_KEY)}`;
 const RASTER_OVERLAYS = {
     cycling: {
         tiles: ['https://a.tile-cyclosm.openstreetmap.fr/cyclosm/{z}/{x}/{y}.png',
@@ -1046,6 +1051,15 @@ function firstSymbolLayerId() {
         const sym = layers.find(l => l.type === 'symbol' && l.id.indexOf('osm-') !== 0);
         return sym ? sym.id : undefined;
     } catch (e) { return undefined; }
+}
+
+// Куда вставлять доп. слои: под подписи, а если их нет (растровые подложки) —
+// под маршруты, чтобы 3D-здания и прочие слои не перекрывали линии маршрута.
+function overlayInsertBefore() {
+    const sym = firstSymbolLayerId();
+    if (sym) return sym;
+    if (APP.map.getLayer('nav-routes-glow')) return 'nav-routes-glow';
+    return undefined;
 }
 
 function addMapLayer(layer, beforeId) {
@@ -1106,14 +1120,25 @@ function applyContours(beforeId) {
 }
 
 function applyBuildings(beforeId) {
-    let src;
+    let src = null;
     try {
         const b = (APP.map.getStyle().layers || []).find(l => l['source-layer'] === 'building');
         src = b && b.source;
-    } catch (e) { return; }
-    if (!src) return;
+    } catch (e) { src = null; }
+    // На растровых подложках (Яндекс.Спутник, Спутник+, OSM) в стиле нет
+    // векторных данных — берём контуры и высоты из тайлсета MapTiler v3.
+    if (!src) {
+        src = BUILDINGS_SOURCE_ID;
+        if (!APP.map.getSource(src)) {
+            APP.map.addSource(src, {
+                type: 'vector',
+                url: BUILDINGS_TILES_URL,
+                maxzoom: 15
+            });
+        }
+    }
     addMapLayer({
-        id: 'osm-3d-buildings',
+        id: BUILDINGS_LAYER_ID,
         type: 'fill-extrusion',
         source: src,
         'source-layer': 'building',
@@ -1186,7 +1211,7 @@ function restoreMapOverlays(force) {
     if (!APP.map.isStyleLoaded()) return;
     if (!force && !APP._overlayRestoreDirty) return;
     const o = APP._overlays || {};
-    const b = firstSymbolLayerId();
+    const b = overlayInsertBefore();
     let ok = true;
     const step = fn => { try { fn(); } catch (e) { ok = false; } };
 
@@ -1209,7 +1234,7 @@ function restoreMapOverlays(force) {
     });
     step(() => {
         if (o.buildings) applyBuildings(b);
-        else removeMapLayer('osm-3d-buildings');
+        else { removeMapLayer(BUILDINGS_LAYER_ID); removeMapSource(BUILDINGS_SOURCE_ID); }
     });
     ['cycling', 'hiking', 'seamark'].forEach(key => {
         step(() => {
