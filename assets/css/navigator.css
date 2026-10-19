@@ -978,13 +978,6 @@ html, body {
 .category-header.expanded {
     background: rgba(0, 122, 255, 0.15);
 }
-.category-header.personal {
-    background: rgba(175, 82, 222, 0.25);
-    border-color: rgba(175, 82, 222, 0.5);
-}
-.category-header.personal.expanded {
-    background: rgba(175, 82, 222, 0.15);
-}
 .category-header.root {
     background: rgba(255, 159, 10, 0.25);
     border-color: rgba(255, 159, 10, 0.5);
@@ -1169,17 +1162,6 @@ html, body {
 /* ---- Tree view for route list ---- */
 .route-item.dragging {
     opacity: 0.5;
-}
-
-.category-header.personal:active {
-    background: rgba(175, 82, 222, 0.25);
-}
-
-.personal-routes-body {
-    padding: 8px 0 4px 16px;
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
 }
 
 /* ============================================

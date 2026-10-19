@@ -8,10 +8,6 @@ const MenuModule = {
     _categoryTree: null,
     _starredTree: null,
     _expandedFolders: new Set(),
-    _userRoutes: null,
-    _userId: null,
-    _expandedPersonalFolders: new Set(),
-    _currentIsPersonal: false,
     _filterCreator: '',
 
     // URL Яндекс-функции для загрузки маршрутов (общий бекенд)
@@ -107,21 +103,6 @@ const MenuModule = {
 
         // Загружаем список маршрутов динамически
         await this._loadRoutesList();
-
-        // Загружаем личные маршруты пользователя
-        const uid = this._detectUserId();
-        if (uid) {
-            this._userId = uid;
-            await this._fetchUserRoutes(uid);
-        } else if (typeof vkBridge !== 'undefined') {
-            vkBridge.subscribe((event) => {
-                const data = event.detail?.data || null;
-                if (data?.id && !this._userId) {
-                    this._userId = String(data.id);
-                    this._fetchUserRoutes(this._userId).then(() => this._buildRoutesList());
-                }
-            });
-        }
 
         // Проверяем параметры сразу и при получении данных от VK Bridge
         this.checkUrlParam();
@@ -261,54 +242,6 @@ const MenuModule = {
         return;
     },
 
-    _detectUserId() {
-        if (window.authLogin) return window.authLogin;
-        return null;
-    },
-
-    _getUserDisplayName() {
-        if (window.authName) return window.authName;
-        if (window.authLogin) return window.authLogin;
-        return '';
-    },
-
-    _getFormattedDisplayName() {
-        const name = this._getUserDisplayName() || this._detectUserId() || '';
-        if (window.authPlatform === 'tg') {
-            const uname = window.tgUser?.username || '';
-            return uname ? `${name} (tg: @${uname})` : `${name} (tg)`;
-        }
-        if (window.authPlatform === 'vk') {
-            return `${name} (vk: id${window.authLogin})`;
-        }
-        return name;
-    },
-
-    async _fetchUserRoutes(userId) {
-        if (!userId) return;
-        try {
-            let url = this.API_URL_V2;
-            const params = ['action=list'];
-
-            if (window.authPlatform === 'tg') {
-                params.push(`p=tg&id=${encodeURIComponent(userId)}&tg_init_data=${encodeURIComponent(window.tgInitData || '')}`);
-            } else if (window.authPlatform === 'user') {
-                params.push(`p=user&login=${encodeURIComponent(window.authLogin)}&password=${encodeURIComponent(window.authPassword)}`);
-            } else {
-                params.push(`p=vk&id=${encodeURIComponent(userId)}`);
-            }
-
-            url += '?' + params.join('&');
-            const resp = await fetch(url);
-            if (!resp.ok) throw new Error('HTTP ' + resp.status);
-            const data = await resp.json();
-            this._userRoutes = data.routes || [];
-        } catch (e) {
-            console.warn('[MenuModule] Не удалось загрузить личные маршруты:', e);
-            this._userRoutes = [];
-        }
-    },
-
     _countTreeRoutes(node) {
         let count = node.routes.length;
         for (const f of Object.values(node.folders)) count += this._countTreeRoutes(f);
@@ -401,74 +334,6 @@ const MenuModule = {
         }
     },
 
-    _buildPersonalCategoryTree() {
-        const root = { folders: {}, routes: [] };
-        for (const route of this._userRoutes) {
-            const fullPath = route.name || route.m || '';
-            const parts = fullPath.split('/').map(s => s.trim()).filter(Boolean);
-            const leafName = parts.pop() || fullPath;
-            let node = root;
-            for (const part of parts) {
-                if (!node.folders[part]) node.folders[part] = { folders: {}, routes: [] };
-                node = node.folders[part];
-            }
-            node.routes.push({ m: route.m, name: leafName, fullPath });
-        }
-        return root;
-    },
-
-    _renderPersonalTreeNode(node, container, path) {
-        const folderNames = Object.keys(node.folders).sort((a, b) => a.localeCompare(b));
-        for (const name of folderNames) {
-            const folderPath = path ? path + '/' + name : name;
-            const sub = node.folders[name];
-            const total = this._countTreeRoutes(sub);
-            const isExpanded = this._expandedPersonalFolders.has(folderPath);
-
-            const el = document.createElement('div');
-            el.className = 'category-folder';
-
-            const header = document.createElement('div');
-            header.className = 'category-header' + (isExpanded ? ' expanded' : '');
-            header.innerHTML = `
-                <span class="category-icon">${isExpanded ? '📂' : '📁'}</span>
-                <span class="category-name">${this._escape(name)}</span>
-                <span class="category-count">${total}</span>
-            `;
-            header.addEventListener('click', e => {
-                e.stopPropagation();
-                if (this._expandedPersonalFolders.has(folderPath)) this._expandedPersonalFolders.delete(folderPath);
-                else this._expandedPersonalFolders.add(folderPath);
-                this._buildRoutesList();
-            });
-            el.appendChild(header);
-            container.appendChild(el);
-
-            if (isExpanded) {
-                const childWrap = document.createElement('div');
-                childWrap.style.cssText = 'padding-left:16px;display:flex;flex-direction:column;gap:6px;';
-                this._renderPersonalTreeNode(sub, childWrap, folderPath);
-                container.appendChild(childWrap);
-            }
-        }
-
-        for (const route of node.routes) {
-            const routeKey = `${this._userId}-${route.m}`;
-            const isActive = this._currentIsPersonal && routeKey === this.currentRoute;
-            const btn = document.createElement('button');
-            btn.className = 'route-item' + (isActive ? ' active' : '');
-            if (isActive) btn.style.cssText = 'background:rgba(48,209,88,0.2);border-color:rgba(48,209,88,0.4);';
-            const nameSpan = document.createElement('span');
-            nameSpan.className = 'route-name';
-            nameSpan.textContent = route.name;
-            btn.appendChild(nameSpan);
-            btn.addEventListener('click', () => {
-                this.loadRouteByName(route.m, this._userId, true);
-            });
-            container.appendChild(btn);
-        }
-    },
-
     _buildRoutesList() {
         const container = document.getElementById('routesListContainer');
         if (!container) return;
@@ -481,7 +346,6 @@ const MenuModule = {
         const starredTree = this._starredTree;
         const hasStarred = starredTree && (Object.keys(starredTree.folders).length > 0 || starredTree.routes.length > 0);
         const hasRegular = this._categoryTree && Object.keys(this._categoryTree.folders).length > 0;
-        const hasPersonal = this._userRoutes && this._userRoutes.length > 0;
 
         if (hasStarred) {
             this._renderTreeNode(starredTree, frag, '', false);
@@ -495,44 +359,6 @@ const MenuModule = {
                 frag.appendChild(sep);
             }
             this._renderTreeNode(this._categoryTree, frag, '', true);
-        }
-
-        // 3. Личные маршруты
-        if (hasPersonal) {
-            const sep = document.createElement('div');
-            sep.style.cssText = 'height:1px;background:rgba(255,255,255,0.1);margin:8px 0;flex-shrink:0;';
-            frag.appendChild(sep);
-
-            const folder = document.createElement('div');
-            folder.className = 'category-folder personal';
-
-            const personalTree = this._buildPersonalCategoryTree();
-            const total = this._countTreeRoutes(personalTree);
-            const isExpanded = this._expandedPersonalFolders.has('__personal__');
-
-            const header = document.createElement('div');
-            header.className = 'category-header personal' + (isExpanded ? ' expanded' : '');
-            header.innerHTML = `
-                <span class="category-icon">👤</span>
-                <span class="category-name">Личные — ${this._getFormattedDisplayName()}, видны только вам.</span>
-                <span class="category-count">${total}</span>
-            `;
-            header.addEventListener('click', e => {
-                e.stopPropagation();
-                if (this._expandedPersonalFolders.has('__personal__')) this._expandedPersonalFolders.delete('__personal__');
-                else this._expandedPersonalFolders.add('__personal__');
-                this._buildRoutesList();
-            });
-            folder.appendChild(header);
-
-            if (isExpanded) {
-                const body = document.createElement('div');
-                body.className = 'personal-routes-body';
-                this._renderPersonalTreeNode(personalTree, body, '');
-                folder.appendChild(body);
-            }
-
-            frag.appendChild(folder);
         }
 
         if (frag.children.length === 0) {
@@ -614,7 +440,7 @@ const MenuModule = {
         for (const route of node.routes) {
             const routeKey = route.key;
             const hasDesc = route.description && route.description.trim() !== '';
-            const isActive = !this._currentIsPersonal && routeKey === this.currentRoute;
+            const isActive = routeKey === this.currentRoute;
             const btn = document.createElement('button');
             btn.className = 'route-item' + (isActive ? ' active' : '');
             if (isActive) btn.style.cssText = 'background:rgba(48,209,88,0.2);border-color:rgba(48,209,88,0.4);';
@@ -853,8 +679,7 @@ const MenuModule = {
     },
     
     // Загрузка маршрута по названию (внутренний метод)
-    async loadRouteByName(routeName, routeId = null, isPersonal = false) {
-        this._currentIsPersonal = isPersonal;
+    async loadRouteByName(routeName, routeId = null) {
         this.showSpinner();
         try {
             this.currentRoute = routeId ? `${routeId}-${routeName}` : routeName;
@@ -1021,14 +846,6 @@ const MenuModule = {
         this._hideRouteDescription();
         this._expandedFolders = new Set();
         this._expandCurrentRoutePath();
-        // Если личные маршруты ещё не загружены, пробуем снова
-        if (this._userRoutes === null && !this._userId) {
-            const uid = this._detectUserId();
-            if (uid) {
-                this._userId = uid;
-                this._fetchUserRoutes(uid).then(() => this._buildRoutesList());
-            }
-        }
         if (!this.routesDescriptions && !this._isFetchingRoutes) {
             this._loadRoutesList();
         } else {
