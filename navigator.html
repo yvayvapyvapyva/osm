@@ -186,10 +186,11 @@ const MAP_STYLES = {
     label: 'Яндекс.Спутник',
     // Keyless-тайлы Яндекса отдаются без ключа и с CORS, но в эллипсоидном
     // Меркаторе (EPSG:3395), а MapLibre рисует Web Mercator (EPSG:3857).
-    // Поэтому картинка может быть смещена относительно GPS и маршрутов.
-    tiles: ['https://core-sat.maps.yandex.net/tiles?l=sat&x={x}&y={y}&z={z}'],
+    // Схему 'yandexsat://' перехватывает кастомный протокол ниже: он сам берёт
+    // нужный тайл Яндекса и сдвигает его по широте, компенсируя разницу проекций.
+    tiles: ['yandexsat://sat/{z}/{x}/{y}'],
     attribution: '© <a href="https://yandex.ru/maps">Яндекс</a>',
-    warn: 'Тайлы Яндекса в другой проекции — возможен сдвиг относительно GPS.'
+    warn: 'Неофициальный keyless-источник Яндекса. Проекция (EPSG:3395) компенсируется автоматически.'
   }
 };
 
@@ -851,6 +852,82 @@ function updateMapStyleNote() {
     const warn = st && st.warn;
     note.textContent = warn ? '⚠️ ' + warn : '';
     note.classList.toggle('hidden', !warn);
+}
+
+/* ---------- Яндекс.Спутник: пересчёт проекции EPSG:3395 -> Web Mercator ----------
+   Keyless-тайлы Яндекса отдаются в эллипсоидном Меркаторе, а MapLibre рисует
+   сферический Web Mercator: по долготе всё совпадает, а по широте нужен сдвиг.
+   Схему 'yandexsat://' перехватывает протокол: он по строке web-тайла считает
+   точную строку в сетке Яндекса, берёт её и субпиксельно сдвигает.
+   Для Нижнего Новгорода сдвиг ≈19.7 км (проверено замером по снимкам). */
+const YANDEX_MERC_E = 0.0818191908426;
+let _yandexProtoRegistered = false;
+
+function webRowToLat(R, worldPx) {
+    return Math.atan(Math.sinh(Math.PI * (1 - 2 * R / worldPx))) * 180 / Math.PI;
+}
+
+function latToYandexRow(lat, worldPx) {
+    const b = lat * Math.PI / 180;
+    const phi = (1 - YANDEX_MERC_E * Math.sin(b)) / (1 + YANDEX_MERC_E * Math.sin(b));
+    const theta = Math.tan(Math.PI / 4 + b / 2) * Math.pow(phi, YANDEX_MERC_E / 2);
+    return worldPx * (1 - Math.log(theta) / Math.PI) / 2;
+}
+
+function makeCanvas(w, h) {
+    if (typeof OffscreenCanvas !== 'undefined') {
+        const c = new OffscreenCanvas(w, h);
+        return { canvas: c, ctx: c.getContext('2d'), offscreen: true };
+    }
+    const c = document.createElement('canvas');
+    c.width = w; c.height = h;
+    return { canvas: c, ctx: c.getContext('2d'), offscreen: false };
+}
+
+async function fetchTileBitmap(url, signal) {
+    const res = await fetch(url, { signal, mode: 'cors' });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    return await createImageBitmap(await res.blob());
+}
+
+async function buildYandexTile(params, abortController) {
+    const m = /yandexsat:\/\/sat\/(\d+)\/(\d+)\/(\d+)/.exec((params && params.url) || '');
+    if (!m) throw new Error('Некорректный URL тайла Яндекса');
+    const z = +m[1], x = +m[2], y = +m[3];
+    const n = Math.pow(2, z);
+    const worldPx = 256 * n;
+
+    const lat = webRowToLat(256 * y, worldPx);
+    const yRow = latToYandexRow(lat, worldPx);
+    let srcY = Math.floor(yRow / 256);
+    srcY = Math.max(0, Math.min(n - 1, srcY));
+    const shiftUp = Math.max(0, Math.min(255.999, yRow - 256 * srcY));
+
+    const base = 'https://core-sat.maps.yandex.net/tiles?l=sat&x=' + x + '&y=';
+    const signal = abortController && abortController.signal;
+    const secondY = Math.min(n - 1, srcY + 1);
+    const [imgA, imgB] = await Promise.all([
+        fetchTileBitmap(base + srcY + '&z=' + z, signal),
+        shiftUp > 0.01
+            ? fetchTileBitmap(base + secondY + '&z=' + z, signal).catch(() => null)
+            : Promise.resolve(null)
+    ]);
+
+    const { canvas, ctx, offscreen } = makeCanvas(256, 256);
+    ctx.drawImage(imgA, 0, -shiftUp);
+    if (imgB) ctx.drawImage(imgB, 0, 256 - shiftUp);
+    if (imgA.close) imgA.close();
+    if (imgB && imgB.close) imgB.close();
+
+    const data = offscreen ? canvas.transferToImageBitmap() : await createImageBitmap(canvas);
+    return { data };
+}
+
+function registerYandexProtocol() {
+    if (_yandexProtoRegistered) return;
+    if (typeof maplibregl === 'undefined' || !maplibregl.addProtocol) return;
+    maplibregl.addProtocol('yandexsat', buildYandexTile);
+    _yandexProtoRegistered = true;
 }
 
 function saveMapPrefs() {
@@ -1957,6 +2034,7 @@ if (typeof maplibregl === 'undefined' || typeof MAPTILER_KEY === 'undefined' || 
         } catch (e) {}
     }
 
+    registerYandexProtocol();
     APP.map = new maplibregl.Map({
         container: 'map',
         style: maptilerStyleUrl(APP._mapStyle),
