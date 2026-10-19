@@ -4,6 +4,13 @@ const API_CONFIG = {
   YANDEX_MAPS_V3_KEY: 'c0e28937-4e16-4d15-9b99-09a30cb8fc13'
 };
 
+// Ключ MapTiler для навигатора (карта, схема, спутник)
+const MAPTILER_KEY = 'mveDsz0PeGC3zhA47AdM';
+const MAPTILER_STYLES = {
+  scheme: 'streets-v2',
+  sat: 'hybrid'
+};
+
 const ROUTE_DATA = {
   Gold: { hex: '#FFD700', label: 'Маневры на перекрестке' },
   Blue: { hex: '#007AFF', label: 'Разворот вне перекрестка' },
