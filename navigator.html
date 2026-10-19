@@ -101,9 +101,8 @@
 
 <div id="toast"></div>
 
-<script src="assets/js/config.js?v=1"></script>
 <script src="assets/js/report.js?v=2"></script>
-<script src="https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.js" onerror="window.__mapFailed = true;"></script>
+<script src="https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
 <script>
 // Грузим Telegram/VK SDK асинхронно с таймаутом 10с.
 // Если telegram.org / unpkg.com заблокированы или недоступны — не блокируем загрузку приложения.
@@ -115,19 +114,18 @@
     var list = cbs.splice(0);
     for (var i = 0; i < list.length; i++) { try { list[i](); } catch (e) {} }
   }
-  function tryLoad(url, flag) {
+  function tryLoad(url) {
     pending++;
     var settled = false;
     var controller = null;
     var timeout = null;
-    function settle(failed) {
+    function settle() {
       if (settled) return; settled = true;
-      if (failed) { try { g[flag] = true; } catch (e) {} }
       if (timeout) { clearTimeout(timeout); timeout = null; }
       if (controller) { try { controller.abort(); } catch (e) {} controller = null; }
       if (--pending === 0) finish();
     }
-    timeout = setTimeout(function () { settle(true); }, 10000);
+    timeout = setTimeout(settle, 10000);
     if (typeof fetch === 'function' && typeof AbortController !== 'undefined') {
       // Реально отменяем запрос через 10с, чтобы браузер не крутил спиннер
       controller = new AbortController();
@@ -140,19 +138,19 @@
             s.text = code;
             (document.head || document.documentElement).appendChild(s);
           } catch (e) {}
-          settle(false);
+          settle();
         })
-        .catch(function () { settle(true); });
+        .catch(settle);
     } else {
       var s = document.createElement('script');
       s.async = true;
       var done = false;
-      function done_(failed) { if (done) return; done = true; settle(failed); }
-      s.onload = function () { done_(false); };
-      s.onerror = function () { done_(true); };
+      function done_() { if (done) return; done = true; settle(); }
+      s.onload = done_;
+      s.onerror = done_;
       s.src = url;
       try { (document.head || document.documentElement).appendChild(s); }
-      catch (e) { done_(true); }
+      catch (e) { done_(); }
     }
   }
   g.bootPlatforms = function (cb) {
@@ -160,24 +158,43 @@
     else cbs.push(cb);
   };
   g.platformReady = new Promise(function (r) { g.bootPlatforms(r); });
-  tryLoad('https://telegram.org/js/telegram-web-app.js', '__tgWebAppFailed');
-  tryLoad('https://unpkg.com/@vkontakte/vk-bridge/dist/browser.min.js', '__vkBridgeFailed');
+  tryLoad('https://telegram.org/js/telegram-web-app.js');
+  tryLoad('https://unpkg.com/@vkontakte/vk-bridge/dist/browser.min.js');
 })(window);
 </script>
 <script src="assets/js/menu-module.js?v=1" defer></script>
 <script>
+// Ключ MapTiler для навигатора (карта, схема, спутник)
+const MAPTILER_KEY = 'mveDsz0PeGC3zhA47AdM';
+const MAPTILER_STYLES = {
+  scheme: 'streets-v2',
+  sat: 'hybrid'
+};
+
+const COLORS = {
+  Gold: { hex: '#FFD700' },
+  Blue: { hex: '#007AFF' },
+  Red: { hex: '#FF3B30' },
+  Fuchsia: { hex: '#AF52DE' },
+  Orange: { hex: '#FF9500' },
+  Purple: { hex: '#5856D6' },
+  Cyan: { hex: '#5AC8FA' },
+  Brown: { hex: '#A2845E' },
+  Lime: { hex: '#34C759' }
+};
+
 const TTS_API_URL = 'https://functions.yandexcloud.net/d4erngid6s4rf5oinnp1';
 
 const APP = {
     map: null, userMarker: null, lastPos: null, lastAz: 0, rawAz: 0, lastTilt: 0, autoCenter: false, currentSpeed: 0,
-    navPoints: [],     navCurrentIndex: 0, navPreviewIndex: -1, _routeTotalDistance: 0,
+    navPoints: [],     navCurrentIndex: 0, _routeTotalDistance: 0,
     navAudio: new Audio(), _commentAudio: new Audio(),
     navConfig: { TRIGGER_DIST: 25, AZ_TOLERANCE: 45, SPEED_THRESHOLD: 2, SHOCK_THRESHOLD: 1, SHOCK_PHRASE: 'Сильный удар', SPEED_ALERT_THRESHOLD: 58, SPEED_ALERT_PHRASE: 'Превышена максимальная скорость' },
     _isScheme: false, _routeFeatures: [], _routeDataSource: null, _routeDataDirty: false,
     _driveActive: false, _driveRaf: null, _driveMarker: null, _driveShowFrom: -1,
     _driveSpeed: 90,
     _userMarkerEl: null, markerRotation: 0,
-    _lastMarkerPos: null, _currentDisplayAz: 0, _prevAnim: null,
+    _currentDisplayAz: 0,
     _audioCache: new Map(),
     _commentEnabled: true,
     _lastShockTime: 0,
@@ -241,16 +258,14 @@ function mapRemoveChild(obj) {
 
 // Auth detection (ждёт загрузки Telegram/VK SDK, максимум ~10с)
 (function() {
-    // localStorage-авторизация применяется СРАЗУ (браузер без TG/VK), чтобы личные маршруты
-    // не ждали таймаута загрузки SDK (до ~10с). TG/VK ниже имеют приоритет и переопределяют её.
+    // localStorage-авторизация применяется СРАЗУ (браузер без TG/VK), чтобы
+    // не ждать таймаута загрузки SDK (до ~10с). TG/VK ниже имеют приоритет и переопределяют её.
     if (!window.authPlatform) {
         try {
             const stored = JSON.parse(localStorage.getItem('3api_auth') || '{}');
             if (stored.platform && stored.login) {
                 window.authPlatform = stored.platform;
                 window.authLogin = stored.login;
-                window.authPassword = stored.password || '';
-                window.authName = stored.name || stored.login;
             }
         } catch (e) {}
     }
@@ -269,10 +284,7 @@ function mapRemoveChild(obj) {
                 if (user) {
                     window.authPlatform = 'tg';
                     window.authLogin = String(user.id);
-                    window.authPassword = '';
-                    window.authName = [user.first_name, user.last_name].filter(Boolean).join(' ');
                     window.tgUser = user;
-                    window.tgInitData = Telegram.WebApp.initData;
                 }
             } catch (e) {}
         }
@@ -283,22 +295,9 @@ function mapRemoveChild(obj) {
                     if (data?.id) {
                         window.authPlatform = 'vk';
                         window.authLogin = String(data.id);
-                        window.authPassword = '';
-                        window.authName = [data.first_name, data.last_name].filter(Boolean).join(' ');
                         window.vkUser = data;
                     }
                 });
-            } catch (e) {}
-        }
-        if (!window.authPlatform) {
-            try {
-                const stored = JSON.parse(localStorage.getItem('3api_auth') || '{}');
-                if (stored.platform && stored.login) {
-                    window.authPlatform = stored.platform;
-                    window.authLogin = stored.login;
-                    window.authPassword = stored.password || '';
-                    window.authName = stored.name || stored.login;
-                }
             } catch (e) {}
         }
         if (navigator.userAgent.includes('Android') && window.authPlatform === 'tg') {
@@ -372,7 +371,6 @@ function stopDrive() {
     if (APP._driveRaf) { cancelAnimationFrame(APP._driveRaf); APP._driveRaf = null; }
     if (APP._zoomWatcherRaf) { cancelAnimationFrame(APP._zoomWatcherRaf); APP._zoomWatcherRaf = null; }
     if (APP._driveMarker) { APP._driveMarker.element.style.display = 'none'; }
-    if (APP._prevAnim) { cancelAnimationFrame(APP._prevAnim); APP._prevAnim = null; }
     APP.navAudio.pause();
     APP._commentAudio.pause();
     APP.navAudio.onended = null;
@@ -567,14 +565,12 @@ function initGeolocation() {
 
             if (APP.userMarker && APP._userMarkerEl) {
                 if (APP.autoCenter) {
-                    APP._lastMarkerPos = coords;
                     APP._currentDisplayAz = APP.lastAz;
                     APP.userMarker.update({ coordinates: [coords[1], coords[0]] });
                     const camera = { center: [coords[1], coords[0]], pitch: APP.lastTilt };
                     if (APP.lastAz) camera.bearing = APP.lastAz;
                     APP.map.jumpTo(camera);
                 } else {
-                    APP._lastMarkerPos = coords;
                     APP._currentDisplayAz = APP.lastAz;
                     APP.userMarker.update({ coordinates: [coords[1], coords[0]] });
                 }
@@ -843,9 +839,9 @@ function closeSettings() {
     hideSheetModal('navSettingsModal', 'navSettingsSheet');
 }
 
-function getNavIconSvg(col, txt, az, isEnd, isCurr = false, hasComm = false) {
-    const s = isEnd ? 34 : 40, c = s / 2;
-    const r = isEnd ? 7 : 9;
+function getNavIconSvg(col, txt, isCurr = false, hasComm = false) {
+    const s = 40, c = s / 2;
+    const r = 9;
     const txtFill = '#ffffff';
     const txtStroke = hasComm ? '#FF3B30' : '#000000';
     const txtStrokeW = hasComm ? 3 : 2;
@@ -856,7 +852,7 @@ function getNavIconSvg(col, txt, az, isEnd, isCurr = false, hasComm = false) {
         <circle cx="${c}" cy="${c}" r="${r}" fill="${col}" opacity="0.3"/>
         <circle cx="${c}" cy="${c}" r="${r}" fill="none" stroke="${col}" stroke-width="1.5"/>
         <circle cx="${c}" cy="${c}" r="${r}" fill="none" stroke="rgba(255,255,255,0.3)" stroke-width="0.5"/>
-        <text x="${c}" y="${c + 0.5}" font-size="${isEnd ? 8 : 9}" font-family="Arial" font-weight="900" text-anchor="middle" dominant-baseline="middle" fill="${txtFill}" stroke="${txtStroke}" stroke-width="${txtStrokeW}" paint-order="stroke fill">${txt}</text>
+        <text x="${c}" y="${c + 0.5}" font-size="9" font-family="Arial" font-weight="900" text-anchor="middle" dominant-baseline="middle" fill="${txtFill}" stroke="${txtStroke}" stroke-width="${txtStrokeW}" paint-order="stroke fill">${txt}</text>
     </svg>`;
     return 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svg)));
 }
@@ -946,7 +942,6 @@ function removeRouteObjects() {
     APP.navPoints.forEach(p => {
         if (p.placemark) mapRemoveChild(p.placemark);
         p.placemark = null;
-        p.line = null;
     });
     updateRouteLines([]);
 }
@@ -1019,7 +1014,7 @@ function renderRoutePoints() {
         if (showPoint) {
             el.style.display = '';
             el.style.opacity = isPrevious ? '0.7' : '';
-            el.innerHTML = `<img src="${getNavIconSvg(p.hex, p.id, p.az, false, isCurrent, hasComm)}" width="40" height="40" class="marker-img" />`;
+            el.innerHTML = `<img src="${getNavIconSvg(p.hex, p.id, isCurrent, hasComm)}" width="40" height="40" class="marker-img" />`;
             p.placemark.update({ coordinates: [p.lon, p.lat] });
         } else {
             el.style.display = 'none';
@@ -1412,7 +1407,7 @@ async function processRouteData(data) {
         if (!pts || pts.length === 0) return null;
         return {
             id: d.id || (i + 1), lat: pts[0]?.[0], lon: pts[0]?.[1],
-            color: d.color, hex: COLORS[d.color]?.hex || '#007AFF',
+            hex: COLORS[d.color]?.hex || '#007AFF',
             cmd: (d.cmd || d.comm || `Т${i + 1}`).trim(),
             comm: d.comm || '', pts: pts,
             az: pts.length >= 2 ? calcAzimuth(pts[0], pts[1]) : 0
@@ -1856,7 +1851,7 @@ document.addEventListener('click', (e) => {
     });
 });
 
-function enableSheetSwipe(modalId, sheetId, handleId, closeFn) {
+function enableSheetSwipe(sheetId, handleId, closeFn) {
     const sheet = document.getElementById(sheetId);
     const handle = document.getElementById(handleId);
     let startY = 0, currentY = 0, dragging = false;
@@ -1889,9 +1884,9 @@ function enableSheetSwipe(modalId, sheetId, handleId, closeFn) {
     window.addEventListener('pointercancel', onEnd);
 }
 
-enableSheetSwipe('navSettingsModal', 'navSettingsSheet', 'settingsSheetDragArea', closeSettings);
-enableSheetSwipe('pointsListModal', 'pointsListSheet', 'sheetDragArea', closePointsList);
-enableSheetSwipe('instructionModal', 'instructionSheet', 'instructionDragArea', closeInstruction);
+enableSheetSwipe('navSettingsSheet', 'settingsSheetDragArea', closeSettings);
+enableSheetSwipe('pointsListSheet', 'sheetDragArea', closePointsList);
+enableSheetSwipe('instructionSheet', 'instructionDragArea', closeInstruction);
 </script>
 </body>
 </html>

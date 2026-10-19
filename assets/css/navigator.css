@@ -6,24 +6,12 @@
     --glass-bg: rgba(15, 15, 15, 0.75);
     --glass-bg-heavy: rgba(12, 12, 12, 0.82);
     --glass-border: rgba(255, 255, 255, 0.12);
-    --glass-border-bright: rgba(255, 255, 255, 0.2);
-    --glass-highlight: rgba(255, 255, 255, 0.08);
-    --btn-txt: #ffffff;
     --accent-green: #30D158;
     --accent-green-glow: rgba(48, 209, 88, 0.35);
-    --accent-blue: #0A84FF;
-    --accent-red: #FF453A;
-    --accent-orange: #FF9F0A;
     --text-primary: #ffffff;
-    --text-secondary: rgba(255, 255, 255, 0.7);
-    --text-tertiary: rgba(255, 255, 255, 0.5);
     --shadow-soft: 0 8px 32px rgba(0, 0, 0, 0.3);
     --shadow-medium: 0 12px 40px rgba(0, 0, 0, 0.4);
-    --shadow-strong: 0 20px 60px rgba(0, 0, 0, 0.4);
     --radius-sm: 14px;
-    --radius-md: 18px;
-    --radius-lg: 24px;
-    --radius-xl: 28px;
     --radius-full: 100px;
 }
 
@@ -71,17 +59,6 @@ html, body {
     inset: 0;
     z-index: 1;
 }
-
-[class*="-controls-pane"] { display: none !important; }
-[class*="-gotoymaps"] { display: none !important; }
-[class*="-gototaxi"] { display: none !important; }
-[class*="-map-copyrights-promo"] { display: none !important; }
-[class*="-copyrights-pane"] { display: none !important; }
-[class*="-copyright"] { display: none !important; }
-[class*="-logo-wrap"] { display: none !important; }
-[class*="-powered"] { display: none !important; }
-[class*="-watermark"] { display: none !important; }
-.ymaps3--controls_bottom.ymaps3--controls_left { display: none !important; }
 
 /* ============================================
    Загрузка
