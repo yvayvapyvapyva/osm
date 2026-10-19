@@ -1039,33 +1039,80 @@ html, body {
     margin-top: 12px;
 }
 
-.map-type-btns {
-    display: flex;
-    gap: 10px;
+.settings-sublabel {
+    font-size: 13px;
+    font-weight: 600;
+    color: rgba(255,255,255,0.55);
+    text-align: center;
+    margin-top: 2px;
 }
 
-.map-type-btn {
-    flex: 1;
-    padding: 14px;
-    border-radius: 12px;
+.map-style-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+}
+
+.map-style-btn {
+    padding: 10px 6px;
+    border-radius: 10px;
     background: var(--glass-bg);
     border: 1px solid rgba(255, 255, 255, 0.25);
     color: #fff;
-    font-size: 15px;
+    font-size: 13px;
     font-weight: 600;
     cursor: pointer;
     transition: all 0.15s;
     text-align: center;
+    white-space: nowrap;
 }
 
-.map-type-btn:active {
+.map-style-btn:active {
     background: rgba(80, 80, 80, 0.6);
 }
 
-.map-type-btn.active {
+.map-style-btn.active {
     border-color: var(--accent-green);
     background: rgba(48, 209, 88, 0.15);
     box-shadow: 0 0 12px rgba(48, 209, 88, 0.2);
+}
+
+.map-overlay-list {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.map-overlay-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    padding: 6px 2px;
+    cursor: pointer;
+}
+
+.map-overlay-row .label {
+    font-size: 14px;
+    font-weight: 600;
+    color: #fff;
+    flex: 1;
+}
+
+.map-reset-btn {
+    align-self: center;
+    padding: 8px 18px;
+    border-radius: 10px;
+    background: transparent;
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    color: rgba(255,255,255,0.75);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.map-reset-btn:active {
+    background: rgba(255, 255, 255, 0.12);
 }
 
 /* ---- Trigger settings ---- */

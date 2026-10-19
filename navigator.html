@@ -166,10 +166,53 @@
 <script>
 // Ключ MapTiler для навигатора (карта, схема, спутник)
 const MAPTILER_KEY = 'mveDsz0PeGC3zhA47AdM';
-const MAPTILER_STYLES = {
-  scheme: 'streets-v2',
-  sat: 'hybrid'
+
+// Доступные подложки. id можно посмотреть/поменять в кабинете MapTiler.
+const MAP_STYLES = {
+  scheme:    { id: 'streets-v4',      label: 'Схема' },
+  base:      { id: 'base-v4',         label: 'Базовая' },
+  sat:       { id: 'hybrid-v4',       label: 'Спутник' },
+  satellite: { id: 'satellite',       label: 'Спутник+' },
+  outdoor:   { id: 'outdoor-v4',      label: 'Outdoor' },
+  topo:      { id: 'topo-v4',         label: 'Топо' },
+  winter:    { id: 'winter-v4',       label: 'Зима' },
+  ocean:     { id: 'ocean-v4',        label: 'Океан' },
+  dark:      { id: 'streets-v4-dark', label: 'Тёмная' },
+  night:     { id: 'base-v4-dark',    label: 'Ночная' },
+  toner:     { id: 'toner-v2',        label: 'Тонер' },
+  dataviz:   { id: 'dataviz-v4',      label: 'Данные' },
+  osm:       { id: 'openstreetmap',   label: 'OSM' }
 };
+
+// Дополнительные слои поверх любой подложки.
+const MAP_OVERLAYS = {
+  hillshade: { label: 'Рельеф' },
+  terrain:   { label: '3D рельеф' },
+  contours:  { label: 'Горизонтали' },
+  buildings: { label: '3D-здания' },
+  rain:      { label: 'Осадки' },
+  cycling:   { label: 'Велодорожки' },
+  hiking:    { label: 'Пешие тропы' },
+  seamark:   { label: 'Морские знаки' }
+};
+
+const MAP_PREFS_KEY = 'osm_map_prefs_v1';
+
+function loadMapPrefs() {
+  const prefs = { style: 'sat', overlays: {} };
+  try {
+    const saved = JSON.parse(localStorage.getItem(MAP_PREFS_KEY) || '{}');
+    if (saved && MAP_STYLES[saved.style]) prefs.style = saved.style;
+    if (saved && saved.overlays && typeof saved.overlays === 'object') {
+      for (const key of Object.keys(MAP_OVERLAYS)) {
+        if (saved.overlays[key]) prefs.overlays[key] = true;
+      }
+    }
+  } catch (e) {}
+  return prefs;
+}
+
+const MAP_PREFS = loadMapPrefs();
 
 const COLORS = {
   Gold: { hex: '#FFD700' },
@@ -190,7 +233,8 @@ const APP = {
     navPoints: [],     navCurrentIndex: 0, _routeTotalDistance: 0,
     navAudio: new Audio(), _commentAudio: new Audio(),
     navConfig: { TRIGGER_DIST: 25, AZ_TOLERANCE: 45, SPEED_THRESHOLD: 2, SHOCK_THRESHOLD: 1, SHOCK_PHRASE: 'Сильный удар', SPEED_ALERT_THRESHOLD: 58, SPEED_ALERT_PHRASE: 'Превышена максимальная скорость' },
-    _isScheme: false, _routeFeatures: [], _routeDataSource: null, _routeDataDirty: false,
+    _mapStyle: MAP_PREFS.style, _overlays: Object.assign({}, MAP_PREFS.overlays), _overlayRestoreDirty: true, _rainToken: 0,
+    _routeFeatures: [], _routeDataSource: null, _routeDataDirty: false,
     _driveActive: false, _driveRaf: null, _driveMarker: null, _driveShowFrom: -1,
     _driveSpeed: 90,
     _userMarkerEl: null, markerRotation: 0,
@@ -777,20 +821,294 @@ function checkSpeedAlert(speed) {
 }
 
 function maptilerStyleUrl(type) {
-    const style = type === 'scheme' ? MAPTILER_STYLES.scheme : MAPTILER_STYLES.sat;
+    const style = (MAP_STYLES[type] || MAP_STYLES.scheme).id;
     return `https://api.maptiler.com/maps/${style}/style.json?key=${encodeURIComponent(MAPTILER_KEY)}`;
 }
 
+function saveMapPrefs() {
+    try {
+        localStorage.setItem(MAP_PREFS_KEY, JSON.stringify({
+            style: APP._mapStyle,
+            overlays: APP._overlays
+        }));
+    } catch (e) {}
+}
+
+function renderMapSettings() {
+    const grid = $('mapStyleGrid');
+    if (grid) {
+        grid.innerHTML = '';
+        Object.keys(MAP_STYLES).forEach(key => {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'map-style-btn' + (APP._mapStyle === key ? ' active' : '');
+            btn.dataset.style = key;
+            btn.textContent = MAP_STYLES[key].label;
+            btn.addEventListener('click', () => setMapType(key));
+            grid.appendChild(btn);
+        });
+    }
+    const list = $('mapOverlayList');
+    if (list) {
+        list.innerHTML = '';
+        Object.keys(MAP_OVERLAYS).forEach(key => {
+            const row = document.createElement('label');
+            row.className = 'map-overlay-row';
+            const label = document.createElement('span');
+            label.className = 'label';
+            label.textContent = MAP_OVERLAYS[key].label;
+            const sw = document.createElement('span');
+            sw.className = 'toggle-switch';
+            const input = document.createElement('input');
+            input.type = 'checkbox';
+            input.className = 'toggle-input';
+            input.checked = !!APP._overlays[key];
+            input.addEventListener('change', () => setOverlay(key, input.checked));
+            const slider = document.createElement('span');
+            slider.className = 'toggle-slider';
+            sw.appendChild(input);
+            sw.appendChild(slider);
+            row.appendChild(label);
+            row.appendChild(sw);
+            list.appendChild(row);
+        });
+    }
+}
+
+function syncMapStyleButtons() {
+    document.querySelectorAll('.map-style-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.style === APP._mapStyle);
+    });
+}
+
 function setMapType(type) {
+    if (!MAP_STYLES[type] || !APP.map || APP._mapStyle === type) return;
+    APP._mapStyle = type;
+    saveMapPrefs();
+    syncMapStyleButtons();
+    APP._routeDataSource = null;
+    APP._overlayRestoreDirty = true;
+    APP.map.setStyle(maptilerStyleUrl(type));
+    showToast(MAP_STYLES[type].label, 'info', 1500);
+}
+
+function resetMapLayers() {
     if (!APP.map) return;
-    const isScheme = type === 'scheme';
-    const changed = isScheme !== APP._isScheme;
-    APP._isScheme = isScheme;
-    $('schemeBtn').classList.toggle('active', isScheme);
-    $('satBtn').classList.toggle('active', !isScheme);
-    if (!changed) return;
-    APP.map.setStyle(maptilerStyleUrl(isScheme ? 'scheme' : 'sat'));
-    showToast(isScheme ? 'Схема' : 'Спутник', 'info', 2000);
+    APP._mapStyle = 'sat';
+    APP._overlays = {};
+    saveMapPrefs();
+    if ($('mapOverlayList')) renderMapSettings();
+    APP._routeDataSource = null;
+    APP._overlayRestoreDirty = true;
+    APP.map.setStyle(maptilerStyleUrl('sat'));
+    showToast('Слои сброшены', 'info', 1500);
+}
+
+/* ---------- Дополнительные слои карты ---------- */
+const TERRAIN_SOURCE_ID = 'osm-terrain-dem';
+const RAIN_SOURCE_ID = 'osm-rain';
+const RASTER_OVERLAYS = {
+    cycling: {
+        tiles: ['https://a.tile-cyclosm.openstreetmap.fr/cyclosm/{z}/{x}/{y}.png',
+                'https://b.tile-cyclosm.openstreetmap.fr/cyclosm/{z}/{x}/{y}.png',
+                'https://c.tile-cyclosm.openstreetmap.fr/cyclosm/{z}/{x}/{y}.png'],
+        attribution: '© <a href="https://www.cyclosm.org">CyclOSM</a> · © OpenStreetMap',
+        opacity: 0.85, maxzoom: 20
+    },
+    hiking: {
+        tiles: ['https://tile.waymarkedtrails.org/hiking/{z}/{x}/{y}.png'],
+        attribution: '© <a href="https://waymarkedtrails.org">Waymarked Trails</a>',
+        opacity: 0.85, maxzoom: 18
+    },
+    seamark: {
+        tiles: ['https://tiles.openseamap.org/seamark/{z}/{x}/{y}.png'],
+        attribution: '© <a href="https://www.openseamap.org">OpenSeaMap</a>',
+        opacity: 0.9, maxzoom: 18
+    }
+};
+
+function firstSymbolLayerId() {
+    try {
+        const layers = APP.map.getStyle().layers || [];
+        const sym = layers.find(l => l.type === 'symbol' && l.id.indexOf('osm-') !== 0);
+        return sym ? sym.id : undefined;
+    } catch (e) { return undefined; }
+}
+
+function addMapLayer(layer, beforeId) {
+    if (APP.map.getLayer(layer.id)) return;
+    APP.map.addLayer(layer, beforeId);
+}
+
+function removeMapLayer(id) {
+    if (APP.map.getLayer(id)) APP.map.removeLayer(id);
+}
+
+function removeMapSource(id) {
+    if (APP.map.getSource(id)) APP.map.removeSource(id);
+}
+
+function ensureTerrainSource() {
+    if (!APP.map.getSource(TERRAIN_SOURCE_ID)) {
+        APP.map.addSource(TERRAIN_SOURCE_ID, {
+            type: 'raster-dem',
+            url: `https://api.maptiler.com/tiles/terrain-rgb-v2/tiles.json?key=${encodeURIComponent(MAPTILER_KEY)}`,
+            tileSize: 256
+        });
+    }
+}
+
+function applyHillshade(beforeId) {
+    ensureTerrainSource();
+    addMapLayer({
+        id: 'osm-hillshade',
+        type: 'hillshade',
+        source: TERRAIN_SOURCE_ID,
+        paint: {
+            'hillshade-exaggeration': 0.35,
+            'hillshade-shadow-color': 'rgba(0,0,0,0.55)',
+            'hillshade-highlight-color': 'rgba(255,255,255,0.25)'
+        }
+    }, beforeId);
+}
+
+function applyContours(beforeId) {
+    if (!APP.map.getSource('osm-contours')) {
+        APP.map.addSource('osm-contours', {
+            type: 'vector',
+            url: `https://api.maptiler.com/tiles/contours-v2/tiles.json?key=${encodeURIComponent(MAPTILER_KEY)}`
+        });
+    }
+    addMapLayer({
+        id: 'osm-contours',
+        type: 'line',
+        source: 'osm-contours',
+        'source-layer': 'contour',
+        minzoom: 10,
+        paint: {
+            'line-color': 'rgba(150,110,70,0.6)',
+            'line-width': ['case', ['==', ['get', 'nth_line'], 10], 1.4, ['==', ['get', 'nth_line'], 5], 1, 0.6]
+        }
+    }, beforeId);
+}
+
+function applyBuildings(beforeId) {
+    let src;
+    try {
+        const b = (APP.map.getStyle().layers || []).find(l => l['source-layer'] === 'building');
+        src = b && b.source;
+    } catch (e) { return; }
+    if (!src) return;
+    addMapLayer({
+        id: 'osm-3d-buildings',
+        type: 'fill-extrusion',
+        source: src,
+        'source-layer': 'building',
+        minzoom: 14,
+        paint: {
+            'fill-extrusion-color': '#cfcfcf',
+            'fill-extrusion-height': ['coalesce', ['get', 'render_height'], ['get', 'height'], 8],
+            'fill-extrusion-base': ['coalesce', ['get', 'render_min_height'], ['get', 'min_height'], 0],
+            'fill-extrusion-opacity': 0.75
+        }
+    }, beforeId);
+}
+
+function applyRasterOverlay(key, beforeId) {
+    const cfg = RASTER_OVERLAYS[key];
+    if (!cfg) return;
+    const srcId = 'osm-' + key;
+    if (!APP.map.getSource(srcId)) {
+        APP.map.addSource(srcId, {
+            type: 'raster',
+            tiles: cfg.tiles,
+            tileSize: 256,
+            maxzoom: cfg.maxzoom,
+            attribution: cfg.attribution
+        });
+    }
+    addMapLayer({
+        id: srcId, type: 'raster', source: srcId,
+        paint: { 'raster-opacity': cfg.opacity }
+    }, beforeId);
+}
+
+async function applyRainOverlay(beforeId) {
+    const token = ++APP._rainToken;
+    try {
+        const res = await fetch('https://api.rainviewer.com/public/weather-maps.json');
+        if (!res.ok) throw new Error('rainviewer');
+        const data = await res.json();
+        const past = (data && data.radar && data.radar.past) || [];
+        const frame = past[past.length - 1];
+        if (!frame) return;
+        if (token !== APP._rainToken || !APP._overlays.rain || !APP.map) return;
+        removeMapLayer(RAIN_SOURCE_ID);
+        removeMapSource(RAIN_SOURCE_ID);
+        APP.map.addSource(RAIN_SOURCE_ID, {
+            type: 'raster',
+            tiles: [`${data.host}${frame.path}/256/{z}/{x}/{y}/2/1_1.png`],
+            tileSize: 256,
+            attribution: '© <a href="https://www.rainviewer.com">RainViewer</a>'
+        });
+        addMapLayer({
+            id: RAIN_SOURCE_ID, type: 'raster', source: RAIN_SOURCE_ID,
+            paint: { 'raster-opacity': 0.65 }
+        }, beforeId);
+    } catch (e) {
+        showToast('Не удалось загрузить осадки', 'error', 4000);
+    }
+}
+
+function setOverlay(key, enabled) {
+    if (!MAP_OVERLAYS[key]) return;
+    APP._overlays[key] = !!enabled;
+    saveMapPrefs();
+    APP._overlayRestoreDirty = true;
+    restoreMapOverlays(true);
+}
+
+function restoreMapOverlays(force) {
+    if (!APP.map) return;
+    if (!APP.map.isStyleLoaded()) return;
+    if (!force && !APP._overlayRestoreDirty) return;
+    const o = APP._overlays || {};
+    const b = firstSymbolLayerId();
+    let ok = true;
+    const step = fn => { try { fn(); } catch (e) { ok = false; } };
+
+    step(() => {
+        if (o.hillshade) applyHillshade(b);
+        else removeMapLayer('osm-hillshade');
+    });
+    step(() => {
+        if (o.terrain) {
+            ensureTerrainSource();
+            APP.map.setTerrain({ source: TERRAIN_SOURCE_ID, exaggeration: 1.3 });
+        } else {
+            APP.map.setTerrain(null);
+        }
+        if (!o.terrain && !o.hillshade) removeMapSource(TERRAIN_SOURCE_ID);
+    });
+    step(() => {
+        if (o.contours) applyContours(b);
+        else { removeMapLayer('osm-contours'); removeMapSource('osm-contours'); }
+    });
+    step(() => {
+        if (o.buildings) applyBuildings(b);
+        else removeMapLayer('osm-3d-buildings');
+    });
+    ['cycling', 'hiking', 'seamark'].forEach(key => {
+        step(() => {
+            if (o[key]) applyRasterOverlay(key, b);
+            else { removeMapLayer('osm-' + key); removeMapSource('osm-' + key); }
+        });
+    });
+    step(() => {
+        if (o.rain) applyRainOverlay(b);
+        else { removeMapLayer(RAIN_SOURCE_ID); removeMapSource(RAIN_SOURCE_ID); }
+    });
+    APP._overlayRestoreDirty = !ok;
 }
 
 function setTilt(mode) {
@@ -814,8 +1132,7 @@ function closeAllSheets() {
 function openSettings() {
     if (!$('navSettingsModal').classList.contains('hidden')) { closeSettings(); return; }
     closeAllSheets();
-    $('schemeBtn').classList.toggle('active', APP._isScheme);
-    $('satBtn').classList.toggle('active', !APP._isScheme);
+    renderMapSettings();
     const shockOn = APP.navConfig.SHOCK_THRESHOLD > 0;
     $('triggerShockToggle').checked = shockOn;
     $('triggerShock').value = shockOn ? APP.navConfig.SHOCK_THRESHOLD : 1;
@@ -935,6 +1252,7 @@ function restoreRouteLayers() {
     if (!APP.map) return;
     ensureRouteLayers();
     updateRouteLines();
+    restoreMapOverlays(false);
 }
 
 
@@ -1609,10 +1927,9 @@ if (typeof maplibregl === 'undefined' || typeof MAPTILER_KEY === 'undefined' || 
         } catch (e) {}
     }
 
-    APP._isScheme = false;
     APP.map = new maplibregl.Map({
         container: 'map',
-        style: maptilerStyleUrl('sat'),
+        style: maptilerStyleUrl(APP._mapStyle),
         center: [initCenter[0], initCenter[1]],
         zoom: 17,
         minZoom: 3,
@@ -1770,10 +2087,10 @@ if (typeof maplibregl === 'undefined' || typeof MAPTILER_KEY === 'undefined' || 
         <div class="settings-body">
             <div class="settings-group">
                 <div class="settings-label">Вид карты</div>
-                <div class="map-type-btns">
-                    <button class="map-type-btn" id="satBtn" onclick="setMapType('sat')">Спутник</button>
-                    <button class="map-type-btn" id="schemeBtn" onclick="setMapType('scheme')">Схема</button>
-                </div>
+                <div id="mapStyleGrid" class="map-style-grid"></div>
+                <div class="settings-sublabel">Дополнительные слои</div>
+                <div id="mapOverlayList" class="map-overlay-list"></div>
+                <button type="button" class="map-reset-btn" onclick="resetMapLayers()">Сбросить слои</button>
             </div>
 
             <div class="settings-group">
