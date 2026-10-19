@@ -903,19 +903,25 @@ async function buildYandexTile(params, abortController) {
     srcY = Math.max(0, Math.min(n - 1, srcY));
     const shiftUp = Math.max(0, Math.min(255.999, yRow - 256 * srcY));
 
+    // Сдвиг округляем до целых пикселей: при дробном сдвиге drawImage
+    // пересэмплирует стык двух тайлов и на нём проступает видимая
+    // горизонтальная линия. Целочисленный сдвиг линию убирает, а ошибка
+    // при этом меньше пикселя.
+    const snap = Math.max(0, Math.min(255, Math.round(shiftUp)));
+
     const base = 'https://core-sat.maps.yandex.net/tiles?l=sat&x=' + x + '&y=';
     const signal = abortController && abortController.signal;
     const secondY = Math.min(n - 1, srcY + 1);
     const [imgA, imgB] = await Promise.all([
         fetchTileBitmap(base + srcY + '&z=' + z, signal),
-        shiftUp > 0.01
+        snap > 0
             ? fetchTileBitmap(base + secondY + '&z=' + z, signal).catch(() => null)
             : Promise.resolve(null)
     ]);
 
     const { canvas, ctx, offscreen } = makeCanvas(256, 256);
-    ctx.drawImage(imgA, 0, -shiftUp);
-    if (imgB) ctx.drawImage(imgB, 0, 256 - shiftUp);
+    ctx.drawImage(imgA, 0, -snap);
+    if (imgB) ctx.drawImage(imgB, 0, 256 - snap);
     if (imgA.close) imgA.close();
     if (imgB && imgB.close) imgB.close();
 
