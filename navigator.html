@@ -182,8 +182,7 @@ const MAP_STYLES = {
     // Схему 'yandexsat://' перехватывает кастомный протокол ниже: он сам берёт
     // нужный тайл Яндекса и сдвигает его по широте, компенсируя разницу проекций.
     tiles: ['yandexsat://sat/{z}/{x}/{y}'],
-    attribution: '© <a href="https://yandex.ru/maps">Яндекс</a>',
-    warn: 'Неофициальный keyless-источник Яндекса. Проекция (EPSG:3395) компенсируется автоматически.'
+    attribution: '© <a href="https://yandex.ru/maps">Яндекс</a>'
   }
 };
 
@@ -831,15 +830,6 @@ function maptilerStyleUrl(type) {
     return `https://api.maptiler.com/maps/${st.id}/style.json?key=${encodeURIComponent(MAPTILER_KEY)}`;
 }
 
-function updateMapStyleNote() {
-    const note = $('mapStyleNote');
-    if (!note) return;
-    const st = MAP_STYLES[APP._mapStyle];
-    const warn = st && st.warn;
-    note.textContent = warn ? '⚠️ ' + warn : '';
-    note.classList.toggle('hidden', !warn);
-}
-
 /* ---------- Яндекс.Спутник: пересчёт проекции EPSG:3395 -> Web Mercator ----------
    Keyless-тайлы Яндекса отдаются в эллипсоидном Меркаторе, а MapLibre рисует
    сферический Web Mercator: по долготе всё совпадает, а по широте нужен сдвиг.
@@ -970,14 +960,12 @@ function renderMapSettings() {
             list.appendChild(row);
         });
     }
-    updateMapStyleNote();
 }
 
 function syncMapStyleButtons() {
     document.querySelectorAll('.map-style-btn').forEach(btn => {
         btn.classList.toggle('active', btn.dataset.style === APP._mapStyle);
     });
-    updateMapStyleNote();
 }
 
 function setMapType(type) {
@@ -2109,7 +2097,6 @@ if (typeof maplibregl === 'undefined' || typeof MAPTILER_KEY === 'undefined' || 
             <div class="settings-group">
                 <div class="settings-label">Вид карты</div>
                 <div id="mapStyleGrid" class="map-style-grid"></div>
-                <div id="mapStyleNote" class="map-style-note hidden"></div>
                 <div class="settings-sublabel">Дополнительные слои</div>
                 <div id="mapOverlayList" class="map-overlay-list"></div>
             </div>

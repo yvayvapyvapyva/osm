@@ -1077,20 +1077,6 @@ html, body {
     box-shadow: 0 0 12px rgba(48, 209, 88, 0.2);
 }
 
-.map-style-note {
-    font-size: 12px;
-    line-height: 1.35;
-    color: #ffcc66;
-    background: rgba(255, 149, 0, 0.12);
-    border-radius: 8px;
-    padding: 6px 10px;
-    text-align: center;
-}
-
-.map-style-note.hidden {
-    display: none;
-}
-
 .map-overlay-list {
     display: flex;
     flex-direction: column;
