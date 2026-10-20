@@ -231,6 +231,7 @@ const APP = {
     _mapStyle: MAP_PREFS.style, _overlays: Object.assign({}, MAP_PREFS.overlays), _overlayRestoreDirty: true,
     _routeFeatures: [], _routeDataSource: null, _routeDataDirty: false,
     _driveActive: false, _driveRaf: null, _driveMarker: null, _driveShowFrom: -1,
+    _driveState: null, _driveResume: null,
     _driveSpeed: 90,
     _userMarkerEl: null, markerRotation: 0,
     _currentDisplayAz: 0,
@@ -243,8 +244,6 @@ const APP = {
     _shockPeakTime: 0,
     _simFirstRun: true,
     _simMode: false,
-    _drivePaused: false,
-    _drivePauseData: null,
     _navSeq: 0,
     _audioPending: 0,
     _autoCenterTimer: null
@@ -405,11 +404,31 @@ function setMapLocation(center, zoom, azimuth, duration = 400) {
 
 function stopDrive() {
     APP._driveActive = false;
-    APP._drivePaused = false;
     APP._driveShowFrom = -1;
+    APP._driveState = null;
+    APP._driveResume = null;
     if (APP._driveRaf) { cancelAnimationFrame(APP._driveRaf); APP._driveRaf = null; }
-    if (APP._zoomWatcherRaf) { cancelAnimationFrame(APP._zoomWatcherRaf); APP._zoomWatcherRaf = null; }
+    if (APP.map) APP.map.stop();
     if (APP._driveMarker) { APP._driveMarker.element.style.display = 'none'; }
+    APP.navAudio.pause();
+    APP._commentAudio.pause();
+    APP.navAudio.onended = null;
+    APP._commentAudio.onended = null;
+    document.querySelectorAll('.playing').forEach(e => e.classList.remove('playing'));
+    const pb = $('playBtn');
+    if (pb) {
+        pb.classList.remove('active');
+        pb.innerHTML = '<svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>';
+    }
+}
+
+function pauseDrive() {
+    if (!APP._driveActive) return;
+    APP._driveActive = false;
+    if (APP._driveRaf) { cancelAnimationFrame(APP._driveRaf); APP._driveRaf = null; }
+    if (APP.map) APP.map.stop();
+    APP._driveResume = APP._driveState ? { ...APP._driveState } : null;
+    APP._driveState = null;
     APP.navAudio.pause();
     APP._commentAudio.pause();
     APP.navAudio.onended = null;
@@ -425,6 +444,8 @@ function stopDrive() {
 function driveAlongPath(fromIdx) {
     const p = APP.navPoints[fromIdx];
     if (!p || !p.pts || p.pts.length < 2) return;
+
+    const resume = APP._driveResume && APP._driveResume.idx === fromIdx ? APP._driveResume : null;
     stopDrive();
 
     const path = p.pts;
@@ -441,16 +462,18 @@ function driveAlongPath(fromIdx) {
     APP._driveShowFrom = fromIdx;
 
     APP._driveActive = true;
-    const resume = APP._drivePauseData;
-    APP._drivePauseData = null;
-    APP._drivePaused = false;
     let simulatedDist = resume ? resume.dist : 0;
     let currentSeg = resume ? resume.seg : 0;
     let currentAz = resume ? resume.az : calcAzimuth(path[0], path[1]);
     let lastFrameTime = performance.now();
     let _lastSeg = resume ? resume.lastSeg : 0;
-    let _simZoom;
-    try { _simZoom = APP.map.getZoom(); } catch (e) { _simZoom = undefined; }
+    let _lastZoom = APP.map.getZoom();
+    let _zoomChangedAt = 0;
+    let _zoomRecenterPending = false;
+    APP._driveState = { idx: fromIdx, dist: simulatedDist, seg: currentSeg, az: currentAz, lastSeg: _lastSeg };
+
+    // Зум не ставит симуляцию на паузу. После окончания жеста мягко
+    // возвращаем камеру к текущей точке, сохраняя выбранный пользователем зум.
 
     mapRemoveChild(APP._driveMarker);
     mapAddChild(APP._driveMarker);
@@ -460,10 +483,7 @@ function driveAlongPath(fromIdx) {
     if (resume) {
         const mp = getPos(simulatedDist);
         APP._driveMarker.update({ coordinates: [mp.lon, mp.lat] });
-        const nextIdx = resume.seg + 1;
-        if (nextIdx < path.length) {
-            setMapLocation([path[nextIdx][0], path[nextIdx][1]], undefined, currentAz, 0);
-        }
+        setMapLocation([mp.lat, mp.lon], undefined, currentAz, 0);
     } else {
         const firstDur = (dists[1] - dists[0]) / (APP._driveSpeed / 3.6) * 1000;
         const zoom = APP._simForceZoom ? 19 : undefined;
@@ -487,12 +507,9 @@ function driveAlongPath(fromIdx) {
 
     function frame(time) {
         if (!APP._driveActive) return;
-        if (APP._drivePaused) {
-            APP._drivePauseData = { dist: simulatedDist, seg: currentSeg, az: currentAz, lastSeg: _lastSeg, idx: fromIdx };
-            APP._driveRaf = null;
-            return;
-        }
-        const dt = (time - lastFrameTime) / 1000;
+        // Ограничиваем шаг: после сворачивания вкладки rAF может вернуть
+        // большой dt, и машина иначе прыгнет далеко вперёд.
+        const dt = Math.min((time - lastFrameTime) / 1000, 0.1);
         lastFrameTime = time;
         simulatedDist += (APP._driveSpeed / 3.6) * dt;
 
@@ -531,19 +548,10 @@ function driveAlongPath(fromIdx) {
         const mp = getPos(simulatedDist);
 
         const curZoom = APP.map.getZoom();
-        if (curZoom !== _simZoom) {
-            if (_simZoom === undefined) {
-                _simZoom = curZoom;
-            } else {
-                _simZoom = curZoom;
-                APP._drivePaused = true;
-                APP._drivePauseData = { dist: simulatedDist, seg: currentSeg, az: currentAz, lastSeg: _lastSeg, idx: fromIdx };
-                $('playBtn').classList.remove('active');
-                $('playBtn').innerHTML = '<svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>';
-                APP._driveRaf = null;
-                startZoomWatcher();
-                return;
-            }
+        if (curZoom !== _lastZoom) {
+            _lastZoom = curZoom;
+            _zoomChangedAt = time;
+            _zoomRecenterPending = true;
         }
 
         if (mp.seg !== currentSeg) {
@@ -552,34 +560,25 @@ function driveAlongPath(fromIdx) {
             if (nextIdx < path.length) {
                 const d = (dists[nextIdx] - dists[mp.seg]) / (APP._driveSpeed / 3.6) * 1000;
                 currentAz = calcAzimuth(path[mp.seg], path[nextIdx]);
-                setMapLocation([path[nextIdx][0], path[nextIdx][1]], undefined, currentAz, Math.max(d, 500));
+                if (!_zoomRecenterPending) {
+                    setMapLocation([path[nextIdx][0], path[nextIdx][1]], undefined, currentAz, Math.max(d, 500));
+                }
             }
+        }
+
+        if (_zoomRecenterPending && time - _zoomChangedAt >= 180) {
+            _zoomRecenterPending = false;
+            setMapLocation([mp.lat, mp.lon], undefined, currentAz, 300);
+        }
+
+        if (APP._driveState) {
+            APP._driveState.dist = simulatedDist;
+            APP._driveState.seg = currentSeg;
+            APP._driveState.az = currentAz;
+            APP._driveState.lastSeg = _lastSeg;
         }
         APP._driveMarker.update({ coordinates: [mp.lon, mp.lat] });
         APP._driveRaf = requestAnimationFrame(frame);
-    }
-
-    function startZoomWatcher() {
-        let stableStart = 0;
-        let prevZoom = APP.map.getZoom();
-        function watch() {
-            if (!APP._drivePaused || !APP._driveActive) return;
-            const z = APP.map.getZoom();
-            if (z === prevZoom) {
-                if (!stableStart) stableStart = performance.now();
-                if ((performance.now() - stableStart) >= 100) {
-                    const idx = APP._drivePauseData ? APP._drivePauseData.idx : APP.navCurrentIndex;
-                    APP._driveRaf = null;
-                    if (idx !== undefined) driveAlongPath(idx);
-                    return;
-                }
-            } else {
-                stableStart = 0;
-                prevZoom = z;
-            }
-            APP._zoomWatcherRaf = requestAnimationFrame(watch);
-        }
-        watch();
     }
 
     APP._driveRaf = requestAnimationFrame(frame);
@@ -1971,15 +1970,28 @@ if (typeof maplibregl === 'undefined' || typeof MAPTILER_KEY === 'undefined' || 
 
     $('settingsBtn').addEventListener('click', openSettings);
     $('playBtn').addEventListener('click', () => {
-        if (APP._driveActive || (!APP.navAudio.paused && APP.navAudio.currentTime > 0) ||
+        if (APP._driveActive) {
+            pauseDrive();
+            return;
+        }
+        if ((!APP.navAudio.paused && APP.navAudio.currentTime > 0) ||
             (!APP._commentAudio.paused && APP._commentAudio.currentTime > 0)) {
             stopDrive();
             APP._simMode = false;
             updateTiltState();
             return;
         }
-        APP._drivePauseData = null;
         const idx = APP.navCurrentIndex;
+        if (APP._driveResume && APP._driveResume.idx === idx) {
+            disableAutoCenter();
+            APP._simMode = true;
+            APP._simForceZoom = false;
+            updateTiltState();
+            APP._driveShowFrom = idx;
+            renderRoutePoints();
+            driveAlongPath(idx);
+            return;
+        }
         const p = APP.navPoints[idx];
         if (!p || !p.pts || p.pts.length < 2) {
             showToast('У текущей точки нет пути для симуляции', 'info');
