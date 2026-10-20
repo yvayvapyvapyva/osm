@@ -174,7 +174,6 @@ const MAP_STYLES = {
   sat:       { id: 'hybrid-v4',       label: 'Спутник' },
   topo:      { id: 'topo-v4',         label: 'Топо' },
   dark:      { id: 'streets-v4-dark', label: 'Тёмная' },
-  night:     { id: 'base-v4-dark',    label: 'Ночная' },
   osm:       { id: 'openstreetmap',   label: 'OSM' },
   yandex_sat: {
     label: 'Яндекс.Спутник',
@@ -190,7 +189,6 @@ const MAP_STYLES = {
 
 // Дополнительные слои поверх любой подложки.
 const MAP_OVERLAYS = {
-  terrain:   { label: '3D рельеф' },
   buildings: { label: '3D-здания' }
 };
 
@@ -993,20 +991,7 @@ function setMapType(type) {
     showToast(MAP_STYLES[type].label, 'info', 1500);
 }
 
-function resetMapLayers() {
-    if (!APP.map) return;
-    APP._mapStyle = 'sat';
-    APP._overlays = {};
-    saveMapPrefs();
-    if ($('mapOverlayList')) renderMapSettings();
-    APP._routeDataSource = null;
-    APP._overlayRestoreDirty = true;
-    APP.map.setStyle(maptilerStyleUrl('sat'));
-    showToast('Слои сброшены', 'info', 1500);
-}
-
 /* ---------- Дополнительные слои карты ---------- */
-const TERRAIN_SOURCE_ID = 'osm-terrain-dem';
 const BUILDINGS_SOURCE_ID = 'osm-buildings';
 const BUILDINGS_LAYER_ID = 'osm-3d-buildings';
 // Векторный тайлсет MapTiler со слоем building (render_height/render_min_height).
@@ -1041,16 +1026,6 @@ function removeMapLayer(id) {
 
 function removeMapSource(id) {
     if (APP.map.getSource(id)) APP.map.removeSource(id);
-}
-
-function ensureTerrainSource() {
-    if (!APP.map.getSource(TERRAIN_SOURCE_ID)) {
-        APP.map.addSource(TERRAIN_SOURCE_ID, {
-            type: 'raster-dem',
-            url: `https://api.maptiler.com/tiles/terrain-rgb-v2/tiles.json?key=${encodeURIComponent(MAPTILER_KEY)}`,
-            tileSize: 256
-        });
-    }
 }
 
 function applyBuildings(beforeId) {
@@ -1103,15 +1078,6 @@ function restoreMapOverlays(force) {
     let ok = true;
     const step = fn => { try { fn(); } catch (e) { ok = false; } };
 
-    step(() => {
-        if (o.terrain) {
-            ensureTerrainSource();
-            APP.map.setTerrain({ source: TERRAIN_SOURCE_ID, exaggeration: 1.3 });
-        } else {
-            APP.map.setTerrain(null);
-        }
-        if (!o.terrain) removeMapSource(TERRAIN_SOURCE_ID);
-    });
     step(() => {
         if (o.buildings) applyBuildings(b);
         else { removeMapLayer(BUILDINGS_LAYER_ID); removeMapSource(BUILDINGS_SOURCE_ID); }
@@ -2146,7 +2112,6 @@ if (typeof maplibregl === 'undefined' || typeof MAPTILER_KEY === 'undefined' || 
                 <div id="mapStyleNote" class="map-style-note hidden"></div>
                 <div class="settings-sublabel">Дополнительные слои</div>
                 <div id="mapOverlayList" class="map-overlay-list"></div>
-                <button type="button" class="map-reset-btn" onclick="resetMapLayers()">Сбросить слои</button>
             </div>
 
             <div class="settings-group">

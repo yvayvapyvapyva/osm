@@ -1112,22 +1112,6 @@ html, body {
     flex: 1;
 }
 
-.map-reset-btn {
-    align-self: center;
-    padding: 8px 18px;
-    border-radius: 10px;
-    background: transparent;
-    border: 1px solid rgba(255, 255, 255, 0.25);
-    color: rgba(255,255,255,0.75);
-    font-size: 13px;
-    font-weight: 600;
-    cursor: pointer;
-}
-
-.map-reset-btn:active {
-    background: rgba(255, 255, 255, 0.12);
-}
-
 /* ---- Trigger settings ---- */
 .trigger-setting-row {
     display: flex;
