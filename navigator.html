@@ -1971,7 +1971,10 @@ if (typeof maplibregl === 'undefined' || typeof MAPTILER_KEY === 'undefined' || 
 
     const driveEl = document.createElement('div');
     driveEl.innerHTML = '<svg width="18" height="18" viewBox="0 0 18 18"><circle cx="9" cy="9" r="7" fill="#FF3B30" stroke="#fff" stroke-width="2.5"/></svg>';
-    driveEl.style.cssText = 'display:none;position:relative;z-index:9999;';
+    // Явные размеры обязательны: MapLibre центрирует маркер через
+    // translate(-50%,-50%) от размера элемента. Без width/height div
+    // растягивался на всю ширину карты, и точка уезжала в левый край.
+    driveEl.style.cssText = 'display:none;position:absolute;width:18px;height:18px;z-index:9999;';
     APP._driveMarker = new MapMarker({ coordinates: [0, 0] }, driveEl);
     mapAddChild(APP._driveMarker);
 
