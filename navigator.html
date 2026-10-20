@@ -1026,7 +1026,7 @@ function firstSymbolLayerId() {
 function overlayInsertBefore() {
     const sym = firstSymbolLayerId();
     if (sym) return sym;
-    if (APP.map.getLayer('nav-routes-glow')) return 'nav-routes-glow';
+    if (APP.map.getLayer('nav-routes-casing')) return 'nav-routes-casing';
     return undefined;
 }
 
@@ -1197,22 +1197,19 @@ function ensureRouteLayers() {
                 data: { type: 'FeatureCollection', features: [] }
             });
         }
-        if (!APP.map.getLayer('nav-routes-glow')) {
-            APP.map.addLayer({
-                id: 'nav-routes-glow',
-                type: 'line',
-                source: ROUTE_SOURCE_ID,
-                filter: ['==', ['get', 'glow'], true],
-                layout: { 'line-join': 'round', 'line-cap': 'round' },
-                paint: { 'line-color': '#00FF00', 'line-width': 12, 'line-opacity': 0.95 }
-            });
-        }
+        // Нижняя группа: предыдущий (priority 20) и будущие (10) сегменты.
+        // line-sort-key гарантирует, что предыдущий рисуется поверх будущих.
         if (!APP.map.getLayer('nav-routes-casing')) {
             APP.map.addLayer({
                 id: 'nav-routes-casing',
                 type: 'line',
                 source: ROUTE_SOURCE_ID,
-                layout: { 'line-join': 'round', 'line-cap': 'round' },
+                filter: ['!=', ['get', 'priority'], 30],
+                layout: {
+                    'line-join': 'round',
+                    'line-cap': 'round',
+                    'line-sort-key': ['get', 'priority']
+                },
                 paint: {
                     'line-color': ['get', 'casingColor'],
                     'line-width': ['get', 'casingWidth']
@@ -1224,6 +1221,48 @@ function ensureRouteLayers() {
                 id: 'nav-routes-main',
                 type: 'line',
                 source: ROUTE_SOURCE_ID,
+                filter: ['!=', ['get', 'priority'], 30],
+                layout: {
+                    'line-join': 'round',
+                    'line-cap': 'round',
+                    'line-sort-key': ['get', 'priority']
+                },
+                paint: {
+                    'line-color': ['get', 'color'],
+                    'line-width': ['get', 'width']
+                }
+            });
+        }
+        // Верхняя группа: только активный сегмент (priority 30) — всегда выше остальных.
+        if (!APP.map.getLayer('nav-routes-glow')) {
+            APP.map.addLayer({
+                id: 'nav-routes-glow',
+                type: 'line',
+                source: ROUTE_SOURCE_ID,
+                filter: ['==', ['get', 'priority'], 30],
+                layout: { 'line-join': 'round', 'line-cap': 'round' },
+                paint: { 'line-color': '#00FF00', 'line-width': 12, 'line-opacity': 0.95 }
+            });
+        }
+        if (!APP.map.getLayer('nav-routes-active-casing')) {
+            APP.map.addLayer({
+                id: 'nav-routes-active-casing',
+                type: 'line',
+                source: ROUTE_SOURCE_ID,
+                filter: ['==', ['get', 'priority'], 30],
+                layout: { 'line-join': 'round', 'line-cap': 'round' },
+                paint: {
+                    'line-color': ['get', 'casingColor'],
+                    'line-width': ['get', 'casingWidth']
+                }
+            });
+        }
+        if (!APP.map.getLayer('nav-routes-active-main')) {
+            APP.map.addLayer({
+                id: 'nav-routes-active-main',
+                type: 'line',
+                source: ROUTE_SOURCE_ID,
+                filter: ['==', ['get', 'priority'], 30],
                 layout: { 'line-join': 'round', 'line-cap': 'round' },
                 paint: {
                     'line-color': ['get', 'color'],
@@ -1358,7 +1397,7 @@ function renderRoutePoints() {
                     casingColor: isPrevious ? 'rgba(0,0,0,0.7)' : '#000000',
                     casingWidth: isCurrent ? 8 : (isPrevious ? 8 : 6),
                     width: isCurrent ? 6 : (isPrevious ? 6 : 4),
-                    glow: isCurrent
+                    priority: isCurrent ? 30 : (isPrevious ? 20 : 10)
                 }
             });
         }
