@@ -470,8 +470,16 @@ const MenuModule = {
         }
     },
 
+    // HTML-экранирование для вставки в innerHTML.
+    // Раньше здесь экранировалась только одинарная кавычка (для JS-строки),
+    // из-за чего название категории с <img onerror=...> выполнялось как HTML.
     _escape(str) {
-        return str.replace(/'/g, "\\'");
+        return String(str)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
     },
 
     /**

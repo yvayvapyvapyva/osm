@@ -1167,6 +1167,10 @@ function closeSettings() {
 function getNavIconSvg(col, txt, isCurr = false, hasComm = false) {
     const s = 40, c = s / 2;
     const r = 9;
+    // Цвет подставляется в атрибуты SVG, номер точки — в текстовый узел.
+    // И то, и другое приходит из данных маршрута, поэтому валидируем/экранируем.
+    const safeCol = /^#[0-9a-f]{6}$/i.test(col) ? col : '#007AFF';
+    const safeTxt = escapeHtml(String(txt ?? ''));
     const txtFill = '#ffffff';
     const txtStroke = hasComm ? '#FF3B30' : '#000000';
     const txtStrokeW = hasComm ? 3 : 2;
@@ -1174,10 +1178,10 @@ function getNavIconSvg(col, txt, isCurr = false, hasComm = false) {
         <rect width="${s}" height="${s}" fill="transparent"/>
         ${isCurr ? `<circle cx="${c}" cy="${c}" r="${r + 3}" fill="none" stroke="#00FF00" stroke-width="2.5" opacity="0.9"/>` : ''}
         <circle cx="${c}" cy="${c}" r="${r}" fill="rgba(0,0,0,0.7)"/>
-        <circle cx="${c}" cy="${c}" r="${r}" fill="${col}" opacity="0.3"/>
-        <circle cx="${c}" cy="${c}" r="${r}" fill="none" stroke="${col}" stroke-width="1.5"/>
+        <circle cx="${c}" cy="${c}" r="${r}" fill="${safeCol}" opacity="0.3"/>
+        <circle cx="${c}" cy="${c}" r="${r}" fill="none" stroke="${safeCol}" stroke-width="1.5"/>
         <circle cx="${c}" cy="${c}" r="${r}" fill="none" stroke="rgba(255,255,255,0.3)" stroke-width="0.5"/>
-        <text x="${c}" y="${c + 0.5}" font-size="9" font-family="Arial" font-weight="900" text-anchor="middle" dominant-baseline="middle" fill="${txtFill}" stroke="${txtStroke}" stroke-width="${txtStrokeW}" paint-order="stroke fill">${txt}</text>
+        <text x="${c}" y="${c + 0.5}" font-size="9" font-family="Arial" font-weight="900" text-anchor="middle" dominant-baseline="middle" fill="${txtFill}" stroke="${txtStroke}" stroke-width="${txtStrokeW}" paint-order="stroke fill">${safeTxt}</text>
     </svg>`;
     return 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svg)));
 }
@@ -1421,7 +1425,7 @@ function updateHud() {
     const t = APP.navPoints[idx];
     if (!t) return;
 
-    $('hudCmdNum').innerHTML = `<svg width="44" height="44" viewBox="0 0 20 20"><circle cx="10" cy="10" r="9" fill="${t.hex}" opacity="0.3"/><circle cx="10" cy="10" r="9" fill="none" stroke="${t.hex}" stroke-width="1.5"/><text x="10" y="10.5" font-size="8" font-family="Arial" font-weight="900" text-anchor="middle" dominant-baseline="middle" fill="#fff">${t.id}</text></svg>`;
+    $('hudCmdNum').innerHTML = `<svg width="44" height="44" viewBox="0 0 20 20"><circle cx="10" cy="10" r="9" fill="${t.hex}" opacity="0.3"/><circle cx="10" cy="10" r="9" fill="none" stroke="${t.hex}" stroke-width="1.5"/><text x="10" y="10.5" font-size="8" font-family="Arial" font-weight="900" text-anchor="middle" dominant-baseline="middle" fill="#fff">${escapeHtml(t.id)}</text></svg>`;
     $('hudCmdTextInner').textContent = t.cmd;
     $('hudCmdTextInner').style.opacity = APP._audioCache.has(t.cmd) ? '1' : '0.35';
     $('hudCmdNum').onclick = (e) => {
@@ -1473,7 +1477,7 @@ function updateHud() {
             prevHeader.style.display = 'none';
         } else {
             prevHeader.style.display = '';
-            $('hudPrevCmdNum').innerHTML = `<svg width="44" height="44" viewBox="0 0 20 20"><circle cx="10" cy="10" r="9" fill="${prev.hex}" opacity="0.3"/><circle cx="10" cy="10" r="9" fill="none" stroke="${prev.hex}" stroke-width="1.5"/><text x="10" y="10.5" font-size="8" font-family="Arial" font-weight="900" text-anchor="middle" dominant-baseline="middle" fill="#fff">${prev.id}</text></svg>`;
+            $('hudPrevCmdNum').innerHTML = `<svg width="44" height="44" viewBox="0 0 20 20"><circle cx="10" cy="10" r="9" fill="${prev.hex}" opacity="0.3"/><circle cx="10" cy="10" r="9" fill="none" stroke="${prev.hex}" stroke-width="1.5"/><text x="10" y="10.5" font-size="8" font-family="Arial" font-weight="900" text-anchor="middle" dominant-baseline="middle" fill="#fff">${escapeHtml(prev.id)}</text></svg>`;
             $('hudPrevCmdTextInner').textContent = prev.cmd;
             $('hudPrevCmdTextInner').style.opacity = APP._audioCache.has(prev.cmd) ? '1' : '0.35';
             $('hudPrevCmdNum').onclick = (e) => {
@@ -1523,8 +1527,8 @@ function openPointsList() {
         return `<div class="${cls}" data-idx="${i}">
             <div class="pl-item-row"${activeStyle}>
                 <div class="pl-item-row-main">
-                    <div class="pl-item-icon" data-play="${i}"><svg width="44" height="44" viewBox="0 0 20 20"><circle cx="10" cy="10" r="9" fill="${p.hex}" opacity="0.3"/><circle cx="10" cy="10" r="9" fill="none" stroke="${p.hex}" stroke-width="1.5"/><text x="10" y="10.5" font-size="8" font-family="Arial" font-weight="900" text-anchor="middle" dominant-baseline="middle" fill="#fff">${p.id}</text></svg></div>
-                    <div class="pl-item-text">${p.cmd}</div>
+                    <div class="pl-item-icon" data-play="${i}"><svg width="44" height="44" viewBox="0 0 20 20"><circle cx="10" cy="10" r="9" fill="${p.hex}" opacity="0.3"/><circle cx="10" cy="10" r="9" fill="none" stroke="${p.hex}" stroke-width="1.5"/><text x="10" y="10.5" font-size="8" font-family="Arial" font-weight="900" text-anchor="middle" dominant-baseline="middle" fill="#fff">${escapeHtml(p.id)}</text></svg></div>
+                    <div class="pl-item-text">${escapeHtml(p.cmd)}</div>
                     ${dist ? `<div class="pl-item-dist">${dist}</div>` : ''}
                 </div>
                 ${p.comm && p.comm.trim() ? `<div class="pl-comment">${escapeHtml(p.comm)}</div>` : ''}
