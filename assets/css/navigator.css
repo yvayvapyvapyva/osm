@@ -593,10 +593,6 @@ html, body {
     cursor: not-allowed;
 }
 
-#playBtn.active svg {
-    fill: #FF453A;
-}
-
 #playBtn:disabled {
     opacity: 0.4;
     cursor: not-allowed;

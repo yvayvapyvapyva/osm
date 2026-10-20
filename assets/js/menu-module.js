@@ -238,8 +238,6 @@ const MenuModule = {
         this.routesDescriptions = routesFlat;
         this._categoryTree = this._buildCategoryTree();
         this._starredTree = this._buildStarredTree();
-        
-        return;
     },
 
     _countTreeRoutes(node) {

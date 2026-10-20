@@ -44,7 +44,7 @@
 <body>
 
 <div id="loading" class="loading-overlay">
-    <div id="loadingText">ЗАГРУЗКА...</div>
+    <div>ЗАГРУЗКА...</div>
 </div>
 
 <div id="instructionModal" class="hidden sheet-modal">
@@ -1520,22 +1520,10 @@ function updatePointsListDist() {
 
 
 
-function updateCurrentPointHud() {
-    if (APP.lastPos && APP.navPoints[APP.navCurrentIndex]) {
-        const t = APP.navPoints[APP.navCurrentIndex];
-        const d = getGeoDistance(APP.lastPos, [t.lat, t.lon]);
-        let ad = Math.abs(APP.lastAz - t.az) % 360;
-        if (ad > 180) ad = 360 - ad;
-        $('hudCmdDist').innerHTML = formatDistance(d);
-        $('hudCmdDist').classList.toggle('in-range', d < 50 && ad <= APP.navConfig.AZ_TOLERANCE);
-    }
-}
-
 function setTarget(i) {
     APP.navCurrentIndex = i;
     renderRoutePoints();
     updateHud();
-    updateCurrentPointHud();
     fitMapToCurrentTarget();
     updatePointsListActive();
 }
@@ -2112,7 +2100,7 @@ if (typeof maplibregl === 'undefined' || typeof MAPTILER_KEY === 'undefined' || 
                         <span class="label">Детекция ударов</span>
                         <span class="value" id="triggerShockVal">Выкл</span>
                     </div>
-                    <div id="triggerShockControls">
+                    <div>
                         <input type="range" id="triggerShock" min="0.5" max="3" value="1" step="0.25" oninput="updateShockDisplay();applyShockConfig()">
                         <div class="trigger-pad">
                             <input type="text" id="triggerShockPhrase" value="Сильный удар" class="trigger-input" oninput="applyShockConfig()">
@@ -2129,7 +2117,7 @@ if (typeof maplibregl === 'undefined' || typeof MAPTILER_KEY === 'undefined' || 
                         <span class="label">Превышение скорости</span>
                         <input type="text" inputmode="numeric" pattern="[0-9]*" id="triggerSpeedAlert" value="58" class="trigger-input-num speed-input-inline" oninput="this.value=this.value.replace(/[^0-9]/g,'');applySpeedConfig()">
                     </div>
-                    <div id="triggerSpeedAlertControls">
+                    <div>
                         <div class="trigger-pad">
                             <input type="text" id="triggerSpeedAlertPhrase" value="Превышена максимальная скорость" class="trigger-input" oninput="applySpeedConfig()">
                         </div>
