@@ -1891,7 +1891,7 @@ function openInstruction() {
     if (!modal || !body) return;
     modal.classList.remove('hidden');
     if (!body.dataset.loaded) {
-        fetch('instr.html')
+        fetch('instr.html', { cache: 'no-cache' })
             .then(r => r.text())
             .then(html => {
                 const doc = new DOMParser().parseFromString(html, 'text/html');
@@ -1910,6 +1910,16 @@ document.addEventListener('click', e => {
     const btn = $('instructionBtn');
     if (btn && btn.contains(e.target)) openInstruction();
 });
+
+// Кнопка инструкции скрывается после первого клика в любом месте,
+// кроме самой этой кнопки. Capture нужен, чтобы срабатывало даже если
+// другой обработчик остановит всплытие.
+document.addEventListener('click', e => {
+    const btn = $('instructionBtn');
+    if (!btn || btn.classList.contains('is-hidden')) return;
+    if (btn.contains(e.target)) return;
+    btn.classList.add('is-hidden');
+}, true);
 
 document.addEventListener('DOMContentLoaded', () => {
     setTimeout(startWakeLock, 500);
@@ -2035,7 +2045,6 @@ if (typeof maplibregl === 'undefined' || typeof MAPTILER_KEY === 'undefined' || 
     });
 
     document.getElementById('map').addEventListener('click', () => {
-        $('instructionBtn').classList.add('is-hidden');
         stopDrive();
         APP._simMode = false;
         updateTiltState();
