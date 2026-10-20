@@ -482,8 +482,19 @@ function driveAlongPath(fromIdx) {
 
     if (resume) {
         const mp = getPos(simulatedDist);
+        currentSeg = mp.seg;
         APP._driveMarker.update({ coordinates: [mp.lon, mp.lat] });
+
+        // Сначала совмещаем камеру с маркером, затем ведём её к следующей
+        // вершине за оставшееся время сегмента — иначе маркер уезжает
+        // от центра и камера догоняет его только на следующем сегменте.
         setMapLocation([mp.lat, mp.lon], undefined, currentAz, 0);
+        const nextIdx = mp.seg + 1;
+        if (nextIdx < path.length) {
+            const remaining = Math.max(dists[nextIdx] - simulatedDist, 0);
+            const remainingMs = remaining / (APP._driveSpeed / 3.6) * 1000;
+            setMapLocation([path[nextIdx][0], path[nextIdx][1]], undefined, currentAz, Math.max(remainingMs, 300));
+        }
     } else {
         const firstDur = (dists[1] - dists[0]) / (APP._driveSpeed / 3.6) * 1000;
         const zoom = APP._simForceZoom ? 19 : undefined;
