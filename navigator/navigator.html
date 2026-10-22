@@ -1950,12 +1950,30 @@ if (typeof maplibregl === 'undefined' || typeof MAPTILER_KEY === 'undefined' || 
     APP.map.on('styledata', restoreRouteLayers);
     APP.map.on('idle', restoreRouteLayers);
 
+    const shownMapErrors = new Set();
     APP.map.on('error', (e) => {
-        if (APP._mapErrorShown) return;
-        const msg = e && e.error ? String(e.error.message || '') : '';
-        if (/key|401|403|failed to fetch|load/i.test(msg)) {
-            APP._mapErrorShown = true;
-            showToast('Ошибка карты: проверьте ключ MapTiler', 'error', 6000);
+        const error = e && e.error;
+        const message = error ? String(error.message || '') : '';
+        const url = error && error.url ? String(error.url) : String((e && e.url) || '');
+        if (!/key|401|403|failed to fetch|load/i.test(message + ' ' + url)) return;
+
+        const sourceId = e && e.sourceId;
+        const isYandexError = sourceId === 'osm-yandex-base'
+            || /yandexsat:|core-sat\.maps\.yandex\.net/i.test(url);
+        const isBuildingsError = sourceId === BUILDINGS_SOURCE_ID
+            || /api\.maptiler\.com\/tiles\/v3/i.test(url);
+        const isMapTilerStyleError = !MAP_STYLES[APP._mapStyle].tiles
+            && (sourceId || /api\.maptiler\.com/i.test(url));
+        const errorType = isBuildingsError ? 'buildings' : isYandexError ? 'yandex' : isMapTilerStyleError ? 'maptiler' : null;
+        if (!errorType || shownMapErrors.has(errorType)) return;
+        shownMapErrors.add(errorType);
+
+        if (errorType === 'buildings') {
+            showToast('Не загрузились 3D-здания MapTiler; подложка карты может работать', 'error', 6000);
+        } else if (errorType === 'yandex') {
+            showToast('Ошибка загрузки тайлов Яндекса', 'error', 6000);
+        } else {
+            showToast('Ошибка загрузки подложки MapTiler: проверьте ключ и доступность сети', 'error', 6000);
         }
     });
 
