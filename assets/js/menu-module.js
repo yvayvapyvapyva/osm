@@ -10,8 +10,8 @@ const MenuModule = {
     _expandedFolders: new Set(),
     _filterCreator: '',
 
-    // URL Яндекс-функции для загрузки маршрутов (общий бекенд)
-    API_URL_V2: 'https://functions.yandexcloud.net/d4e6qbc1mm9j44h0na3n',
+    // URL Яндекс-функции OSM-версии (отдельная БД dbosm)
+    API_URL_V2: 'https://functions.yandexcloud.net/d4e02ghbv31h6kpf8ddh',
     
     /**
      * Универсальное получение параметров URL
