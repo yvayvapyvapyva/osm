@@ -17,6 +17,7 @@
 
     const API_URL = 'https://functions.yandexcloud.net/d4esfoiand5dinv3mfth';
     const BOT_LINK = 'https://t.me/E_ia_bot/pad';
+    const SCENE_ID_RE = /^[0-9a-f]{32}$/i;
     const viewOnly = document.documentElement.classList.contains('scene-viewer');
     // Длительность анимации перелёта к камере сохранённой сцены.
     // Мгновенный прыжок camera при холодном кеше спутниковых тайлов даёт
@@ -38,12 +39,6 @@
     // и автоматически обновлялась, когда список наконец загрузится.
     let scenesLoading = false;
     let scenesLoaded = false;
-
-    // ---- Base64URL кодирование для startapp параметра ----
-    function b64urlEncode(str) {
-        return btoa(unescape(encodeURIComponent(str)))
-            .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-    }
 
     async function api(method, { body, query } = {}) {
         let url = API_URL;
@@ -229,9 +224,13 @@
     }
 
     // ---- Загрузка сцены по ссылке ----
-    window.loadSharedScene = async function (sceneName) {
+    window.loadSharedScene = async function (sceneId) {
+        if (!SCENE_ID_RE.test(sceneId || '')) {
+            showToast('Некорректная ссылка на сцену');
+            return;
+        }
         try {
-            const got = await api('GET', { query: { name: sceneName } });
+            const got = await api('GET', { query: { id: sceneId } });
             let data = got.data;
             if (typeof data === 'string') data = JSON.parse(data);
             if (!data) { showToast('Сцена не найдена'); return; }
@@ -243,14 +242,16 @@
     };
 
     // ---- Кодирование deep-link ссылки ----
-    window.makeShareLink = function (sceneName) {
-        const payload = b64urlEncode(sceneName);
-        return BOT_LINK + '?startapp=' + encodeURIComponent(payload);
+    window.makeShareLink = function (sceneId) {
+        if (!SCENE_ID_RE.test(sceneId || '')) {
+            throw new Error('У сцены отсутствует корректный ID');
+        }
+        return BOT_LINK + '?startapp=' + encodeURIComponent('s' + sceneId);
     };
 
     // ---- Копирование в буфер + тост ----
-    function copyShareLink(sceneName) {
-        const link = window.makeShareLink(sceneName);
+    function copyShareLink(sceneName, sceneId) {
+        const link = window.makeShareLink(sceneId);
         if (navigator.clipboard && navigator.clipboard.writeText) {
             navigator.clipboard.writeText(link).then(
                 () => showToast('Ссылка скопирована в буфер обмена'),
@@ -272,8 +273,8 @@
     }
 
     // ---- Нативное меню «Поделиться» в Telegram ----
-    function shareSceneLink(sceneName) {
-        const link = window.makeShareLink(sceneName);
+    function shareSceneLink(sceneName, sceneId) {
+        const link = window.makeShareLink(sceneId);
         const text = '«' + sceneName + '» на доске дорожных ситуаций';
         const shareUrl = 'https://t.me/share/url?url=' + encodeURIComponent(link) + '&text=' + encodeURIComponent(text);
         const wa = window.Telegram && window.Telegram.WebApp;
@@ -285,7 +286,7 @@
     }
 
     // ---- Окно «Поделиться»: отправить или скопировать ----
-    function openSharePopup(sceneName) {
+    function openSharePopup(sceneName, sceneId) {
         const overlay = document.createElement('div');
         overlay.className = 'scene-io-modal scene-io-modal-save scene-io-center';
         const box = document.createElement('div');
@@ -312,7 +313,7 @@
         send.innerHTML = '<span class="scene-io-share-ic"><svg viewBox="0 0 24 24" width="22" height="22" fill="#fff"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg></span><span>Отправить через Telegram</span>';
         send.addEventListener('click', () => {
             closeSharePopup(overlay);
-            shareSceneLink(sceneName);
+            shareSceneLink(sceneName, sceneId);
         });
 
         const copy = document.createElement('button');
@@ -320,7 +321,7 @@
         copy.innerHTML = '<span class="scene-io-share-ic"><svg viewBox="0 0 24 24" width="22" height="22" fill="#fff"><path d="M16 1H4a2 2 0 0 0-2 2v14h2V3h12V1zm3 4H8a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2zm0 16H8V7h11v14z"/></svg></span><span>Копировать ссылку</span>';
         copy.addEventListener('click', () => {
             closeSharePopup(overlay);
-            copyShareLink(sceneName);
+            copyShareLink(sceneName, sceneId);
         });
 
         box.appendChild(header);
@@ -539,7 +540,7 @@
                 () => renameScene(scene, statusEl)));
             btns.appendChild(mkBtn('Поделиться',
                 '<svg viewBox="0 0 24 24" width="18" height="18" fill="#0A84FF"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.16c-.05.21-.08.43-.08.65 0 1.61 1.31 2.92 2.92 2.92s2.92-1.31 2.92-2.92-1.31-2.92-2.92-2.92z"/></svg>',
-                () => openSharePopup(scene.name)));
+                () => openSharePopup(scene.name, scene.id)));
             btns.appendChild(mkBtn('Удалить',
                 '<svg viewBox="0 0 24 24" width="18" height="18" fill="#FF453A"><path d="M6 19a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V7H6v12zM8 9h8v10H8V9zm.5-5l1-1h5l1 1H20v2H4V4h4.5z"/></svg>',
                 () => deleteScene(scene, statusEl)));
@@ -621,7 +622,8 @@
         statusEl.classList.add('busy');
         statusEl.textContent = 'Загрузка: ' + scene.name + '…';
         try {
-            const got = await api('GET', { query: { name: scene.name } });
+            const query = scene.id ? { id: scene.id } : { name: scene.name };
+            const got = await api('GET', { query });
             let data = got.data;
             if (typeof data === 'string') data = JSON.parse(data);
             applyScene(data || got, scene.name);
@@ -633,7 +635,7 @@
             statusEl.classList.remove('busy');
             statusEl.textContent = 'Загружено: ' + scene.name;
             if (typeof window.sendSceneReport === 'function') {
-                window.sendSceneReport(scene.name);
+                window.sendSceneReport(scene.name, scene.id);
             }
             closeManager();
             if (viewOnly) {

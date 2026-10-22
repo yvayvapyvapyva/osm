@@ -317,7 +317,7 @@ class MapMarker {
         this._onMap = false;
         this._marker = new maplibregl.Marker({
             element,
-            anchor: 'center',
+            anchor: options?.anchor || 'center',
             rotationAlignment: 'viewport',
             pitchAlignment: 'viewport',
             draggable: !!options?.draggable
@@ -560,9 +560,9 @@ function updateDrawVertexMarkers(pts, colorHex) {
     const col = colorHex || '#0066ff';
     pts.forEach((pt, i) => {
         const wrap = document.createElement('div');
-        wrap.style.cssText = 'position:relative;transform:translate(-50%,-50%);line-height:0;';
+        wrap.style.cssText = 'position:relative;width:0;height:0;overflow:visible;line-height:0;';
         const dot = document.createElement('div');
-        dot.style.cssText = `width:30px;height:30px;border-radius:50%;cursor:grab;display:flex;align-items:center;justify-content:center;position:relative;`;
+        dot.style.cssText = `position:absolute;left:-15px;top:-15px;width:30px;height:30px;border-radius:50%;cursor:grab;display:flex;align-items:center;justify-content:center;`;
         const bg = document.createElement('div');
         bg.style.cssText = `position:absolute;inset:0;border-radius:50%;background:${col};opacity:0.2;pointer-events:none;`;
         dot.appendChild(bg);
@@ -576,6 +576,7 @@ function updateDrawVertexMarkers(pts, colorHex) {
         wrap.appendChild(del);
         const m = new MapMarker({
             coordinates: [pt[1], pt[0]],
+            anchor: 'top-left',
             draggable: true,
             onDragMove: (newCoords) => {
                 const idx = _drawVertexMarkers.indexOf(m);
