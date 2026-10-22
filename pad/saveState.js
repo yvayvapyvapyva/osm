@@ -1,5 +1,5 @@
 // Менеджер сцен через Яндекс.Облако функцию PAD (YDB, таблица "scene" в базе OSM).
-// Сцены общие: привязки к аккаунтам и паролей нет.
+// Сцены общие; изменения доступны только после проверки пароля администратора.
 //
 // Модуль переиспользует serializeScene()/restoreScene() из pad.html, чтобы не
 // дублировать логику сериализации линий, объектов и записанных движений машинок.
@@ -19,6 +19,7 @@
     const BOT_LINK = 'https://t.me/E_ia_bot/pad';
     const SCENE_ID_RE = /^[a-z0-9]{8}$/;
     const viewOnly = document.documentElement.classList.contains('scene-viewer');
+    let adminPassword = '';
     // Длительность анимации перелёта к камере сохранённой сцены.
     // Мгновенный прыжок camera при холодном кеше спутниковых тайлов даёт
     // рассинхрон растра и слоя элементов на iOS — перелёт это устраняет.
@@ -49,18 +50,80 @@
                 .join('&');
             if (qs) url += '?' + qs;
         }
+        const requestHeaders = Object.assign({ 'Content-Type': 'application/json' }, headers || {});
+        if (['POST', 'PUT', 'DELETE'].includes(method)) {
+            if (!adminPassword) throw new Error('Требуется вход администратора');
+            requestHeaders['X-Scene-Admin-Password'] = adminPassword;
+        }
         const opts = {
             method: method,
-            headers: Object.assign({ 'Content-Type': 'application/json' }, headers || {})
+            headers: requestHeaders
         };
         if (body !== undefined) opts.body = JSON.stringify(body);
         const resp = await fetch(url, opts);
         const json = await resp.json().catch(() => ({}));
         if (!resp.ok || json.ok === false) {
+            if (resp.status === 403 && ['POST', 'PUT', 'DELETE'].includes(method)) {
+                adminPassword = '';
+                showAdminGate('Неверный пароль или вход истёк');
+            }
             throw new Error(json.error || ('Ошибка ' + resp.status));
         }
         return json;
     }
+
+    function showAdminGate(message) {
+        if (viewOnly) return;
+        const gate = document.getElementById('sceneAdminGate');
+        const error = document.getElementById('sceneAdminError');
+        const input = document.getElementById('sceneAdminPassword');
+        if (!gate || !error || !input) return;
+        error.textContent = message || '';
+        input.value = '';
+        gate.style.display = 'flex';
+        setTimeout(() => input.focus(), 50);
+    }
+
+    async function authenticateAdmin() {
+        const input = document.getElementById('sceneAdminPassword');
+        const error = document.getElementById('sceneAdminError');
+        const button = document.getElementById('sceneAdminSubmit');
+        if (!input || !error || !button) return;
+        const password = input.value;
+        if (!password) {
+            error.textContent = 'Введите пароль администратора';
+            input.focus();
+            return;
+        }
+        button.disabled = true;
+        error.textContent = '';
+        try {
+            const response = await fetch(API_URL + '?action=auth', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Scene-Admin-Password': password
+                },
+                body: '{}'
+            });
+            const result = await response.json().catch(() => ({}));
+            if (!response.ok || result.ok === false) {
+                throw new Error(result.error || ('Ошибка ' + response.status));
+            }
+            adminPassword = password;
+            input.value = '';
+            document.getElementById('sceneAdminGate').style.display = 'none';
+        } catch (e) {
+            error.textContent = e.message === 'Неверный пароль администратора'
+                ? 'Неверный пароль'
+                : 'Не удалось проверить пароль: ' + e.message;
+            input.focus();
+        } finally {
+            button.disabled = false;
+        }
+    }
+
+    window.authenticatePadAdmin = authenticateAdmin;
 
     function collectState() {
         const snap = window.serializeScene ? window.serializeScene() : { lines: [], markers: [] };
@@ -435,7 +498,7 @@
     }
 
     // ---- Конфирм (для удаления) ----
-    function confirmBox({ title, message, okText, passwordRequired, onOk }) {
+    function confirmBox({ title, message, okText, onOk }) {
         const wrap = document.createElement('div');
         wrap.className = 'scene-io-modal scene-io-modal-save scene-io-center';
         const box = document.createElement('div');
@@ -457,23 +520,12 @@
         msg.className = 'scene-io-confirm-msg';
         msg.textContent = message;
 
-        let passwordInput = null;
-        if (passwordRequired) {
-            passwordInput = document.createElement('input');
-            passwordInput.type = 'password';
-            passwordInput.className = 'scene-io-input';
-            passwordInput.placeholder = 'Пароль администратора';
-            passwordInput.autocomplete = 'current-password';
-            passwordInput.setAttribute('aria-label', 'Пароль администратора');
-        }
-
         const ok = document.createElement('button');
         ok.className = 'scene-io-opt scene-io-danger';
         ok.textContent = okText || 'Удалить';
 
         box.appendChild(header);
         box.appendChild(msg);
-        if (passwordInput) box.appendChild(passwordInput);
         box.appendChild(ok);
         wrap.appendChild(box);
         wrap.addEventListener('click', e => { if (e.target === wrap) closeM(wrap); });
@@ -481,20 +533,13 @@
         requestAnimationFrame(() => wrap.classList.add('visible'));
 
         ok.addEventListener('click', async () => {
-            const password = passwordInput ? passwordInput.value : '';
-            if (passwordRequired && !password) {
-                msg.textContent = 'Введите пароль администратора';
-                return;
-            }
             ok.disabled = true;
             try {
-                await onOk(password);
+                await onOk();
                 closeM(wrap);
             } catch (e) {
                 ok.disabled = false;
                 msg.textContent = 'Ошибка: ' + e.message;
-            } finally {
-                if (passwordInput) passwordInput.value = '';
             }
         });
     }
@@ -694,14 +739,10 @@
     async function deleteScene(scene, statusEl) {
         confirmBox({
             title: 'Удалить сцену',
-            message: 'Удалить сцену «' + scene.name + '» без возможности восстановления? Введите пароль администратора.',
+            message: 'Удалить сцену «' + scene.name + '» без возможности восстановления?',
             okText: 'Удалить',
-            passwordRequired: true,
-            onOk: async (password) => {
-                await api('DELETE', {
-                    query: { name: scene.name },
-                    headers: { 'X-Scene-Admin-Password': password }
-                });
+            onOk: async () => {
+                await api('DELETE', { query: { name: scene.name } });
                 if (activeSceneName === scene.name) activeSceneName = null;
                 reloadScenes();
             }
@@ -748,6 +789,15 @@
 
     // ---- Кнопка ----
     function init() {
+        const authForm = document.getElementById('sceneAdminForm');
+        if (authForm && !viewOnly) {
+            authForm.addEventListener('submit', event => {
+                event.preventDefault();
+                authenticateAdmin();
+            });
+            showAdminGate();
+        }
+
         const group = document.createElement('div');
         group.id = 'savePddGroup';
         const pddBtn = document.getElementById('pddBtn');

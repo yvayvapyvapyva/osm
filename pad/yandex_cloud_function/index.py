@@ -9,9 +9,10 @@
   GET             — список сцен
   GET ?id=...     — одна сцена по постоянному ID
   GET ?name=...   — одна сцена по имени (совместимость)
-  POST            — сохранить сцену, тело {name, data}
-  PUT             — переименовать, тело {name, from}
-  DELETE ?name=...— удалить сцену
+  POST ?action=auth — проверка пароля администратора
+  POST            — сохранить сцену, тело {name, data} (требует пароль)
+  PUT             — переименовать, тело {name, from} (требует пароль)
+  DELETE ?name=...— удалить сцену (требует пароль)
 
 Деплой: см. pad/deploy.sh.
 """
@@ -248,25 +249,24 @@ def handler(event, context):
             body = {}
 
     query = event.get("queryStringParameters") or {}
+    action = query.get("action")
     name = body.get("name") if isinstance(body, dict) else None
     if not name:
         name = query.get("name")
     scene_id = query.get("id")
 
-    if method == "DELETE":
-        admin_password = os.environ.get("SCENE_ADMIN_PASSWORD")
-        headers = event.get("headers") or {}
-        provided_password = next(
-            (value for key, value in headers.items()
-             if str(key).lower() == "x-scene-admin-password"),
-            "",
-        )
-        if not admin_password:
-            return _error("Удаление не настроено: задайте пароль администратора", 503)
-        if not isinstance(provided_password, str) or not hmac.compare_digest(
-            provided_password, admin_password
-        ):
-            return _error("Неверный пароль администратора", 403)
+    if action == "auth":
+        if method != "POST":
+            return _error("Метод не поддерживается для проверки пароля", 405)
+        auth_error = _authorize_mutation(event)
+        if auth_error:
+            return auth_error
+        return _ok({"ok": True, "authenticated": True})
+
+    if method in {"POST", "PUT", "DELETE"}:
+        auth_error = _authorize_mutation(event)
+        if auth_error:
+            return auth_error
 
     driver = None
     try:
@@ -286,6 +286,23 @@ def handler(event, context):
                 driver.stop()
             except Exception:
                 pass
+
+
+def _authorize_mutation(event):
+    admin_password = os.environ.get("SCENE_ADMIN_PASSWORD")
+    headers = event.get("headers") or {}
+    provided_password = next(
+        (value for key, value in headers.items()
+         if str(key).lower() == "x-scene-admin-password"),
+        "",
+    )
+    if not admin_password:
+        return _error("Операции изменения не настроены: задайте пароль администратора", 503)
+    if not isinstance(provided_password, str) or not hmac.compare_digest(
+        provided_password, admin_password
+    ):
+        return _error("Неверный пароль администратора", 403)
+    return None
 
 
 def _dispatch(session, method, name, scene_id, body):

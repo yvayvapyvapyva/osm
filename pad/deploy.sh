@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Деплой PAD-бэкенда в отдельную Яндекс.Облако функцию.
 # Использует базу данных OSM-проекта (dbosm), таблица сцен — scene.
-# Для операций удаления нужен пароль администратора из SCENE_ADMIN_PASSWORD.
+# Для операций изменения нужен пароль администратора из SCENE_ADMIN_PASSWORD.
 set -euo pipefail
 
 FUNCTION_ID="${FUNCTION_ID:-d4esfoiand5dinv3mfth}"
