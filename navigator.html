@@ -5,7 +5,7 @@
     <title>Автоинструктор</title>
     <link rel="icon" href="ico.png" type="image/png">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <link rel="stylesheet" href="assets/css/navigator.css?v=1">
+    <link rel="stylesheet" href="assets/css/navigator.css?v=2">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.css">
     <style>
 .toggle-switch {
@@ -162,7 +162,7 @@
   tryLoad('https://unpkg.com/@vkontakte/vk-bridge/dist/browser.min.js');
 })(window);
 </script>
-<script src="assets/js/menu-module.js?v=3" defer></script>
+<script src="assets/js/menu-module.js?v=6" defer></script>
 <script>
 // Ключ MapTiler для навигатора (карта, схема, спутник)
 const MAPTILER_KEY = 'mveDsz0PeGC3zhA47AdM';
@@ -1275,8 +1275,7 @@ function updateRouteNameDisplay() {
         if (typeof MenuModule !== 'undefined') {
             const cr = MenuModule.currentRoute;
             if (cr && MenuModule.routesDescriptions && MenuModule.routesDescriptions[cr]) {
-                const fullName = MenuModule.routesDescriptions[cr].name || '';
-                name = fullName.split('/').pop() || fullName;
+                name = (MenuModule.routesDescriptions[cr].name || '').trim();
             }
             if (!name && cr) {
                 name = cr;

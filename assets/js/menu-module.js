@@ -6,7 +6,6 @@ const MenuModule = {
     routesDescriptions: {}, // { "m": { name, description, m } }
     _isFetchingRoutes: false,
     _categoryTree: null,
-    _starredTree: null,
     _expandedFolders: new Set(),
 
     // URL Яндекс-функции OSM-версии (отдельная БД dbosm)
@@ -167,47 +166,26 @@ const MenuModule = {
 
         this.routesDescriptions = routesFlat;
         this._categoryTree = this._buildCategoryTree();
-        this._starredTree = this._buildStarredTree();
     },
 
     _countTreeRoutes(node) {
         let count = node.routes.length;
-        for (const f of Object.values(node.folders)) count += this._countTreeRoutes(f);
+        for (const folder of Object.values(node.folders)) {
+            count += this._countTreeRoutes(folder);
+        }
         return count;
     },
 
     _buildCategoryTree() {
         const root = { folders: {}, routes: [] };
-        for (const [key, route] of Object.entries(this.routesDescriptions)) {
-            const rawName = route.name || '';
-            if (rawName.startsWith('*')) continue;
-            const fullPath = rawName || key;
-            const parts = fullPath.split('/').map(s => s.trim()).filter(Boolean);
-            const leafName = parts.pop() || fullPath;
-            let n = root;
-            for (const part of parts) {
-                if (!n.folders[part]) n.folders[part] = { folders: {}, routes: [] };
-                n = n.folders[part];
-            }
-            n.routes.push({ ...route, name: leafName, fullPath, key });
-        }
-        if (root.routes.length > 0) {
-            root.folders['Без категории'] = root.folders['Без категории'] || { folders: {}, routes: [] };
-            root.folders['Без категории'].routes.push(...root.routes);
-            root.routes = [];
-        }
-        return root;
-    },
 
-    _buildStarredTree() {
-        const root = { folders: {}, routes: [] };
         for (const [key, route] of Object.entries(this.routesDescriptions)) {
-            const rawName = route.name || '';
-            if (!rawName.startsWith('*')) continue;
-            const cleanName = rawName.substring(1);
-            const fullPath = cleanName || key;
+            // Звёздочка больше не выделяет маршрут в отдельный блок,
+            // но остаётся частью названия. Папки строятся по символу "/".
+            const fullPath = (route.name || key).trim() || key;
             const parts = fullPath.split('/').map(s => s.trim()).filter(Boolean);
             const leafName = parts.pop() || fullPath;
+
             let node = root;
             for (const part of parts) {
                 if (!node.folders[part]) node.folders[part] = { folders: {}, routes: [] };
@@ -215,6 +193,7 @@ const MenuModule = {
             }
             node.routes.push({ ...route, name: leafName, fullPath, key });
         }
+
         if (root.routes.length > 0) {
             root.folders['Без категории'] = root.folders['Без категории'] || { folders: {}, routes: [] };
             root.folders['Без категории'].routes.push(...root.routes);
@@ -227,7 +206,7 @@ const MenuModule = {
         if (!this.currentRoute) return;
         const route = this.routesDescriptions[this.currentRoute];
         if (!route || !route.name) return;
-        const rawName = route.name.startsWith('*') ? route.name.substring(1) : route.name;
+        const rawName = route.name.trim();
         const parts = rawName.split('/').filter(Boolean);
         parts.pop();
         let path = '';
@@ -239,37 +218,20 @@ const MenuModule = {
 
     _buildRoutesList() {
         const container = document.getElementById('routesListContainer');
-        if (!container) return;
+        if (!container || !this.routesDescriptions) return;
 
-        if (!this.routesDescriptions) return;
+        const tree = this._categoryTree;
+        const hasRoutes = tree && (Object.keys(tree.folders).length > 0 || tree.routes.length > 0);
+        if (!hasRoutes) {
+            container.innerHTML = '<div style="text-align:center;padding:20px;color:rgba(255,255,255,0.5);font-size:14px;">Нет маршрутов</div>';
+            return;
+        }
 
         const frag = document.createDocumentFragment();
+        this._renderTreeNode(tree, frag, '', true);
 
-        // 1. Звёздочки (*) — в самом верху
-        const starredTree = this._starredTree;
-        const hasStarred = starredTree && (Object.keys(starredTree.folders).length > 0 || starredTree.routes.length > 0);
-        const hasRegular = this._categoryTree && (Object.keys(this._categoryTree.folders).length > 0 || this._categoryTree.routes.length > 0);
-
-        if (hasStarred) {
-            this._renderTreeNode(starredTree, frag, '', false);
-        }
-
-        // 2. Обычные папки
-        if (hasRegular) {
-            if (hasStarred) {
-                const sep = document.createElement('div');
-                sep.style.cssText = 'height:1px;background:rgba(255,255,255,0.1);margin:8px 0;flex-shrink:0;';
-                frag.appendChild(sep);
-            }
-            this._renderTreeNode(this._categoryTree, frag, '', true);
-        }
-
-        if (frag.children.length === 0) {
-            container.innerHTML = '<div style="text-align:center;padding:20px;color:rgba(255,255,255,0.5);font-size:14px;">Нет маршрутов</div>';
-        } else {
-            container.innerHTML = '';
-            container.appendChild(frag);
-        }
+        container.innerHTML = '';
+        container.appendChild(frag);
     },
 
     _renderTreeNode(node, container, path, isRoot = !path) {
@@ -299,7 +261,6 @@ const MenuModule = {
                 this._buildRoutesList();
             });
             el.appendChild(header);
-
             container.appendChild(el);
 
             if (isExpanded) {
@@ -312,11 +273,12 @@ const MenuModule = {
 
         const uncat = node.folders['Без категории'];
         if (uncat) {
-            const fcPath = path ? path + '/' + 'Без категории' : 'Без категории';
+            const fcPath = path ? path + '/Без категории' : 'Без категории';
             const fcExpanded = this._expandedFolders.has(fcPath);
             const fcTotal = this._countTreeRoutes(uncat);
             const fcEl = document.createElement('div');
             fcEl.className = 'category-folder';
+
             const fcHdr = document.createElement('div');
             fcHdr.className = 'category-header' + (fcExpanded ? ' expanded' : '') + (isRoot ? ' root' : '');
             fcHdr.innerHTML = `
@@ -332,6 +294,7 @@ const MenuModule = {
             });
             fcEl.appendChild(fcHdr);
             container.appendChild(fcEl);
+
             if (fcExpanded) {
                 const childWrap = document.createElement('div');
                 childWrap.style.cssText = 'padding-left:16px;display:flex;flex-direction:column;gap:6px;';
@@ -350,7 +313,7 @@ const MenuModule = {
 
             const nameSpan = document.createElement('span');
             nameSpan.className = 'route-name';
-            nameSpan.textContent = route.name;
+            nameSpan.textContent = route.name || route.m;
             btn.appendChild(nameSpan);
 
             if (hasDesc) {
@@ -421,8 +384,7 @@ const MenuModule = {
         }
 
         const routeData2 = this.routesDescriptions[routeKey];
-        const titleName = routeData2.name ? routeData2.name.split('/').pop() : routeData2.name;
-        document.getElementById('routeDescTitle').textContent = titleName;
+        document.getElementById('routeDescTitle').textContent = (routeData2.name || routeKey).trim();
         document.getElementById('routeDescText').textContent = routeData2.description;
         descModal.style.display = 'block';
         requestAnimationFrame(() => descModal.classList.add('visible'));
