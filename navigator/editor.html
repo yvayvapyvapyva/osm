@@ -646,6 +646,12 @@ function openInstruction() {
     if (!modal || !body) return;
     modal.classList.add('visible');
     if (!body.dataset.loaded) {
+        const embeddedInstruction = $('embeddedInstruction');
+        if (embeddedInstruction) {
+            body.innerHTML = embeddedInstruction.innerHTML;
+            body.dataset.loaded = '1';
+            return;
+        }
         fetch('instr_editor.html')
             .then(r => r.text())
             .then(html => {
