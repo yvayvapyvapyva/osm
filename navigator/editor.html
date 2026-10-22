@@ -1343,7 +1343,7 @@ const updateVisibility = () => {
     updateSaveState();
 };
 
-const generateId = () => Math.random().toString(36).slice(2, 8);
+const generateId = () => Array.from({ length: 8 }, () => Math.floor(Math.random() * 36).toString(36)).join('');
 
 const getRouteName = (route) => {
     if (!route) return '';

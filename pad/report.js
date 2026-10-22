@@ -16,7 +16,7 @@
 
     // Распознаёт короткий startapp-токен постоянного ID сцены.
     function decodeStartParam(param) {
-        const match = /^s([0-9a-f]{32})$/i.exec(String(param));
+        const match = /^s([a-z0-9]{8})$/.exec(String(param));
         return match ? { sceneId: match[1] } : null;
     }
 
@@ -53,7 +53,7 @@
     }
 
     function sceneLinkLine(sceneName, source, sceneId) {
-        if (!/^[0-9a-f]{32}$/i.test(sceneId || '')) return null;
+        if (!/^[a-z0-9]{8}$/.test(sceneId || '')) return null;
         const payload = 's' + sceneId;
         const link = 'https://t.me/E_ia_bot/pad?startapp=' + encodeURIComponent(payload);
         const label = source ? ('Загружена сцена ' + source + ': ') : 'Загружена сцена: ';

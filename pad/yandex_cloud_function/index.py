@@ -1,7 +1,7 @@
 """Бэкенд PAD на Яндекс.Облако Function.
 
 Сцены не привязаны к аккаунтам. Имя — уникальный ключ записи, ID — постоянный
-UUID сцены, используемый в коротких ссылках и сохраняемый при переименовании.
+восьмисимвольный код сцены, используемый в ссылках и сохраняемый при переименовании.
 База — общая serverless-YDB OSM-проекта (`dbosm`), таблица `scene`.
 Таблица маршрутов `roads` не затрагивается.
 
@@ -18,8 +18,9 @@ UUID сцены, используемый в коротких ссылках и 
 
 import json
 import os
+import secrets
+import string
 import urllib.request
-import uuid
 
 import ydb
 import ydb.credentials
@@ -85,8 +86,9 @@ def _ensure_table(session: ydb.Session) -> None:
 
 
 def _new_scene_id() -> str:
-    """Создаёт постоянный 128-битный ID сцены."""
-    return uuid.uuid4().hex
+    """Создаёт восьмисимвольный ID в том же алфавите, что и навигатор."""
+    alphabet = string.ascii_lowercase + string.digits
+    return "".join(secrets.choice(alphabet) for _ in range(8))
 
 
 def _write_scene(session: ydb.Session, name: str, payload: str, scene_id: str) -> None:
@@ -110,10 +112,10 @@ def _ascii(v) -> str:
     return str(v)
 
 
-def _upsert_scene(session: ydb.Session, name: str, data, scene_id: str | None = None) -> str:
+def _upsert_scene(session: ydb.Session, name: str, data) -> str:
     payload = data if isinstance(data, str) else json.dumps(data, ensure_ascii=False)
     existing = _get_scene(session, name)
-    scene_id = scene_id or (existing and existing["id"]) or _new_scene_id()
+    scene_id = existing["id"] if existing else _new_scene_id()
     _write_scene(session, name, payload, scene_id)
     return scene_id
 
@@ -131,18 +133,21 @@ def _get_scene(session: ydb.Session, name: str):
     rows = result_sets[0].rows
     if not rows:
         return None
-    scene_id = _ascii(rows[0]["id"]) if rows[0]["id"] is not None else _new_scene_id()
+    scene_id = _ascii(rows[0]["id"]) if rows[0]["id"] is not None else ""
     scene = {
         "name": _ascii(rows[0]["name"]),
         "data": _ascii(rows[0]["data"]),
         "id": scene_id,
     }
-    if rows[0]["id"] is None:
-        _write_scene(session, scene["name"], scene["data"], scene_id)
+    if len(scene_id) != 8 or any(char not in string.ascii_lowercase + string.digits for char in scene_id):
+        scene["id"] = _new_scene_id()
+        _write_scene(session, scene["name"], scene["data"], scene["id"])
     return scene
 
 
 def _get_scene_by_id(session: ydb.Session, scene_id: str):
+    if len(scene_id) != 8 or any(char not in string.ascii_lowercase + string.digits for char in scene_id):
+        return None
     data_query = session.prepare(
         "DECLARE $id AS Utf8; "
         "SELECT `name`, `data`, `id` FROM `scene` WHERE `id` = $id;"
@@ -169,8 +174,9 @@ def _list_scenes(session: ydb.Session):
     for row in result_sets[0].rows:
         name = _ascii(row["name"])
         data = _ascii(row["data"])
-        scene_id = _ascii(row["id"]) if row["id"] is not None else _new_scene_id()
-        if row["id"] is None:
+        scene_id = _ascii(row["id"]) if row["id"] is not None else ""
+        if len(scene_id) != 8 or any(char not in string.ascii_lowercase + string.digits for char in scene_id):
+            scene_id = _new_scene_id()
             _write_scene(session, name, data, scene_id)
         try:
             saved_at = json.loads(data).get("savedAt")
@@ -208,8 +214,8 @@ def _rename_scene(session: ydb.Session, old_name: str, new_name: str) -> dict:
         return {"name": new_name, "id": scene["id"]}
     if _get_scene(session, new_name) is not None:
         raise ValueError("Сцена с таким именем уже существует")
-    _upsert_scene(session, new_name, scene["data"], scene["id"])
     _delete_scene(session, old_name)
+    _write_scene(session, new_name, scene["data"], scene["id"])
     return {"name": new_name, "id": scene["id"]}
 
 

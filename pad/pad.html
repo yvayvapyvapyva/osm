@@ -58,7 +58,7 @@
         // Если SDK уже был в кэше браузера — инициализируем сразу
         _initTelegram();
     </script>
-    <script src="report.js?v=5"></script>
+    <script src="report.js?v=6"></script>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.css">
     <style>
         * { margin:0; padding:0; box-sizing:border-box; -webkit-user-select:none; user-select:none; -webkit-tap-highlight-color:transparent; }
@@ -2389,7 +2389,7 @@ function initCustomPinchRotate() {
 <script src="padtext.js"></script>
 <script src="recplay.js"></script>
 <script src="trafficlights.js"></script>
-<script src="saveState.js?v=10"></script>
+<script src="saveState.js?v=11"></script>
 <script>
 // Deep-link сцены: startapp содержит s + постоянный ID сцены.
 // Сцены общие, привязки к аккаунту нет.
@@ -2429,7 +2429,7 @@ function initCustomPinchRotate() {
             }
             const param = tgParam || urlParam;
             if (!param) return;
-            const match = /^s([0-9a-f]{32})$/i.exec(param);
+            const match = /^s([a-z0-9]{8})$/.exec(param);
             if (!match) return;
             const sceneId = match[1];
             // Показываем спиннер «Загрузка», пока сцена грузится в карту.

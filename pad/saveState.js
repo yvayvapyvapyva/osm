@@ -17,7 +17,7 @@
 
     const API_URL = 'https://functions.yandexcloud.net/d4esfoiand5dinv3mfth';
     const BOT_LINK = 'https://t.me/E_ia_bot/pad';
-    const SCENE_ID_RE = /^[0-9a-f]{32}$/i;
+    const SCENE_ID_RE = /^[a-z0-9]{8}$/;
     const viewOnly = document.documentElement.classList.contains('scene-viewer');
     // Длительность анимации перелёта к камере сохранённой сцены.
     // Мгновенный прыжок camera при холодном кеше спутниковых тайлов даёт
