@@ -1,5 +1,7 @@
 # OSM-версия навигатора
 
+Все файлы навигатора находятся в этой папке (`navigator/`).
+
 Статический клиент (`navigator.html`), скрытый редактор маршрутов (`editor.html`)
 и отдельный бэкенд в Яндекс Облаке для этой версии.
 
@@ -13,7 +15,7 @@
 | Serverless YDB | `dbosm` | `etnjvaftd6eakeq08kqr` |
 | Cloud Function | `osmn` | `d4e02ghbv31h6kpf8ddh` |
 | HTTP-эндпоинт | — | https://functions.yandexcloud.net/d4e02ghbv31h6kpf8ddh |
-| Редактор (прямая ссылка) | — | `editor.html` на том же домене, где лежит навигатор |
+| Редактор (прямая ссылка) | — | `navigator/editor.html` на том же домене, где лежит навигатор |
 | База-источник (не используется клиентом) | `dbnav` | `etn3ppn9gdj01le0ep1v` |
 | TTS (общая для версий) | `tts` | `d4erngid6s4rf5oinnp1` |
 
@@ -26,7 +28,7 @@
 или ссылок на него. Открывается только по прямой ссылке:
 
 ```
-https://<домен-навигатора>/editor.html
+https://<домен-навигатора>/navigator/editor.html
 ```
 
 В `editor.html` стоит `<meta name="robots" content="noindex, nofollow">`, поэтому
@@ -35,25 +37,28 @@ https://<домен-навигатора>/editor.html
 Авторизации нет: редактор открывается сразу. Это значит, что любой, у кого есть
 прямая ссылка на `editor.html`, может просматривать и редактировать все маршруты.
 
-Ссылка на конкретный маршрут в навигаторе имеет вид `navigator.html#m=<m>`.
+Ссылка на конкретный маршрут в навигаторе имеет вид
+`https://<домен-навигатора>/navigator/navigator.html#m=<m>`.
 Идентификатор `m` — единственный ключ маршрута.
 
 ## Структура
 
 ```
 osm/
-├── navigator.html          # клиент навигатора
-├── editor.html             # скрытый редактор маршрутов
-├── instr.html              # инструкция навигатора
-├── instr_editor.html       # инструкция редактора
-├── assets/                 # стили и клиентские модули
-│   ├── css/editor.css
-│   └── js/config.js        # константы редактора (цвета, ключ карт)
-├── backend/
-│   ├── handler.py          # код функции osmn
-│   └── requirements.txt
-├── scripts/init_db.py      # создание схемы и перенос маршрутов
-└── deploy.sh               # деплой новой версии функции
+├── navigator/
+│   ├── navigator.html      # клиент навигатора
+│   ├── editor.html         # скрытый редактор маршрутов
+│   ├── instr.html          # инструкция навигатора
+│   ├── instr_editor.html   # инструкция редактора
+│   ├── assets/             # стили и клиентские модули
+│   │   ├── css/editor.css
+│   │   └── js/config.js    # константы редактора (цвета, ключ карт)
+│   ├── backend/
+│   │   ├── handler.py      # код функции osmn
+│   │   └── requirements.txt
+│   ├── scripts/init_db.py  # создание схемы и перенос маршрутов
+│   └── deploy.sh           # деплой новой версии функции
+└── pad/                    # отдельное приложение PAD
 ```
 
 ## API функции
@@ -112,18 +117,20 @@ GET  ?action=delete&m=<m>
 
 ## Развёртывание
 
+Из корня репозитория:
+
 ```bash
 # 1. Первичная инициализация БД и перенос маршрутов из dbnav
-python3 scripts/init_db.py
+python3 navigator/scripts/init_db.py
 
 # только схема, без данных
-python3 scripts/init_db.py --no-copy
+python3 navigator/scripts/init_db.py --no-copy
 
 # только видимые маршруты
-python3 scripts/init_db.py --visible-only
+python3 navigator/scripts/init_db.py --visible-only
 
 # 2. Обновление кода функции
-./deploy.sh
+./navigator/deploy.sh
 ```
 
 `init_db.py` берёт IAM-токен из `yc iam create-token`, поэтому нужен
@@ -131,17 +138,17 @@ python3 scripts/init_db.py --visible-only
 `SRC_DATABASE` и `DST_DATABASE`. При переносе из точек удаляется legacy-поле
 `info`.
 
-`deploy.sh` передаёт функции только `YDB_ENDPOINT` и `YDB_DATABASE`.
+`navigator/deploy.sh` передаёт функции только `YDB_ENDPOINT` и `YDB_DATABASE`.
 
 ## Переключение клиента
 
-Адрес функции задан в `assets/js/menu-module.js` и `editor.html`:
+Адрес функции задан в `navigator/assets/js/menu-module.js` и `navigator/editor.html`:
 
 ```js
 API_URL_V2: 'https://functions.yandexcloud.net/d4e02ghbv31h6kpf8ddh',
 ```
 
-В `editor.html` — константа `YC_FUNCTION_URL`. После изменения констант обновите
+В `navigator/editor.html` — константа `YC_FUNCTION_URL`. После изменения констант обновите
 `?v=` у подключаемых скриптов, чтобы браузер не взял старую версию из кэша.
 
 ## Права

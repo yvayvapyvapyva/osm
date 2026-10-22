@@ -1,10 +1,10 @@
 """Инициализация отдельной БД dbosm и перенос маршрутов из dbnav.
 
-Запуск (нужен настроенный yc CLI):
+Запуск из корня репозитория (нужен настроенный yc CLI):
 
-    python3 scripts/init_db.py                 # создать таблицу + скопировать всё
-    python3 scripts/init_db.py --no-copy       # только создать таблицу
-    python3 scripts/init_db.py --visible-only  # только visible = true
+    python3 navigator/scripts/init_db.py                 # создать таблицу + скопировать всё
+    python3 navigator/scripts/init_db.py --no-copy       # только создать таблицу
+    python3 navigator/scripts/init_db.py --visible-only  # только visible = true
 
 Маршруты не привязаны к аккаунтам: ключ маршрута — только `m`.
 Legacy-поле info из точек маршрутов при переносе удаляется.
