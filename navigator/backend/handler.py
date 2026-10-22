@@ -6,11 +6,11 @@
   GET ?action=list_routes   — список видимых маршрутов
   GET ?action=get&m=<m>     — маршрут {name, m, data}
 
-API редактора (просмотр и изменение доступны по прямой ссылке;
-удаление требует ROUTE_ADMIN_PASSWORD):
+API редактора (операции изменения требуют ROUTE_ADMIN_PASSWORD):
   GET  ?action=list                  — все маршруты
   GET  ?action=get&m=<m>             — данные маршрута
   GET  ?action=get_meta&m=<m>        — название, описание, видимость
+  POST ?action=auth                  — проверка X-Route-Admin-Password
   POST ?action=save&m=<m>            — тело {data: [...]}
   POST ?action=save_meta&m=<m>       — тело {name, description, visible[, new_m]}
   POST ?action=delete&m=<m>       — заголовок X-Route-Admin-Password
@@ -212,7 +212,7 @@ def handler(event, context):
     action = params.get("action") or "get"
     m_val = params.get("m")
 
-    if action == "delete":
+    if action in {"auth", "save", "save_meta", "delete"}:
         admin_password = os.environ.get("ROUTE_ADMIN_PASSWORD")
         headers = event.get("headers") or {}
         provided_password = next(
@@ -221,11 +221,13 @@ def handler(event, context):
             "",
         )
         if not admin_password:
-            return create_response(503, {"error": "route_deletion_not_configured"})
+            return create_response(503, {"error": "admin_auth_not_configured"})
         if not isinstance(provided_password, str) or not hmac.compare_digest(
             provided_password, admin_password
         ):
             return create_response(403, {"error": "invalid_admin_password"})
+        if action == "auth":
+            return create_response(200, {"status": "authenticated"}, is_public=True)
 
     try:
         if action == "list_routes":

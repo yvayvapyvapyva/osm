@@ -12,6 +12,15 @@
 <body>
 
 <div id="toast">Готово</div>
+<div id="editorAuthGate" style="position:fixed;inset:0;z-index:30000;display:flex;align-items:center;justify-content:center;padding:24px;background:rgba(0,0,0,0.88);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);">
+    <form onsubmit="event.preventDefault(); authenticateEditor();" style="width:min(100%,360px);display:flex;flex-direction:column;gap:14px;padding:24px;border:1px solid rgba(255,255,255,0.16);border-radius:20px;background:rgba(20,20,24,0.96);box-shadow:0 20px 60px rgba(0,0,0,0.5);">
+        <h2 style="margin:0;text-align:center;font-size:20px;">Вход в редактор</h2>
+        <p style="margin:0;text-align:center;color:rgba(255,255,255,0.65);font-size:14px;">Введите пароль администратора</p>
+        <input id="editorAuthPassword" type="password" autocomplete="current-password" placeholder="Пароль" aria-label="Пароль администратора" required style="width:100%;box-sizing:border-box;padding:13px;border-radius:12px;border:1px solid rgba(255,255,255,0.2);background:rgba(255,255,255,0.08);color:#fff;font-size:16px;outline:none;">
+        <div id="editorAuthError" role="alert" style="min-height:18px;text-align:center;color:#ff6961;font-size:13px;"></div>
+        <button id="editorAuthSubmit" class="btn-action btn-primary" type="submit">Войти</button>
+    </form>
+</div>
 <div id="welcomeScreen" style="display:flex;align-items:center;justify-content:center;background:rgba(10,11,15,0.95);"><div style="display:flex;flex-direction:column;align-items:center;gap:16px;"><span style="width:32px;height:32px;border:3px solid rgba(255,255,255,0.3);border-top-color:#fff;border-radius:50%;animation:spin 1s linear infinite;"></span><div style="font-size:16px;font-weight:600;color:#fff;">Загрузка</div></div></div>
 <div id="map"></div>
 <div class="top-controls" id="uiControls" style="display:none">
@@ -62,7 +71,7 @@
 <button class="btn-action" onclick="shareRouteFromSettings();">🔗 Скопировать ссылку</button>
 <button class="btn-action btn-danger" onclick="confirmDeleteRoute();">🗑️ Удалить маршрут</button>
 </div></div></div>
-<div id="confirmDeleteModal" onclick="if(event.target===this) toggleM('confirmDeleteModal')"><div class="modal-sheet modal-sheet-compact"><h3 class="modal-title">Удалить маршрут?</h3><p id="confirmDeleteText" class="modal-desc-text" style="font-size:16px;"></p><input id="routeAdminPassword" type="password" autocomplete="current-password" placeholder="Пароль администратора" aria-label="Пароль администратора" style="width:100%;padding:12px;border-radius:12px;border:1px solid rgba(255,255,255,0.2);background:rgba(255,255,255,0.08);color:#fff;font-size:16px;outline:none;"><div class="modal-actions"><button class="btn-action flex-1" onclick="toggleM('confirmDeleteModal')">Отмена</button><button id="confirmDeleteRouteBtn" class="btn-action btn-danger flex-1" onclick="executeDeleteRoute()">Удалить</button></div></div></div>
+<div id="confirmDeleteModal" onclick="if(event.target===this) toggleM('confirmDeleteModal')"><div class="modal-sheet modal-sheet-compact"><h3 class="modal-title">Удалить маршрут?</h3><p id="confirmDeleteText" class="modal-desc-text" style="font-size:16px;"></p><div class="modal-actions"><button class="btn-action flex-1" onclick="toggleM('confirmDeleteModal')">Отмена</button><button id="confirmDeleteRouteBtn" class="btn-action btn-danger flex-1" onclick="executeDeleteRoute()">Удалить</button></div></div></div>
 <div id="confirmDeletePointModal" onclick="if(event.target===this) toggleM('confirmDeletePointModal')"><div class="modal-sheet modal-sheet-compact"><h3 class="modal-title">Удалить точку?</h3><p class="modal-desc-text" style="font-size:16px;">Вы уверены, что хотите удалить эту точку?</p><div class="modal-actions"><button class="btn-action flex-1" onclick="toggleM('confirmDeletePointModal')">Отмена</button><button class="btn-action btn-danger flex-1" onclick="executeDeletePoint()">Удалить</button></div></div></div>
 <div id="shareModal" onclick="if(event.target===this) toggleM('shareModal')"><div class="modal-sheet modal-sheet-compact"><h3 class="modal-title">Поделиться маршрутом</h3><p class="modal-desc-text">При открытии ссылки откроется навигатор с этим маршрутом.</p><div style="display:flex;flex-direction:column;gap:12px"><button class="btn-action flex-1" onclick="copyShareLink('vk')">VK</button><button class="btn-action flex-1" onclick="copyShareLink('tg')">Telegram</button><button class="btn-action flex-1" onclick="copyShareLink('web')">Браузер</button><button class="btn-action flex-1" onclick="toggleM('shareModal')">Отмена</button></div></div></div>
 <button id="instructionBtn" onclick="openInstruction()">📖 Инструкция</button>
@@ -525,6 +534,7 @@ function attachEditorMapApi() {
 }
 
 let map, points = [], cur = null, isAdd = false, isDrawing = false, curRoute = null, activeListPoint = null, modalMode = 'list', tempNewPointData = null, userLocPlacemark = null, activePoint = null, settingsRouteFiles = [];
+let routeAdminPassword = '';
 let historyStack = [], historyIndex = -1, lastSavedSnapshot = "[]", toastTimer = null;
 let pendingDeletePoint = null;
 let _currentFolderPrefix = null;
@@ -675,10 +685,15 @@ async function callYcFunction(action, params = {}, bodyData = null, headers = {}
     url.searchParams.set('action', action);
 
     Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
-    
+    const requestHeaders = Object.assign({ 'Content-Type': 'application/json' }, headers);
+    if (['save', 'save_meta', 'delete'].includes(action)) {
+        if (!routeAdminPassword) throw new Error('AUTH_REQUIRED');
+        requestHeaders['X-Route-Admin-Password'] = routeAdminPassword;
+    }
+
     const options = {
         method: 'POST',
-        headers: Object.assign({ 'Content-Type': 'application/json' }, headers)
+        headers: requestHeaders
     };
     
     if (bodyData !== null) {
@@ -692,6 +707,32 @@ async function callYcFunction(action, params = {}, bodyData = null, headers = {}
     }
     
     return await response.json();
+}
+
+async function authenticateEditor() {
+    const passwordInput = $('editorAuthPassword');
+    const submitButton = $('editorAuthSubmit');
+    const error = $('editorAuthError');
+    const password = passwordInput.value;
+    if (!password) return;
+    submitButton.disabled = true;
+    error.textContent = '';
+    try {
+        await callYcFunction('auth', {}, null, {
+            'X-Route-Admin-Password': password
+        });
+        routeAdminPassword = password;
+        passwordInput.value = '';
+        $('editorAuthGate').style.display = 'none';
+        await handleInitialLoad();
+    } catch (e) {
+        error.textContent = e.message === 'HTTP 403'
+            ? 'Неверный пароль'
+            : 'Не удалось проверить пароль. ' + e.message;
+        passwordInput.focus();
+    } finally {
+        submitButton.disabled = false;
+    }
 }
 
 function getNavIconSvg(col, txt, az, isEnd = false, isCurr = false, hasComm = false) {
@@ -929,7 +970,7 @@ if (typeof maplibregl === 'undefined') {
         new Sortable($('pointsSortList'), { animation: 150, handle: '.sort-handle', ghostClass: 'sortable-ghost', onEnd: reorderPointsFromList, scroll: $('pointsSortList'), scrollSensitivity: 40, scrollSpeed: 15 });
     }
 
-    handleInitialLoad();
+    $('editorAuthPassword').focus();
 })().catch(e => {
     showToast('Ошибка загрузки карты: ' + e.message, 'error', 8000);
     const wsEl = document.getElementById('welcomeScreen');
@@ -1490,29 +1531,16 @@ const saveRouteMeta = async () => {
 const confirmDeleteRoute = () => {
     if (!settingsRouteName) return;
     const displayName = currentRouteMeta.name || settingsRouteName;
-    $('confirmDeleteText').textContent = `Вы уверены, что хотите удалить маршрут "${displayName}"? Введите пароль администратора.`;
-    $('routeAdminPassword').value = '';
+    $('confirmDeleteText').textContent = `Вы уверены, что хотите удалить маршрут "${displayName}"?`;
     toggleM('settingsRouteModal');
-    setTimeout(() => {
-        toggleM('confirmDeleteModal');
-        $('routeAdminPassword').focus();
-    }, 100);
+    setTimeout(() => toggleM('confirmDeleteModal'), 100);
 };
 const executeDeleteRoute = async () => {
     if (!settingsRouteName) return;
-    const passwordInput = $('routeAdminPassword');
-    const password = passwordInput.value;
-    if (!password) {
-        showToast('Введите пароль администратора', 'error');
-        passwordInput.focus();
-        return;
-    }
     const deleteBtn = $('confirmDeleteRouteBtn');
     deleteBtn.disabled = true;
     try {
-        await callYcFunction('delete', { m: settingsRouteName }, null, {
-            'X-Route-Admin-Password': password
-        });
+        await callYcFunction('delete', { m: settingsRouteName });
         toggleM('confirmDeleteModal');
         if (curRoute === settingsRouteName) {
             clearRouteObjects();
@@ -1527,7 +1555,6 @@ const executeDeleteRoute = async () => {
             ? 'Неверный пароль администратора'
             : 'Ошибка удаления: ' + e.message, 'error');
     } finally {
-        passwordInput.value = '';
         deleteBtn.disabled = false;
     }
 };
