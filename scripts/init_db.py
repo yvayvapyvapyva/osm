@@ -1,17 +1,19 @@
-"""Инициализация отдельной БД dbosm и перенос данных из dbnav.
+"""Инициализация отдельной БД dbosm и перенос маршрутов из dbnav.
 
 Запуск (нужен настроенный yc CLI):
 
-    python3 scripts/init_db.py                 # создать таблицы + скопировать всё
-    python3 scripts/init_db.py --no-copy       # только создать таблицы
-    python3 scripts/init_db.py --visible-only  # маршруты: только visible = true
+    python3 scripts/init_db.py                 # создать таблицу + скопировать всё
+    python3 scripts/init_db.py --no-copy       # только создать таблицу
+    python3 scripts/init_db.py --visible-only  # только visible = true
 
-Копируются таблицы roads (маршруты) и users (логины редактора).
+Маршруты не привязаны к аккаунтам: ключ маршрута — только `m`.
+Legacy-поле info из точек маршрутов при переносе удаляется.
 Параметры подключения можно переопределить через переменные окружения:
     SRC_DATABASE, DST_DATABASE, YDB_ENDPOINT
 """
 
 import argparse
+import json
 import os
 import subprocess
 import sys
@@ -26,75 +28,48 @@ DST_DATABASE = os.getenv(
     "DST_DATABASE", "/ru-central1/b1gtnlal9r2s3rvqadjn/etnjvaftd6eakeq08kqr"
 )
 
-TABLES = {
-    "roads": {
-        "ddl": """
-            CREATE TABLE roads (
-                id Utf8,
-                m Utf8,
-                json Json,
-                name Utf8,
-                description Utf8,
-                visible Bool,
-                creator_name Utf8,
-                PRIMARY KEY (id, m)
-            );
-        """,
-        "columns": (
-            "id",
-            "m",
-            "json",
-            "name",
-            "description",
-            "visible",
-            "creator_name",
-        ),
-        "upsert": """
-            DECLARE $id AS Utf8;
-            DECLARE $m AS Utf8;
-            DECLARE $json AS Json;
-            DECLARE $name AS Utf8;
-            DECLARE $description AS Utf8;
-            DECLARE $visible AS Bool;
-            DECLARE $creator_name AS Utf8;
-            UPSERT INTO roads (id, m, json, name, description, visible, creator_name)
-            VALUES ($id, $m, $json, $name, $description, $visible, $creator_name);
-        """,
-        "params": lambda row: {
-            "$id": row["id"] or "",
-            "$m": row["m"] or "",
-            "$json": row["json"] or "[]",
-            "$name": row["name"] or "",
-            "$description": row["description"] or "",
-            "$visible": bool(row["visible"]),
-            "$creator_name": row["creator_name"] or "",
-        },
-    },
-    "users": {
-        "ddl": """
-            CREATE TABLE users (
-                login Utf8,
-                password Utf8,
-                creator_name Utf8,
-                created_at Timestamp,
-                PRIMARY KEY (login)
-            );
-        """,
-        "columns": ("login", "password", "creator_name", "created_at"),
-        "upsert": """
-            DECLARE $login AS Utf8;
-            DECLARE $password AS Utf8;
-            DECLARE $creator_name AS Utf8;
-            DECLARE $created_at AS Timestamp;
-            UPSERT INTO users (login, password, creator_name, created_at)
-            VALUES ($login, $password, $creator_name, $created_at);
-        """,
-        "params": lambda row: {
-            "$login": row["login"] or "",
-            "$password": row["password"] or "",
-            "$creator_name": row["creator_name"] or "",
-            "$created_at": row["created_at"] or 0,
-        },
+
+def strip_legacy_info(raw):
+    """Убирает legacy-поле info из точек маршрута при переносе."""
+    try:
+        data = json.loads(raw or "[]")
+    except (TypeError, ValueError):
+        return raw or "[]"
+    if not isinstance(data, list):
+        return raw or "[]"
+    for point in data:
+        if isinstance(point, dict):
+            point.pop("info", None)
+    return json.dumps(data, ensure_ascii=False)
+
+
+ROADS = {
+    "ddl": """
+        CREATE TABLE roads (
+            m Utf8,
+            json Json,
+            name Utf8,
+            description Utf8,
+            visible Bool,
+            PRIMARY KEY (m)
+        );
+    """,
+    "columns": ("m", "json", "name", "description", "visible"),
+    "upsert": """
+        DECLARE $m AS Utf8;
+        DECLARE $json AS Json;
+        DECLARE $name AS Utf8;
+        DECLARE $description AS Utf8;
+        DECLARE $visible AS Bool;
+        UPSERT INTO roads (m, json, name, description, visible)
+        VALUES ($m, $json, $name, $description, $visible);
+    """,
+    "params": lambda row: {
+        "$m": row["m"] or "",
+        "$json": strip_legacy_info(row["json"]),
+        "$name": row["name"] or "",
+        "$description": row["description"] or "",
+        "$visible": bool(row["visible"]),
     },
 }
 
@@ -111,7 +86,9 @@ def make_pool(database):
 
 def table_exists(pool, database, name):
     try:
-        pool.retry_operation_sync(lambda session: session.describe_table(f"{database}/{name}"))
+        pool.retry_operation_sync(
+            lambda session: session.describe_table(f"{database}/{name}")
+        )
         return True
     except ydb.SchemeError:
         return False
@@ -125,33 +102,33 @@ def create_table(pool, name, ddl):
     print(f"Таблица {name} создана")
 
 
-def copy_table(src_pool, dst_pool, name, spec, where=""):
-    query = f"SELECT {', '.join(spec['columns'])} FROM {name} {where};"
+def copy_roads(src_pool, dst_pool, where=""):
+    query = f"SELECT {', '.join(ROADS['columns'])} FROM roads {where};"
 
     def read(session):
         return session.transaction().execute(session.prepare(query), commit_tx=True)
 
     rows = src_pool.retry_operation_sync(read)[0].rows
-    print(f"{name}: прочитано строк {len(rows)}")
+    print(f"roads: прочитано строк {len(rows)}")
     if not rows:
         return
 
     def write(session):
-        prepared = session.prepare(spec["upsert"])
+        prepared = session.prepare(ROADS["upsert"])
         for row in rows:
             session.transaction().execute(
-                prepared, spec["params"](row), commit_tx=True
+                prepared, ROADS["params"](row), commit_tx=True
             )
 
     dst_pool.retry_operation_sync(write)
 
     def count(session):
         return session.transaction().execute(
-            session.prepare(f"SELECT COUNT(*) AS c FROM {name};"), commit_tx=True
+            session.prepare("SELECT COUNT(*) AS c FROM roads;"), commit_tx=True
         )
 
     total = dst_pool.retry_operation_sync(count)[0].rows[0]["c"]
-    print(f"{name}: в новой базе {total}")
+    print(f"roads: в новой базе {total}")
 
 
 def main():
@@ -168,22 +145,14 @@ def main():
     src_driver, src_pool = make_pool(SRC_DATABASE)
     dst_driver, dst_pool = make_pool(DST_DATABASE)
 
-    for name, spec in TABLES.items():
-        create_table(dst_pool, name, spec["ddl"])
+    create_table(dst_pool, "roads", ROADS["ddl"])
 
-    if args.no_copy:
-        src_driver.stop()
-        dst_driver.stop()
-        return
-
-    copy_table(
-        src_pool,
-        dst_pool,
-        "roads",
-        TABLES["roads"],
-        "WHERE visible = true AND name IS NOT NULL" if args.visible_only else "",
-    )
-    copy_table(src_pool, dst_pool, "users", TABLES["users"])
+    if not args.no_copy:
+        copy_roads(
+            src_pool,
+            dst_pool,
+            "WHERE visible = true AND name IS NOT NULL" if args.visible_only else "",
+        )
 
     src_driver.stop()
     dst_driver.stop()

@@ -46,9 +46,6 @@ const REPORT = (() => {
                 } else if (decoded.startsWith('tg:')) {
                     platform = 'tg';
                     data = decoded.substring(3);
-                } else if (decoded.startsWith('user:')) {
-                    platform = 'user';
-                    data = decoded.substring(5);
                 }
                 const parts = data.split(',');
                 userId = parts[0] || '?';
@@ -59,8 +56,6 @@ const REPORT = (() => {
                     platformIcon = ' VK';
                 } else if (platform === 'tg') {
                     platformIcon = ' TG';
-                } else if (platform === 'user') {
-                    platformIcon = ' 👤';
                 }
             } catch (e) {
                 userName = 'ошибка декодирования';
@@ -79,9 +74,8 @@ const REPORT = (() => {
     }
 
     // Собирает i_val ('платформа:id,имя,третье поле') из глобального состояния
-    // приложения. Зависит только от данных, которые платформа успела записать
-    // в window (tgUser / vkUser / auth-платформа / последний резерв — initData),
-    // и никогда — от факта загрузки SDK Telegram.
+    // приложения. Это только информация для отчёта, не идентификатор владельца
+    // маршрута.
     function buildUserInfo() {
         try {
             let raw = '';
@@ -94,8 +88,6 @@ const REPORT = (() => {
                 const user = window.tgUser;
                 const fullName = [user.first_name, user.last_name].filter(Boolean).join(' ');
                 raw = 'tg:' + [user.id, fullName, user.username || ''].join(',');
-            } else if (window.authPlatform === 'user') {
-                raw = 'user:' + window.authLogin;
             } else {
                 const u = window.Telegram && window.Telegram.WebApp &&
                     window.Telegram.WebApp.initDataUnsafe &&
@@ -119,8 +111,8 @@ const REPORT = (() => {
         }
     }
 
-    // Формирование текста сообщения — идентично backend/notifier.py
-    function buildMessage({ user_id, m_val, i_val, report_type, route_name, user_agent }) {
+    // Формирование текста сообщения.
+    function buildMessage({ m_val, i_val, report_type, route_name, user_agent }) {
         const now = new Date();
         const moscowOffset = 3 * 60 * 60 * 1000;
         const moscow = new Date(now.getTime() + moscowOffset);
@@ -141,19 +133,16 @@ const REPORT = (() => {
             } else if (info.platform === 'tg') {
                 const thirdPart = info.third ? `, @${info.third}` : '';
                 userInfoText = `ID: ${info.userId}, Имя: ${info.userName}${thirdPart}`;
-            } else if (info.platform === 'user') {
-                userInfoText = `Логин: ${info.userId}`;
             } else {
                 const thirdPart = info.third ? `, ${info.third}` : '';
                 userInfoText = `ID: ${info.userId}, Имя: ${info.userName}${thirdPart}`;
             }
         }
 
-        const tgLink = `https://t.me/E_ia_bot?startapp=m=${user_id}-${m_val}`;
-        const user_id_esc = escapeHtml(String(user_id));
-        const display = escapeHtml(route_name || `${user_id}-${m_val}`);
-        const routeLineEditor = `Ⓜ️ Маршрут: ${user_id_esc} — <a href="${tgLink}">${display}</a>`;
-        const routeLineNav = `🆔 Маршрут: ${user_id_esc} — <a href="${tgLink}">${display}</a>`;
+        const tgLink = `https://t.me/E_ia_bot?startapp=m=${encodeURIComponent(m_val || '')}`;
+        const display = escapeHtml(route_name || m_val || '');
+        const routeLineEditor = `Ⓜ️ Маршрут: <a href="${tgLink}">${display}</a>`;
+        const routeLineNav = `🆔 Маршрут: <a href="${tgLink}">${display}</a>`;
 
         let extraLines = '';
         if (user_agent) {
@@ -212,8 +201,7 @@ const REPORT = (() => {
 
     /***
      * Отправка отчёта. Параметры:
-     *   user_id: ID пользователя (владелец маршрута / логин)
-     *   m_val: имя маршрута
+     *   m_val: идентификатор маршрута
      *   report_type: 'navigator' или 'editor'
      *   i_val: закодированная информация о пользователе (опционально;
      *          если не передано — report.js соберёт сама из window)
@@ -221,9 +209,8 @@ const REPORT = (() => {
      *   user_agent: User-Agent браузера (опционально)
      */
     function send(options) {
-        const { user_id, m_val, i_val, report_type, route_name, user_agent } = options || {};
+        const { m_val, i_val, report_type, route_name, user_agent } = options || {};
         const message = buildMessage({
-            user_id,
             m_val,
             i_val: i_val === undefined ? buildUserInfo() : i_val,
             report_type,

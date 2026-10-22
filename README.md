@@ -3,6 +3,9 @@
 Статический клиент (`navigator.html`), скрытый редактор маршрутов (`editor.html`)
 и отдельный бэкенд в Яндекс Облаке для этой версии.
 
+Маршруты не привязаны к аккаунтам: нет таблицы пользователей, авторизации и
+поля создателя. Единственный идентификатор маршрута — `m`.
+
 ## Ресурсы
 
 | Что | Имя | ID / адрес |
@@ -27,18 +30,13 @@ https://<домен-навигатора>/editor.html
 ```
 
 В `editor.html` стоит `<meta name="robots" content="noindex, nofollow">`, поэтому
-поисковые системы страницу не индексируют. Авторизация остаётся как в исходной
-версии:
+поисковые системы страницу не индексируют.
 
-- логин/пароль из таблицы `users`;
-- Telegram Mini App `initData` (если в функции задан `TELEGRAM_TOKEN`);
-- VK `id` при запуске внутри VK Mini App;
-- админ-ключ `ADMIN_ACCESS_KEY`: позволяет войти под любым `id` создателя и
-  редактировать его маршруты.
+Авторизации нет: редактор открывается сразу. Это значит, что любой, у кого есть
+прямая ссылка на `editor.html`, может просматривать и редактировать все маршруты.
 
-Новые пользователи могут зарегистрироваться на вкладке «Регистрация»; запись
-создаётся в `users` новой базы. Если регистрация не нужна, её можно отключить в
-бэкенде.
+Ссылка на конкретный маршрут в навигаторе имеет вид `navigator.html#m=<m>`.
+Идентификатор `m` — единственный ключ маршрута.
 
 ## Структура
 
@@ -54,7 +52,7 @@ osm/
 ├── backend/
 │   ├── handler.py          # код функции osmn
 │   └── requirements.txt
-├── scripts/init_db.py      # создание схемы и перенос roads + users
+├── scripts/init_db.py      # создание схемы и перенос маршрутов
 └── deploy.sh               # деплой новой версии функции
 ```
 
@@ -62,23 +60,21 @@ osm/
 
 ### Публичное API навигатора
 
-Без авторизации и без отчётов в Telegram (отчёты клиент отправляет
-самостоятельно через Cloudflare Worker).
+Без авторизации.
 
 **Список маршрутов**
 
 ```
 GET ?action=list_routes
-GET ?action=list_routes&creator=<id>
 ```
 
-Возвращает массив `{id, m, name, description, creator_name}` только для
+Возвращает массив `{m, name, description}` только для
 `visible = true AND name IS NOT NULL`.
 
 **Маршрут**
 
 ```
-GET ?id=<id>&m=<m>
+GET ?action=get&m=<m>
 ```
 
 Возвращает `{name, m, data}`, где `data` — исходный JSON маршрута (массив точек).
@@ -86,60 +82,38 @@ GET ?id=<id>&m=<m>
 
 ### API редактора
 
-Авторизация передаётся в параметрах запроса:
-
-- `p=user&login=<login>&password=<password>` — вход по логину/паролю;
-- `p=tg&tg_init_data=<initData>` — Telegram Mini App;
-- `p=vk&id=<vk_id>` — VK Mini App.
-
-Действия:
+Авторизация не требуется. Действия:
 
 ```
-GET  ?action=register&login=<login>&password=<password>&creator_name=<name>
-GET  ?action=login&login=<login>&password=<password>
-GET  ?action=list&p=user&login=<login>&password=<password>
-GET  ?action=get_protected&p=...&m=<m>
-GET  ?action=get_meta&p=...&m=<m>
-POST ?action=save&p=...&m=<m>       # тело: {"data": [...]}
-POST ?action=save_meta&p=...&m=<m>  # тело: {"name","description","visible","creator_name","new_m"}
-GET  ?action=delete&p=...&m=<m>
+GET  ?action=list
+GET  ?action=get&m=<m>
+GET  ?action=get_meta&m=<m>
+POST ?action=save&m=<m>       # тело: {"data": [...]}
+POST ?action=save_meta&m=<m>  # тело: {"name","description","visible","new_m"}
+GET  ?action=delete&m=<m>
 ```
 
 `new_m` в `save_meta` необязателен: если задан и отличается от `m`, маршрут
-переименовывается. `get_protected`, `save`, `save_meta` и `delete` работают
-только с маршрутами текущего пользователя (`id` = логин/VK id/Telegram id) либо
-с чужими маршрутами при входе по `ADMIN_ACCESS_KEY`.
+переименовывается. Все действия работают с маршрутом по его `m`.
 
 ## Схема БД
 
-Таблица `roads` (ключ `id`, `m`):
+Таблица `roads` (ключ `m`):
 
 | Колонка | Тип |
 |---|---|
-| `id` | `Utf8` |
 | `m` | `Utf8` |
 | `json` | `Json` |
 | `name` | `Utf8` |
 | `description` | `Utf8` |
 | `visible` | `Bool` |
-| `creator_name` | `Utf8` |
 
-Таблица `users` (ключ `login`):
-
-| Колонка | Тип |
-|---|---|
-| `login` | `Utf8` |
-| `password` | `Utf8` |
-| `creator_name` | `Utf8` |
-| `created_at` | `Timestamp` |
-
-Пароли в `users` хранятся в том же legacy-виде, что и в исходной базе, чтобы
-существующие логины продолжали работать после переноса.
+Таблицы `users` и полей `id`/`creator_name` нет.
 
 ## Развёртывание
 
 ```bash
-# 1. Первичная инициализация БД и перенос roads + users из dbnav
+# 1. Первичная инициализация БД и перенос маршрутов из dbnav
 python3 scripts/init_db.py
 
 # только схема, без данных
@@ -154,14 +128,10 @@ python3 scripts/init_db.py --visible-only
 
 `init_db.py` берёт IAM-токен из `yc iam create-token`, поэтому нужен
 авторизованный `yc` CLI. Адреса БД можно переопределить переменными
-`SRC_DATABASE` и `DST_DATABASE`.
+`SRC_DATABASE` и `DST_DATABASE`. При переносе из точек удаляется legacy-поле
+`info`.
 
-`deploy.sh` при обновлении переиспользует `TELEGRAM_TOKEN` и `ADMIN_ACCESS_KEY`
-из текущей версии функции. Их можно переопределить переменными окружения:
-
-```bash
-TELEGRAM_TOKEN=... ADMIN_ACCESS_KEY=... ./deploy.sh
-```
+`deploy.sh` передаёт функции только `YDB_ENDPOINT` и `YDB_DATABASE`.
 
 ## Переключение клиента
 

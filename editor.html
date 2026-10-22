@@ -6,7 +6,7 @@
     <link rel="icon" href="ico.png" type="image/png">
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
     <meta name="robots" content="noindex, nofollow">
-    <link rel="stylesheet" href="assets/css/editor.css?v=1">
+    <link rel="stylesheet" href="assets/css/editor.css?v=2">
 </head>
 <body>
 
@@ -39,7 +39,7 @@
 <div id="listColorDropdown" class="color-dropdown"></div>
 
 <div id="pointsOrderModal" onclick="if(event.target===this) toggleM('pointsOrderModal')"><div class="modal-sheet" style="gap:0;"><div class="modal-header"><h3 id="orderModalTitle">Маршрут</h3><button class="close-circle" onclick="toggleM('pointsOrderModal')">✕</button></div><div id="pointsSortList" style="flex:1;overflow-y:auto;padding:14px;"></div><div class="modal-footer"><button id="saveInListBtn" class="btn-action" onclick="handleModalSave()"><span id="saveBtnText">Готово</span></button></div></div></div>
-<div id="settingsModal" onclick="if(event.target===this) toggleM('settingsModal')"><div class="modal-sheet"><div class="modal-header" style="padding:16px 20px 16px 10px;"><button class="settings-tool-btn settings-share-btn" title="Поделиться ссылкой на маршруты">🔗</button><span id="settingsTitle">Ваши маршруты</span><div style="display:flex;gap:6px;margin-left:auto;"><button class="close-circle" onclick="toggleM('settingsModal')">✕</button></div></div><div class="settings-body" id="routesList"></div><div class="modal-actions-sm"><button class="settings-tool-btn settings-tool-btn-green flex-1" onclick="openCreateRouteModal()" style="text-align:center;">Создать маршрут</button><button class="settings-tool-btn flex-1" onclick="window.createFolder()" style="text-align:center;background:rgba(0,122,255,0.25);border-color:rgba(0,122,255,0.4);">Создать папку</button></div></div></div>
+<div id="settingsModal" onclick="if(event.target===this) toggleM('settingsModal')"><div class="modal-sheet"><div class="modal-header" style="padding:16px 20px 16px 20px;"><span id="settingsTitle">Маршруты</span><div style="display:flex;gap:6px;margin-left:auto;"><button class="close-circle" onclick="toggleM('settingsModal')">✕</button></div></div><div class="settings-body" id="routesList"></div><div class="modal-actions-sm"><button class="settings-tool-btn settings-tool-btn-green flex-1" onclick="openCreateRouteModal()" style="text-align:center;">Создать маршрут</button><button class="settings-tool-btn flex-1" onclick="window.createFolder()" style="text-align:center;background:rgba(0,122,255,0.25);border-color:rgba(0,122,255,0.4);">Создать папку</button></div></div></div>
 <div id="createRouteModal" onclick="if(event.target===this) toggleM('createRouteModal')"><div class="modal-sheet modal-sheet-compact"><h3 class="modal-title">Новый маршрут</h3><div class="input-wrapper" style="padding:4px;border-radius:14px;"><input type="text" id="newRouteNameInput" placeholder="Название маршрута"></div><div class="modal-actions"><button class="btn-action flex-1" onclick="toggleM('createRouteModal')">Отмена</button><button class="btn-action btn-primary flex-1" onclick="handleCreateNew()">Создать</button></div></div></div>
 <div id="createFolderModal" onclick="if(event.target===this) toggleM('createFolderModal')"><div class="modal-sheet modal-sheet-compact"><h3 class="modal-title">Новая папка</h3><div class="input-wrapper" style="padding:4px;border-radius:14px;"><input type="text" id="newFolderNameInput" placeholder="Название папки"></div><div class="modal-actions"><button class="btn-action flex-1" onclick="toggleM('createFolderModal')">Отмена</button><button class="btn-action btn-primary flex-1" onclick="handleCreateFolder()">Создать</button></div></div></div>
 <div id="settingsRouteModal" onclick="if(event.target===this) toggleM('settingsRouteModal')"><div class="modal-sheet" style="gap:0;padding:0;"><div class="modal-header"><h3 id="settingsRouteTitle">Настройки маршрута</h3><button class="close-circle" onclick="toggleM('settingsRouteModal')">✕</button></div><div class="modal-body-scroll">
@@ -63,8 +63,7 @@
 </div></div></div>
 <div id="confirmDeleteModal" onclick="if(event.target===this) toggleM('confirmDeleteModal')"><div class="modal-sheet modal-sheet-compact"><h3 class="modal-title">Удалить маршрут?</h3><p id="confirmDeleteText" class="modal-desc-text" style="font-size:16px;"></p><div class="modal-actions"><button class="btn-action flex-1" onclick="toggleM('confirmDeleteModal')">Отмена</button><button class="btn-action btn-danger flex-1" onclick="executeDeleteRoute()">Удалить</button></div></div></div>
 <div id="confirmDeletePointModal" onclick="if(event.target===this) toggleM('confirmDeletePointModal')"><div class="modal-sheet modal-sheet-compact"><h3 class="modal-title">Удалить точку?</h3><p class="modal-desc-text" style="font-size:16px;">Вы уверены, что хотите удалить эту точку?</p><div class="modal-actions"><button class="btn-action flex-1" onclick="toggleM('confirmDeletePointModal')">Отмена</button><button class="btn-action btn-danger flex-1" onclick="executeDeletePoint()">Удалить</button></div></div></div>
-<div id="shareModal" onclick="if(event.target===this) toggleM('shareModal')"><div class="modal-sheet modal-sheet-compact"><h3 class="modal-title">Поделиться маршрутом</h3><p class="modal-desc-text">При открытии маршрута по ссылке пользователь будет видеть в окне маршрутов только ваши публичные маршруты.</p><div style="display:flex;flex-direction:column;gap:12px"><button class="btn-action flex-1" onclick="copyShareLink('vk')">VK</button><button class="btn-action flex-1" onclick="copyShareLink('tg')">Telegram</button><button class="btn-action flex-1" onclick="copyShareLink('web')">Браузер</button><button class="btn-action flex-1" onclick="toggleM('shareModal')">Отмена</button></div></div></div>
-<div id="creatorShareModal" onclick="if(event.target===this) toggleM('creatorShareModal')"><div class="modal-sheet modal-sheet-compact"><h3 class="modal-title">Поделиться маршрутами</h3><p class="modal-desc-text">При открытии данной ссылки пользователь увидит только ваши публичные маршруты.</p><div style="display:flex;flex-direction:column;gap:12px"><button class="btn-action flex-1" onclick="copyCreatorLink('vk')">VK</button><button class="btn-action flex-1" onclick="copyCreatorLink('tg')">Telegram</button><button class="btn-action flex-1" onclick="copyCreatorLink('web')">Браузер</button><button class="btn-action flex-1" onclick="toggleM('creatorShareModal')">Отмена</button></div></div></div>
+<div id="shareModal" onclick="if(event.target===this) toggleM('shareModal')"><div class="modal-sheet modal-sheet-compact"><h3 class="modal-title">Поделиться маршрутом</h3><p class="modal-desc-text">При открытии ссылки откроется навигатор с этим маршрутом.</p><div style="display:flex;flex-direction:column;gap:12px"><button class="btn-action flex-1" onclick="copyShareLink('vk')">VK</button><button class="btn-action flex-1" onclick="copyShareLink('tg')">Telegram</button><button class="btn-action flex-1" onclick="copyShareLink('web')">Браузер</button><button class="btn-action flex-1" onclick="toggleM('shareModal')">Отмена</button></div></div></div>
 <button id="instructionBtn" onclick="openInstruction()">📖 Инструкция</button>
 <div id="instructionModal" class="instruction-overlay" onclick="if(event.target===this) closeInstruction()">
     <div class="instruction-sheet">
@@ -79,19 +78,6 @@
 </div>
 
 <div id="loadingSpinner"><div class="spinner-box"><div class="spinner-ring"></div><div class="spinner-text">Загрузка...</div></div></div>
-
-<div id="loginModal" onclick="if(event.target===this) toggleM('loginModal')" style="display:none;"><div class="modal-sheet" style="max-width:360px;margin:0 auto;border-radius:20px;"><div class="modal-header"><h3 style="text-align:center;flex:1;">Авторизация</h3><button class="close-circle" onclick="toggleM('loginModal')">✕</button></div><div class="modal-body-scroll" style="padding:0 20px 20px;">
-<div class="auth-tabs" style="display:flex;margin-bottom:20px;background:rgba(255,255,255,0.06);border-radius:12px;padding:3px;">
-<button class="auth-tab active" data-tab="login" style="flex:1;text-align:center;padding:10px;border-radius:10px;font-size:15px;font-weight:600;color:rgba(255,255,255,0.5);cursor:pointer;border:none;background:transparent;font-family:inherit;">Вход</button>
-<button class="auth-tab" data-tab="register" style="flex:1;text-align:center;padding:10px;border-radius:10px;font-size:15px;font-weight:600;color:rgba(255,255,255,0.5);cursor:pointer;border:none;background:transparent;font-family:inherit;">Регистрация</button>
-</div>
-<div class="auth-field" style="margin-bottom:12px;"><input type="text" id="authLogin" placeholder="Логин" autocomplete="username" style="width:100%;padding:14px 16px;border-radius:14px;border:1px solid rgba(255,255,255,0.12);background:rgba(255,255,255,0.06);color:#f5f7fa;font-size:16px;outline:none;box-sizing:border-box;font-family:inherit;"></div>
-<div class="auth-field" style="margin-bottom:12px;"><input type="password" id="authPassword" placeholder="Пароль" autocomplete="current-password" style="width:100%;padding:14px 16px;border-radius:14px;border:1px solid rgba(255,255,255,0.12);background:rgba(255,255,255,0.06);color:#f5f7fa;font-size:16px;outline:none;box-sizing:border-box;font-family:inherit;"></div>
-<div id="authNameField" class="auth-field" style="margin-bottom:12px;display:none;"><input type="text" id="authName" placeholder="Ваше имя" style="width:100%;padding:14px 16px;border-radius:14px;border:1px solid rgba(255,255,255,0.12);background:rgba(255,255,255,0.06);color:#f5f7fa;font-size:16px;outline:none;box-sizing:border-box;font-family:inherit;"></div>
-<button id="authActionBtn" class="auth-btn auth-btn-login" style="width:100%;padding:14px;border-radius:14px;border:none;font-size:17px;font-weight:700;color:#fff;cursor:pointer;font-family:inherit;margin-top:8px;background:linear-gradient(180deg,rgba(0,122,255,0.9),rgba(0,90,200,0.85));">Войти</button>
-<div id="authError" class="auth-modal-error" style="font-size:13px;color:#FF453A;text-align:center;margin-top:8px;display:none;"></div>
-<div id="authSuccess" class="auth-modal-success" style="font-size:13px;color:#30D158;text-align:center;margin-top:8px;display:none;"></div>
-</div></div></div>
 
 <script>
 // Грузим Telegram/VK SDK асинхронно с таймаутом 10с.
@@ -156,7 +142,7 @@
     <script src="https://api-maps.yandex.ru/v3/?apikey=c0e28937-4e16-4d15-9b99-09a30cb8fc13&lang=ru_RU" onerror="window.__ycMapsFailed = true;"></script>
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js" defer onerror="window.__sortableFailed = true;"></script>
 <script src="assets/js/config.js?v=1"></script>
-<script src="assets/js/report.js?v=2"></script>
+<script src="assets/js/report.js?v=3"></script>
 <script>
 (function (global) {
   const byId = (id) => document.getElementById(id);
@@ -173,24 +159,12 @@ const { byId, round6 } = window.AppShared;
 const $ = byId;
 const f6 = round6;
 
-// ---- Auth detection (ждёт загрузки Telegram/VK SDK, максимум ~10с) ----
+// ---- Определение платформы (Telegram/VK SDK, максимум ~10с) ----
+// Нужно только для UI и отчётов; аккаунты не используются.
 (function() {
-    // localStorage-авторизация применяется СРАЗУ (браузер без TG/VK), чтобы личные маршруты
-    // не ждали таймаута загрузки SDK (до ~10с). TG/VK ниже имеют приоритет и переопределяют её.
-    if (!window.authPlatform) {
-        try {
-            const stored = JSON.parse(localStorage.getItem('3api_auth') || '{}');
-            if (stored.platform && stored.login) {
-                window.authPlatform = stored.platform;
-                window.authLogin = stored.login;
-                window.authPassword = stored.password || '';
-                window.authName = stored.name || stored.login;
-            }
-        } catch (e) {}
-    }
-    const runAuth = () => {
-        if (window._authRan) return;
-        window._authRan = true;
+    const runPlatform = () => {
+        if (window._platformRan) return;
+        window._platformRan = true;
         if (typeof Telegram !== 'undefined' && Telegram.WebApp) {
             try {
                 Telegram.WebApp.ready();
@@ -201,12 +175,8 @@ const f6 = round6;
                 }
                 const user = Telegram.WebApp.initDataUnsafe?.user;
                 if (user) {
-                    window.authPlatform = 'tg';
-                    window.authLogin = String(user.id);
-                    window.authPassword = '';
-                    window.authName = [user.first_name, user.last_name].filter(Boolean).join(' ');
+                    window.platformType = 'tg';
                     window.tgUser = user;
-                    window.tgInitData = Telegram.WebApp.initData;
                 }
             } catch (e) {}
         }
@@ -215,32 +185,18 @@ const f6 = round6;
                 vkBridge.send('VKWebAppInit');
                 vkBridge.send('VKWebAppGetUserInfo').then(data => {
                     if (data?.id) {
-                        window.authPlatform = 'vk';
-                        window.authLogin = String(data.id);
-                        window.authPassword = '';
-                        window.authName = [data.first_name, data.last_name].filter(Boolean).join(' ');
+                        window.platformType = 'vk';
                         window.vkUser = data;
                         if (window._onVkReady) window._onVkReady();
                     }
                 });
             } catch (e) {}
         }
-        if (!window.authPlatform) {
-            try {
-                const stored = JSON.parse(localStorage.getItem('3api_auth') || '{}');
-                if (stored.platform && stored.login) {
-                    window.authPlatform = stored.platform;
-                    window.authLogin = stored.login;
-                    window.authPassword = stored.password || '';
-                    window.authName = stored.name || stored.login;
-                }
-            } catch (e) {}
-        }
-        if (navigator.userAgent.includes('Android') && window.authPlatform === 'tg') {
+        if (navigator.userAgent.includes('Android') && window.platformType === 'tg') {
             document.documentElement.classList.add('android-app');
         }
     };
-    if (window.bootPlatforms) window.bootPlatforms(runAuth); else runAuth();
+    if (window.bootPlatforms) window.bootPlatforms(runPlatform); else runPlatform();
 })();
 // -------------------------
 
@@ -376,18 +332,6 @@ function closeInstruction() {
     if (modal) modal.classList.remove('visible');
 }
 
-function getFormattedCreatorName() {
-    const name = window.authName || window.authLogin || '';
-    if (window.authPlatform === 'tg') {
-        const uname = window.tgUser?.username || '';
-        return uname ? `${name} (tg: @${uname})` : `${name} (tg)`;
-    }
-    if (window.authPlatform === 'vk') {
-        return `${name} (vk: id${window.authLogin})`;
-    }
-    return name;
-}
-
 const showToast = (text, type = 'info', duration = 2200) => {
     const el = $('toast');
     el.textContent = text;
@@ -410,19 +354,6 @@ async function callYcFunction(action, params = {}, bodyData = null) {
     const url = new URL(YC_FUNCTION_URL);
     url.searchParams.set('action', action);
 
-    if (window.authPlatform === 'tg') {
-        url.searchParams.set('p', 'tg');
-        url.searchParams.set('id', window.authLogin);
-        url.searchParams.set('tg_init_data', window.tgInitData || '');
-    } else if (window.authPlatform === 'vk') {
-        url.searchParams.set('p', 'vk');
-        url.searchParams.set('id', window.authLogin);
-    } else if (window.authPlatform === 'user') {
-        url.searchParams.set('p', 'user');
-        url.searchParams.set('login', window.authLogin);
-        url.searchParams.set('password', window.authPassword);
-    }
-
     Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
     
     const options = {
@@ -443,30 +374,6 @@ async function callYcFunction(action, params = {}, bodyData = null) {
     return await response.json();
 }
 
-function encodeUserInfo() {
-    try {
-        if (window.tgUser) {
-            const user = window.tgUser;
-            const fullName = [user.first_name, user.last_name].filter(Boolean).join(' ');
-            const userInfoStr = 'tg:' + [user.id, fullName, user.username || ''].join(',');
-            return btoa(encodeURIComponent(userInfoStr));
-        }
-        if (window.vkUser) {
-            const user = window.vkUser;
-            const city = user.city?.title || 'не указан';
-            const fullName = [user.first_name, user.last_name].filter(Boolean).join(' ');
-            const userInfoStr = 'vk:' + [user.id, fullName, city].join(',');
-            return btoa(encodeURIComponent(userInfoStr));
-        }
-
-        if (window.authPlatform === 'user') {
-            const userInfoStr = 'user:' + window.authLogin;
-            return btoa(encodeURIComponent(userInfoStr));
-        }
-
-    } catch (e) {}
-    return null;
-}
 function getNavIconSvg(col, txt, az, isEnd = false, isCurr = false, hasComm = false) {
     const s = isEnd ? 34 : 40, c = s / 2;
     const r = isEnd ? 7 : 9;
@@ -594,8 +501,8 @@ ymaps3.ready.then(async () => {
         try { await Promise.race([window.platformReady, grace]); } catch (e) {}
     }
 
-    // Wait for VK async auth if needed
-    if (!window.authPlatform && typeof vkBridge !== 'undefined') {
+    // Ждём данные VK для отчёта (необязательно)
+    if (!window.platformType && typeof vkBridge !== 'undefined') {
         try {
             await new Promise((resolve, reject) => {
                 window._onVkReady = resolve;
@@ -603,27 +510,6 @@ ymaps3.ready.then(async () => {
             });
         } catch (e) {}
     }
-
-    // Try localStorage again (e.g. VK timed out)
-    if (!window.authPlatform) {
-        try {
-            const stored = JSON.parse(localStorage.getItem('3api_auth') || '{}');
-            if (stored.platform && stored.login) {
-                window.authPlatform = stored.platform;
-                window.authLogin = stored.login;
-                window.authPassword = stored.password || '';
-                window.authName = stored.name || stored.login;
-            }
-        } catch (e) {}
-    }
-
-    if (!window.authPlatform) {
-        showLoginModal();
-        // When login succeeds, page reloads and initialization starts fresh
-        return;
-    }
-
-    const userId = window.authLogin;
 
     const center = await initMapWithGeolocation();
     map = new YMap(document.getElementById('map'), {
@@ -704,7 +590,7 @@ ymaps3.ready.then(async () => {
         new Sortable($('pointsSortList'), { animation: 150, handle: '.sort-handle', ghostClass: 'sortable-ghost', onEnd: reorderPointsFromList, scroll: $('pointsSortList'), scrollSensitivity: 40, scrollSpeed: 15 });
     }
 
-    handleInitialAuth();
+    handleInitialLoad();
 }).catch(e => {
     showToast('Ошибка загрузки карты: ' + e.message, 'error', 8000);
     const wsEl = document.getElementById('welcomeScreen');
@@ -735,7 +621,7 @@ const initGeolocation = () => {
         }, null, { enableHighAccuracy: true, maximumAge: 5000 });
     }
 };
-const handleInitialAuth = async () => {
+const handleInitialLoad = async () => {
     
     $('welcomeScreen').style.display = 'none';
     $('uiControls').style.display = 'flex';
@@ -744,7 +630,7 @@ const handleInitialAuth = async () => {
     updateSaveState();
     await refreshFileList();
     const routeCount = settingsRouteFiles.length;
-    $('settingsTitle').textContent = `${getFormattedCreatorName()} - маршрутов:${routeCount}`;
+    $('settingsTitle').textContent = `Маршруты: ${routeCount}`;
 };
 
 const refreshFileList = async () => {
@@ -928,7 +814,7 @@ async function moveRouteToFolder(routeKey, folderPath) {
         const parts = nm.split('/').filter(Boolean);
         const leafName = parts.pop() || nm;
         const newName = folderPath + '/' + leafName;
-        await callYcFunction('save_meta', { m: routeKey }, { name: newName, description: meta.description || '', visible: meta.visible !== undefined ? meta.visible : false, creator_name: meta.creator_name || getFormattedCreatorName() });
+        await callYcFunction('save_meta', { m: routeKey }, { name: newName, description: meta.description || '', visible: meta.visible !== undefined ? meta.visible : false });
         if (curRoute === routeKey) {
             currentRouteMeta.name = newName;
         }
@@ -960,8 +846,8 @@ const renderSettingsFileList = () => {
     if (!list) return;
     list.innerHTML = '';
     if (settingsRouteFiles.length === 0 && _emptyFolders.length === 0) {
-        list.innerHTML = '<div style="text-align:center;padding:40px 20px;color:#8b8f99;font-size:15px;">У вас пока нет маршрутов.<br>Создайте первый маршрут.</div>';
-        $('settingsTitle').textContent = `${getFormattedCreatorName()} - маршрутов:0`;
+        list.innerHTML = '<div style="text-align:center;padding:40px 20px;color:#8b8f99;font-size:15px;">Маршрутов пока нет.<br>Создайте первый маршрут.</div>';
+        $('settingsTitle').textContent = 'Маршруты: 0';
         return;
     }
     if (curRoute) {
@@ -1006,8 +892,7 @@ const renderSettingsFileList = () => {
         });
         list.appendChild(el);
     }
-    const userId = window.authLogin;
-    $('settingsTitle').textContent = `${getFormattedCreatorName()} - маршрутов:${settingsRouteFiles.length}`;
+    $('settingsTitle').textContent = `Маршруты: ${settingsRouteFiles.length}`;
     if (!list.dataset.dragScroll) {
         list.dataset.dragScroll = '1';
         list.addEventListener('dragover', e => _dragAutoScroll(e, list));
@@ -1123,6 +1008,10 @@ const generateId = () => Math.random().toString(36).slice(2, 8);
 
 const getRouteName = (route) => {
     if (!route) return '';
+    if (typeof route === 'string') {
+        const found = settingsRouteFiles.find(r => r && r.m === route);
+        return found ? (found.name || found.m || '') : route;
+    }
     return route.name || route.m || '';
 };
 
@@ -1140,7 +1029,7 @@ const handleCreateNew = async () => {
     
     try {
         await callYcFunction('save', { m: id }, { data: [] });
-        await callYcFunction('save_meta', { m: id }, { name, description: '', visible: false, creator_name: getFormattedCreatorName() });
+        await callYcFunction('save_meta', { m: id }, { name, description: '', visible: false });
         await refreshFileList(); 
         await loadRoute(id); 
         showToast("Маршрут создан", 'success'); 
@@ -1153,11 +1042,7 @@ const handleCreateNew = async () => {
 const loadRoute = async (routeName) => {
     showToast("Загрузка...", "info");
     try {
-        const userInfo = encodeUserInfo();
-        const params = { m: routeName };
-        if (userInfo) params.i = userInfo;
-        params.ua = navigator.userAgent.match(/^[^)]+\)/)?.[0] || navigator.userAgent;
-        const result = await callYcFunction('get_protected', params);
+        const result = await callYcFunction('get', { m: routeName });
         if (result.error) {
             showToast(result.error, 'error');
             return;
@@ -1176,8 +1061,7 @@ const loadRoute = async (routeName) => {
             currentRouteMeta = {
                 name: meta.name || routeName,
                 description: meta.description || '',
-                visible: meta.visible !== undefined ? meta.visible : false,
-                creator_name: meta.creator_name || ''
+                visible: meta.visible !== undefined ? meta.visible : false
             };
         } catch (e) {
             currentRouteMeta = { name: routeName, description: '', visible: false };
@@ -1189,7 +1073,6 @@ const loadRoute = async (routeName) => {
         try {
             if (typeof REPORT !== 'undefined') {
                 REPORT.send({
-                    user_id: window.authLogin,
                     m_val: routeName,
                     report_type: 'editor',
                     route_name: currentRouteMeta.name || ''
@@ -1223,8 +1106,7 @@ const openRouteSettings = async (routeName) => {
         currentRouteMeta = {
             name: meta.name || routeName,
             description: meta.description || '',
-            visible: meta.visible !== undefined ? meta.visible : false,
-            creator_name: meta.creator_name || ''
+            visible: meta.visible !== undefined ? meta.visible : false
         };
         $('settingsRouteTitle').textContent = currentRouteMeta.name;
         $('routeDisplayName').value = currentRouteMeta.name;
@@ -1249,10 +1131,9 @@ const saveRouteMeta = async () => {
     if (!name) { showToast('Введите имя маршрута', 'error'); return; }
 
     try {
-        const creatorName = (currentRouteMeta && currentRouteMeta.creator_name) || getFormattedCreatorName();
-        await callYcFunction('save_meta', { m: settingsRouteName }, { name, description, visible, creator_name: creatorName });
+        await callYcFunction('save_meta', { m: settingsRouteName }, { name, description, visible });
         
-        currentRouteMeta = { name, description, visible, creator_name: creatorName };
+        currentRouteMeta = { name, description, visible };
         
         if (curRoute === settingsRouteName) {
             const rnd = $('routeNameDisplay');
@@ -1313,32 +1194,20 @@ function copyToClipboard(text, msg) {
 function copyShareLink(platform) {
     const name = _shareRouteName || settingsRouteName || curRoute;
     if (!name) return;
-    const userId = window.authLogin;
+    const encoded = encodeURIComponent(name);
     const webBase = location.origin + location.pathname.replace(/[^/]*$/, 'navigator.html');
     const link = platform === 'vk'
-        ? `https://vk.com/app54507759#m=${userId}-${name}`
+        ? `https://vk.com/app54507759#m=${encoded}`
         : platform === 'web'
-        ? `${webBase}#m=${userId}-${name}`
-        : `${TG_BOT_LINK}${userId}-${name}`;
+        ? `${webBase}#m=${encoded}`
+        : `${TG_BOT_LINK}${encoded}`;
     toggleM('shareModal');
-    copyToClipboard(link, "Ссылка скопирована в буфер обмена");
-}
-function copyCreatorLink(platform) {
-    const userId = window.authLogin;
-    const webBase = location.origin + location.pathname.replace(/[^/]*$/, 'navigator.html');
-    const link = platform === 'vk'
-        ? `https://vk.com/app54507759#m=${userId}`
-        : platform === 'web'
-        ? `${webBase}#m=${userId}`
-        : `https://t.me/E_ia_bot?startapp=m=${userId}`;
-    toggleM('creatorShareModal');
     copyToClipboard(link, "Ссылка скопирована в буфер обмена");
 }
 const openInNavigator = () => {
     const routeKey = settingsRouteName || curRoute;
     if (!routeKey) return;
-    const userId = window.authLogin;
-    window.location.href = `navigator.html#m=${userId}-${routeKey}`;
+    window.location.href = `navigator.html#m=${encodeURIComponent(routeKey)}`;
 };
 const openSettingsModal = () => { refreshFileList(); toggleM('settingsModal'); };
 const toggleM = id => { const m = $(id); m.style.display = (m.style.display === 'none' || !m.style.display) ? 'flex' : 'none'; };
@@ -1754,135 +1623,6 @@ window.openInstruction = openInstruction;
 window.closeInstruction = closeInstruction;
 window.handleCreateFolder = handleCreateFolder;
 
-// ---- Login modal ----
-let _loginCurrentTab = 'login';
-
-function showLoginModal() {
-    const err = document.getElementById('authError');
-    const succ = document.getElementById('authSuccess');
-    if (err) err.style.display = 'none';
-    if (succ) succ.style.display = 'none';
-    toggleM('loginModal');
-}
-window.showLoginModal = showLoginModal;
-
-document.querySelectorAll('#loginModal .auth-tab').forEach(tab => {
-    tab.addEventListener('click', () => {
-        document.querySelectorAll('#loginModal .auth-tab').forEach(t => t.classList.remove('active'));
-        tab.classList.add('active');
-        _loginCurrentTab = tab.dataset.tab;
-        const btn = document.getElementById('authActionBtn');
-        const nameField = document.getElementById('authNameField');
-        if (_loginCurrentTab === 'register') {
-            btn.textContent = 'Зарегистрироваться';
-            btn.style.background = 'linear-gradient(180deg,rgba(52,199,89,0.9),rgba(40,160,70,0.85))';
-            nameField.style.display = 'block';
-        } else {
-            btn.textContent = 'Войти';
-            btn.style.background = 'linear-gradient(180deg,rgba(0,122,255,0.9),rgba(0,90,200,0.85))';
-            nameField.style.display = 'none';
-        }
-        document.getElementById('authError').style.display = 'none';
-        document.getElementById('authSuccess').style.display = 'none';
-    });
-});
-
-document.getElementById('authActionBtn').addEventListener('click', async () => {
-    const login = document.getElementById('authLogin').value.trim();
-    const password = document.getElementById('authPassword').value;
-    const name = document.getElementById('authName').value.trim() || login;
-    const errorEl = document.getElementById('authError');
-    const successEl = document.getElementById('authSuccess');
-
-    if (!login || !password) {
-        errorEl.textContent = 'Заполните все поля';
-        errorEl.style.display = 'block';
-        return;
-    }
-
-    errorEl.style.display = 'none';
-    successEl.style.display = 'none';
-
-    const btn = document.getElementById('authActionBtn');
-    btn.disabled = true;
-    btn.textContent = 'Подождите...';
-
-    try {
-        const action = _loginCurrentTab === 'register' ? 'register' : 'login';
-        const params = new URLSearchParams({ action, login, password });
-        if (action === 'register') params.set('creator_name', name);
-
-        const res = await fetch(`${YC_FUNCTION_URL}?${params.toString()}`);
-        const data = await res.json();
-
-        if (!res.ok) {
-            throw new Error(data.error || 'Ошибка');
-        }
-
-        if (_loginCurrentTab === 'register') {
-            successEl.textContent = 'Регистрация успешна! Теперь войдите.';
-            successEl.style.display = 'block';
-        } else {
-            const AUTH_KEY = '3api_auth';
-            localStorage.setItem(AUTH_KEY, JSON.stringify({ platform: 'user', login, password, name }));
-            location.reload();
-            return;
-        }
-    } catch (e) {
-        const code = e.message;
-        if (code === 'invalid_credentials') {
-            errorEl.textContent = 'Неправильный логин или пароль';
-        } else if (code === 'login_taken') {
-            errorEl.textContent = 'Этот логин уже занят';
-        } else if (code === 'login_must_contain_letter') {
-            errorEl.textContent = 'Логин должен содержать хотя бы одну букву';
-        } else if (code === 'login_no_hyphen') {
-            errorEl.textContent = 'Логин не может содержать дефис';
-        } else if (code === 'login_min_2_password_min_3') {
-            errorEl.textContent = 'Логин минимум 2 символа, пароль минимум 3';
-        } else if (code === 'missing_fields') {
-            errorEl.textContent = 'Заполните все поля';
-        } else {
-            errorEl.textContent = code;
-        }
-        errorEl.style.display = 'block';
-    } finally {
-        btn.disabled = false;
-        btn.textContent = _loginCurrentTab === 'register' ? 'Зарегистрироваться' : 'Войти';
-    }
-});
-// ----------------------------
-
-// Долгое нажатие на 🔗 → смена пользователя
-const shareBtn = document.querySelector('.settings-share-btn');
-let longPressTimer = null;
-let wasLongPress = false;
-
-shareBtn.addEventListener('pointerdown', () => {
-    wasLongPress = false;
-    longPressTimer = setTimeout(() => {
-        wasLongPress = true;
-        longPressTimer = null;
-        showLoginModal();
-    }, 1000);
-});
-
-shareBtn.addEventListener('pointerup', () => {
-    if (longPressTimer) {
-        clearTimeout(longPressTimer);
-        longPressTimer = null;
-    }
-    if (!wasLongPress) {
-        toggleM('creatorShareModal');
-    }
-});
-
-shareBtn.addEventListener('pointerleave', () => {
-    if (longPressTimer) {
-        clearTimeout(longPressTimer);
-        longPressTimer = null;
-    }
-});
 </script>
 </body>
 </html>

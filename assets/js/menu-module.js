@@ -3,19 +3,18 @@ const MenuModule = {
     callback: null,
     isLoaded: false,
     currentRoute: null,
-    routesDescriptions: {}, // { "id-m": { name, description, id, m } }
+    routesDescriptions: {}, // { "m": { name, description, m } }
     _isFetchingRoutes: false,
     _categoryTree: null,
     _starredTree: null,
     _expandedFolders: new Set(),
-    _filterCreator: '',
 
     // URL Яндекс-функции OSM-версии (отдельная БД dbosm)
     API_URL_V2: 'https://functions.yandexcloud.net/d4e02ghbv31h6kpf8ddh',
-    
+
     /**
-     * Универсальное получение параметров URL
-     * Поддерживает только формат: #m=id-название
+     * Универсальное получение параметров URL.
+     * Поддерживается формат: #m=<m>, ?m=<m> и #/path?m=<m>.
      */
     getUrlParam(name) {
         if (name !== 'm') return null;
@@ -24,15 +23,14 @@ const MenuModule = {
         let value = new URLSearchParams(window.location.search).get(name);
         if (value) return value;
 
-        // Проверка hash: #m=id-название
+        // Проверка hash
         const hash = window.location.hash.slice(1);
         if (hash) {
-            // Формат: #m=id-название
             const hashParams = new URLSearchParams(hash);
             value = hashParams.get(name);
             if (value) return value;
 
-            // Формат: #/path?m=id-название
+            // Формат: #/path?m=<m>
             const hashQueryIndex = hash.indexOf('?');
             if (hashQueryIndex > -1) {
                 const hashQuery = hash.substring(hashQueryIndex + 1);
@@ -45,61 +43,12 @@ const MenuModule = {
         return null;
     },
 
-    /**
-     * Парсинг ввода в формате "id-название"
-     * @returns {{id: string, name: string}}
-     */
-    parseRouteInput(input) {
-        const trimmed = input.trim();
-        const dashIndex = trimmed.indexOf('-');
-        
-        if (dashIndex > 0) {
-            const id = trimmed.substring(0, dashIndex).trim();
-            const name = trimmed.substring(dashIndex + 1).trim();
-            return { id, name };
-        }
-        return { id: trimmed, name: '' };
-    },
-
     // Инициализация
     async init(onRouteLoaded) {
         this.callback = onRouteLoaded;
         this.createModal();
         this.createButton();
         this.hide();
-
-        // Читаем параметры фильтрации из URL/hash
-        const urlM = new URLSearchParams(window.location.search).get('m')
-            || (() => {
-                const hash = window.location.hash.slice(1);
-                if (hash) return new URLSearchParams(hash).get('m');
-                return '';
-            })() || '';
-        if (urlM && !urlM.includes('-')) {
-            this._filterCreator = urlM.trim();
-        } else {
-            this._filterCreator = new URLSearchParams(window.location.search).get('creator')
-                || (() => {
-                    const hash = window.location.hash.slice(1);
-                    if (hash) return new URLSearchParams(hash).get('creator');
-                    return '';
-                })() || '';
-        }
-
-        // Проверка start_param от Telegram Mini App (ДО загрузки маршрутов)
-        if (typeof Telegram !== 'undefined' && Telegram.WebApp) {
-            try {
-                const startParam = Telegram.WebApp.initDataUnsafe?.start_param;
-                if (startParam) {
-                    if (startParam.startsWith('m=')) {
-                        const val = startParam.substring(2);
-                        if (val && !val.includes('-')) this._filterCreator = val;
-                    } else if (startParam.startsWith('creator=')) {
-                        this._filterCreator = startParam.substring(8);
-                    }
-                }
-            } catch (e) {}
-        }
 
         // Загружаем список маршрутов динамически
         await this._loadRoutesList();
@@ -110,7 +59,6 @@ const MenuModule = {
         // Подписка на события VK Bridge для параметров запуска
         if (typeof vkBridge !== 'undefined') {
             vkBridge.subscribe((event) => {
-                // Проверяем, что маршрут ещё не загружен
                 if (!this.isLoaded && (event && event.type === 'VKWebAppUpdateConfig' || event.detail)) {
                     this.checkUrlParam();
                 }
@@ -120,17 +68,10 @@ const MenuModule = {
             try {
                 vkBridge.send('VKWebAppGetLaunchParams')
                     .then(params => {
-                        // Проверяем, что маршрут ещё не загружен
                         if (!this.isLoaded && params && params.m) {
-                            const { id, name } = this.parseRouteInput(params.m);
-                            if (name) {
-                                this.isLoaded = true;
-                                this._filterCreator = id;
-                                this.hide();
-                                this.loadRouteByName(name, id);
-                            } else if (id) {
-                                this.currentRoute = id;
-                            }
+                            this.isLoaded = true;
+                            this.hide();
+                            this.loadRouteByName(params.m);
                         }
                     })
                     .catch(e => {});
@@ -144,20 +85,14 @@ const MenuModule = {
                 const startParam = Telegram.WebApp.initDataUnsafe?.start_param;
                 if (startParam && !this.isLoaded && startParam.startsWith('m=')) {
                     const mValue = startParam.substring(2);
-                    const { id, name } = this.parseRouteInput(mValue);
-                    if (name) {
+                    if (mValue) {
                         this.isLoaded = true;
-                        this._filterCreator = id;
                         this.hide();
-                        this.loadRouteByName(name, id);
-                        this._loadRoutesList().then(() => this._buildRoutesList());
-                    } else if (id) {
-                        this.currentRoute = id;
+                        this.loadRouteByName(mValue);
                     }
                 }
             } catch (e) {}
         }
-
     },
 
     /**
@@ -210,9 +145,7 @@ const MenuModule = {
      * Запрос к Яндекс-функции за списком маршрутов
      */
     async _fetchFromAPI() {
-        let url = `${this.API_URL_V2}?action=list_routes`;
-        if (this._filterCreator) url += `&creator=${encodeURIComponent(this._filterCreator)}`;
-        const response = await fetch(url);
+        const response = await fetch(`${this.API_URL_V2}?action=list_routes`);
 
         if (!response.ok) {
             throw new Error(`HTTP ${response.status}`);
@@ -221,17 +154,14 @@ const MenuModule = {
         const data = await response.json();
 
         const routesFlat = {};
-        
+
         for (const route of data) {
-            const key = `${route.id}-${route.m}`;
-            const rawName = route.name || route.m || '';
-            
+            const key = route.m;
+            if (!key) continue;
             routesFlat[key] = {
-                id: route.id,
                 m: route.m,
-                name: rawName,
-                description: route.description || '',
-                creator_name: route.creator_name || ''
+                name: route.name || route.m,
+                description: route.description || ''
             };
         }
 
@@ -248,35 +178,23 @@ const MenuModule = {
 
     _buildCategoryTree() {
         const root = { folders: {}, routes: [] };
-        const groups = {};
         for (const [key, route] of Object.entries(this.routesDescriptions)) {
             const rawName = route.name || '';
             if (rawName.startsWith('*')) continue;
-            const cid = route.id;
-            if (!groups[cid]) {
-                groups[cid] = { name: route.creator_name || cid, routes: [] };
+            const fullPath = rawName || key;
+            const parts = fullPath.split('/').map(s => s.trim()).filter(Boolean);
+            const leafName = parts.pop() || fullPath;
+            let n = root;
+            for (const part of parts) {
+                if (!n.folders[part]) n.folders[part] = { folders: {}, routes: [] };
+                n = n.folders[part];
             }
-            groups[cid].routes.push({ ...route, key });
+            n.routes.push({ ...route, name: leafName, fullPath, key });
         }
-        for (const group of Object.values(groups)) {
-            const node = { folders: {}, routes: [] };
-            for (const route of group.routes) {
-                const fullPath = route.name || route.key;
-                const parts = fullPath.split('/').map(s => s.trim()).filter(Boolean);
-                const leafName = parts.pop() || fullPath;
-                let n = node;
-                for (const part of parts) {
-                    if (!n.folders[part]) n.folders[part] = { folders: {}, routes: [] };
-                    n = n.folders[part];
-                }
-                n.routes.push({ ...route, name: leafName, fullPath });
-            }
-            if (node.routes.length > 0) {
-                node.folders['Без категории'] = node.folders['Без категории'] || { folders: {}, routes: [] };
-                node.folders['Без категории'].routes.push(...node.routes);
-                node.routes = [];
-            }
-            root.folders[group.name] = node;
+        if (root.routes.length > 0) {
+            root.folders['Без категории'] = root.folders['Без категории'] || { folders: {}, routes: [] };
+            root.folders['Без категории'].routes.push(...root.routes);
+            root.routes = [];
         }
         return root;
     },
@@ -309,26 +227,13 @@ const MenuModule = {
         if (!this.currentRoute) return;
         const route = this.routesDescriptions[this.currentRoute];
         if (!route || !route.name) return;
-        const rawName = route.name;
-        if (rawName.startsWith('*')) {
-            const cleanName = rawName.substring(1);
-            const parts = cleanName.split('/').filter(Boolean);
-            parts.pop();
-            let path = '';
-            for (const part of parts) {
-                path = path ? path + '/' + part : part;
-                this._expandedFolders.add(path);
-            }
-        } else {
-            const creatorName = route.creator_name || route.id;
-            this._expandedFolders.add(creatorName);
-            const parts = rawName.split('/').filter(Boolean);
-            parts.pop();
-            let path = creatorName;
-            for (const part of parts) {
-                path = path + '/' + part;
-                this._expandedFolders.add(path);
-            }
+        const rawName = route.name.startsWith('*') ? route.name.substring(1) : route.name;
+        const parts = rawName.split('/').filter(Boolean);
+        parts.pop();
+        let path = '';
+        for (const part of parts) {
+            path = path ? path + '/' + part : part;
+            this._expandedFolders.add(path);
         }
     },
 
@@ -340,16 +245,16 @@ const MenuModule = {
 
         const frag = document.createDocumentFragment();
 
-        // 1. Звёздочки (*) — без папки создателя, в самом верху
+        // 1. Звёздочки (*) — в самом верху
         const starredTree = this._starredTree;
         const hasStarred = starredTree && (Object.keys(starredTree.folders).length > 0 || starredTree.routes.length > 0);
-        const hasRegular = this._categoryTree && Object.keys(this._categoryTree.folders).length > 0;
+        const hasRegular = this._categoryTree && (Object.keys(this._categoryTree.folders).length > 0 || this._categoryTree.routes.length > 0);
 
         if (hasStarred) {
             this._renderTreeNode(starredTree, frag, '', false);
         }
 
-        // 2. Папки создателей (без *)
+        // 2. Обычные папки
         if (hasRegular) {
             if (hasStarred) {
                 const sep = document.createElement('div');
@@ -461,16 +366,13 @@ const MenuModule = {
 
             btn.addEventListener('click', e => {
                 e.stopPropagation();
-                const route = this.routesDescriptions[routeKey];
-                if (route) this.loadRouteByName(route.m, route.id);
+                if (route.m) this.loadRouteByName(route.m);
             });
             container.appendChild(btn);
         }
     },
 
     // HTML-экранирование для вставки в innerHTML.
-    // Раньше здесь экранировалась только одинарная кавычка (для JS-строки),
-    // из-за чего название категории с <img onerror=...> выполнялось как HTML.
     _escape(str) {
         return String(str)
             .replace(/&/g, '&amp;')
@@ -536,7 +438,7 @@ const MenuModule = {
             setTimeout(() => descModal.style.display = 'none', 300);
         }
     },
-    
+
     // Создание модального окна
     createModal() {
         const html = `
@@ -627,7 +529,7 @@ const MenuModule = {
             }
         });
     },
-    
+
     // Создание кнопки меню
     createButton() {
         const html = `
@@ -635,7 +537,7 @@ const MenuModule = {
                 <span>Маршруты</span>
             </button>
         `;
-        
+
         const container = document.getElementById('topCenterControls');
         if (container) {
             container.insertAdjacentHTML('afterbegin', html);
@@ -647,7 +549,7 @@ const MenuModule = {
                 document.body.insertAdjacentHTML('afterbegin', html);
             }
         }
-        
+
         // Обработчик клика
         document.getElementById('menuBtn').addEventListener('click', () => {
             if (typeof closeInstruction === 'function') closeInstruction();
@@ -659,127 +561,38 @@ const MenuModule = {
             }
         });
     },
-    
+
     // Проверка URL параметра
     checkUrlParam() {
         const routeParam = this.getUrlParam('m');
         if (!routeParam) return;
 
-        const { id, name } = this.parseRouteInput(routeParam);
-
-        // Только ID, без названия — фильтруем список по создателю
-        if (!name) {
-            this.currentRoute = id;
-            this._filterCreator = id;
-            this._loadRoutesList().then(() => this._buildRoutesList());
-            return;
-        }
-
-        // ID и название — загружаем маршрут
         this.currentRoute = routeParam;
-        this._filterCreator = id;
         this.isLoaded = true;
         this.hide();
-        this.loadRouteByName(name, id);
-        this._loadRoutesList().then(() => this._buildRoutesList());
+        this.loadRouteByName(routeParam);
     },
-    
-    // Загрузка маршрута по названию (внутренний метод)
-    async loadRouteByName(routeName, routeId = null) {
+
+    // Загрузка маршрута по m
+    async loadRouteByName(routeM) {
         this.showSpinner();
         try {
-            this.currentRoute = routeId ? `${routeId}-${routeName}` : routeName;
+            if (!routeM) throw new Error('Не указан маршрут');
+            this.currentRoute = routeM;
 
             this.hide();
-            
-            let url = this.API_URL_V2;
-            const params = [];
-            if (routeId) {
-                params.push(`id=${encodeURIComponent(routeId)}`);
-            }
-            if (routeName) {
-                params.push(`m=${encodeURIComponent(routeName)}`);
-            }
 
-            if (window.vkUser) {
-                const user = window.vkUser;
-                const city = user.city?.title || 'не указан';
-                const fullName = [user.first_name, user.last_name].filter(Boolean).join(' ');
-                const userInfoStr = 'vk:' + [user.id, fullName, city].join(',');
-                const userInfoBase64 = btoa(encodeURIComponent(userInfoStr));
-                params.push(`i=${userInfoBase64}`);
-            } else if (typeof vkBridge !== 'undefined') {
-                try {
-                    const userInfo = await Promise.race([
-                        vkBridge.send('VKWebAppGetUserInfo'),
-                        new Promise((_, reject) =>
-                            setTimeout(() => reject(new Error('timeout')), 1000)
-                        )
-                    ]);
-                    if (userInfo) {
-                        const city = userInfo.city?.title || 'не указан';
-                        const fullName = [userInfo.first_name, userInfo.last_name].filter(Boolean).join(' ');
-                        const userInfoStr = 'vk:' + [userInfo.id, fullName, city].join(',');
-                        const userInfoBase64 = btoa(encodeURIComponent(userInfoStr));
-                        params.push(`i=${userInfoBase64}`);
-                    }
-                } catch (e) {
-                }
-            }
-
-            if (window.tgUser) {
-                try {
-                    const user = window.tgUser;
-                    const fullName = [user.first_name, user.last_name].filter(Boolean).join(' ');
-                    const userInfoStr = 'tg:' + [user.id, fullName, user.username || ''].join(',');
-                    const userInfoBase64 = btoa(encodeURIComponent(userInfoStr));
-                    params.push(`i=${userInfoBase64}`);
-                } catch (e) {
-                }
-            }
-
-            if (window.authPlatform === 'user') {
-                try {
-                    const userInfoStr = 'user:' + window.authLogin;
-                    const userInfoBase64 = btoa(encodeURIComponent(userInfoStr));
-                    params.push(`i=${userInfoBase64}`);
-                } catch (e) {
-                }
-            }
-
-            params.push(`ua=${encodeURIComponent(navigator.userAgent.match(/^[^)]+\)/)?.[0] || navigator.userAgent)}`);
-
-            try {
-                const pos = await new Promise((resolve) => {
-                    navigator.geolocation.getCurrentPosition(
-                        p => resolve(p.coords),
-                        () => resolve(null),
-                        { enableHighAccuracy: false, timeout: 1, maximumAge: Infinity }
-                    );
-                });
-                if (pos) {
-                    params.push(`lat=${pos.latitude}&lon=${pos.longitude}`);
-                }
-            } catch {}
-
-            if (params.length > 0) {
-                url += '?' + params.join('&');
-            }
-
+            const url = this.API_URL_V2 + '?action=get&m=' + encodeURIComponent(routeM);
             const res = await fetch(url);
 
             if (!res.ok) throw new Error('HTTP ' + res.status);
             const data = await res.json();
 
-            // Отчёт об открытии маршрута — после получения данных маршрута
-            // (для названия route_name), но без какой-либо зависимости от SDK
-            // Telegram и геолокации. Логика — в report.js, он сам собирает
-            // данные пользователя.
+            // Отчёт об открытии маршрута — после получения данных маршрута.
             try {
                 if (typeof REPORT !== 'undefined') {
                     REPORT.send({
-                        user_id: routeId,
-                        m_val: routeName,
+                        m_val: routeM,
                         report_type: 'navigator',
                         route_name: data && data.name ? data.name : ''
                     });
@@ -805,7 +618,7 @@ const MenuModule = {
         if (typeof clearRoute === 'function') {
             clearRoute();
         }
-        
+
         // Если ответ содержит метаданные (имя, m), извлекаем их
         let routeData = jsonData;
         if (jsonData && typeof jsonData === 'object' && 'data' in jsonData) {
@@ -816,11 +629,11 @@ const MenuModule = {
                 if (this.routesDescriptions[cr]) {
                     this.routesDescriptions[cr].name = jsonData.name;
                 } else {
-                    this.routesDescriptions[cr] = { name: jsonData.name, m: jsonData.m || '' };
+                    this.routesDescriptions[cr] = { name: jsonData.name, m: jsonData.m || cr };
                 }
             }
         }
-        
+
         // Передаём JSON данные в навигатор
         if (typeof this.callback === 'function') {
             this.callback(routeData);
@@ -828,7 +641,7 @@ const MenuModule = {
         this.isLoaded = true;
         this.hide();
     },
-    
+
     // Скрыть модальное окно
     hide() {
         const modal = document.getElementById('jsonModal');
@@ -843,7 +656,7 @@ const MenuModule = {
             this._retryTimer = null;
         }
     },
-    
+
     // Показать модальное окно
     show() {
         if (typeof closeAllSheets === 'function') closeAllSheets();
@@ -858,7 +671,7 @@ const MenuModule = {
             this._buildRoutesList();
         }
     },
-    
+
     showSpinner() {
         const spinner = document.getElementById('loadingSpinner');
         if (spinner) spinner.classList.add('active');

@@ -101,7 +101,7 @@
 
 <div id="toast"></div>
 
-<script src="assets/js/report.js?v=2"></script>
+<script src="assets/js/report.js?v=3"></script>
 <script src="https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
 <script>
 // Грузим Telegram/VK SDK асинхронно с таймаутом 10с.
@@ -162,7 +162,7 @@
   tryLoad('https://unpkg.com/@vkontakte/vk-bridge/dist/browser.min.js');
 })(window);
 </script>
-<script src="assets/js/menu-module.js?v=2" defer></script>
+<script src="assets/js/menu-module.js?v=3" defer></script>
 <script>
 // Ключ MapTiler для навигатора (карта, схема, спутник)
 const MAPTILER_KEY = 'mveDsz0PeGC3zhA47AdM';
@@ -294,22 +294,12 @@ function mapRemoveChild(obj) {
     if (obj._remove) obj._remove();
 }
 
-// Auth detection (ждёт загрузки Telegram/VK SDK, максимум ~10с)
+// Определение платформы (Telegram/VK SDK). Нужно только для UI и отчётов,
+// аккаунты и привязка маршрутов к пользователям не используются.
 (function() {
-    // localStorage-авторизация применяется СРАЗУ (браузер без TG/VK), чтобы
-    // не ждать таймаута загрузки SDK (до ~10с). TG/VK ниже имеют приоритет и переопределяют её.
-    if (!window.authPlatform) {
-        try {
-            const stored = JSON.parse(localStorage.getItem('3api_auth') || '{}');
-            if (stored.platform && stored.login) {
-                window.authPlatform = stored.platform;
-                window.authLogin = stored.login;
-            }
-        } catch (e) {}
-    }
-    const runAuth = () => {
-        if (window._authRan) return;
-        window._authRan = true;
+    const runPlatform = () => {
+        if (window._platformRan) return;
+        window._platformRan = true;
         if (typeof Telegram !== 'undefined' && Telegram.WebApp) {
             try {
                 Telegram.WebApp.ready();
@@ -320,8 +310,7 @@ function mapRemoveChild(obj) {
                 }
                 const user = Telegram.WebApp.initDataUnsafe?.user;
                 if (user) {
-                    window.authPlatform = 'tg';
-                    window.authLogin = String(user.id);
+                    window.platformType = 'tg';
                     window.tgUser = user;
                 }
             } catch (e) {}
@@ -331,18 +320,17 @@ function mapRemoveChild(obj) {
                 vkBridge.send('VKWebAppInit');
                 vkBridge.send('VKWebAppGetUserInfo').then(data => {
                     if (data?.id) {
-                        window.authPlatform = 'vk';
-                        window.authLogin = String(data.id);
+                        window.platformType = 'vk';
                         window.vkUser = data;
                     }
                 });
             } catch (e) {}
         }
-        if (navigator.userAgent.includes('Android') && window.authPlatform === 'tg') {
+        if (navigator.userAgent.includes('Android') && window.platformType === 'tg') {
             document.documentElement.classList.add('android-app');
         }
     };
-    if (window.bootPlatforms) window.bootPlatforms(runAuth); else runAuth();
+    if (window.bootPlatforms) window.bootPlatforms(runPlatform); else runPlatform();
 })();
 
 let toastTimer = null;
@@ -1291,8 +1279,7 @@ function updateRouteNameDisplay() {
                 name = fullName.split('/').pop() || fullName;
             }
             if (!name && cr) {
-                const dashIndex = cr.indexOf('-');
-                name = dashIndex > 0 ? decodeURIComponent(cr.substring(dashIndex + 1)) : cr;
+                name = cr;
             }
         }
     } catch (e) {}

@@ -790,23 +790,6 @@ input, textarea, select {
     height: auto;
 }
 
-#loginModal {
-    position: fixed;
-    inset: 0;
-    z-index: 11000;
-    align-items: center;
-    justify-content: center;
-    background: rgba(0, 0, 0, 0.5);
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
-}
-
-#loginModal .modal-sheet {
-    height: auto;
-}
-
-.auth-tab.active { background: rgba(0,122,255,0.3) !important; color: #fff !important; }
-
 #settingsRouteModal {
     position: fixed;
     top: calc(76px + env(safe-area-inset-top));
@@ -834,22 +817,6 @@ input, textarea, select {
 }
 
 #shareModal .modal-sheet {
-    height: auto;
-}
-
-#creatorShareModal {
-    position: fixed;
-    inset: 0;
-    z-index: 14000;
-    display: none;
-    align-items: center;
-    justify-content: center;
-    background: rgba(0, 0, 0, 0.5);
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
-}
-
-#creatorShareModal .modal-sheet {
     height: auto;
 }
 
@@ -1285,20 +1252,6 @@ input, textarea, select {
     text-align: left;
     box-shadow: var(--shadow-soft), inset 0 0.5px 0 rgba(255, 255, 255, 0.1);
     transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.settings-share-btn {
-    width: auto;
-    align-self: stretch;
-    aspect-ratio: 1;
-    padding: 0;
-    font-size: 16px;
-    flex-shrink: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: rgba(0,122,255,0.2);
-    border-color: rgba(0,122,255,0.3);
 }
 
 .settings-tool-btn-green {

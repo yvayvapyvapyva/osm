@@ -14,32 +14,7 @@ cd "$(dirname "$0")"
 echo "Деплой функции ${FUNCTION_NAME} (${FUNCTION_ID})"
 echo "База: ${DATABASE}"
 
-# Секреты авторизации редактора не хранятся в репозитории. Если они не заданы
-# в окружении, переиспользуем значения из текущей версии функции, чтобы
-# обычный деплой не отключал вход через Telegram и админ-ключ.
-CURRENT_ENV="$(yc serverless function version get-by-tag \
-  --function-id "${FUNCTION_ID}" --tag '$latest' --format json 2>/dev/null || true)"
-
-current_secret() {
-  printf '%s' "${CURRENT_ENV}" | python3 -c \
-    'import json, sys
-try:
-    data = json.load(sys.stdin)
-except Exception:
-    sys.exit(0)
-print((data.get("environment") or {}).get(sys.argv[1], ""))' "$1"
-}
-
-TELEGRAM_TOKEN="${TELEGRAM_TOKEN:-$(current_secret TELEGRAM_TOKEN)}"
-ADMIN_ACCESS_KEY="${ADMIN_ACCESS_KEY:-$(current_secret ADMIN_ACCESS_KEY)}"
-
 ENVIRONMENT="YDB_ENDPOINT=${ENDPOINT},YDB_DATABASE=${DATABASE}"
-if [ -n "${TELEGRAM_TOKEN}" ]; then
-  ENVIRONMENT="${ENVIRONMENT},TELEGRAM_TOKEN=${TELEGRAM_TOKEN}"
-fi
-if [ -n "${ADMIN_ACCESS_KEY}" ]; then
-  ENVIRONMENT="${ENVIRONMENT},ADMIN_ACCESS_KEY=${ADMIN_ACCESS_KEY}"
-fi
 
 yc serverless function version create \
   --function-id "${FUNCTION_ID}" \
