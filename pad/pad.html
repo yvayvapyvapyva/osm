@@ -548,7 +548,7 @@
 </div>
 
 <script src="https://api-maps.yandex.ru/v3/?apikey=c0e28937-4e16-4d15-9b99-09a30cb8fc13&lang=ru_RU"></script>
-<script src="mapLayers.js?v=1"></script>
+<script src="mapLayers.js?v=2"></script>
 <script src="pdd.js"></script>
 <script>
 let map = null, userMarker = null, lastPos = null;
@@ -1649,7 +1649,7 @@ function initCustomPinchRotate() {
         projection: ymaps3.projections.sphericalMercator,
         behaviors: appBehaviors
     });
-    // Базовый слой: MapTiler (как в навигаторе) + переключатель на Яндекс.Спутник.
+    // Базовый слой: Яндекс.Спутник.
     PadMapLayers.init({ map, YMapTileDataSource, YMapLayer });
     map.addChild(new YMapDefaultFeaturesLayer({ zIndex: 100000 }));
     initCustomPinchRotate();
