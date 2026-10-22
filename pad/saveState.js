@@ -19,7 +19,7 @@
     const BOT_LINK = 'https://t.me/E_ia_bot/pad';
     const SCENE_ID_RE = /^[a-z0-9]{8}$/;
     const viewOnly = document.documentElement.classList.contains('scene-viewer');
-    let adminPassword = '';
+    const ADMIN_PASSWORD_KEY = 'padSceneAdminPassword';
     // Длительность анимации перелёта к камере сохранённой сцены.
     // Мгновенный прыжок camera при холодном кеше спутниковых тайлов даёт
     // рассинхрон растра и слоя элементов на iOS — перелёт это устраняет.
@@ -41,6 +41,30 @@
     let scenesLoading = false;
     let scenesLoaded = false;
 
+    function getStoredAdminPassword() {
+        try {
+            return sessionStorage.getItem(ADMIN_PASSWORD_KEY) || '';
+        } catch (e) {
+            return '';
+        }
+    }
+
+    function storeAdminPassword(password) {
+        try {
+            sessionStorage.setItem(ADMIN_PASSWORD_KEY, password);
+        } catch (e) {
+            showToast('Пароль не удалось сохранить до конца сессии');
+        }
+    }
+
+    function clearStoredAdminPassword() {
+        try {
+            sessionStorage.removeItem(ADMIN_PASSWORD_KEY);
+        } catch (e) {
+            showToast('Не удалось очистить сохранённый пароль');
+        }
+    }
+
     async function api(method, { body, query, headers } = {}) {
         let url = API_URL;
         if (query && Object.keys(query).length) {
@@ -51,10 +75,6 @@
             if (qs) url += '?' + qs;
         }
         const requestHeaders = Object.assign({ 'Content-Type': 'application/json' }, headers || {});
-        if (['POST', 'PUT', 'DELETE'].includes(method)) {
-            if (!adminPassword) throw new Error('Требуется вход администратора');
-            requestHeaders['X-Scene-Admin-Password'] = adminPassword;
-        }
         const opts = {
             method: method,
             headers: requestHeaders
@@ -63,67 +83,36 @@
         const resp = await fetch(url, opts);
         const json = await resp.json().catch(() => ({}));
         if (!resp.ok || json.ok === false) {
-            if (resp.status === 403 && ['POST', 'PUT', 'DELETE'].includes(method)) {
-                adminPassword = '';
-                showAdminGate('Неверный пароль или вход истёк');
+            if (resp.status === 403 && requestHeaders['X-Scene-Admin-Password']) {
+                clearStoredAdminPassword();
             }
             throw new Error(json.error || ('Ошибка ' + resp.status));
+        }
+        if (['POST', 'PUT', 'DELETE'].includes(method)
+            && requestHeaders['X-Scene-Admin-Password']) {
+            storeAdminPassword(requestHeaders['X-Scene-Admin-Password']);
         }
         return json;
     }
 
-    function showAdminGate(message) {
-        if (viewOnly) return;
-        const gate = document.getElementById('sceneAdminGate');
-        const error = document.getElementById('sceneAdminError');
-        const input = document.getElementById('sceneAdminPassword');
-        if (!gate || !error || !input) return;
-        error.textContent = message || '';
-        input.value = '';
-        gate.style.display = 'flex';
-        setTimeout(() => input.focus(), 50);
-    }
-
-    async function authenticateAdmin() {
-        const input = document.getElementById('sceneAdminPassword');
-        const error = document.getElementById('sceneAdminError');
-        const button = document.getElementById('sceneAdminSubmit');
-        if (!input || !error || !button) return;
-        const password = input.value;
-        if (!password) {
-            error.textContent = 'Введите пароль администратора';
-            input.focus();
-            return;
-        }
-        button.disabled = true;
-        error.textContent = '';
-        try {
-            const response = await fetch(API_URL + '?action=auth', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-Scene-Admin-Password': password
-                },
-                body: '{}'
+    function requestAdminPassword() {
+        const storedPassword = getStoredAdminPassword();
+        if (storedPassword) return Promise.resolve(storedPassword);
+        return new Promise(resolve => {
+            promptBox({
+                title: 'Подтвердите изменение',
+                label: 'Пароль администратора',
+                placeholder: 'Пароль администратора',
+                inputType: 'password',
+                okText: 'Продолжить',
+                onCancel: () => resolve(null),
+                onSubmit: async (password, wrap) => {
+                    closeM(wrap);
+                    resolve(password);
+                }
             });
-            const result = await response.json().catch(() => ({}));
-            if (!response.ok || result.ok === false) {
-                throw new Error(result.error || ('Ошибка ' + response.status));
-            }
-            adminPassword = password;
-            input.value = '';
-            document.getElementById('sceneAdminGate').style.display = 'none';
-        } catch (e) {
-            error.textContent = e.message === 'Неверный пароль администратора'
-                ? 'Неверный пароль'
-                : 'Не удалось проверить пароль: ' + e.message;
-            input.focus();
-        } finally {
-            button.disabled = false;
-        }
+        });
     }
-
-    window.authenticatePadAdmin = authenticateAdmin;
 
     function collectState() {
         const snap = window.serializeScene ? window.serializeScene() : { lines: [], markers: [] };
@@ -414,7 +403,12 @@
             placeholder: 'Имя сцены',
             okText: 'Сохранить',
             onSubmit: async (name, wrap) => {
-                await api('POST', { body: { name: name, data: collectState() } });
+                const password = await requestAdminPassword();
+                if (password === null) return;
+                await api('POST', {
+                    body: { name: name, data: collectState() },
+                    headers: { 'X-Scene-Admin-Password': password }
+                });
                 closeM(wrap);
                 showToast('Сохранено: ' + name);
                 if (callback) callback(name);
@@ -435,7 +429,7 @@
     }
 
     // ---- Простой prompt-модалка (для переименования) ----
-    function promptBox({ title, label, value, placeholder, okText, onSubmit }) {
+    function promptBox({ title, label, value, placeholder, okText, inputType, onCancel, onSubmit }) {
         const wrap = document.createElement('div');
         wrap.className = 'scene-io-modal scene-io-modal-save scene-io-center';
         const box = document.createElement('div');
@@ -446,7 +440,11 @@
         const closeBtn = document.createElement('button');
         closeBtn.className = 'scene-io-close';
         closeBtn.innerHTML = '&#10005;';
-        closeBtn.addEventListener('click', () => closeM(wrap));
+        const cancel = () => {
+            closeM(wrap);
+            if (onCancel) onCancel();
+        };
+        closeBtn.addEventListener('click', cancel);
         const headerTitle = document.createElement('div');
         headerTitle.className = 'scene-io-header-title';
         headerTitle.textContent = title;
@@ -454,12 +452,12 @@
         header.appendChild(headerTitle);
 
         const input = document.createElement('input');
-        input.type = 'text';
+        input.type = inputType || 'text';
         input.className = 'scene-io-input';
         input.value = value || '';
         input.placeholder = placeholder || label || '';
         input.spellcheck = false;
-        input.autocomplete = 'off';
+        input.autocomplete = inputType === 'password' ? 'current-password' : 'off';
 
         const ok = document.createElement('button');
         ok.className = 'scene-io-opt';
@@ -473,7 +471,7 @@
         box.appendChild(ok);
         box.appendChild(status);
         wrap.appendChild(box);
-        wrap.addEventListener('click', e => { if (e.target === wrap) closeM(wrap); });
+        wrap.addEventListener('click', e => { if (e.target === wrap) cancel(); });
         document.body.appendChild(wrap);
         requestAnimationFrame(() => {
             wrap.classList.add('visible');
@@ -482,11 +480,17 @@
         });
 
         const submit = () => {
-            const val = sanitizeName(input.value);
-            if (!val) { status.textContent = 'Введите имя'; return; }
+            const val = inputType === 'password' ? input.value : sanitizeName(input.value);
+            if (!val) {
+                status.textContent = inputType === 'password'
+                    ? 'Введите пароль администратора'
+                    : 'Введите имя';
+                return;
+            }
             ok.disabled = true;
             onSubmit(val, wrap).catch(e => {
                 status.textContent = 'Ошибка: ' + e.message;
+            }).finally(() => {
                 ok.disabled = false;
             });
         };
@@ -498,7 +502,7 @@
     }
 
     // ---- Конфирм (для удаления) ----
-    function confirmBox({ title, message, okText, onOk }) {
+    function confirmBox({ title, message, okText, passwordRequired, onOk }) {
         const wrap = document.createElement('div');
         wrap.className = 'scene-io-modal scene-io-modal-save scene-io-center';
         const box = document.createElement('div');
@@ -520,12 +524,23 @@
         msg.className = 'scene-io-confirm-msg';
         msg.textContent = message;
 
+        let passwordInput = null;
+        if (passwordRequired) {
+            passwordInput = document.createElement('input');
+            passwordInput.type = 'password';
+            passwordInput.className = 'scene-io-input';
+            passwordInput.placeholder = 'Пароль администратора';
+            passwordInput.autocomplete = 'current-password';
+            passwordInput.setAttribute('aria-label', 'Пароль администратора');
+        }
+
         const ok = document.createElement('button');
         ok.className = 'scene-io-opt scene-io-danger';
         ok.textContent = okText || 'Удалить';
 
         box.appendChild(header);
         box.appendChild(msg);
+        if (passwordInput) box.appendChild(passwordInput);
         box.appendChild(ok);
         wrap.appendChild(box);
         wrap.addEventListener('click', e => { if (e.target === wrap) closeM(wrap); });
@@ -533,13 +548,32 @@
         requestAnimationFrame(() => wrap.classList.add('visible'));
 
         ok.addEventListener('click', async () => {
+            const password = passwordInput
+                ? passwordInput.value
+                : getStoredAdminPassword();
+            if (passwordRequired && !password) {
+                msg.textContent = 'Введите пароль администратора';
+                return;
+            }
             ok.disabled = true;
             try {
-                await onOk();
+                await onOk(password);
                 closeM(wrap);
             } catch (e) {
                 ok.disabled = false;
                 msg.textContent = 'Ошибка: ' + e.message;
+                if (!passwordInput && !getStoredAdminPassword()) {
+                    passwordInput = document.createElement('input');
+                    passwordInput.type = 'password';
+                    passwordInput.className = 'scene-io-input';
+                    passwordInput.placeholder = 'Пароль администратора';
+                    passwordInput.autocomplete = 'current-password';
+                    passwordInput.setAttribute('aria-label', 'Пароль администратора');
+                    box.insertBefore(passwordInput, ok);
+                    passwordInput.focus();
+                }
+            } finally {
+                if (passwordInput) passwordInput.value = '';
             }
         });
     }
@@ -728,7 +762,12 @@
             placeholder: 'Новое имя сцены',
             okText: 'Переименовать',
             onSubmit: async (newName, wrap) => {
-                await api('PUT', { body: { name: newName, from: scene.name } });
+                const password = await requestAdminPassword();
+                if (password === null) return;
+                await api('PUT', {
+                    body: { name: newName, from: scene.name },
+                    headers: { 'X-Scene-Admin-Password': password }
+                });
                 if (activeSceneName === scene.name) activeSceneName = newName;
                 closeM(wrap);
                 reloadScenes();
@@ -741,8 +780,12 @@
             title: 'Удалить сцену',
             message: 'Удалить сцену «' + scene.name + '» без возможности восстановления?',
             okText: 'Удалить',
-            onOk: async () => {
-                await api('DELETE', { query: { name: scene.name } });
+            passwordRequired: !getStoredAdminPassword(),
+            onOk: async (password) => {
+                await api('DELETE', {
+                    query: { name: scene.name },
+                    headers: { 'X-Scene-Admin-Password': password }
+                });
                 if (activeSceneName === scene.name) activeSceneName = null;
                 reloadScenes();
             }
@@ -789,15 +832,6 @@
 
     // ---- Кнопка ----
     function init() {
-        const authForm = document.getElementById('sceneAdminForm');
-        if (authForm && !viewOnly) {
-            authForm.addEventListener('submit', event => {
-                event.preventDefault();
-                authenticateAdmin();
-            });
-            showAdminGate();
-        }
-
         const group = document.createElement('div');
         group.id = 'savePddGroup';
         const pddBtn = document.getElementById('pddBtn');
