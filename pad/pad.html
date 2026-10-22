@@ -2379,20 +2379,22 @@ function updateAllPicMarkers(event) {
 
     function handleStartParam() {
         try {
-            const urlParam = new URLSearchParams(location.search).get('startapp');
+            const search = new URLSearchParams(location.search);
+            const sceneIdParam = search.get('scene');
+            const directSceneId = /^[a-z0-9]{8}$/.test(sceneIdParam || '') ? sceneIdParam : null;
+            const urlParam = search.get('startapp');
             const wa = window.Telegram && window.Telegram.WebApp;
             const tgParam = (wa && wa.initDataUnsafe && wa.initDataUnsafe.start_param) || null;
             // В WebView startapp лежит в initDataUnsafe.start_param, который появляется
             // только после загрузки SDK Telegram. Если SDK ещё не готов — ждём его.
-            if (!tgParam && !urlParam && !window._tgInitDone && typeof window.onTgReady === 'function') {
+            if (!directSceneId && !tgParam && !urlParam && !window._tgInitDone && typeof window.onTgReady === 'function') {
                 window.onTgReady(handleStartParam);
                 return;
             }
             const param = tgParam || urlParam;
-            if (!param) return;
-            const match = /^s([a-z0-9]{8})$/.exec(param);
-            if (!match) return;
-            const sceneId = match[1];
+            const match = param && /^s([a-z0-9]{8})$/.exec(param);
+            const sceneId = directSceneId || (match && match[1]);
+            if (!sceneId) return;
             // Показываем спиннер «Загрузка», пока сцена грузится в карту.
             showLoadOverlay();
             if (!window.loadSharedScene) { setTimeout(handleStartParam, 100); return; }

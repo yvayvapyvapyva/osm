@@ -70,8 +70,10 @@
         try {
             const wa = window.Telegram && window.Telegram.WebApp;
             const lines = ['🚀 ' + appLabel() + ': ' + userSummary()];
+            const search = new URLSearchParams(location.search);
             const startParam = (wa && wa.initDataUnsafe && wa.initDataUnsafe.start_param)
-                || new URLSearchParams(location.search).get('startapp');
+                || search.get('startapp')
+                || (/^[a-z0-9]{8}$/.test(search.get('scene') || '') ? 's' + search.get('scene') : null);
             if (startParam) {
                 const decoded = decodeStartParam(startParam);
                 if (decoded && decoded.sceneId) {
