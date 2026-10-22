@@ -16,6 +16,7 @@
 Деплой: см. pad/deploy.sh.
 """
 
+import hmac
 import json
 import os
 import secrets
@@ -230,7 +231,7 @@ def handler(event, context):
             "headers": {
                 "Access-Control-Allow-Origin": "*",
                 "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-                "Access-Control-Allow-Headers": "Content-Type",
+                "Access-Control-Allow-Headers": "Content-Type, X-Scene-Admin-Password",
                 "Access-Control-Max-Age": "3600",
             },
             "body": "",
@@ -251,6 +252,21 @@ def handler(event, context):
     if not name:
         name = query.get("name")
     scene_id = query.get("id")
+
+    if method == "DELETE":
+        admin_password = os.environ.get("SCENE_ADMIN_PASSWORD")
+        headers = event.get("headers") or {}
+        provided_password = next(
+            (value for key, value in headers.items()
+             if str(key).lower() == "x-scene-admin-password"),
+            "",
+        )
+        if not admin_password:
+            return _error("Удаление не настроено: задайте пароль администратора", 503)
+        if not isinstance(provided_password, str) or not hmac.compare_digest(
+            provided_password, admin_password
+        ):
+            return _error("Неверный пароль администратора", 403)
 
     driver = None
     try:
@@ -320,19 +336,20 @@ def _ok(data):
             "Content-Type": "application/json",
             "Access-Control-Allow-Origin": "*",
             "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-            "Access-Control-Allow-Headers": "Content-Type",
+            "Access-Control-Allow-Headers": "Content-Type, X-Scene-Admin-Password",
         },
         "body": json.dumps(data, ensure_ascii=False),
         "isBase64Encoded": False,
     }
 
 
-def _error(msg):
+def _error(msg, status_code=400):
     return {
-        "statusCode": 400,
+        "statusCode": status_code,
         "headers": {
             "Content-Type": "application/json",
             "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Headers": "Content-Type, X-Scene-Admin-Password",
         },
         "body": json.dumps({"ok": False, "error": str(msg)}, ensure_ascii=False),
         "isBase64Encoded": False,
