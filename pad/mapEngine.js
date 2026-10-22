@@ -144,7 +144,11 @@
                 anchor: 'center',
                 rotationAlignment: 'viewport',
                 pitchAlignment: 'viewport',
-                draggable: this._draggable
+                draggable: this._draggable,
+                // Без этого MapLibre округляет позицию маркера до целых пикселей
+                // при каждом setLngLat(). На большом отдалении машинка за кадр
+                // смещается меньше пикселя, и округление даёт заметные рывки.
+                subpixelPositioning: true
             }).setLngLat(this._coords).addTo(engine._map);
             this._marker = marker;
             if (opts.onDragStart) marker.on('dragstart', function () { try { opts.onDragStart(); } catch (e) {} });
