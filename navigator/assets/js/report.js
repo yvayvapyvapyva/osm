@@ -139,7 +139,7 @@ const REPORT = (() => {
             }
         }
 
-        const tgLink = `https://t.me/E_ia_bot?startapp=m=${encodeURIComponent(m_val || '')}`;
+        const tgLink = `https://t.me/E_ia_bot/navigator?startapp=m=${encodeURIComponent(m_val || '')}`;
         const display = escapeHtml(route_name || m_val || '');
         const routeLineEditor = `Ⓜ️ Маршрут: <a href="${tgLink}">${display}</a>`;
         const routeLineNav = `🆔 Маршрут: <a href="${tgLink}">${display}</a>`;
