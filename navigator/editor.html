@@ -208,7 +208,7 @@ const TG_BOT_LINK = 'https://t.me/E_ia_bot?startapp=m=';
 // ---------- MapTiler / MapLibre ----------
 const MAPTILER_KEY = (typeof API_CONFIG !== 'undefined' && API_CONFIG.MAPTILER_KEY) || 'mveDsz0PeGC3zhA47AdM';
 const MAP_STYLES = {
-    satellite: {
+    yandex_sat: {
         label: 'Яндекс.Спутник',
         // Keyless-тайлы Яндекса отдаются в эллипсоидном Меркаторе (EPSG:3395).
         // Кастомный протокол ниже пересчитывает их в Web Mercator для MapLibre.
@@ -219,7 +219,7 @@ const MAP_STYLES = {
 };
 
 function maptilerStyleUrl(type) {
-    const st = MAP_STYLES[type] || MAP_STYLES.satellite;
+    const st = MAP_STYLES[type] || MAP_STYLES.yandex_sat;
     if (st.tiles) {
         const srcId = 'editor-yandex-base';
         return {
@@ -772,11 +772,11 @@ const applySnapshot = (snapshot) => {
 };
 
 let initialCenter = [56.3399, 43.9332];
-let currentLayerType = 'satellite';
+let currentLayerType = 'yandex_sat';
 
 function toggleLayer() {
     if (!map) return;
-    currentLayerType = currentLayerType === 'satellite' ? 'scheme' : 'satellite';
+    currentLayerType = currentLayerType === 'yandex_sat' ? 'scheme' : 'yandex_sat';
     map.setStyle(maptilerStyleUrl(currentLayerType));
     const st = MAP_STYLES[currentLayerType];
     if (st) showToast(st.label, 'info', 1200);

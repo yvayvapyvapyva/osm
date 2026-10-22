@@ -194,7 +194,7 @@ const MAP_OVERLAYS = {
 const MAP_PREFS_KEY = 'osm_map_prefs_v1';
 
 function loadMapPrefs() {
-  const prefs = { style: 'sat', overlays: {} };
+  const prefs = { style: 'yandex_sat', overlays: {} };
   try {
     const saved = JSON.parse(localStorage.getItem(MAP_PREFS_KEY) || '{}');
     if (saved && MAP_STYLES[saved.style]) prefs.style = saved.style;
