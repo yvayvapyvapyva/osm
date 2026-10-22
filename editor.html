@@ -20,7 +20,7 @@
     </button>
     <div id="routeNameDisplay"></div>
 </div>
-<button id="layerSwitchBtn" class="circle-btn hidden-vis" onclick="toggleLayer()">
+<button id="layerSwitchBtn" class="circle-btn" onclick="toggleLayer()">
     <svg viewBox="0 0 24 24"><path d="M11.99 18.54l-7.37-5.73L3 14.07l9 7 9-7-1.63-1.27-7.38 5.74zM12 16l7.36-5.73L21 9l-9-7-9 7 1.63 1.27L12 16z"/></svg>
 </button>
 <button id="listPointsBtn" class="circle-btn hidden-vis" onclick="openPointsOrderModal()">
@@ -1235,7 +1235,7 @@ const updateVisibility = () => {
     const act = curRoute !== null;
     $('listPointsBtn').style.visibility = act ? 'visible' : 'hidden';
     $('routeSettingsBtn').style.visibility = act ? 'visible' : 'hidden';
-    $('layerSwitchBtn').style.visibility = act ? 'visible' : 'hidden';
+    $('layerSwitchBtn').style.visibility = 'visible';
     $('addMarkerBtn').style.visibility = act ? 'visible' : 'hidden';
     updateGpsBtnVisibility();
     if(curRoute) {
