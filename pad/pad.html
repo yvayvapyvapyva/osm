@@ -548,6 +548,7 @@
 </div>
 
 <script src="https://api-maps.yandex.ru/v3/?apikey=c0e28937-4e16-4d15-9b99-09a30cb8fc13&lang=ru_RU"></script>
+<script src="mapLayers.js?v=1"></script>
 <script src="pdd.js"></script>
 <script>
 let map = null, userMarker = null, lastPos = null;
@@ -1635,7 +1636,7 @@ function initCustomPinchRotate() {
 }
 
 (async () => {
-    const { YMap, YMapDefaultSatelliteLayer, YMapDefaultFeaturesLayer, YMapMarker, YMapListener, YMapFeature } = await ymaps3.ready;
+    const { YMap, YMapDefaultFeaturesLayer, YMapMarker, YMapListener, YMapFeature, YMapTileDataSource, YMapLayer } = await ymaps3.ready;
 
     // При запуске без ссылки на сцену сразу центрируемся на текущем местоположении
     // (при запуске по ссылке центр задаёт сама загружаемая сцена).
@@ -1643,9 +1644,13 @@ function initCustomPinchRotate() {
     map = new YMap(document.getElementById('map'), {
         location: { center: center || [43.9968, 56.3269], zoom: 19 },
         zoomRounding: 'smooth',
+        zoomRange: { min: 0, max: 21 },
+        mode: 'raster',
+        projection: ymaps3.projections.sphericalMercator,
         behaviors: appBehaviors
     });
-    map.addChild(new YMapDefaultSatelliteLayer({}));
+    // Базовый слой: MapTiler (как в навигаторе) + переключатель на Яндекс.Спутник.
+    PadMapLayers.init({ map, YMapTileDataSource, YMapLayer });
     map.addChild(new YMapDefaultFeaturesLayer({ zIndex: 100000 }));
     initCustomPinchRotate();
     map.addChild(new YMapListener({
