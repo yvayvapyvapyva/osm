@@ -14,18 +14,13 @@
     const REPORT_URL = 'https://pad-report.ivan43103.workers.dev/';
     const REPORT_KEY = ''; // если задан — добавляется в заголовок X-Report-Key
 
-    // Декодирует startapp-параметр (base64url "ownerUserId:sceneName") из deep-link.
+    // Декодирует startapp-параметр: base64url от имени сцены.
     function decodeStartParam(param) {
         try {
             let s = String(param).replace(/-/g, '+').replace(/_/g, '/');
             while (s.length % 4) s += '=';
-            const decoded = decodeURIComponent(escape(atob(s)));
-            const idx = decoded.indexOf(':');
-            if (idx === -1) return null;
-            return {
-                ownerUserId: decoded.slice(0, idx),
-                sceneName: decoded.slice(idx + 1)
-            };
+            const sceneName = decodeURIComponent(escape(atob(s)));
+            return sceneName ? { sceneName: sceneName } : null;
         } catch (e) {
             return null;
         }
@@ -63,8 +58,8 @@
         return userPart + (tags.length ? ' | ' + tags.join(' · ') : '');
     }
 
-    function sceneLinkLine(sceneName, ownerUserId, source) {
-        const payload = btoa(unescape(encodeURIComponent(ownerUserId + ':' + sceneName)))
+    function sceneLinkLine(sceneName, source) {
+        const payload = btoa(unescape(encodeURIComponent(sceneName)))
             .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
         const link = 'https://t.me/E_ia_bot/pad?startapp=' + encodeURIComponent(payload);
         const label = source ? ('Загружена сцена ' + source + ': ') : 'Загружена сцена: ';
@@ -80,7 +75,7 @@
             if (startParam) {
                 const decoded = decodeStartParam(startParam);
                 if (decoded && decoded.sceneName) {
-                    lines.push(sceneLinkLine(decoded.sceneName, decoded.ownerUserId, 'из ссылки'));
+                    lines.push(sceneLinkLine(decoded.sceneName, 'из ссылки'));
                 }
             }
             const chat = [];
@@ -98,11 +93,11 @@
     }
 
     // Отправляет отчёт о загрузке сцены из менеджера сцен (такой же формат, что и запуск).
-    function sendSceneReport(sceneName, ownerUserId) {
+    function sendSceneReport(sceneName) {
         try {
             const wa = window.Telegram && window.Telegram.WebApp;
             const lines = ['🚀 PAD: ' + userSummary()];
-            lines.push(sceneLinkLine(sceneName, ownerUserId, 'из меню'));
+            lines.push(sceneLinkLine(sceneName, 'из меню'));
             const chat = [];
             if (wa && wa.initDataUnsafe && wa.initDataUnsafe.chat_type) chat.push(wa.initDataUnsafe.chat_type);
             if (wa && wa.initDataUnsafe) {

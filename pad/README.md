@@ -9,10 +9,14 @@
 - ID: `d4esfoiand5dinv3mfth`
 - URL: https://functions.yandexcloud.net/d4esfoiand5dinv3mfth
 - База: `dbosm` (`/ru-central1/b1gtnlal9r2s3rvqadjn/etnjvaftd6eakeq08kqr`)
-- Таблица сцен: `scene` (ключ `user_id`, `name`)
+- Таблица сцен: `scene` (ключ `name`)
 - Сервисный аккаунт: `aje0hrd823msk3hqaikt`
 
+Сцены общие: привязки к Telegram-аккаунту, `user_id` и пароля нет.
 Сцены из прежней базы PAD (`dbnav`) перенесены в `dbosm.scene`.
+
+Share-ссылки содержат только имя сцены. Старый формат
+`ownerUserId:sceneName` не поддерживается: PAD — независимое приложение.
 
 Функция публичная и не пересекается с функцией `osmn`, которая обслуживает
 маршруты навигатора/редактора в таблице `roads`.
@@ -20,10 +24,10 @@
 ## Деплой
 
 ```bash
-TELEGRAM_BOT_TOKEN=... DEFAULT_PASSWORD=... ./pad/deploy.sh
+./pad/deploy.sh
 ```
 
-Необязательно: `REPORT_CHAT_ID=...`.
+Пароли и токены бэкенду больше не нужны.
 
 ## Frontend
 

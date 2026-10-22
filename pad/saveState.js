@@ -1,9 +1,10 @@
 // Менеджер сцен через Яндекс.Облако функцию PAD (YDB, таблица "scene" в базе OSM).
+// Сцены общие: привязки к аккаунтам и паролей нет.
 //
 // Модуль переиспользует serializeScene()/restoreScene() из pad.html, чтобы не
 // дублировать логику сериализации линий, объектов и записанных движений машинок.
 //
-// Кнопка сразу открывает менеджер со списком всех сцен пользователя. Из него:
+// Кнопка сразу открывает менеджер со списком всех сцен. Из него:
 //   - Сохранить   — открывает окно с именем: если ввести существующее имя,
 //                   сцена перезаписывается, новое имя — создаётся новая сцена;
 //   - Клик по строке сцены — применяет сцену на карту и делает её активной;
@@ -37,48 +38,29 @@
     let scenesLoading = false;
     let scenesLoaded = false;
 
-    // ---- Base64URL кодирование/декодирование для startapp параметра ----
+    // ---- Base64URL кодирование для startapp параметра ----
     function b64urlEncode(str) {
         return btoa(unescape(encodeURIComponent(str)))
             .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
     }
-    function b64urlDecode(s) {
-        s = s.replace(/-/g, '+').replace(/_/g, '/');
-        while (s.length % 4) s += '=';
-        return decodeURIComponent(escape(atob(s)));
-    }
 
-    // Telegram-контекст: user_id и init_data (подписанные данные для проверки на сервере)
-    // ID по умолчанию для работы вне Telegram (делёжка/обычный запуск).
-    const DEFAULT_USER_ID = 'default';
-const SESSION_PASSWORD_KEY = 'pad_default_password';
-
-    function getCachedPassword() {
-        try {
-            return sessionStorage.getItem(SESSION_PASSWORD_KEY);
-        } catch (e) { return null; }
-    }
-
-    function setCachedPassword(pwd) {
-        try {
-            sessionStorage.setItem(SESSION_PASSWORD_KEY, pwd);
-        } catch (e) {}
-    }
-
-    function clearCachedPassword() {
-        try {
-            sessionStorage.removeItem(SESSION_PASSWORD_KEY);
-        } catch (e) {}
-    }
-
-    function tgCreds() {
-        const wa = window.Telegram && window.Telegram.WebApp;
-        const user = wa && wa.initDataUnsafe && wa.initDataUnsafe.user;
-        return {
-            // Вне Telegram берём дефолтный ID, чтобы сцены можно было сохранять
-            user_id: user ? String(user.id) : DEFAULT_USER_ID,
-            init_data: wa ? (wa.initData || '') : ''
-        };
+    async function api(method, { body, query } = {}) {
+        let url = API_URL;
+        if (query && Object.keys(query).length) {
+            const qs = Object.keys(query)
+                .filter(k => query[k] != null && query[k] !== '')
+                .map(k => encodeURIComponent(k) + '=' + encodeURIComponent(query[k]))
+                .join('&');
+            if (qs) url += '?' + qs;
+        }
+        const opts = { method: method, headers: { 'Content-Type': 'application/json' } };
+        if (body !== undefined) opts.body = JSON.stringify(body);
+        const resp = await fetch(url, opts);
+        const json = await resp.json().catch(() => ({}));
+        if (!resp.ok || json.ok === false) {
+            throw new Error(json.error || ('Ошибка ' + resp.status));
+        }
+        return json;
     }
 
     function collectState() {
@@ -109,139 +91,6 @@ const SESSION_PASSWORD_KEY = 'pad_default_password';
 
     function sanitizeName(name) {
         return String(name).replace(/[\\/:*?"<>|]/g, '_').trim();
-    }
-
-    function isDefaultUser() {
-        const creds = tgCreds();
-        return creds.user_id === DEFAULT_USER_ID;
-    }
-
-    // Обёртка: сначала пароль с проверкой на бэкенде, потом действие
-    async function withPasswordGate({ title, message, okText, onReady }) {
-        const cached = getCachedPassword();
-        if (cached) {
-            onReady(cached);
-            return;
-        }
-
-        const wrap = document.createElement('div');
-        wrap.className = 'scene-io-modal scene-io-modal-save scene-io-center';
-        const box = document.createElement('div');
-        box.className = 'scene-io-box';
-
-        const header = document.createElement('div');
-        header.className = 'scene-io-header';
-        const closeBtn = document.createElement('button');
-        closeBtn.className = 'scene-io-close';
-        closeBtn.innerHTML = '&#10005;';
-        closeBtn.addEventListener('click', () => closeM(wrap));
-        const headerTitle = document.createElement('div');
-        headerTitle.className = 'scene-io-header-title';
-        headerTitle.textContent = title;
-        header.appendChild(closeBtn);
-        header.appendChild(headerTitle);
-
-        const msg = document.createElement('div');
-        msg.className = 'scene-io-confirm-msg';
-        msg.textContent = message;
-
-        const input = document.createElement('input');
-        input.type = 'password';
-        input.className = 'scene-io-input';
-        input.placeholder = 'Введите пароль';
-        input.spellcheck = false;
-        input.autocomplete = 'current-password';
-
-        const ok = document.createElement('button');
-        ok.className = 'scene-io-opt';
-        ok.textContent = okText || 'Продолжить';
-
-        const status = document.createElement('div');
-        status.className = 'scene-io-status';
-
-        box.appendChild(header);
-        box.appendChild(msg);
-        box.appendChild(input);
-        box.appendChild(ok);
-        box.appendChild(status);
-        wrap.appendChild(box);
-        wrap.addEventListener('click', e => { if (e.target === wrap) closeM(wrap); });
-        document.body.appendChild(wrap);
-        requestAnimationFrame(() => {
-            wrap.classList.add('visible');
-            input.focus();
-        });
-
-        const submit = async () => {
-            const val = input.value;
-            if (!val) { status.textContent = 'Введите пароль'; return; }
-            ok.disabled = true;
-            status.textContent = 'Проверка…';
-            status.classList.add('busy');
-            try {
-                // Проверяем пароль на бэкенде
-                await api('POST', { body: { name: '__verify_password__', password: val } });
-                // Успех — кэшируем и переходим к действию
-                setCachedPassword(val);
-                closeM(wrap);
-                onReady(val);
-            } catch (e) {
-                ok.disabled = false;
-                status.classList.remove('busy');
-                status.textContent = e.message.includes('Неверный пароль') ? 'Неверный пароль' : 'Ошибка: ' + e.message;
-            }
-        };
-
-        ok.addEventListener('click', submit);
-        input.addEventListener('keydown', e => {
-            if (e.key === 'Enter') { e.preventDefault(); submit(); }
-        });
-    }
-
-    async function api(method, { body, query } = {}) {
-        const creds = tgCreds();
-        // Для GET/DELETE/PUT передаём user_id и init_data в query-строке
-        query = Object.assign({}, query || {});
-        if (creds.user_id && query.user_id == null) query.user_id = creds.user_id;
-        if (creds.init_data && query.initData == null) query.initData = creds.init_data;
-        
-        // Автоматически подставляем кэшированный пароль для дефолтного пользователя
-        if (creds.user_id === DEFAULT_USER_ID && (method === 'POST' || method === 'PUT' || method === 'DELETE')) {
-            const cachedPwd = getCachedPassword();
-            if (cachedPwd && body && !body.password) {
-                body = Object.assign({}, body, { password: cachedPwd });
-            }
-        }
-        
-        let url = API_URL;
-        if (query && Object.keys(query).length) {
-            const qs = Object.keys(query)
-                .filter(k => query[k] != null && query[k] !== '')
-                .map(k => encodeURIComponent(k) + '=' + encodeURIComponent(query[k]))
-                .join('&');
-            if (qs) url += '?' + qs;
-        }
-        const opts = { method: method, headers: { 'Content-Type': 'application/json' } };
-        if (body !== undefined) {
-            const full = Object.assign({}, body);
-            if (creds.user_id) full.user_id = creds.user_id;
-            if (creds.init_data) full.init_data = creds.init_data;
-            opts.body = JSON.stringify(full);
-        }
-        const resp = await fetch(url, opts);
-        const json = await resp.json().catch(() => ({}));
-        if (!resp.ok || json.ok === false) {
-            const errMsg = json.error || ('Ошибка ' + resp.status);
-            const isWrongPwd = errMsg.includes('Неверный пароль');
-            if (isWrongPwd && creds.user_id === DEFAULT_USER_ID) {
-                clearCachedPassword();
-                const err = new Error(errMsg);
-                err.isWrongPassword = true;
-                throw err;
-            }
-            throw new Error(errMsg);
-        }
-        return json;
     }
 
     // ---- Размер в килобайтах ----
@@ -389,10 +238,10 @@ const SESSION_PASSWORD_KEY = 'pad_default_password';
         setTimeout(() => t.remove(), duration + 300);
     }
 
-    // ---- Загрузка чужой сцены (shared) ----
-    window.loadSharedScene = async function (ownerUserId, sceneName) {
+    // ---- Загрузка сцены по ссылке ----
+    window.loadSharedScene = async function (sceneName) {
         try {
-            const got = await api('GET', { query: { owner_user_id: ownerUserId, name: sceneName } });
+            const got = await api('GET', { query: { name: sceneName } });
             let data = got.data;
             if (typeof data === 'string') data = JSON.parse(data);
             if (!data) { showToast('Сцена не найдена'); return; }
@@ -404,14 +253,14 @@ const SESSION_PASSWORD_KEY = 'pad_default_password';
     };
 
     // ---- Кодирование deep-link ссылки ----
-    window.makeShareLink = function (ownerUserId, sceneName) {
-        const payload = b64urlEncode(ownerUserId + ':' + sceneName);
+    window.makeShareLink = function (sceneName) {
+        const payload = b64urlEncode(sceneName);
         return BOT_LINK + '?startapp=' + encodeURIComponent(payload);
     };
 
     // ---- Копирование в буфер + тост ----
-    function copyShareLink(ownerUserId, sceneName) {
-        const link = window.makeShareLink(ownerUserId, sceneName);
+    function copyShareLink(sceneName) {
+        const link = window.makeShareLink(sceneName);
         if (navigator.clipboard && navigator.clipboard.writeText) {
             navigator.clipboard.writeText(link).then(
                 () => showToast('Ссылка скопирована в буфер обмена'),
@@ -433,8 +282,8 @@ const SESSION_PASSWORD_KEY = 'pad_default_password';
     }
 
     // ---- Нативное меню «Поделиться» в Telegram ----
-    function shareSceneLink(ownerUserId, sceneName) {
-        const link = window.makeShareLink(ownerUserId, sceneName);
+    function shareSceneLink(sceneName) {
+        const link = window.makeShareLink(sceneName);
         const text = '«' + sceneName + '» на доске дорожных ситуаций';
         const shareUrl = 'https://t.me/share/url?url=' + encodeURIComponent(link) + '&text=' + encodeURIComponent(text);
         const wa = window.Telegram && window.Telegram.WebApp;
@@ -446,7 +295,7 @@ const SESSION_PASSWORD_KEY = 'pad_default_password';
     }
 
     // ---- Окно «Поделиться»: отправить или скопировать ----
-    function openSharePopup(ownerUserId, sceneName) {
+    function openSharePopup(sceneName) {
         const overlay = document.createElement('div');
         overlay.className = 'scene-io-modal scene-io-modal-save scene-io-center';
         const box = document.createElement('div');
@@ -473,7 +322,7 @@ const SESSION_PASSWORD_KEY = 'pad_default_password';
         send.innerHTML = '<span class="scene-io-share-ic"><svg viewBox="0 0 24 24" width="22" height="22" fill="#fff"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg></span><span>Отправить через Telegram</span>';
         send.addEventListener('click', () => {
             closeSharePopup(overlay);
-            shareSceneLink(ownerUserId, sceneName);
+            shareSceneLink(sceneName);
         });
 
         const copy = document.createElement('button');
@@ -481,7 +330,7 @@ const SESSION_PASSWORD_KEY = 'pad_default_password';
         copy.innerHTML = '<span class="scene-io-share-ic"><svg viewBox="0 0 24 24" width="22" height="22" fill="#fff"><path d="M16 1H4a2 2 0 0 0-2 2v14h2V3h12V1zm3 4H8a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2zm0 16H8V7h11v14z"/></svg></span><span>Копировать ссылку</span>';
         copy.addEventListener('click', () => {
             closeSharePopup(overlay);
-            copyShareLink(ownerUserId, sceneName);
+            copyShareLink(sceneName);
         });
 
         box.appendChild(header);
@@ -502,89 +351,18 @@ const SESSION_PASSWORD_KEY = 'pad_default_password';
 
     // ---- Сохранение (интерактив: ввод имени) ----
     function saveWithName({ prefill, callback }) {
-        const doShowSaveDialog = (password) => {
-            const wrap = document.createElement('div');
-            wrap.className = 'scene-io-modal scene-io-modal-save scene-io-center';
-            const box = document.createElement('div');
-            box.className = 'scene-io-box';
-
-            const header = document.createElement('div');
-            header.className = 'scene-io-header';
-            const closeBtn = document.createElement('button');
-            closeBtn.className = 'scene-io-close';
-            closeBtn.innerHTML = '&#10005;';
-            closeBtn.addEventListener('click', () => closeM(wrap));
-            const headerTitle = document.createElement('div');
-            headerTitle.className = 'scene-io-header-title';
-            headerTitle.textContent = 'Сохранить сцену';
-            header.appendChild(closeBtn);
-            header.appendChild(headerTitle);
-
-            const nameInput = document.createElement('input');
-            nameInput.type = 'text';
-            nameInput.className = 'scene-io-input';
-            nameInput.value = prefill || '';
-            nameInput.placeholder = 'Имя сцены';
-            nameInput.spellcheck = false;
-            nameInput.autocomplete = 'off';
-
-            const confirm = document.createElement('button');
-            confirm.className = 'scene-io-opt scene-io-primary';
-            confirm.innerHTML = '<span class="scene-io-opt-icon"><svg viewBox="0 0 24 24" width="22" height="22" fill="#fff"><path d="M12 16l-5-5h3V4h4v7h3l-5 5zm-7 3h14v2H5v-2z"/></svg></span><span>Сохранить</span>';
-
-            const status = document.createElement('div');
-            status.className = 'scene-io-status';
-
-            box.appendChild(header);
-            box.appendChild(nameInput);
-            box.appendChild(confirm);
-            box.appendChild(status);
-            wrap.appendChild(box);
-            wrap.addEventListener('click', e => { if (e.target === wrap) { closeM(wrap); } });
-            document.body.appendChild(wrap);
-            attachSheetDrag(wrap);
-            requestAnimationFrame(() => {
-                wrap.classList.add('visible');
-                nameInput.focus();
-                if (nameInput.value) nameInput.select();
-            });
-
-            confirm.addEventListener('click', async () => {
-                const name = sanitizeName(nameInput.value);
-                if (!name) { status.textContent = 'Введите имя сцены'; return; }
-                confirm.disabled = true;
-                status.textContent = 'Сохранение…';
-                status.classList.add('busy');
-                try {
-                    const body = { name: name, data: collectState() };
-                    if (isDefaultUser()) body.password = password;
-                    await api('POST', { body });
-                    status.textContent = 'Сохранено ✓';
-                    status.classList.remove('busy');
-                    status.classList.add('ok');
-                    closeM(wrap);
-                    if (callback) callback(name);
-                } catch (e) {
-                    status.textContent = 'Ошибка: ' + e.message;
-                    status.classList.remove('busy');
-                    confirm.disabled = false;
-                }
-            });
-            nameInput.addEventListener('keydown', e => {
-                if (e.key === 'Enter') { e.preventDefault(); confirm.click(); }
-            });
-        };
-
-        if (isDefaultUser()) {
-            withPasswordGate({
-                title: 'Сохранить сцену',
-                message: 'Введите пароль для подтверждения:',
-                okText: 'Продолжить',
-                onReady: doShowSaveDialog
-            });
-        } else {
-            doShowSaveDialog(null);
-        }
+        promptBox({
+            title: 'Сохранить сцену',
+            value: prefill,
+            placeholder: 'Имя сцены',
+            okText: 'Сохранить',
+            onSubmit: async (name, wrap) => {
+                await api('POST', { body: { name: name, data: collectState() } });
+                closeM(wrap);
+                showToast('Сохранено: ' + name);
+                if (callback) callback(name);
+            }
+        });
     }
 
     // Сохранить в активную сцену (перезапись) или создать новую
@@ -770,7 +548,7 @@ const SESSION_PASSWORD_KEY = 'pad_default_password';
             () => renameScene(scene, statusEl)));
         btns.appendChild(mkBtn('Поделиться',
             '<svg viewBox="0 0 24 24" width="18" height="18" fill="#0A84FF"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.16c-.05.21-.08.43-.08.65 0 1.61 1.31 2.92 2.92 2.92s2.92-1.31 2.92-2.92-1.31-2.92-2.92-2.92z"/></svg>',
-            () => openSharePopup(tgCreds().user_id, scene.name)));
+            () => openSharePopup(scene.name)));
         btns.appendChild(mkBtn('Удалить',
             '<svg viewBox="0 0 24 24" width="18" height="18" fill="#FF453A"><path d="M6 19a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V7H6v12zM8 9h8v10H8V9zm.5-5l1-1h5l1 1H20v2H4V4h4.5z"/></svg>',
             () => deleteScene(scene, statusEl)));
@@ -799,7 +577,7 @@ const SESSION_PASSWORD_KEY = 'pad_default_password';
         closeBtn.addEventListener('click', closeManager);
         const headerTitle = document.createElement('div');
         headerTitle.className = 'scene-io-header-title';
-        headerTitle.textContent = 'Ваши сцены';
+        headerTitle.textContent = 'Сцены';
         header.appendChild(closeBtn);
         header.appendChild(headerTitle);
 
@@ -860,7 +638,7 @@ const SESSION_PASSWORD_KEY = 'pad_default_password';
             statusEl.classList.remove('busy');
             statusEl.textContent = 'Загружено: ' + scene.name;
             if (typeof window.sendSceneReport === 'function') {
-                window.sendSceneReport(scene.name, tgCreds().user_id);
+                window.sendSceneReport(scene.name);
             }
             closeManager();
         } catch (e) {
@@ -874,162 +652,32 @@ const SESSION_PASSWORD_KEY = 'pad_default_password';
     }
 
     async function renameScene(scene, statusEl) {
-        const doRename = (password) => {
-            const wrap = document.createElement('div');
-            wrap.className = 'scene-io-modal scene-io-modal-save scene-io-center';
-            const box = document.createElement('div');
-            box.className = 'scene-io-box';
-
-            const header = document.createElement('div');
-            header.className = 'scene-io-header';
-            const closeBtn = document.createElement('button');
-            closeBtn.className = 'scene-io-close';
-            closeBtn.innerHTML = '&#10005;';
-            closeBtn.addEventListener('click', () => closeM(wrap));
-            const headerTitle = document.createElement('div');
-            headerTitle.className = 'scene-io-header-title';
-            headerTitle.textContent = 'Переименовать сцену';
-            header.appendChild(closeBtn);
-            header.appendChild(headerTitle);
-
-            const nameInput = document.createElement('input');
-            nameInput.type = 'text';
-            nameInput.className = 'scene-io-input';
-            nameInput.value = scene.name;
-            nameInput.placeholder = 'Новое имя сцены';
-            nameInput.spellcheck = false;
-            nameInput.autocomplete = 'off';
-
-            const ok = document.createElement('button');
-            ok.className = 'scene-io-opt';
-            ok.textContent = 'Переименовать';
-
-            const status = document.createElement('div');
-            status.className = 'scene-io-status';
-
-            box.appendChild(header);
-            box.appendChild(nameInput);
-            box.appendChild(ok);
-            box.appendChild(status);
-            wrap.appendChild(box);
-            wrap.addEventListener('click', e => { if (e.target === wrap) closeM(wrap); });
-            document.body.appendChild(wrap);
-            requestAnimationFrame(() => { wrap.classList.add('visible'); nameInput.focus(); nameInput.select(); });
-
-            const submit = async () => {
-                const newName = sanitizeName(nameInput.value);
-                if (!newName) { status.textContent = 'Введите имя'; return; }
-                ok.disabled = true;
-                try {
-                    await api('PUT', { body: { name: newName, from: scene.name, password } });
-                    if (activeSceneName === scene.name) activeSceneName = newName;
-                    closeM(wrap);
-                    reloadScenes();
-                } catch (e) {
-                    status.textContent = 'Ошибка: ' + e.message;
-                    ok.disabled = false;
-                }
-            };
-            ok.addEventListener('click', submit);
-            nameInput.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); submit(); } });
-        };
-
-        if (isDefaultUser()) {
-            withPasswordGate({
-                title: 'Переименовать сцену',
-                message: 'Введите пароль для подтверждения:',
-                okText: 'Продолжить',
-                onReady: doRename
-            });
-        } else {
-            promptBox({
-                title: 'Переименовать сцену',
-                label: 'Новое имя',
-                value: scene.name,
-                placeholder: 'Новое имя сцены',
-                okText: 'Переименовать',
-                onSubmit: async (newName, wrap) => {
-                    await api('PUT', { body: { name: newName, from: scene.name } });
-                    if (activeSceneName === scene.name) activeSceneName = newName;
-                    closeM(wrap);
-                    reloadScenes();
-                }
-            });
-        }
+        promptBox({
+            title: 'Переименовать сцену',
+            label: 'Новое имя',
+            value: scene.name,
+            placeholder: 'Новое имя сцены',
+            okText: 'Переименовать',
+            onSubmit: async (newName, wrap) => {
+                await api('PUT', { body: { name: newName, from: scene.name } });
+                if (activeSceneName === scene.name) activeSceneName = newName;
+                closeM(wrap);
+                reloadScenes();
+            }
+        });
     }
 
     async function deleteScene(scene, statusEl) {
-        const doDelete = (password) => {
-            const wrap = document.createElement('div');
-            wrap.className = 'scene-io-modal scene-io-modal-save scene-io-center';
-            const box = document.createElement('div');
-            box.className = 'scene-io-box';
-
-            const header = document.createElement('div');
-            header.className = 'scene-io-header';
-            const closeBtn = document.createElement('button');
-            closeBtn.className = 'scene-io-close';
-            closeBtn.innerHTML = '&#10005;';
-            closeBtn.addEventListener('click', () => closeM(wrap));
-            const headerTitle = document.createElement('div');
-            headerTitle.className = 'scene-io-header-title';
-            headerTitle.textContent = 'Удалить сцену';
-            header.appendChild(closeBtn);
-            header.appendChild(headerTitle);
-
-            const msg = document.createElement('div');
-            msg.className = 'scene-io-confirm-msg';
-            msg.textContent = 'Удалить сцену «' + scene.name + '» без возможности восстановления?';
-
-            const ok = document.createElement('button');
-            ok.className = 'scene-io-opt scene-io-danger';
-            ok.textContent = 'Удалить';
-
-            const status = document.createElement('div');
-            status.className = 'scene-io-status';
-
-            box.appendChild(header);
-            box.appendChild(msg);
-            box.appendChild(ok);
-            box.appendChild(status);
-            wrap.appendChild(box);
-            wrap.addEventListener('click', e => { if (e.target === wrap) closeM(wrap); });
-            document.body.appendChild(wrap);
-            requestAnimationFrame(() => wrap.classList.add('visible'));
-
-            ok.addEventListener('click', async () => {
-                ok.disabled = true;
-                try {
-                    await api('DELETE', { query: { name: scene.name }, body: { password } });
-                    if (activeSceneName === scene.name) activeSceneName = null;
-                    closeM(wrap);
-                    reloadScenes();
-                } catch (e) {
-                    ok.disabled = false;
-                    status.textContent = 'Ошибка: ' + e.message;
-                }
-            });
-        };
-
-        if (isDefaultUser()) {
-            withPasswordGate({
-                title: 'Удалить сцену',
-                message: 'Введите пароль для подтверждения:',
-                okText: 'Продолжить',
-                onReady: doDelete
-            });
-        } else {
-            confirmBox({
-                title: 'Удалить сцену',
-                message: 'Удалить сцену «' + scene.name + '» без возможности восстановления?',
-                okText: 'Удалить',
-                onOk: async () => {
-                    await api('DELETE', { query: { name: scene.name } });
-                    if (activeSceneName === scene.name) activeSceneName = null;
-                    reloadScenes();
-                }
-            });
-        }
+        confirmBox({
+            title: 'Удалить сцену',
+            message: 'Удалить сцену «' + scene.name + '» без возможности восстановления?',
+            okText: 'Удалить',
+            onOk: async () => {
+                await api('DELETE', { query: { name: scene.name } });
+                if (activeSceneName === scene.name) activeSceneName = null;
+                reloadScenes();
+            }
+        });
     }
 
     // Показать состояние загрузки в открытой шторке (если она есть)
@@ -1181,8 +829,7 @@ const SESSION_PASSWORD_KEY = 'pad_default_password';
             window.onTgReady(startLoadScenes);
             // Резерв: если SDK Telegram так и не загрузился (открыто в обычном
             // браузере, telegram.org недоступен/заблокирован), всё равно загружаем
-            // список сцен с текущими кредами (вне Telegram это default-пользователь).
-            // Иначе загрузка списка на старте навсегда остаётся невыполненной.
+            // общий список сцен. Иначе загрузка на старте остаётся невыполненной.
             setTimeout(startLoadScenes, 6000);
         } else {
             startLoadScenes();

@@ -53,7 +53,7 @@
         // Если SDK уже был в кэше браузера — инициализируем сразу
         _initTelegram();
     </script>
-    <script src="report.js"></script>
+    <script src="report.js?v=3"></script>
     <style>
         * { margin:0; padding:0; box-sizing:border-box; -webkit-user-select:none; user-select:none; -webkit-tap-highlight-color:transparent; }
         html, body { height:100%; width:100%; overflow:hidden; background:#000; }
@@ -2374,10 +2374,10 @@ function initCustomPinchRotate() {
 <script src="padtext.js"></script>
 <script src="recplay.js"></script>
 <script src="trafficlights.js"></script>
-<script src="saveState.js?v=4"></script>
+<script src="saveState.js?v=6"></script>
 <script>
 // Обработка deep-link: сцена по ссылке t.me/E_ia_bot/pad?startapp=<payload>.
-// payload — base64url(ownerUserId:sceneName). Загружаем чужую сцену напрямую.
+// payload — base64url(имя сцены). Сцены общие, привязки к аккаунту нет.
 (function () {
     function b64urlDecode(s) {
         if (!s) return null;
@@ -2423,13 +2423,8 @@ function initCustomPinchRotate() {
             }
             const param = tgParam || urlParam;
             if (!param) return;
-            const decoded = b64urlDecode(param);
-            if (!decoded) return;
-            const idx = decoded.indexOf(':');
-            if (idx === -1) return;
-            const ownerUserId = decoded.slice(0, idx);
-            const sceneName = decoded.slice(idx + 1);
-            if (!ownerUserId || !sceneName) return;
+            const sceneName = b64urlDecode(param);
+            if (!sceneName) return;
             // Показываем спиннер «Загрузка», пока сцена грузится в карту.
             showLoadOverlay();
             if (!window.loadSharedScene) { setTimeout(handleStartParam, 100); return; }
@@ -2441,7 +2436,7 @@ function initCustomPinchRotate() {
             }
             // Ждём готовности карты
             const doLoad = () => {
-                window.loadSharedScene(ownerUserId, sceneName).then(() => {
+                window.loadSharedScene(sceneName).then(() => {
                     // Сцена применена — ждём завершения полёта карты к сцене.
                     setTimeout(() => hideLoadOverlay(), FLY_PAUSE_MS);
                     // Записи в сцене есть — включаем кнопку запуска воспроизведения
