@@ -4,6 +4,11 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <script>
+        if (new URLSearchParams(location.search).get('viewer') === '1') {
+            document.documentElement.classList.add('scene-viewer');
+        }
+    </script>
+    <script>
         // Загружаем Telegram WebApp SDK асинхронно с таймаутом,
         // чтобы при блокировке/недоступности telegram.org страница
         // не зависала на десятки секунд (синхронный <script> блокирует рендер).
@@ -58,6 +63,8 @@
     <style>
         * { margin:0; padding:0; box-sizing:border-box; -webkit-user-select:none; user-select:none; -webkit-tap-highlight-color:transparent; }
         html, body { height:100%; width:100%; overflow:hidden; background:#000; }
+        html.scene-viewer body > :not(#map):not(#loading):not(#savePddGroup):not(.scene-io-modal):not(script):not(style) { display:none !important; }
+        html.scene-viewer #savePddGroup #pddBtn { display:none !important; }
         #map { position:absolute; inset:0; z-index:1; }
         .fab {
             position:fixed; z-index:9005; width:52px; height:52px; border-radius:50%; border:0.5px solid rgba(255,255,255,0.12);
@@ -2382,7 +2389,7 @@ function initCustomPinchRotate() {
 <script src="padtext.js"></script>
 <script src="recplay.js"></script>
 <script src="trafficlights.js"></script>
-<script src="saveState.js?v=7"></script>
+<script src="saveState.js?v=8"></script>
 <script>
 // Обработка deep-link: сцена по ссылке t.me/E_ia_bot/pad?startapp=<payload>.
 // payload — base64url(имя сцены). Сцены общие, привязки к аккаунту нет.
