@@ -61,7 +61,7 @@
     function sceneLinkLine(sceneName, source, sceneId) {
         if (!/^[a-z0-9]{8}$/.test(sceneId || '')) return null;
         const payload = 's' + sceneId;
-        const link = 'https://t.me/E_ia_bot/pad?startapp=' + encodeURIComponent(payload);
+        const link = 'https://t.me/E_ia_bot/viewer?startapp=' + encodeURIComponent(payload);
         const label = source ? ('Загружена сцена ' + source + ': ') : 'Загружена сцена: ';
         return label + '<a href="' + link + '">' + sceneName + '</a>';
     }
