@@ -633,7 +633,7 @@
         if (_recOn) {
             stopRec();
         } else {
-            placedMarkers.forEach(m => { m._recActive = false; m._prevSamples = undefined; m._lastRel = 0; m._lastSampleT = undefined; m._recSigOpen = undefined; m._stylusOn = false; m._activePtr = null; m._pauseAcc = 0; m._pausePhase = 0; m._pauseFrom = null; });
+            placedMarkers.forEach(m => { m._recActive = false; m._prevSamples = undefined; m._lastRel = 0; m._lastSampleT = undefined; m._recDragStarted = false; m._recSigOpen = undefined; m._stylusOn = false; m._activePtr = null; m._pauseAcc = 0; m._pausePhase = 0; m._pauseFrom = null; });
             // Новая сессия записи: у светофоров обнуляем запись ламп (движение не пишется)
             placedMarkers.forEach(m => {
                 if (m._isTl && !m._playing) { m._tlRec = []; m._tlInit = null; m._phaseOffset = 0; }
@@ -709,6 +709,12 @@
         marker._activePtr = pid;
         // Начался реальный драг — завершаем открытую паузу.
         closePause(marker);
+        if (!marker._recDragStarted && marker._samples && marker._samples.length) {
+            const t = relTime(marker);
+            marker._samples[0].t = Math.round(t);
+            marker._lastSampleT = t;
+            marker._recDragStarted = true;
+        }
     };
 
     function endStylusRec(e) {
