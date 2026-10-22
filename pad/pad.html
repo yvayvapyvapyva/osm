@@ -1,0 +1,2480 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <script>
+        // Загружаем Telegram WebApp SDK асинхронно с таймаутом,
+        // чтобы при блокировке/недоступности telegram.org страница
+        // не зависала на десятки секунд (синхронный <script> блокирует рендер).
+        window._tgInitDone = false;
+        window._tgReadyCbs = [];
+        window.onTgReady = function (cb) {
+            if (window._tgInitDone) { try { cb(); } catch (e) {} }
+            else window._tgReadyCbs.push(cb);
+        };
+        function _initTelegram() {
+            if (window._tgInitDone) return;
+            if (!(window.Telegram && window.Telegram.WebApp)) return;
+            window._tgInitDone = true;
+            var wa = window.Telegram.WebApp;
+            wa.ready();
+            wa.expand();
+            if (typeof wa.disableVerticalSwipes === 'function') wa.disableVerticalSwipes();
+            if (typeof wa.requestFullscreen === 'function') {
+                try { wa.requestFullscreen(); } catch (e) {}
+            }
+            var applyTgInsets = function () {
+                var top = 0;
+                var cs = wa.contentSafeAreaInset, sa = wa.safeAreaInset;
+                if (cs && typeof cs.top === 'number') top = Math.max(top, cs.top);
+                if (sa && typeof sa.top === 'number') top = Math.max(top, sa.top);
+                document.documentElement.style.setProperty('--tg-top', Math.max(0, top) + 'px');
+            };
+            applyTgInsets();
+            ['viewportChanged', 'contentSafeAreaChanged', 'safeAreaChanged'].forEach(function (ev) {
+                if (typeof wa.onEvent === 'function') wa.onEvent(ev, applyTgInsets);
+            });
+            var cbs = window._tgReadyCbs;
+            window._tgReadyCbs = [];
+            for (var i = 0; i < cbs.length; i++) {
+                try { cbs[i](); } catch (e) {}
+            }
+        }
+        (function () {
+            var s = document.createElement('script');
+            s.src = 'https://telegram.org/js/telegram-web-app.js';
+            s.async = true;
+            s.onerror = function () { console.warn('Telegram WebApp SDK не загружен'); };
+            var timer = setTimeout(function () { s.src = ''; }, 5000);
+            s.onload = function () { clearTimeout(timer); _initTelegram(); };
+            document.head.appendChild(s);
+        })();
+        // Если SDK уже был в кэше браузера — инициализируем сразу
+        _initTelegram();
+    </script>
+    <script src="report.js"></script>
+    <style>
+        * { margin:0; padding:0; box-sizing:border-box; -webkit-user-select:none; user-select:none; -webkit-tap-highlight-color:transparent; }
+        html, body { height:100%; width:100%; overflow:hidden; background:#000; }
+        #map { position:absolute; inset:0; z-index:1; }
+        [class*="-controls-pane"], [class*="-gotoymaps"], [class*="-gototaxi"], [class*="-map-copyrights-promo"],
+        [class*="-copyrights-pane"], [class*="-copyright"], [class*="-logo-wrap"], [class*="-powered"], [class*="-watermark"],
+        .ymaps3--controls_bottom.ymaps3--controls_left { display:none !important; }
+        .fab {
+            position:fixed; z-index:9005; width:52px; height:52px; border-radius:50%; border:0.5px solid rgba(255,255,255,0.12);
+            background:rgba(15,15,15,0.75); color:#fff; cursor:pointer; display:flex; align-items:center; justify-content:center;
+            box-shadow:0 8px 32px rgba(0,0,0,0.3); touch-action:manipulation;
+        }
+        .fab:active { transform:scale(0.92); }
+        .fab.active { background:rgba(48,209,88,0.5); border-color:#30D158; }
+        #eraserBtn.active { background:rgba(255,59,48,0.55); border-color:#FF453A; }
+        #drawBtn { bottom:calc(12px + env(safe-area-inset-bottom)); left:332px; border-radius:12px; transition:bottom .25s ease; }
+        #eraserBtn { bottom:calc(12px + env(safe-area-inset-bottom)); left:268px; border-radius:12px; transition:bottom .25s ease; }
+        #textBtn { bottom:calc(12px + env(safe-area-inset-bottom)); left:204px; border-radius:12px; transition:bottom .25s ease; }
+        #addPicBtn { bottom:calc(12px + env(safe-area-inset-bottom)); left:12px; border-radius:12px; overflow:hidden; transition:bottom .25s ease; }
+        #addPicBtn img { width:100%; height:100%; object-fit:contain; padding:5px; border-radius:10px; pointer-events:none; box-sizing:border-box; }
+        #addZnakBtn { bottom:calc(12px + env(safe-area-inset-bottom)); left:76px; border-radius:12px; overflow:hidden; transition:bottom .25s ease; }
+        #addZnakBtn img { width:100%; height:100%; object-fit:contain; padding:5px; border-radius:10px; pointer-events:none; box-sizing:border-box; }
+        #locateBtn { top:calc(76px + env(safe-area-inset-top)); right:12px; }
+        #locateBtn.active { background:rgba(48,209,88,0.5); border-color:#30D158; }
+        #hideUiBtn { top:calc(140px + env(safe-area-inset-top)); right:12px; }
+        #hideUiBtn.active { background:rgba(48,209,88,0.5); border-color:#30D158; }
+        #rotateBtn {
+            position:fixed; top:calc(12px + env(safe-area-inset-top)); right:12px;
+            z-index:9005; display:flex; flex-direction:row; overflow:hidden;
+            background:rgba(15,15,15,0.75); border:0.5px solid rgba(255,255,255,0.12); border-radius:52px;
+            box-shadow:0 8px 32px rgba(0,0,0,0.3); touch-action:manipulation;
+        }
+        #rotateBtn .rot-btn {
+            width:46px; height:52px; border:none; background:transparent; color:#fff; cursor:pointer;
+            display:flex; align-items:center; justify-content:center; padding:0;
+        }
+        #rotateBtn .rot-btn:active { background:rgba(255,255,255,0.15); }
+        #rotateBtn .rot-btn + .rot-btn { border-left:0.5px solid rgba(255,255,255,0.12); }
+        #historyBtn {
+            position:fixed; top:calc(12px + env(safe-area-inset-top) + var(--tg-top)); left:12px;
+            z-index:9005; display:flex; flex-direction:row; overflow:hidden;
+            background:rgba(15,15,15,0.75); border:0.5px solid rgba(255,255,255,0.12); border-radius:52px;
+            box-shadow:0 8px 32px rgba(0,0,0,0.3); touch-action:manipulation;
+        }
+        #historyBtn .rot-btn {
+            width:46px; height:52px; border:none; background:transparent; color:#fff; cursor:pointer;
+            display:flex; align-items:center; justify-content:center; padding:0;
+        }
+        #historyBtn .rot-btn:active { background:rgba(255,255,255,0.15); }
+        #historyBtn .rot-btn + .rot-btn { border-left:0.5px solid rgba(255,255,255,0.12); }
+        #historyBtn .rot-btn.dim { opacity:0.35; }
+        #pddBtn {
+            position:fixed; top:calc(12px + env(safe-area-inset-top)); left:50%; transform:translateX(-50%);
+            z-index:9005; height:52px; padding:0 22px; border-radius:26px; border:0.5px solid rgba(255,255,255,0.12);
+            background:rgba(15,15,15,0.75); color:#fff; cursor:pointer; display:flex; align-items:center; justify-content:center;
+            box-shadow:0 8px 32px rgba(0,0,0,0.3); touch-action:manipulation;
+            font-size:16px; font-weight:700; letter-spacing:0.5px;
+        }
+        #pddBtn:active { transform:translateX(-50%) scale(0.92); }
+        #pddBtn.active { background:rgba(48,209,88,0.5); border-color:#30D158; }
+        /* Режим скрытия элементов управления (долгое нажатие на ПДД) */
+        body.controls-hidden .fab:not(#pddBtn):not(#saveBtn):not(#hideUiBtn),
+        body.controls-hidden #textBtn,
+        body.controls-hidden #rotateBtn,
+        body.controls-hidden #historyBtn,
+        body.controls-hidden .sig-fab,
+        body.controls-hidden #signalBtns,
+        body.controls-hidden #tlMini,
+        body.controls-hidden #picPanel,
+        body.controls-hidden #znakPanel,
+        body.controls-hidden #tlPanel,
+        body.controls-hidden #colorPanel,
+        body.controls-hidden #widthSlider,
+        body.controls-hidden #textPanel,
+        body.controls-hidden #recAllBtn { display:none !important; }
+        body.controls-hidden #pddBtn,
+        body.controls-hidden #saveBtn,
+        body.controls-hidden #hideUiBtn { background:rgba(15,15,15,0.25); border-color:rgba(255,255,255,0.12); box-shadow:none; }
+        #pddModal {
+            position:fixed; left:0; right:0; bottom:0; height:40vh; max-height:88vh; z-index:9100;
+            background:rgba(15,15,15,0.97); color:#fff;
+            display:flex; flex-direction:column;
+            border-radius:16px 16px 0 0; border-top:0.5px solid rgba(255,255,255,0.12);
+            box-shadow:0 -8px 32px rgba(0,0,0,0.4);
+            padding-bottom:env(safe-area-inset-bottom);
+            transform:translateY(105%); visibility:hidden;
+            transition:transform .3s ease, visibility .3s;
+        }
+        #pddModal.visible { transform:translateY(0); visibility:visible; }
+        .pdd-header {
+            display:flex; align-items:center; gap:8px;
+            padding:8px 10px; border-bottom:0.5px solid rgba(255,255,255,0.12); flex-shrink:0;
+            touch-action:none; user-select:none; -webkit-user-select:none;
+        }
+        #pddTitle { font-size:15px; font-weight:600; flex:1; text-align:center; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+        .pdd-nav {
+            width:30px; height:30px; border-radius:50%; border:0.5px solid rgba(255,255,255,0.12);
+            background:rgba(255,255,255,0.06); color:#fff; font-size:15px; cursor:pointer;
+            display:flex; align-items:center; justify-content:center; touch-action:manipulation; flex-shrink:0;
+        }
+        .pdd-nav:active { background:rgba(255,255,255,0.15); }
+        .pdd-nav.active { background:rgba(48,209,88,0.5); border-color:#30D158; }
+        .pdd-search { display:none; padding:8px 10px; border-bottom:0.5px solid rgba(255,255,255,0.12); flex-shrink:0; background:rgba(255,255,255,0.02); }
+        .pdd-search.visible { display:block; }
+        #pddSearch {
+            width:100%; height:36px; padding:0 12px; border-radius:18px; border:0.5px solid rgba(255,255,255,0.18);
+            background:rgba(255,255,255,0.08); color:#fff; font-size:15px; outline:none; touch-action:manipulation;
+            -webkit-appearance:none; appearance:none;
+        }
+        #pddSearch::placeholder { color:rgba(255,255,255,0.4); }
+        #pddSearch::-webkit-search-cancel-button { -webkit-appearance:none; }
+        #pddSearch:focus { border-color:#30D158; }
+        mark { background:#FFD60A; color:#000; border-radius:3px; padding:0 1px; }
+        .pdd-empty { padding:24px 12px; font-size:15px; color:rgba(255,255,255,0.55); text-align:center; }
+        #pddBody { flex:1; overflow-y:auto; padding:8px 12px 32px; -webkit-overflow-scrolling:touch; }
+        .pdd-row { padding:12px; border-radius:12px; cursor:pointer; touch-action:manipulation; border-bottom:0.5px solid rgba(255,255,255,0.06); }
+        .pdd-row:active { background:rgba(255,255,255,0.08); }
+        .pdd-row-num { font-weight:700; color:#fff; margin-right:8px; }
+        .pdd-row-prev { color:#fff; font-size:16px; line-height:1.4; margin-top:2px; white-space:pre-wrap; word-break:break-word; }
+        .pdd-group { padding:12px 12px 4px; font-size:13px; color:#FFD60A; font-weight:600; letter-spacing:0.3px; }
+        .pdd-text { padding:8px 6px; font-size:16px; line-height:1.55; white-space:pre-wrap; color:rgba(255,255,255,0.95); }
+        #picPanel {
+            position:fixed; bottom:calc(76px + env(safe-area-inset-bottom)); left:12px;
+            z-index:9005; width:max-content; max-width:calc(100vw - 24px);
+            background:rgba(15,15,15,0.82); border:0.5px solid rgba(255,255,255,0.12); border-radius:16px;
+            padding:10px; max-height:50vh; overflow-y:auto; display:none;
+            box-shadow:0 20px 60px rgba(0,0,0,0.4); transition:bottom .25s ease;
+        }
+        #picPanel.visible { display:block; }
+        #znakPanel {
+            position:fixed; bottom:calc(76px + env(safe-area-inset-bottom)); left:12px;
+            z-index:9005; width:max-content; max-width:calc(100vw - 24px);
+            background:rgba(15,15,15,0.82); border:0.5px solid rgba(255,255,255,0.12); border-radius:16px;
+            padding:10px 4px 10px 10px; height:180px; overflow:hidden;
+            display:none; flex-direction:row; align-items:stretch;
+            box-shadow:0 20px 60px rgba(0,0,0,0.4); transition:bottom .25s ease;
+        }
+        #znakPanel.visible { display:flex; }
+        #znakScroll { flex:1; overflow-y:scroll; overflow-x:hidden; -webkit-overflow-scrolling:touch; scrollbar-width:none; overscroll-behavior:contain; }
+        #znakScroll::-webkit-scrollbar { display:none; }
+        #znakScrollbar { position:relative; flex-shrink:0; width:24px; margin-left:2px; }
+        #znakScrollThumb {
+            position:absolute; left:1px; right:1px; top:0; height:40px; min-height:30px;
+            background:rgba(255,255,255,0.45); border-radius:7px; cursor:pointer; touch-action:none;
+        }
+        .pdd-open #addPicBtn, .pdd-open #picPanel, .pdd-open #addZnakBtn, .pdd-open #znakPanel,
+        .pdd-open #addTlBtn, .pdd-open #tlPanel, .pdd-open #textBtn, .pdd-open #eraserBtn,
+        .pdd-open #drawBtn, .pdd-open #historyBtn, .pdd-open #saveBtn { z-index:9200; }
+        body.pdd-drag #addPicBtn, body.pdd-drag #picPanel, body.pdd-drag #addZnakBtn, body.pdd-drag #znakPanel,
+        body.pdd-drag #addTlBtn, body.pdd-drag #tlPanel, body.pdd-drag #textBtn, body.pdd-drag #eraserBtn,
+        body.pdd-drag #drawBtn, body.pdd-drag #historyBtn, body.pdd-drag #saveBtn { transition:none; }
+        #colorPanel {
+            position:fixed; bottom:calc(76px + env(safe-area-inset-bottom)); left:12px;
+            z-index:9005; display:none; flex-direction:row; gap:10px;
+            background:rgba(15,15,15,0.82); border:0.5px solid rgba(255,255,255,0.12); border-radius:100px;
+            padding:8px 14px; box-shadow:0 20px 60px rgba(0,0,0,0.4);
+        }
+        #colorPanel.visible { display:flex; }
+        #colorRow { display:flex; flex-direction:row; gap:10px; }
+        #widthSlider {
+            position:fixed; bottom:calc(140px + env(safe-area-inset-bottom)); left:12px;
+            z-index:9005; display:none; width:238px; height:8px; margin:0;
+            -webkit-appearance:none; appearance:none; background:rgba(255,255,255,0.2);
+            border-radius:4px; outline:none; touch-action:none;
+            writing-mode:horizontal-tb; direction:ltr;
+        }
+        #widthSlider.visible { display:block; }
+        #widthSlider::-webkit-slider-thumb {
+            -webkit-appearance:none; appearance:none; width:22px; height:22px; border-radius:50%;
+            background:#fff; border:2px solid rgba(255,255,255,0.6); cursor:pointer; box-shadow:0 2px 8px rgba(0,0,0,0.4);
+        }
+        #widthSlider::-moz-range-thumb {
+            width:22px; height:22px; border-radius:50%; background:#fff; cursor:pointer;
+        }
+        .color-btn {
+            width:34px; height:34px; border-radius:50%; border:2px solid rgba(255,255,255,0.55); cursor:pointer;
+            touch-action:manipulation; flex-shrink:0;
+        }
+        .color-btn.active { border-color:#30D158; box-shadow:0 0 0 3px rgba(48,209,88,0.4); }
+        .color-btn:active { transform:scale(0.9); }
+        #signalBtns {
+            position:fixed; top:calc(76px + env(safe-area-inset-top)); left:12px;
+            z-index:9005; display:none; flex-direction:row; gap:10px;
+        }
+        #signalBtns.visible { display:flex; }
+        /* Мини-светофор: панель активного светофора вместо кнопок поворотников */
+        #tlMini {
+            position:fixed; top:calc(76px + env(safe-area-inset-top)); left:12px;
+            z-index:9005; display:none; flex-direction:row; gap:10px; align-items:flex-start;
+        }
+        #tlMini.visible { display:flex; }
+        #textPanel {
+            position:fixed; top:calc(76px + env(safe-area-inset-top)); left:12px;
+            z-index:9005; display:none; flex-direction:row; gap:10px; align-items:flex-start;
+        }
+        #textPanel.visible { display:flex; }
+        #textCollapseBtn.active { background:rgba(255,255,255,0.3); border-color:#fff; box-shadow:none; }
+        #textCollapseBtn svg[data-icon="expand"] { display:none; }
+        #textCollapseBtn.active svg[data-icon="collapse"] { display:none; }
+        #textCollapseBtn.active svg[data-icon="expand"] { display:block; }
+        #textDragBtn.active { background:rgba(48,209,88,0.5); border-color:#30D158; box-shadow:none; }
+        #textDragBtn.active svg { fill:#fff; }
+        #textDragBtn svg[data-icon="drag-off"] { display:none; }
+        #textDragBtn.active svg[data-icon="drag"] { display:none; }
+        #textDragBtn.active svg[data-icon="drag-off"] { display:block; }
+        .tlm-body {
+            width:36px; padding:7px 0; background:#202020; border:1px solid #fff;
+            border-radius:10px; display:flex; flex-direction:column; align-items:center; gap:9px;
+            box-shadow:0 8px 32px rgba(0,0,0,0.3);
+        }
+        .tlm-lamp { width:21px; height:21px; border-radius:50%; background:#111; outline:1px solid #4a4a4a; cursor:pointer; touch-action:manipulation; }
+        .tlm-lamp:active { transform:scale(0.92); }
+        .tlm-lamp.on.tlm-red { background:#ff3b30; box-shadow:0 0 10px 3px rgba(255,59,48,0.85); }
+        .tlm-lamp.on.tlm-yellow { background:#ffcc00; box-shadow:0 0 10px 3px rgba(255,204,0,0.85); }
+        .tlm-lamp.on.tlm-green { background:#30d158; box-shadow:0 0 10px 3px rgba(48,209,88,0.85); }
+        /* Боковая секция мини-светофора — как .tl-side на карте с учётом
+           масштаба светофора TL_PX_SIZE/TL_BASE_H (100/64 ≈ 1.56):
+           22px * 1.56 ≈ 34px */
+        #tlMini { position:fixed; }
+        .tlm-wrap { position:relative; }
+        .tlm-side {
+            position:absolute; bottom:0;
+            display:none; align-items:center; justify-content:center;
+            width:34px; height:34px; background:#202020; border:1px solid #fff;
+            border-radius:9px; color:#111; cursor:pointer; touch-action:manipulation;
+        }
+        .tlm-side[data-key="left"] { right:100%; }
+        .tlm-side[data-key="right"] { left:100%; }
+        /* Левая секция выступает влево — сдвигаем панель от края экрана */
+        #tlMini.has-left { margin-left:38px; }
+        .tlm-side.visible { display:flex; }
+        .tlm-side:active { transform:scale(0.92); }
+        .tlm-side.on { color:#30d158; }
+        .sig-fab {
+            width:44px; height:44px; border-radius:12px;
+            background:rgba(15,15,15,0.75); border:0.5px solid rgba(255,255,255,0.12);
+            color:#fff; cursor:pointer; display:flex; align-items:center; justify-content:center;
+            box-shadow:0 8px 32px rgba(0,0,0,0.3); touch-action:manipulation; flex-shrink:0;
+        }
+        .sig-fab:active { transform:scale(0.92); }
+        .sig-fab.active {
+            background:rgba(255,204,0,0.5); border-color:#FFD60A; color:#fff;
+            box-shadow:0 0 16px 4px rgba(255,204,0,0.55);
+        }
+        #signLegBtn.active,
+        #tlLegBtn.active {
+            background:rgba(255,255,255,0.3); border-color:#fff;
+            box-shadow:0 0 8px 2px rgba(255,255,255,0.45);
+        }
+        #signDragBtn.active,
+        #tlDragBtn.active {
+            background:rgba(48,209,88,0.5); border-color:#30D158; box-shadow:none;
+        }
+        #signDragBtn.active svg,
+        #tlDragBtn.active svg { fill:#fff; }
+        .sig-fab.danger { color:#FF453A; }
+        .sig-fab.danger:active { background:rgba(255,69,58,0.35); border-color:#FF453A; }
+        .sig-fab.play { color:#30D158; }
+        .sig-fab.play:active { background:rgba(48,209,88,0.3); border-color:#30D158; }
+        .sig-fab.play.active {
+            background:rgba(48,209,88,0.45); border-color:#30D158; color:#fff;
+            box-shadow:0 0 16px 4px rgba(48,209,88,0.55);
+        }
+        #picGrid, #znakGrid { display:flex; flex-wrap:wrap; gap:8px; justify-content:center; }
+        .pic-item {
+            display:flex; align-items:center; justify-content:center; padding:6px; border-radius:10px;
+            background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.1); cursor:pointer; touch-action:none;
+            flex:0 0 auto;
+        }
+        .pic-item img { max-width:80px; max-height:60px; object-fit:contain; display:block; }
+        .pic-item.active { border-color:#30D158; background:rgba(48,209,88,0.2); }
+        .pic-item.hidden { display:none; }
+        #loading {
+            position:fixed; inset:0; background:rgba(0,0,0,0.75); z-index:9999; display:flex; align-items:center; justify-content:center;
+        }
+        #loading.hidden { opacity:0; pointer-events:none; transition:opacity 0.6s; }
+        .spinner { width:40px; height:40px; border:3px solid rgba(255,255,255,0.15); border-top-color:#30D158; border-radius:50%; animation:spin 0.8s linear infinite; }
+        @keyframes spin { to { transform:rotate(360deg); } }
+        .pic-marker { max-width:none; -webkit-user-select:none; user-select:none; -webkit-touch-callout:none; touch-action:none; }
+
+        /* Изображение машинки всегда под управляющими элементами над ней */
+        .pic-marker .rot-wrap { z-index:0; }
+        .rot-wrap { position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); }
+        /* Текстовое поле на карте: фиксируется относительно центра левого верхнего угла */
+        .text-item {
+            position:relative; transform:translate(-50%,-50%); cursor:grab;
+            -webkit-user-select:text; user-select:text; -webkit-touch-callout:none;
+            font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
+            font-weight:600; color:#000; line-height:1.2; text-align:center;
+            touch-action:none;
+        }
+        .text-item.fixed { user-select:none; -webkit-user-select:none; -webkit-touch-callout:none; cursor:grab; }
+        .text-input {
+            display:block; box-sizing:border-box; width:max-content; max-width:calc(100vw - 24px);
+            padding:4px 8px; margin:0; overflow:hidden;
+            background:rgba(255,255,255,0.85); color:#000; border:1px solid rgba(0,0,0,0.35); border-radius:6px;
+            font:inherit; outline:none; -webkit-user-select:text; user-select:text;
+            touch-action:manipulation; white-space:pre-wrap; overflow-wrap:anywhere;
+            text-align:left; cursor:text;
+        }
+        .text-input.empty::before { content:attr(data-placeholder); color:rgba(0,0,0,0.35); }
+        .text-item.fixed .text-input { border:none; background:rgba(90,90,90,0.6); color:#fff; text-shadow:0 1px 2px rgba(0,0,0,0.6); width:max-content; user-select:none; -webkit-user-select:none; -webkit-touch-callout:none; touch-action:none; cursor:grab; box-shadow:0 1px 4px rgba(0,0,0,0.3); }
+        .text-item.fixed .text-input.empty::before { content:''; }
+        .text-item .text-input:focus { border-color:rgba(0,0,0,0.35); }
+        /* Свернутое состояние: квадратная иконка с буквой «T» */
+        .text-badge {
+            display:none; width:30px; height:30px; border-radius:6px;
+            align-items:center; justify-content:center;
+            background:#fff; color:#000; border:1px solid rgba(0,0,0,0.4);
+            box-shadow:0 1px 3px rgba(0,0,0,0.25);
+            font-size:18px; font-weight:700; line-height:1; cursor:grab;
+            margin:0 auto; user-select:none; -webkit-user-select:none;
+            -webkit-touch-callout:none;
+        }
+        .text-item.collapsed .text-input { display:none; }
+        .text-item.collapsed .text-badge { display:flex; }
+        .text-item.text-active { background:rgba(90,90,90,0.4); border-radius:6px; }
+        .text-item.text-active.fixed .text-input { background:rgba(90,90,90,0.8); }
+        /* Режим перетаскивания активен: метка выделяется тонкой зелёной рамкой */
+        .text-item.text-drag { outline:1px solid #30D158; outline-offset:2px; border-radius:2px; }
+        /* Режим перетаскивания активен у знака/светофора: зелёная рамка вокруг тела,
+           как у текстового поля. Класс висит на .rot-wrap; рамка — на самом корпусе
+           (img у знака, .tl у светофора), т.к. .rot-wrap имеет схлопнутый/немасштабный layout */
+        .pic-marker .rot-wrap.marker-drag img { outline:2px solid #30D158; outline-offset:2px; border-radius:4px; }
+        .pic-marker .rot-wrap.marker-drag .tl { outline:2px solid #30D158; outline-offset:2px; border-radius:6px; }
+
+        .sign-leg {
+            position:absolute; left:50%; transform:translateX(-50%);
+            background:#8E8E93; border-radius:2px; pointer-events:none;
+            box-shadow:0 0 0 1px #fff;
+            z-index:-1;
+        }
+
+        .turn-indicator {
+            position:absolute; width:10px; height:10px;
+            background:#FFCC00; border-radius:50%; opacity:0; pointer-events:none;
+            box-shadow:0 0 0 2px rgba(255,204,0,0.5), 0 0 0 4px rgba(255,204,0,0.22);
+        }
+        .turn-left-top { left:8%; top:8%; transform:translate(-50%,-50%); }
+        .turn-left-bottom { left:8%; bottom:8%; transform:translate(-50%,50%); }
+        .turn-right-top { right:8%; top:8%; transform:translate(50%,-50%); }
+        .turn-right-bottom { right:8%; bottom:8%; transform:translate(50%,50%); }
+        .signal-left .turn-left-top, .signal-left .turn-left-bottom,
+        .signal-right .turn-right-top, .signal-right .turn-right-bottom,
+        .signal-both .turn-left-top, .signal-both .turn-left-bottom,
+        .signal-both .turn-right-top, .signal-both .turn-right-bottom {
+            opacity:0;
+        }
+        .signal-left.blink-on .turn-left-top, .signal-left.blink-on .turn-left-bottom,
+        .signal-right.blink-on .turn-right-top, .signal-right.blink-on .turn-right-bottom,
+        .signal-both.blink-on .turn-left-top, .signal-both.blink-on .turn-left-bottom,
+        .signal-both.blink-on .turn-right-top, .signal-both.blink-on .turn-right-bottom {
+            opacity:1;
+        }
+        /* Запрет встроенного зума браузера на элементах управления */
+        .fab, .sig-fab, #tlMini, .tlm-lamp, .tlm-side,
+        #recAllBtn, #playAllBtn { touch-action:none !important; }
+
+        /* Telegram Mini App: опускаем верхние элементы ниже системных кнопок.
+           Величина --tg-top задаётся из Telegram.WebApp (contentSafeAreaInset). */
+        :root { --tg-top: 0px; }
+        /* Кнопка ПДД остаётся у верхнего края и не смещается на --tg-top */
+        #pddBtn { top: calc(12px + env(safe-area-inset-top)); }
+        #drawBtn { bottom: calc(12px + env(safe-area-inset-bottom)); }
+        #rotateBtn { top: calc(12px + env(safe-area-inset-top) + var(--tg-top)); }
+        #locateBtn, #signalBtns, #tlMini, #textPanel { top: calc(76px + env(safe-area-inset-top) + var(--tg-top)); }
+        #hideUiBtn { top: calc(140px + env(safe-area-inset-top) + var(--tg-top)); }
+        #colorPanel { bottom: calc(76px + env(safe-area-inset-bottom)); }
+        #widthSlider { bottom: calc(140px + env(safe-area-inset-bottom)); }
+        /* Оверлей загрузки сцены по ссылке (spinner + Загрузка) */
+        #loadOverlay {
+            position:fixed; inset:0; z-index:9500;
+            display:flex; flex-direction:column; align-items:center; justify-content:center; gap:14px;
+            background:rgba(10,13,18,0.55); color:#fff;
+            font-size:16px; font-weight:600; letter-spacing:0.3px;
+        }
+        #loadOverlay .load-spinner {
+            width:38px; height:38px; border-radius:50%;
+            border:3px solid rgba(255,255,255,0.22); border-top-color:#FFD60A;
+            animation:loadSpin .7s linear infinite;
+        }
+        @keyframes loadSpin { to { transform:rotate(360deg); } }
+    </style>
+</head>
+<body>
+
+<div id="loading"><div class="spinner"></div></div>
+<div id="map"></div>
+<button id="addPicBtn" class="fab">
+    <img id="addPicThumb" alt="">
+</button>
+<button id="addZnakBtn" class="fab">
+    <img id="addZnakThumb" alt="">
+</button>
+<button id="drawBtn" class="fab">
+    <svg viewBox="0 0 24 24" width="22" height="22" fill="#fff"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34a1 1 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
+</button>
+<button id="eraserBtn" class="fab">
+    <svg viewBox="0 0 24 24" width="22" height="22" fill="#fff"><g transform="rotate(45 12 12)"><rect x="7.75" y="2" width="8.5" height="12" rx="2"/><rect x="7.75" y="15" width="8.5" height="6.5" rx="2"/></g></svg>
+</button>
+<button id="textBtn" class="fab" title="Текст">
+    <svg viewBox="0 0 24 24" width="24" height="24" fill="#fff"><path d="M5 4v3h5.5v12.5h3V7H19V4z"/></svg>
+</button>
+<button id="locateBtn" class="fab">
+    <svg viewBox="0 0 24 24" width="22" height="22" fill="#fff"><path d="M12 8c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4zm8.94 3c-.46-4.17-3.77-7.48-7.94-7.94V1h-2v2.06C6.83 3.52 3.52 6.83 3.06 11H1v2h2.06c.46 4.17 3.77 7.48 7.94 7.94V23h2v-2.06c4.17-.46 7.48-3.77 7.94-7.94H23v-2h-2.06zM12 19c-3.87 0-7-3.13-7-7s3.13-7 7-7 7 3.13 7 7-3.13 7-7 7z"/></svg>
+</button>
+<button id="hideUiBtn" class="fab" title="Скрыть элементы управления">
+    <svg viewBox="0 0 24 24" width="22" height="22" fill="#fff"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>
+</button>
+<button id="pddBtn">ПДД</button>
+<div id="pddModal">
+    <div class="pdd-header">
+        <button id="pddBack" class="pdd-nav">&#8592;</button>
+        <div id="pddTitle">ПДД РФ</div>
+        <button id="pddSearchBtn" class="pdd-nav" title="Поиск">
+            <svg viewBox="0 0 24 24" width="17" height="17" fill="#fff"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
+        </button>
+        <button id="pddClose" class="pdd-nav">&#10005;</button>
+    </div>
+    <div class="pdd-search">
+        <input id="pddSearch" type="search" placeholder="Поиск по ПДД..." autocomplete="off" spellcheck="false">
+    </div>
+    <div id="pddBody"></div>
+</div>
+<div id="rotateBtn">
+    <button class="rot-btn" id="rotCCWBtn" title="Против часовой стрелки">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="#fff"><path d="M7.11 8.53 5.7 7.11C4.8 8.27 4.24 9.61 4.07 11h2.02c.14-.87.49-1.72 1.02-2.47zM6.09 13H4.07c.17 1.39.72 2.73 1.62 3.89l1.41-1.42c-.52-.75-.87-1.59-1.01-2.47zm1.01 5.32c1.16.9 2.51 1.44 3.9 1.61V17.9c-.87-.15-1.71-.49-2.46-1.03L7.1 18.32zM13 4.07V1L8.45 5.55 13 10V6.09c2.84.48 5 2.94 5 5.91s-2.16 5.43-5 5.91v2.02c3.95-.49 7-3.85 7-7.93s-3.05-7.44-7-7.93z"/></svg>
+    </button>
+    <button class="rot-btn" id="rotCWBtn" title="По часовой стрелке">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="#fff" style="transform:scaleX(-1)"><path d="M7.11 8.53 5.7 7.11C4.8 8.27 4.24 9.61 4.07 11h2.02c.14-.87.49-1.72 1.02-2.47zM6.09 13H4.07c.17 1.39.72 2.73 1.62 3.89l1.41-1.42c-.52-.75-.87-1.59-1.01-2.47zm1.01 5.32c1.16.9 2.51 1.44 3.9 1.61V17.9c-.87-.15-1.71-.49-2.46-1.03L7.1 18.32zM13 4.07V1L8.45 5.55 13 10V6.09c2.84.48 5 2.94 5 5.91s-2.16 5.43-5 5.91v2.02c3.95-.49 7-3.85 7-7.93s-3.05-7.44-7-7.93z"/></svg>
+    </button>
+</div>
+<div id="historyBtn">
+    <button class="rot-btn" id="undoBtn" title="Отменить">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5"/><path d="M12 5l-7 7 7 7"/></svg>
+    </button>
+    <button class="rot-btn" id="redoBtn" title="Вернуть">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5l7 7-7 7"/></svg>
+    </button>
+</div>
+<div id="picPanel" class="visible">
+    <div id="picGrid"></div>
+</div>
+<div id="znakPanel">
+    <div id="znakScroll">
+        <div id="znakGrid"></div>
+    </div>
+    <div id="znakScrollbar"><div id="znakScrollThumb"></div></div>
+</div>
+<div id="colorPanel">
+    <div id="colorRow">
+        <div class="color-btn" data-color="#000000" style="background:#000000;"></div>
+        <div class="color-btn" data-color="#ffffff" style="background:#ffffff;"></div>
+        <div class="color-btn" data-color="#30D158" style="background:#30D158;"></div>
+        <div class="color-btn" data-color="#FFD60A" style="background:#FFD60A;"></div>
+        <div class="color-btn" data-color="#FF453A" style="background:#FF453A;"></div>
+    </div>
+</div>
+<input id="widthSlider" type="range" min="1" max="30" value="5">
+<div id="signalBtns">
+    <div class="sig-fab" id="sigLeftBtn"><svg viewBox="0 0 22 10" width="30" height="13.6" fill="currentColor"><rect x="11" y="2.5" width="8" height="5" rx="1.2"/><polygon points="11,0.5 3,5 11,9.5"/></svg></div>
+    <div class="sig-fab" id="sigHazBtn"><svg viewBox="0 0 22 10" width="30" height="13.6" fill="currentColor"><g><polygon points="6,0.5 0,5 6,9.5"/><rect x="6" y="3" width="5" height="4" rx="1.2"/></g><g><polygon points="16,0.5 22,5 16,9.5"/><rect x="11" y="3" width="5" height="4" rx="1.2"/></g></svg></div>
+    <div class="sig-fab" id="sigRightBtn"><svg viewBox="0 0 22 10" width="30" height="13.6" fill="currentColor"><rect x="3" y="2.5" width="8" height="5" rx="1.2"/><polygon points="11,0.5 19,5 11,9.5"/></svg></div>
+    <div class="sig-fab" id="signLegBtn" style="display:none"><svg viewBox="0 0 24 24" width="20" height="20"><rect x="9" y="2" width="6" height="20" rx="3" fill="#8E8E93" stroke="#fff" stroke-width="1"/></svg></div>
+    <div class="sig-fab" id="signDragBtn" style="display:none"><svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M13 24C9.74 24 6.81 22 5.6 19L2.57 11.37C2.26 10.58 3 9.79 3.81 10.05L4.6 10.31C5.16 10.5 5.62 10.92 5.84 11.47L7.25 15H8V3.25C8 2.56 8.56 2 9.25 2S10.5 2.56 10.5 3.25V12H11.5V1.25C11.5 .56 12.06 0 12.75 0S14 .56 14 1.25V12H15V2.75C15 2.06 15.56 1.5 16.25 1.5C16.94 1.5 17.5 2.06 17.5 2.75V12H18.5V5.75C18.5 5.06 19.06 4.5 19.75 4.5S21 5.06 21 5.75V16C21 20.42 17.42 24 13 24Z"/></svg></div>
+    <div class="sig-fab danger" id="sigDelBtn"><svg viewBox="0 0 24 24" width="20" height="20"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg></div>
+    <div class="sig-fab play" id="sigPlayBtn" style="display:none">
+        <svg class="pb-ic-play" viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M7 4.5v15l12-7.5z"/></svg>
+        <svg class="pb-ic-stop" viewBox="0 0 24 24" width="20" height="20" fill="currentColor" style="display:none"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>
+    </div>
+</div>
+<div id="tlMini">
+    <div class="tlm-wrap">
+        <div class="tlm-body">
+            <div class="tlm-lamp tlm-red" data-key="red"></div>
+            <div class="tlm-lamp tlm-yellow" data-key="yellow"></div>
+            <div class="tlm-lamp tlm-green" data-key="green"></div>
+        </div>
+        <div class="tlm-side" data-key="left"><svg viewBox="0 0 22 10" width="34" height="15.6"><rect x="11" y="3" width="7" height="4" fill="currentColor"/><polygon points="11,1 4,5 11,9" fill="currentColor"/></svg></div>
+        <div class="tlm-side" data-key="right"><svg viewBox="0 0 22 10" width="34" height="15.6"><rect x="4" y="3" width="7" height="4" fill="currentColor"/><polygon points="11,1 18,5 11,9" fill="currentColor"/></svg></div>
+    </div>
+    <div class="sig-fab" id="tlLegBtn"><svg viewBox="0 0 24 24" width="20" height="20"><rect x="9" y="2" width="6" height="20" rx="3" fill="#8E8E93" stroke="#fff" stroke-width="1"/></svg></div>
+    <div class="sig-fab" id="tlDragBtn"><svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M13 24C9.74 24 6.81 22 5.6 19L2.57 11.37C2.26 10.58 3 9.79 3.81 10.05L4.6 10.31C5.16 10.5 5.62 10.92 5.84 11.47L7.25 15H8V3.25C8 2.56 8.56 2 9.25 2S10.5 2.56 10.5 3.25V12H11.5V1.25C11.5 .56 12.06 0 12.75 0S14 .56 14 1.25V12H15V2.75C15 2.06 15.56 1.5 16.25 1.5C16.94 1.5 17.5 2.06 17.5 2.75V12H18.5V5.75C18.5 5.06 19.06 4.5 19.75 4.5S21 5.06 21 5.75V16C21 20.42 17.42 24 13 24Z"/></svg></div>
+    <div class="sig-fab danger" id="tlDelBtn"><svg viewBox="0 0 24 24" width="20" height="20"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg></div>
+</div>
+
+<div id="textPanel">
+    <div class="sig-fab" id="textCollapseBtn"><svg data-icon="collapse" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7l6 5-6 5M21 7l-6 5 6 5"/></svg><svg data-icon="expand" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 7 3 12l6 5M15 7l6 5-6 5"/></svg></div>
+    <div class="sig-fab" id="textEditBtn"><svg viewBox="0 0 24 24" width="20" height="20"><path d="M4 20h16M5.5 17.5l.5-3L15.5 5a2.12 2.12 0 0 1 3 3L9 17.5l-3 .5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+    <div class="sig-fab" id="textDragBtn"><svg data-icon="drag" viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M13 24C9.74 24 6.81 22 5.6 19L2.57 11.37C2.26 10.58 3 9.79 3.81 10.05L4.6 10.31C5.16 10.5 5.62 10.92 5.84 11.47L7.25 15H8V3.25C8 2.56 8.56 2 9.25 2S10.5 2.56 10.5 3.25V12H11.5V1.25C11.5 .56 12.06 0 12.75 0S14 .56 14 1.25V12H15V2.75C15 2.06 15.56 1.5 16.25 1.5C16.94 1.5 17.5 2.06 17.5 2.75V12H18.5V5.75C18.5 5.06 19.06 4.5 19.75 4.5S21 5.06 21 5.75V16C21 20.42 17.42 24 13 24Z"/></svg><svg data-icon="drag-off" viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M13 24C9.74 24 6.81 22 5.6 19L2.57 11.37C2.26 10.58 3 9.79 3.81 10.05L4.6 10.31C5.16 10.5 5.62 10.92 5.84 11.47L7.25 15H8V3.25C8 2.56 8.56 2 9.25 2S10.5 2.56 10.5 3.25V12H11.5V1.25C11.5 .56 12.06 0 12.75 0S14 .56 14 1.25V12H15V2.75C15 2.06 15.56 1.5 16.25 1.5C16.94 1.5 17.5 2.06 17.5 2.75V12H18.5V5.75C18.5 5.06 19.06 4.5 19.75 4.5S21 5.06 21 5.75V16C21 20.42 17.42 24 13 24Z"/></svg></div>
+    <div class="sig-fab danger" id="textDelBtn"><svg viewBox="0 0 24 24" width="20" height="20"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg></div>
+</div>
+
+<script src="https://api-maps.yandex.ru/v3/?apikey=c0e28937-4e16-4d15-9b99-09a30cb8fc13&lang=ru_RU"></script>
+<script src="pdd.js"></script>
+<script>
+let map = null, userMarker = null, lastPos = null;
+let placedMarkers = [], selectedPic = null, drawMode = false, drawFeature = null, drawing = false;
+let eraserMode = false, drawnLines = [], eraserDrag = false;
+let drawColor = '#000000';
+let drawWidth = 5;
+let drawPointerId = null;
+let eraserPointerId = null;
+let eraserLongPress = null;
+let eraserLongPressFired = false;
+
+// Список изображений из папки pic/ — при добавлении новых файлов добавьте их сюда
+const PIC_FILES = ['1.png', '2.png', '3.png', '4.png'];
+
+// Список знаков из папки znaki/
+const ZNAKI_FILES = ['2.1.svg', '2.2.svg', '2.4.svg', '2.5.svg', '2.6.svg', '3.1.svg', '3.2.svg', '3.24.20.svg', '3.24.30.svg', '3.24.40.svg', '3.24.50.svg', '3.25.40.svg', '3.27.svg', '3.31.svg', '4.1.1.svg', '4.1.2.svg', '4.1.3.svg', '4.3.svg', '5.5.svg', '5.15.2.svg', '5.15.2_2.svg', '5.15.2_3.svg', '5.15.2_5.svg', '5.15.2_7.svg', '5.15.2_8.svg', '5.20.svg', '5.21.svg', '6.3.1.svg', '6.4.svg', '6.16.svg', '8.2.3.svg', '8.2.4.svg', '8.5.1.svg', '8.5.2.svg', '8.5.7.svg', '8.5.7.2.png', 'zona20.png', 'konec_zona20.png', 'пешеход.png'];
+
+// Реальный размер изображения на карте в метрах (по высоте)
+const PIC_SIZE_M = 5;
+
+// Реальный размер знака на карте в метрах (видимая часть по большей стороне)
+const ZNAK_WIDTH_M = 3;
+
+// Долгое нажатие по маркеру: длительность и допуск смещения (стилус/палец дрожит)
+const LP_DURATION_MS = 500;
+const LP_MOVE_TOLERANCE_PX = 10;
+
+// Диаметр лампочки поворотника в метрах (масштабируется с картой)
+const TURN_IND_SIZE_M = 1;
+
+const userLocSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 40 40"><circle cx="20" cy="20" r="18" fill="#007AFF" opacity="0.2"/><circle cx="20" cy="20" r="9" fill="#007AFF" stroke="#fff" stroke-width="2.5"/></svg>`;
+
+// Запуск по ссылке на сцену (startapp) — тогда карту центрирует сама сцена.
+function hasStartParam() {
+    const wa = window.Telegram && window.Telegram.WebApp;
+    return !!((wa && wa.initDataUnsafe && wa.initDataUnsafe.start_param)
+        || new URLSearchParams(location.search).get('startapp'));
+}
+
+// Разовое получение текущего местоположения.
+function getPos() {
+    return new Promise(resolve => navigator.geolocation.getCurrentPosition(p => resolve([p.coords.longitude, p.coords.latitude]), () => resolve(null), { enableHighAccuracy: true, timeout: 15000 }));
+}
+
+function updateMarker() {
+    if (userMarker && lastPos) {
+        userMarker.update({ coordinates: [lastPos[1], lastPos[0]] });
+        if (userMarker._el) userMarker._el.style.display = '';
+    }
+}
+
+function buildPicGrid() {
+    const grid = document.getElementById('picGrid');
+    grid.innerHTML = '';
+    PIC_FILES.forEach(file => {
+        const cell = document.createElement('div');
+        cell.className = 'pic-item';
+        cell.dataset.file = file;
+        cell.dataset.type = 'pic';
+        const imgSrc = 'pic/' + encodeURIComponent(file);
+        const img = document.createElement('img');
+        img.src = imgSrc;
+        img.draggable = false;
+        img.onerror = () => cell.classList.add('hidden');
+        cell.appendChild(img);
+        cell.addEventListener('pointerdown', e => startPicDrag(cell, e));
+        grid.appendChild(cell);
+    });
+}
+
+function buildZnakGrid() {
+    const grid = document.getElementById('znakGrid');
+    grid.innerHTML = '';
+    ZNAKI_FILES.forEach(file => {
+        const cell = document.createElement('div');
+        cell.className = 'pic-item';
+        cell.dataset.file = file;
+        cell.dataset.type = 'znak';
+        const img = document.createElement('img');
+        img.src = 'znaki/' + encodeURIComponent(file);
+        img.draggable = false;
+        img.onerror = () => cell.classList.add('hidden');
+        cell.appendChild(img);
+        cell.addEventListener('pointerdown', e => startPicDrag(cell, e));
+        grid.appendChild(cell);
+    });
+    if (window.updateZnakScrollbar) window.updateZnakScrollbar();
+}
+
+// ---- Кастомный постоянно видимый ползунок прокрутки галереи знаков ----
+function initZnakScrollbar() {
+    const scroller = document.getElementById('znakScroll');
+    const thumb = document.getElementById('znakScrollThumb');
+    if (!scroller || !thumb) return;
+    const update = () => {
+        const scrollH = scroller.scrollHeight - scroller.clientHeight;
+        const trackH = scroller.clientHeight;
+        if (scrollH <= 0) {
+            thumb.style.height = '0px';
+            thumb.style.top = '0px';
+            return;
+        }
+        const thumbH = Math.max(30, trackH * trackH / scroller.scrollHeight);
+        thumb.style.height = thumbH + 'px';
+        thumb.style.top = (scroller.scrollTop / scrollH * (trackH - thumbH)) + 'px';
+    };
+    scroller.addEventListener('scroll', update, { passive: true });
+    window.addEventListener('resize', update);
+    thumb.addEventListener('pointerdown', e => {
+        e.preventDefault();
+        const startY = e.clientY;
+        const startTop = parseFloat(thumb.style.top) || 0;
+        const trackH = scroller.clientHeight;
+        const thumbH = parseFloat(thumb.style.height) || 40;
+        const scrollH = scroller.scrollHeight - scroller.clientHeight;
+        const onMove = ev => {
+            const maxTop = trackH - thumbH;
+            const t = Math.min(maxTop, Math.max(0, startTop + (ev.clientY - startY)));
+            if (scrollH > 0) scroller.scrollTop = t / maxTop * scrollH;
+        };
+        const onEnd = () => {
+            window.removeEventListener('pointermove', onMove);
+            window.removeEventListener('pointerup', onEnd);
+            window.removeEventListener('pointercancel', onEnd);
+        };
+        window.addEventListener('pointermove', onMove);
+        window.addEventListener('pointerup', onEnd);
+        window.addEventListener('pointercancel', onEnd);
+    });
+    window.updateZnakScrollbar = update;
+    update();
+}
+
+let picDrag = null;
+let picGhost = null;
+
+function startPicDrag(cell, e) {
+    e.preventDefault();
+    const t = cell.dataset.type;
+    picDrag = { id: e.pointerId, item: cell, type: t, startX: e.clientX, startY: e.clientY, active: false, angle: null, cx: 0, cy: 0, h: 0, sizeM: t === 'pic' ? PIC_SIZE_M : (t === 'znak' ? ZNAK_WIDTH_M : 0), scaleK: 1, pxH: t === 'tl' ? Math.min(100, Math.max(20, 10 / metersPerPixel(map.center[1]))) : 0 };
+}
+
+window.addEventListener('pointermove', e => {
+    if (!picDrag || e.pointerId !== picDrag.id) return;
+    if (!picDrag.active) {
+        const dx = e.clientX - picDrag.startX, dy = e.clientY - picDrag.startY;
+        if (dx * dx + dy * dy < 49) return;
+        picDrag.active = true;
+        selectedPic = { file: picDrag.item.dataset.file, type: picDrag.type };
+        picGhost = document.createElement('img');
+        if (picDrag.type === 'tl') {
+            picGhost.src = (window.tlGhostSrc ? window.tlGhostSrc(selectedPic.file) : '');
+        } else {
+            picGhost.src = (picDrag.type === 'znak' ? 'znaki/' : 'pic/') + encodeURIComponent(selectedPic.file);
+        }
+        picGhost.style.cssText = 'position:fixed;left:0;top:0;width:auto;height:auto;pointer-events:none;z-index:9999;opacity:0.9;transform:translate(-50%,-50%);';
+        document.body.appendChild(picGhost);
+        const geo = screenToGeo(e.clientX, e.clientY);
+        picDrag.h = Math.max(10, (picDrag.pxH ? picDrag.pxH : picDrag.sizeM / metersPerPixel(geo.lat) / picDrag.scaleK)) / 2;
+        picDrag.cx = e.clientX;
+        picDrag.cy = e.clientY + picDrag.h;
+        picDrag.angle = Math.atan2(e.clientY - picDrag.cy, e.clientX - picDrag.cx);
+    } else if (picGhost) {
+        const cGeo = screenToGeo(picDrag.cx, picDrag.cy);
+        picDrag.h = Math.max(10, (picDrag.pxH ? picDrag.pxH : picDrag.sizeM / metersPerPixel(cGeo.lat) / picDrag.scaleK)) / 2;
+        const ang = Math.atan2(e.clientY - picDrag.cy, e.clientX - picDrag.cx);
+        picDrag.angle = ang;
+        picDrag.cx = e.clientX - Math.cos(ang) * picDrag.h;
+        picDrag.cy = e.clientY - Math.sin(ang) * picDrag.h;
+    }
+    if (picGhost) {
+        picGhost.style.height = (2 * picDrag.h) + 'px';
+        picGhost.style.left = picDrag.cx + 'px';
+        picGhost.style.top = picDrag.cy + 'px';
+        picGhost.style.transform = 'translate(-50%,-50%)' + (picDrag.angle != null ? ' rotate(' + (picDrag.angle * 180 / Math.PI + 90) + 'deg)' : '');
+    }
+}, true);
+
+function endPicDrag(e) {
+    if (!picDrag || e.pointerId !== picDrag.id) return;
+    const active = picDrag.active;
+    let angle = picDrag.angle;
+    const cx = picDrag.cx, cy = picDrag.cy;
+    if (angle == null) angle = Math.atan2(e.clientY - picDrag.startY, e.clientX - picDrag.startX);
+    picDrag = null;
+    if (picGhost) { picGhost.remove(); picGhost = null; }
+    if (!active) return;
+    const mapEl = document.getElementById('map');
+    const rect = mapEl.getBoundingClientRect();
+    if (e.clientX >= rect.left && e.clientX <= rect.right && e.clientY >= rect.top && e.clientY <= rect.bottom) {
+        const geo = screenToGeo(cx, cy);
+        placePic(geo.lat, geo.lon, angle);
+    } else {
+        selectedPic = null;
+    }
+}
+window.addEventListener('pointerup', endPicDrag, true);
+window.addEventListener('pointercancel', endPicDrag, true);
+
+function screenToGeo(clientX, clientY) {
+    const mapEl = document.getElementById('map');
+    const rect = mapEl.getBoundingClientRect();
+    const sx = clientX - rect.left - rect.width / 2;
+    const sy = clientY - rect.top - rect.height / 2;
+    const mpp = metersPerPixel(map.center[1]);
+    const R = mapRot * Math.PI / 180;
+    const dEast = (sx * Math.cos(R) + sy * Math.sin(R)) * mpp;
+    const dNorth = (sx * Math.sin(R) - sy * Math.cos(R)) * mpp;
+    return {
+        lat: map.center[1] + dNorth / 111320,
+        lon: map.center[0] + dEast / (111320 * Math.cos(map.center[1] * Math.PI / 180))
+    };
+}
+
+let lastDrawScreen = null;
+let lineCoords = [];
+
+function setMarkersDraggable(v) {
+    placedMarkers.forEach(m => {
+        if (placedMarkers.indexOf(m) !== -1) {
+            m.update({ draggable: v ? markerDraggable(m) : false });
+        }
+    });
+}
+
+function setHandlesVisible(v) {
+    placedMarkers.forEach(m => {
+        const handles = m._dragHandles || (m._dragHandle ? [m._dragHandle] : []);
+        handles.forEach(h => { h.style.display = v ? '' : 'none'; });
+    });
+}
+
+function startDraw() {
+    drawMode = true;
+    setActiveCar(null);
+    setMarkersDraggable(false);
+    setHandlesVisible(false);
+    document.getElementById('drawBtn').classList.add('active');
+    document.querySelectorAll('.pic-item').forEach(c => c.classList.remove('active'));
+    selectedPic = null;
+    document.getElementById('colorPanel').classList.add('visible');
+    document.getElementById('widthSlider').classList.add('visible');
+    map.update({ behaviors: [] });
+}
+
+function stopDraw() {
+    drawing = false;
+    drawMode = false;
+    setMarkersDraggable(true);
+    setHandlesVisible(true);
+    document.getElementById('drawBtn').classList.remove('active');
+    document.getElementById('colorPanel').classList.remove('visible');
+    document.getElementById('widthSlider').classList.remove('visible');
+    map.update({ behaviors: appBehaviors });
+}
+
+function startEraser() {
+    drawing = false;
+    drawMode = false;
+    eraserMode = true;
+    eraserDrag = false;
+    setActiveCar(null);
+    setMarkersDraggable(false);
+    setHandlesVisible(false);
+    document.getElementById('eraserBtn').classList.add('active');
+    document.getElementById('drawBtn').classList.remove('active');
+    document.querySelectorAll('.pic-item').forEach(c => c.classList.remove('active'));
+    selectedPic = null;
+    document.getElementById('colorPanel').classList.remove('visible');
+    document.getElementById('widthSlider').classList.remove('visible');
+    map.update({ behaviors: [] });
+}
+
+function stopEraser() {
+    eraserMode = false;
+    eraserDrag = false;
+    setMarkersDraggable(true);
+    setHandlesVisible(true);
+    document.getElementById('eraserBtn').classList.remove('active');
+    map.update({ behaviors: appBehaviors });
+}
+
+function eraseLine(line) {
+    if (line.feature) map.removeChild(line.feature);
+    drawnLines.splice(drawnLines.indexOf(line), 1);
+}
+
+// Удаление машинки/знака/светофора/текста под точкой экрана (режим ластика)
+function eraseMarkerAtScreen(x, y) {
+    const el = document.elementFromPoint(x, y);
+    if (!el || !el.closest) return;
+    const tEl = el.closest('.text-item');
+    if (tEl) {
+        const t = textItems.find(mk => mk._select === tEl);
+        if (t) removeTextItem(t);
+        return;
+    }
+    const mEl = el.closest('.pic-marker');
+    if (!mEl) return;
+    const m = placedMarkers.find(mk => mk._select === mEl);
+    if (m) removeMarker(m);
+}
+
+function eraseAt(coords) {
+    const th = 3 * metersPerPixel(coords[1]);
+    for (let i = drawnLines.length - 1; i >= 0; i--) {
+        const line = drawnLines[i];
+        if (!line.coords || line.coords.length < 2) continue;
+        if (distToLineMeters(coords, line.coords) < th) eraseLine(line);
+    }
+}
+
+function distToLineMeters(p, line) {
+    let min = Infinity;
+    for (let i = 0; i < line.length - 1; i++) {
+        const d = ptSegDistMeters(p, line[i], line[i + 1]);
+        if (d < min) min = d;
+    }
+    return min;
+}
+
+function ptSegDistMeters(p, a, b) {
+    const ax = 111320 * Math.cos(a[1] * Math.PI / 180) * a[0];
+    const ay = 111320 * a[1];
+    const bx = 111320 * Math.cos(b[1] * Math.PI / 180) * b[0];
+    const by = 111320 * b[1];
+    const px = 111320 * Math.cos(p[1] * Math.PI / 180) * p[0];
+    const py = 111320 * p[1];
+    const dx = bx - ax, dy = by - ay;
+    const t = Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / (dx * dx + dy * dy)));
+    const cx = ax + t * dx, cy = ay + t * dy;
+    return Math.hypot(px - cx, py - cy);
+}
+
+
+
+function hexToRgba(hex, alpha) {
+    const n = parseInt(hex.replace('#', ''), 16);
+    return 'rgba(' + ((n >> 16) & 255) + ', ' + ((n >> 8) & 255) + ', ' + (n & 255) + ', ' + alpha + ')';
+}
+
+// ---- История действий (undo/redo) ----
+// Снимки сцены: линии + объекты (тип/файл/позиция/угол). Записи REC и сигналы
+// поворотников не являются действиями и в историю не попадают; данные записей
+// передаются по ссылке, чтобы undo/redo их не терял.
+const MAX_HISTORY = 30;
+let undoStack = [], redoStack = [], _restoring = false;
+
+// Упаковка семплов записи движения в плоский массив чисел с округлением,
+// чтобы уменьшить размер JSON-сериализации сцены.
+function packRecSamples(samples) {
+    const arr = [];
+    for (let i = 0; i < samples.length; i++) {
+        const s = samples[i];
+        arr.push(Math.round(s.t));
+        arr.push(Number(s.lat.toFixed(6)));
+        arr.push(Number(s.lon.toFixed(6)));
+        arr.push(Number(s.heading.toFixed(1)));
+    }
+    return arr;
+}
+
+// Распаковка плоского массива обратно в массив объектов {t, lat, lon, heading}.
+function unpackRecSamples(arr) {
+    const out = [];
+    for (let i = 0; i + 3 < arr.length; i += 4) {
+        out.push({ t: arr[i], lat: arr[i + 1], lon: arr[i + 2], heading: arr[i + 3] });
+    }
+    return out;
+}
+
+function serializeScene() {
+    if (textEditing) commitTextEditing();
+    return {
+        lines: drawnLines.map(l => ({ coords: l.coords.map(c => c.slice()), color: l.color || '#000000', width: l.width || 5, widthM: l.widthM || null })),
+        texts: textItems.map(m => ({ lat: m._lat, lon: m._lon, text: m._ta ? m._ta.textContent || '' : '', collapsed: !!(m._select && m._select.classList.contains('collapsed')) })),
+        markers: placedMarkers.map(m => ({
+            kind: m._isTl ? 'tl' : (m._isZnak ? 'znak' : 'pic'),
+            file: m._isTl ? m._tlType : m._file,
+            lat: m._lat, lon: m._lon,
+            heading: m._heading,
+            leg: !!m._leg,
+            rec: (m._samples && m._samples.length) ? { format: 2, samples: packRecSamples(m._samples), st: m._startTrim || 0, et: (m._endTrim != null ? m._endTrim : m._samples[m._samples.length - 1].t), po: m._phaseOffset || 0, sig: m._signals || [], loop: (m._loopMs && m._loopMs > 0) ? m._loopMs : undefined, tt: (m._timedTexts || []).map(t => ({ id: t.id, lat: t.lat, lon: t.lon, text: t.text || '', t0: t.t0, t1: t.t1 })) } : null
+        }))
+    };
+}
+
+function restoreScene(snap) {
+    drawing = false;
+    drawFeature = null;
+    lineCoords = [];
+    lastDrawScreen = null;
+    if (drawMode) stopDraw();
+    if (eraserMode) stopEraser();
+    if (textMode) stopTextMode();
+    else if (textEditing) commitTextEditing();
+    placedMarkers.slice().forEach(m => removeMarker(m));
+    textItems.slice().forEach(m => removeTextItem(m));
+    drawnLines.forEach(l => { if (l.feature) map.removeChild(l.feature); });
+    drawnLines = [];
+    snap.lines.forEach(l => {
+        const color = l.color || '#000000';
+        let width = l.width || 5;
+        let widthM = null;
+        if (l.widthM) {
+            widthM = l.widthM;
+            const wLat = l.coords && l.coords[0] ? l.coords[0][1] : map.center[1];
+            const mpp = metersPerPixel(wLat);
+            if (mpp > 0) width = Math.max(1, widthM / mpp);
+        }
+        const feature = new ymaps3.YMapFeature({
+            geometry: { type: 'LineString', coordinates: l.coords },
+            style: { stroke: [{ width: width, color: hexToRgba(color, 0.7) }] }
+        });
+        map.addChild(feature);
+        drawnLines.push({ feature, coords: l.coords, color: color, width: width, widthM: widthM });
+    });
+    snap.markers.forEach(d => {
+        let m;
+        if (d.kind === 'tl') {
+            const ang = (d.heading + mapRot - 90) * Math.PI / 180;
+            window.placeTlMarker(d.lat, d.lon, ang, d.file);
+            m = placedMarkers[placedMarkers.length - 1];
+        } else {
+            m = buildPicMarker(d.kind === 'znak', d.file, d.lat, d.lon, d.heading);
+            map.addChild(m);
+            placedMarkers.push(m);
+            if (d.leg && m._isZnak) {
+                const leg = document.createElement('div');
+                leg.className = 'sign-leg';
+                m._rotWrap.appendChild(leg);
+                m._leg = leg;
+            }
+        }
+            if (d.rec) {
+                m._samples = (d.rec.format === 2) ? unpackRecSamples(d.rec.samples) : d.rec.samples;
+                m._startTrim = d.rec.st;
+                m._endTrim = d.rec.et;
+                m._phaseOffset = d.rec.po;
+                m._signals = d.rec.sig;
+                m._loopMs = (d.rec.loop && d.rec.loop > 0) ? d.rec.loop : undefined;
+                if (Array.isArray(d.rec.tt)) {
+                    m._timedTexts = d.rec.tt;
+                    if (window.buildTimedTextDom) {
+                        d.rec.tt.forEach(t => window.buildTimedTextDom(m, t));
+                    }
+                }
+            }
+            if (d.leg && m._isTl && window.toggleTlLeg) window.toggleTlLeg(m);
+    });
+    if (activeCar && placedMarkers.indexOf(activeCar) === -1) activeCar = null;
+    if (activeCar && activeCar._rotWrap) activeCar._rotWrap.classList.add('car-active');
+    (snap.texts || []).forEach(d => {
+        const m = buildTextItem(d.lat, d.lon, d.text, !!d.collapsed);
+        map.addChild(m);
+        textItems.push(m);
+    });
+    placedMarkers.forEach(m => m.update({ draggable: markerDraggable(m) }));
+    textItems.forEach(t => t.update({ draggable: false }));
+    updateSignalBtns();
+}
+
+function commit() {
+    if (_restoring) return;
+    const snap = serializeScene();
+    const json = JSON.stringify({ lines: snap.lines, texts: snap.texts, markers: snap.markers.map(r => ({ kind: r.kind, file: r.file, lat: r.lat, lon: r.lon, heading: r.heading, leg: r.leg })) });
+    if (undoStack.length && undoStack[undoStack.length - 1]._json === json) return;
+    snap._json = json;
+    undoStack.push(snap);
+    if (undoStack.length > MAX_HISTORY) undoStack.shift();
+    redoStack.length = 0;
+    updateHistoryBtns();
+}
+
+function applySnapshot(snap) {
+    _restoring = true;
+    try { restoreScene(snap); } finally { _restoring = false; }
+    updateHistoryBtns();
+}
+
+function undoAction() {
+    if (undoStack.length < 2) return;
+    redoStack.push(undoStack.pop());
+    applySnapshot(undoStack[undoStack.length - 1]);
+}
+
+function redoAction() {
+    if (!redoStack.length) return;
+    const s = redoStack.pop();
+    undoStack.push(s);
+    applySnapshot(s);
+}
+
+function updateHistoryBtns() {
+    const u = document.getElementById('undoBtn');
+    const r = document.getElementById('redoBtn');
+    if (!u || !r) return;
+    u.classList.toggle('dim', undoStack.length < 2);
+    r.classList.toggle('dim', !redoStack.length);
+}
+
+// ---- Активная машинка: последняя нажатая/передвинутая, кнопки поворотников под карандашом ----
+let activeCar = null;
+
+function setActiveCar(m) {
+    if (window.closeTextPanel) window.closeTextPanel();
+    if (activeCar !== m) {
+        if (activeCar && activeCar._rotWrap) {
+            activeCar._rotWrap.classList.remove('car-active');
+            activeCar._rotWrap.classList.remove('marker-drag');
+            // Уходим с машинки/знака/светофора — выключаем режим перетаскивания.
+            if (activeCar._dragEnabled) {
+                activeCar._dragEnabled = false;
+                activeCar.update({ draggable: markerDraggable(activeCar) });
+            }
+        }
+        activeCar = m || null;
+        if (activeCar && activeCar._rotWrap) {
+            activeCar._rotWrap.classList.add('car-active');
+            if (activeCar._isZnak || activeCar._isTl) activeCar.update({ draggable: markerDraggable(activeCar) });
+        }
+    }
+    updateSignalBtns();
+}
+
+// Включение/выключение режима перетаскивания знака/светофора:
+// кроме draggable переключает визуальное выделение (.marker-drag).
+function setMarkerDragEnabled(marker, enabled) {
+    if (!marker) return;
+    marker._dragEnabled = !!enabled;
+    marker.update({ draggable: markerDraggable(marker) });
+    if (marker._rotWrap) marker._rotWrap.classList.toggle('marker-drag', marker._dragEnabled);
+}
+
+function updateSignalBtns() {
+    const box = document.getElementById('signalBtns');
+    if (!box) return;
+    const isTl = !!activeCar && !!activeCar._isTl;
+    const isZnak = !!activeCar && !!activeCar._isZnak;
+    // Светофор: вместо кнопок — мини-светофор
+    const mini = document.getElementById('tlMini');
+    mini.classList.toggle('visible', isTl && !drawMode && !eraserMode);
+    if (isTl) {
+        mini.querySelectorAll('.tlm-lamp').forEach(el => {
+            el.classList.toggle('on', !!activeCar._lampState[el.dataset.key]);
+        });
+        const ml = mini.querySelector('[data-key="left"]');
+        const mr = mini.querySelector('[data-key="right"]');
+        ml.classList.toggle('visible', activeCar._tlType === 'arrow-left');
+        mr.classList.toggle('visible', activeCar._tlType === 'arrow-right');
+        mini.classList.toggle('has-left', activeCar._tlType === 'arrow-left');
+        ml.classList.toggle('on', !!activeCar._lampState.left);
+        mr.classList.toggle('on', !!activeCar._lampState.right);
+        document.getElementById('tlLegBtn').classList.toggle('active', isTl && !!activeCar._leg);
+        const tlDrag = document.getElementById('tlDragBtn');
+        if (tlDrag) {
+            tlDrag.style.display = isTl ? '' : 'none';
+            tlDrag.classList.toggle('active', isTl && !!activeCar._dragEnabled);
+        }
+    }
+    box.classList.toggle('visible', !!activeCar && !isTl && !drawMode && !eraserMode);
+    // У знака вместо поворотников — кнопка ножки
+    document.getElementById('sigLeftBtn').style.display = isZnak ? 'none' : '';
+    document.getElementById('sigHazBtn').style.display = isZnak ? 'none' : '';
+    document.getElementById('sigRightBtn').style.display = isZnak ? 'none' : '';
+    const legBtn = document.getElementById('signLegBtn');
+    legBtn.style.display = isZnak ? '' : 'none';
+    legBtn.classList.toggle('active', isZnak && !!activeCar._leg);
+    const signDrag = document.getElementById('signDragBtn');
+    if (signDrag) {
+        signDrag.style.display = isZnak ? '' : 'none';
+        signDrag.classList.toggle('active', isZnak && !!activeCar._dragEnabled);
+    }
+    const l = document.getElementById('sigLeftBtn');
+    const r = document.getElementById('sigRightBtn');
+    l.classList.toggle('active', !!activeCar && activeCar._blinkSide === 'left');
+    r.classList.toggle('active', !!activeCar && activeCar._blinkSide === 'right');
+    const hz = document.getElementById('sigHazBtn');
+    if (hz) hz.classList.toggle('active', !!activeCar && activeCar._blinkSide === 'both');
+    // Кнопка Плей на панели — видна, если у машинки есть запись.
+    // При одиночном воспроизведении текущей машинки превращается в кнопку Стоп.
+    const pb = document.getElementById('sigPlayBtn');
+    if (pb) {
+        const isCar = !!activeCar && !isTl && !isZnak;
+        const hasRec = isCar && !!(activeCar._samples && activeCar._samples.length >= 2);
+        const playing = isCar && window.isSinglePlaying ? window.isSinglePlaying(activeCar) : false;
+        pb.style.display = hasRec || playing ? '' : 'none';
+        pb.classList.toggle('active', playing);
+        const playIc = pb.querySelector('.pb-ic-play');
+        const stopIc = pb.querySelector('.pb-ic-stop');
+        if (playIc) playIc.style.display = playing ? 'none' : '';
+        if (stopIc) stopIc.style.display = playing ? '' : 'none';
+    }
+}
+
+function addDrawPoint(coords, screen) {
+    if (screen && lastDrawScreen) {
+        const dx = screen[0] - lastDrawScreen[0], dy = screen[1] - lastDrawScreen[1];
+        if (dx * dx + dy * dy < 16) return;
+    }
+    lastDrawScreen = screen || null;
+    lineCoords.push(coords);
+    const smooth = lineCoords.slice();
+    if (!drawFeature) {
+        drawFeature = new ymaps3.YMapFeature({
+            geometry: { type: 'LineString', coordinates: smooth },
+            style: { stroke: [{ width: drawWidth, color: hexToRgba(drawColor, 0.7) }] }
+        });
+        map.addChild(drawFeature);
+    } else {
+        drawFeature.update({ geometry: { type: 'LineString', coordinates: smooth } });
+    }
+}
+
+// Фабрика маркера (машинка/знак): используется placePic и restoreScene
+function buildPicMarker(isZnak, file, lat, lon, headingDeg) {
+    const el = document.createElement('div');
+    el.className = 'pic-marker';
+    el.style.cssText = 'transform:translate(-50%,-50%);cursor:grab;';
+    const wrap = document.createElement('div');
+    wrap.className = 'rot-wrap';
+    wrap.style.transform = 'translate(-50%,-50%)';
+    const img = document.createElement('img');
+    img.src = (isZnak ? 'znaki/' : 'pic/') + encodeURIComponent(file);
+    img.draggable = false; // десктоп: не даём нативному HTML5-drag изображения ломать pointer-драг
+    img.style.cssText = 'height:auto;display:block;pointer-events:none;';
+    img.onerror = () => el.remove();
+    wrap.appendChild(img);
+    el.appendChild(wrap);
+    const marker = new ymaps3.YMapMarker({
+        coordinates: [lon, lat],
+        draggable: true,
+        onDragMove: (coords) => {
+            marker._lat = coords[1];
+            marker._lon = coords[0];
+            updatePicMarker(marker);
+        },
+        onDragStart: () => { if (!isZnak) setActiveCar(marker); },
+        onDragEnd: () => commit()
+    }, el);
+    marker._img = img;
+    marker._rotWrap = wrap;
+    marker._sizeM = isZnak ? ZNAK_WIDTH_M : PIC_SIZE_M;
+    marker._file = file;
+    marker._isZnak = isZnak;
+    img.onload = () => updatePicMarker(marker);
+    marker._heading = headingDeg;
+    marker._lat = lat;
+    marker._lon = lon;
+    marker._select = el;
+    setupTopDrag(marker);
+    if (!isZnak) { ensureIndicators(marker); }
+    updatePicMarker(marker);
+    return marker;
+}
+
+function placePic(lat, lon, moveAngle) {
+    if (!selectedPic) return;
+    const file = selectedPic.file;
+    const type = selectedPic.type;
+    if (type === 'tl') {
+        if (window.placeTlMarker) {
+            window.placeTlMarker(lat, lon, moveAngle, file);
+            const m = placedMarkers[placedMarkers.length - 1];
+            if (m && m._isTl) {
+                setActiveCar(m);
+                setMarkerDragEnabled(m, true);
+                updateSignalBtns();
+            }
+        }
+        selectedPic = null;
+        document.querySelectorAll('.pic-item').forEach(c => c.classList.remove('active'));
+        return;
+    }
+    const isZnak = type === 'znak';
+    // Изначальное направление: строго вверх экрана, компенсирует текущий поворот карты
+    const headingDeg = (moveAngle != null)
+        ? moveAngle * 180 / Math.PI + 90 - mapRot
+        : -mapRot;
+    const marker = buildPicMarker(isZnak, file, lat, lon, headingDeg);
+    map.addChild(marker);
+    placedMarkers.push(marker);
+    setActiveCar(marker);
+    if (isZnak) { setMarkerDragEnabled(marker, true); updateSignalBtns(); }
+    selectedPic = null;
+    document.querySelectorAll('.pic-item').forEach(c => c.classList.remove('active'));
+    commit();
+}
+
+// Перетаскивание с фиксацией на границе изображения.
+// Касание картинки само по себе ничего не двигает; когда палец доходит
+// до границы изображения, точка захвата фиксируется на границе в одной
+// из 2 зон (вперёд = верх / назад = низ) и включается механизм
+// «тянуть-вращать»: машинка едет по дуге за пальцем.
+function setupTopDrag(marker) {
+    const el = marker._select;
+    // Смещение угла курса для каждой зоны захвата
+    const ZONE_OFF = { top: 90, bottom: -90 };
+    let armed = false, active = false, pid = -1;
+    let cx = 0, cy = 0, offX = 0, offY = 0, downHD = 0, prevHD = 0, downH = 0, sideOff = 90;
+    let downLat = 0, downLon = 0, downHeading = 0;
+    let lastX = 0, lastY = 0, hasPrev = false;
+
+    // Кнопки панелей исключаем; лампочки и боковые стрелки НЕ исключаем —
+    // касание корпуса должно гасить нативный драг маркера и взводить механизм
+    const skipped = t => t.closest && t.closest('.tl-ctrl');
+
+    // Видимые полуразмеры изображения (без учёта поворота)
+    const halfExtents = () => {
+        if (marker._isTl && marker._tlRoot) {
+            const s = marker._tlScale || ((window.TL_PX_SIZE || 100) / 64); // 64 — базовая высота .tl
+            return [marker._tlRoot.offsetWidth * s / 2, marker._tlRoot.offsetHeight * s / 2];
+        }
+        if (marker._img) return [marker._img.offsetWidth / 2, marker._img.offsetHeight / 2];
+        const r = marker._rotWrap.getBoundingClientRect();
+        return [r.width / 2, r.height / 2];
+    };
+
+    // Фиксация на границе изображения: зона + точка захвата. false — ещё внутри.
+    // Зона выбирается не по стороне перехода, а по направлению движения пальца:
+    // активной становится та сторона (вперёд/назад), чья нормаль лучше совпадает
+    // с вектором движения.
+    const tryEngage = (e, mvx, mvy) => {
+        const rect = marker._rotWrap.getBoundingClientRect();
+        cx = rect.left + rect.width / 2;
+        cy = rect.top + rect.height / 2;
+        const th = (marker._heading + mapRot) * Math.PI / 180;
+        const cosT = Math.cos(th), sinT = Math.sin(th);
+        const dxw = e.clientX - cx, dyw = e.clientY - cy;
+        // Палец в локальных координатах изображения
+        const lx = dxw * cosT + dyw * sinT;
+        const ly = -dxw * sinT + dyw * cosT;
+        const hw = halfExtents()[0], hh = halfExtents()[1];
+        if (Math.abs(lx) <= hw && Math.abs(ly) <= hh) return false;
+        // Вектор движения в локальных координатах изображения
+        const vx = mvx * cosT + mvy * sinT;
+        const vy = -mvx * sinT + mvy * cosT;
+        // Нормали сторон: вперёд (0,-1), назад (0,1)
+        let best = -Infinity, zone = 'top';
+        [[0, -1, 'top'], [0, 1, 'bottom']].forEach(c => {
+            const dot = vx * c[0] + vy * c[1];
+            if (dot > best) { best = dot; zone = c[2]; }
+        });
+        sideOff = ZONE_OFF[zone];
+        // Проекция пальца на границу — точка фиксации
+        const fx = Math.max(-hw, Math.min(hw, lx));
+        const fy = Math.max(-hh, Math.min(hh, ly));
+        offX = e.clientX - (cx + fx * cosT - fy * sinT);
+        offY = e.clientY - (cy + fx * sinT + fy * cosT);
+        downH = Math.hypot(fx, fy);
+        downHD = marker._heading + mapRot;
+        prevHD = downHD;
+        downLat = marker._lat;
+        downLon = marker._lon;
+        downHeading = marker._heading;
+        active = true;
+        return true;
+    };
+
+    el.addEventListener('pointerdown', e => {
+        if (drawMode || eraserMode || marker._panelOpen) return;
+        if (skipped(e.target)) return;
+        // Знак/светофор двигаются ТОЛЬКО через кнопку режима перетаскивания в панели.
+        // Обычное касание их не двигает — только выделяет (панель вверху слева).
+        if (marker._isZnak || marker._isTl) {
+            setActiveCar(marker);
+            if (!marker._dragEnabled) return;
+        }
+        armed = true; active = false; pid = e.pointerId;
+        lastX = e.clientX; lastY = e.clientY; hasPrev = false;
+        setActiveCar(marker);
+        marker.update({ draggable: false });
+        map.update({ behaviors: [] });
+    });
+
+    window.addEventListener('pointermove', e => {
+        if (!armed || active || e.pointerId !== pid) return;
+        if (marker._panelOpen) { armed = false; pid = -1; return; }
+        // Вектор направления движения пальца с прошлого события
+        const mvx = e.clientX - lastX, mvy = e.clientY - lastY;
+        lastX = e.clientX; lastY = e.clientY;
+        hasPrev = true;
+        // пока вектор движения слишком мал — ждём (шум касания)
+        if (mvx * mvx + mvy * mvy < 1) return;
+        // Фиксация драга на границе изображения. Только в этот момент (а не при самом
+        // касании) начинается реальное перетаскивание — сообщаем об этом модулю записи,
+        // чтобы пауза (время, когда машинку не тянут) завершилась и запись пошла.
+        const engaged = tryEngage(e, mvx, mvy);
+        if (engaged && window.onCarDragStart) window.onCarDragStart(marker, e.pointerId);
+    });
+
+    window.addEventListener('pointermove', e => {
+        if (!active || e.pointerId !== pid) return;
+        const mpp = metersPerPixel(marker._lat);
+        const R = mapRot * Math.PI / 180;
+        // Захват вперёд/назад: езда по дуге с поворотом курса
+        const h = downH;
+        let rot = (prevHD - downHD) * Math.PI / 180;
+        let hx = e.clientX - (offX * Math.cos(rot) - offY * Math.sin(rot));
+        let hy = e.clientY - (offX * Math.sin(rot) + offY * Math.cos(rot));
+        let ang = Math.atan2(hy - cy, hx - cx);
+        let headingDeg = ang * 180 / Math.PI + sideOff;
+        for (let i = 0; i < 8; i++) {
+            const r2 = (headingDeg - downHD) * Math.PI / 180;
+            hx = e.clientX - (offX * Math.cos(r2) - offY * Math.sin(r2));
+            hy = e.clientY - (offX * Math.sin(r2) + offY * Math.cos(r2));
+            ang = Math.atan2(hy - cy, hx - cx);
+            const nd = ang * 180 / Math.PI + sideOff;
+            if (Math.abs(nd - headingDeg) < 1e-9) { headingDeg = nd; break; }
+            headingDeg = nd;
+        }
+        const nx = hx - Math.cos(ang) * h;
+        const ny = hy - Math.sin(ang) * h;
+        marker._heading = headingDeg - mapRot;
+        prevHD = headingDeg;
+        const dx = nx - cx, dy = ny - cy;
+        const dEast = (dx * Math.cos(R) + dy * Math.sin(R)) * mpp;
+        const dNorth = (dx * Math.sin(R) - dy * Math.cos(R)) * mpp;
+        marker._lat += dNorth / 111320;
+        marker._lon += dEast / (111320 * Math.cos(marker._lat * Math.PI / 180));
+        marker.update({ coordinates: [marker._lon, marker._lat] });
+        updatePicMarker(marker);
+        cx = nx; cy = ny;
+    });
+
+    const stop = e => {
+        if (e.pointerId !== pid) return;
+        pid = -1;
+        if (active) {
+            marker.update({ draggable: markerDraggable(marker) });
+            map.update({ behaviors: (marker._panelOpen || drawMode || eraserMode) ? [] : appBehaviors });
+            const moved = Math.abs(marker._lat - downLat) > 1e-12 || Math.abs(marker._lon - downLon) > 1e-12 ||
+                Math.abs(((marker._heading - downHeading) % 360 + 540) % 360 - 180) > 1e-6;
+            // Во время паузы воспроизведения машинку можно поставить руками — это
+            // временная правка, её не пишем в историю (marker._playing ещё активен).
+            if (moved && !marker._playing) commit();
+        } else if (armed) {
+            marker.update({ draggable: markerDraggable(marker) });
+            if (!(marker._panelOpen || drawMode || eraserMode) && !anyPanelOpen()) map.update({ behaviors: appBehaviors });
+        }
+        armed = false; active = false;
+    };
+    window.addEventListener('pointerup', stop);
+    window.addEventListener('pointercancel', stop);
+}
+
+function ensureIndicators(marker) {
+    if (!marker._indicators) {
+        marker._indicators = [];
+        ['turn-left-top', 'turn-left-bottom', 'turn-right-top', 'turn-right-bottom'].forEach(cls => {
+            const ind = document.createElement('div');
+            ind.className = 'turn-indicator ' + cls;
+            marker._rotWrap.appendChild(ind);
+            marker._indicators.push(ind);
+        });
+        updatePicMarker(marker);
+    }
+}
+
+// Ножка знака: добавить/убрать. Высота ножки = высоте знака (задаётся в updatePicMarker)
+function toggleSignLeg(marker) {
+    if (!marker || !marker._isZnak) return;
+    if (marker._leg) {
+        marker._leg.remove();
+        marker._leg = null;
+    } else {
+        const leg = document.createElement('div');
+        leg.className = 'sign-leg';
+        marker._rotWrap.appendChild(leg);
+        marker._leg = leg;
+    }
+    updatePicMarker(marker);
+    updateSignalBtns();
+    commit();
+}
+
+function removeMarker(marker) {
+    if (marker._panelOpen) setPanel(marker, false);    if (activeCar === marker) setActiveCar(null);
+    map.removeChild(marker);
+    const idx = placedMarkers.indexOf(marker);
+    if (idx !== -1) placedMarkers.splice(idx, 1);
+}
+
+function clearEverything() {
+    if (drawMode) stopDraw();
+    if (eraserMode) stopEraser();
+    if (textMode) stopTextMode();
+    else if (textEditing) commitTextEditing();
+    drawing = false;
+    drawFeature = null;
+    lineCoords = [];
+    lastDrawScreen = null;
+    setActiveCar(null);
+    drawnLines.forEach(line => { if (line.feature) map.removeChild(line.feature); });
+    drawnLines = [];
+    placedMarkers.slice().forEach(m => removeMarker(m));
+    textItems.slice().forEach(m => removeTextItem(m));
+    document.getElementById('picPanel').classList.remove('visible');
+    document.getElementById('addPicBtn').classList.remove('open');
+    document.getElementById('znakPanel').classList.remove('visible');
+    document.getElementById('addZnakBtn').classList.remove('open');
+    const tlPanel = document.getElementById('tlPanel');
+    const tlBtn = document.getElementById('addTlBtn');
+    if (tlPanel) tlPanel.classList.remove('visible');
+    if (tlBtn) tlBtn.classList.remove('open');
+    commit();
+}
+
+function setBlink(marker, side) {
+    ensureIndicators(marker);
+    const prev = marker._blinkSide;
+    marker._blinkSide = (marker._blinkSide === side) ? null : side;
+    if (marker._blinkSide !== prev) marker._blinkSince = performance.now();
+    marker._rotWrap.classList.remove('signal-both');
+    marker._rotWrap.classList.toggle('signal-left', marker._blinkSide === 'left');
+    marker._rotWrap.classList.toggle('signal-right', marker._blinkSide === 'right');
+    if (marker._leftBtn) marker._leftBtn.classList.toggle('active', marker._blinkSide === 'left');
+    if (marker._rightBtn) marker._rightBtn.classList.toggle('active', marker._blinkSide === 'right');
+    updateSignalBtns();
+}
+
+function setHazard(marker) {
+    ensureIndicators(marker);
+    const on = marker._blinkSide !== 'both';
+    marker._blinkSide = on ? 'both' : null;
+    if (marker._blinkSide) marker._blinkSince = performance.now();
+    else marker._blinkSince = 0;
+    marker._rotWrap.classList.toggle('signal-both', on);
+    marker._rotWrap.classList.remove('signal-left', 'signal-right');
+    if (marker._leftBtn) marker._leftBtn.classList.remove('active');
+    if (marker._rightBtn) marker._rightBtn.classList.remove('active');
+    updateSignalBtns();
+}
+
+function anyPanelOpen() {
+    return placedMarkers.some(m => m._panelOpen);
+}
+
+// Перетаскиваемость маркера: машинки — всегда вне модальных режимов,
+// знак/светофор — только когда включён режим перетаскивания (кнопка в панели).
+function markerDraggable(marker) {
+    if (marker._isZnak || marker._isTl) {
+        return !!(marker._dragEnabled && !drawMode && !eraserMode);
+    }
+    return !(marker._panelOpen || drawMode || eraserMode);
+}
+
+function setPanel(marker, open) {
+    if (marker._isTl && window.setTlPanel) window.setTlPanel(marker, open);
+}
+
+// Метры на пиксель (Web Mercator, тайлы 256px)
+function metersPerPixel(lat) {
+    const zoom = map.zoom;
+    if (zoom == null || !isFinite(zoom)) return 0;
+    return 156543.03392 * Math.cos(lat * Math.PI / 180) / Math.pow(2, zoom);
+}
+
+
+// Перемещение машинок касанием по телу убрано: перетаскивание теперь
+// начинается только с фиксации на границе изображения (см. setupTopDrag).
+
+let mapRot = 0;
+// pinchRotate отключён: вращение двумя пальцами реализовано кастомно (см. initCustomPinchRotate)
+let appBehaviors = ['drag', 'scrollZoom', 'dblClick', 'pinchZoom', 'pinchTilt', 'mouseTilt', 'mouseRotate'];
+
+function updatePicSize(marker) {
+    if (!marker) return;
+    if (marker._isTl) { if (window.updateTlMarker) window.updateTlMarker(marker); return; }
+    if (!marker._img) return;
+    const mpp = metersPerPixel(marker._lat);
+    if (!mpp) return;
+    let imgH;
+    if (marker._isZnak) {
+        const realH = (marker._sizeM || ZNAK_WIDTH_M) / mpp;
+        imgH = Math.max(15, realH);
+        marker._img.style.width = imgH + 'px';
+        marker._img.style.height = imgH + 'px';
+        if (marker._leg) {
+            // Ножка длиннее знака: верхние 35% прячутся под знак (ножка на слое позади).
+            // Ножка считается от РЕАЛЬНОГО размера знака (не ограниченного минимумом 10px),
+            // чтобы она всегда уменьшалась вместе с масштабом карты.
+            const legH = realH || imgH;
+            const overlap = legH * 0.35;
+            marker._leg.style.top = (legH - overlap) + 'px';
+            marker._leg.style.height = (legH + overlap) + 'px';
+            marker._leg.style.width = (legH * 0.09) + 'px';
+        }
+    } else {
+        // Машинка: минимальная длина 15px по аналогии с минимумом светофора.
+        imgH = Math.max(15, (marker._sizeM || PIC_SIZE_M) / mpp);
+        marker._img.style.height = imgH + 'px';
+    }
+    if (marker._indicators) {
+        const s = (TURN_IND_SIZE_M / mpp) + 'px';
+        marker._indicators.forEach(ind => {
+            ind.style.width = s;
+            ind.style.height = s;
+        });
+    }
+    updatePicTransform(marker);
+}
+
+// Лёгкое обновление: только поворот (transform), без пересчёта размера.
+// Вызывается на каждый кадр воспроизведения — поэтому без metersPerPixel (cos/pow)
+// и без записи style.width/height, чтобы не нагружать layout.
+function updatePicTransform(marker) {
+    if (!marker) return;
+    if (marker._isTl) { if (window.updateTlTransform) window.updateTlTransform(marker); return; }
+    if (marker._rotWrap) marker._rotWrap.style.transform = `translate(-50%,-50%) rotate(${marker._heading + mapRot}deg)`;
+}
+
+function updatePicMarker(marker) {
+    updatePicSize(marker);
+}
+
+// Кэшируем последний zoom: размер маркеров пересчитывается только при его изменении,
+// а не на каждый кадр движения камеры (перемещение не меняет zoom).
+let _lastZoomForSize = null;
+
+function updateAllPicMarkers(event) {
+    if (!map) return;
+    const cam = (event && event.camera) || {};
+    const azDeg = isFinite(cam.azimuth) ? cam.azimuth * 180 / Math.PI : undefined;
+    if (azDeg !== undefined) mapRot = azDeg;
+    const zoom = isFinite(cam.zoom) ? cam.zoom : map.zoom;
+    const cLat = cam.center && isFinite(cam.center[1])
+        ? cam.center[1]
+        : (map.center && isFinite(map.center[1]) ? map.center[1] : NaN);
+    // Камера ещё не стабилизировалась (иногда на первом кадре zoom/center = NaN) —
+    // пропускаем кадр, чтобы не пересчитывать размеры в мусорные значения.
+    if (!isFinite(zoom) || !isFinite(cLat)) return;
+    if (zoom !== _lastZoomForSize) {
+        // zoom изменился — пересчитываем размер всех маркеров
+        _lastZoomForSize = zoom;
+        placedMarkers.forEach(updatePicSize);
+        // и толщину линий, нарисованных в «метровом» режиме (widthM).
+        // Старые линии без widthM остаются фиксированной пиксельной толщины.
+        if (drawnLines.some(l => l.widthM)) {
+            const mpp = metersPerPixel(cLat);
+            if (isFinite(mpp) && mpp > 0) {
+                drawnLines.forEach(l => {
+                    if (!l.widthM) return;
+                    l.feature.update({ style: { stroke: [{ width: Math.max(1, l.widthM / mpp), color: hexToRgba(l.color, 0.7) }] } });
+                });
+            }
+        }
+    } else {
+        // zoom не менялся (перемещение/поворот) — только поворот, без пересчёта размера
+        placedMarkers.forEach(updatePicTransform);
+    }
+    positionAllText();
+}
+
+// Кастомный пинч-поворот карты двумя пальцами: штатный pinchRotate отключён,
+// азимут задаётся напрямую по углу между пальцами — без привязки к фиксированным углам.
+function initCustomPinchRotate() {
+    const el = document.getElementById('map');
+    let baseAngle = null, baseAzimuth = 0;
+    const pair = e => e.touches.length >= 2 ? [e.touches[0], e.touches[1]] : null;
+    const angleOf = (a, b) => Math.atan2(b.clientY - a.clientY, b.clientX - a.clientX);
+    const norm = a => {
+        while (a > Math.PI) a -= 2 * Math.PI;
+        while (a < -Math.PI) a += 2 * Math.PI;
+        return a;
+    };
+    el.addEventListener('touchstart', e => {
+        const t = pair(e);
+        if (!t || drawMode || eraserMode || anyPanelOpen()) return;
+        baseAngle = angleOf(t[0], t[1]);
+        baseAzimuth = map.azimuth;
+    }, { passive: true });
+    el.addEventListener('touchmove', e => {
+        if (baseAngle == null) return;
+        const t = pair(e);
+        if (!t) return;
+        const d = norm(angleOf(t[0], t[1]) - baseAngle);
+        map.update({ camera: { azimuth: baseAzimuth + d } });
+    }, { passive: true });
+    ['touchend', 'touchcancel'].forEach(ev =>
+        el.addEventListener(ev, e => {
+            if (e.touches.length < 2) baseAngle = null;
+        }, { passive: true }));
+}
+
+(async () => {
+    const { YMap, YMapDefaultSatelliteLayer, YMapDefaultFeaturesLayer, YMapMarker, YMapListener, YMapFeature } = await ymaps3.ready;
+
+    // При запуске без ссылки на сцену сразу центрируемся на текущем местоположении
+    // (при запуске по ссылке центр задаёт сама загружаемая сцена).
+    let center = hasStartParam() ? null : await getPos();
+    map = new YMap(document.getElementById('map'), {
+        location: { center: center || [43.9968, 56.3269], zoom: 19 },
+        zoomRounding: 'smooth',
+        behaviors: appBehaviors
+    });
+    map.addChild(new YMapDefaultSatelliteLayer({}));
+    map.addChild(new YMapDefaultFeaturesLayer({ zIndex: 100000 }));
+    initCustomPinchRotate();
+    map.addChild(new YMapListener({
+        onUpdate: updateAllPicMarkers
+    }));
+
+    const el = document.createElement('div');
+    el.style.cssText = 'width:40px;height:40px;transform:translate(-50%,-50%);display:none;';
+    el.innerHTML = userLocSvg;
+    userMarker = new YMapMarker({ coordinates: [0, 0] }, el);
+    userMarker._el = el;
+    map.addChild(userMarker);
+
+    if (center) lastPos = [center[1], center[0]];
+    updateMarker();
+
+    map.addChild(new YMapListener({
+        onPointerDown: (_, event) => {
+            if (window.closeTextPanel && !window._textTapPointer) {
+                window.closeTextPanel();
+            }
+            if (window.onMapTap && typeof window.onMapTap === 'function') {
+                const handled = window.onMapTap(event);
+                if (handled) return;
+            }
+            if (anyPanelOpen()) {
+                placedMarkers.forEach(m => { if (m._panelOpen) setPanel(m, false); });
+                return;
+            }
+            if (eraserMode) {
+                if (!event?.coordinates) return;
+                eraserPointerId = event.pointerId;
+                eraserDrag = true;
+                eraseAt(event.coordinates);
+                if (event.screenCoordinates) eraseMarkerAtScreen(event.screenCoordinates[0], event.screenCoordinates[1]);
+                return;
+            }
+            if (textMode) {
+                if (!event?.coordinates) return;
+                placeTextField(event.coordinates[1], event.coordinates[0]);
+                return;
+            }
+            if (!drawMode || !event?.coordinates || drawing) return;
+            drawing = true;
+            drawPointerId = event.pointerId;
+            drawFeature = null;
+            lineCoords = [];
+            lastDrawScreen = null;
+            addDrawPoint(event.coordinates, event.screenCoordinates);
+        },
+        onPointerMove: (_, event) => {
+            if (eraserMode) {
+                if (eraserDrag && event?.coordinates && event.pointerId === eraserPointerId) {
+                    eraseAt(event.coordinates);
+                    if (event.screenCoordinates) eraseMarkerAtScreen(event.screenCoordinates[0], event.screenCoordinates[1]);
+                }
+                return;
+            }
+            if (!drawMode || !drawing || !event?.coordinates || event.pointerId !== drawPointerId) return;
+            addDrawPoint(event.coordinates, event.screenCoordinates);
+        },
+        onPointerUp: () => {
+            if (drawing && drawFeature) {
+                const wLat = lineCoords[0] ? lineCoords[0][1] : map.center[1];
+                drawnLines.push({ feature: drawFeature, coords: lineCoords.slice(), color: drawColor, width: drawWidth, widthM: drawWidth * metersPerPixel(wLat) });
+                commit();
+            }
+            if (eraserMode && eraserDrag) commit();
+            drawing = false;
+            drawFeature = null;
+            lineCoords = [];
+            eraserDrag = false;
+            drawPointerId = null;
+            eraserPointerId = null;
+        },
+        onPointerCancel: () => {
+            if (drawing && drawFeature) {
+                const wLat = lineCoords[0] ? lineCoords[0][1] : map.center[1];
+                drawnLines.push({ feature: drawFeature, coords: lineCoords.slice(), color: drawColor, width: drawWidth, widthM: drawWidth * metersPerPixel(wLat) });
+                commit();
+            }
+            if (eraserMode && eraserDrag) commit();
+            drawing = false;
+            drawFeature = null;
+            lineCoords = [];
+            eraserDrag = false;
+            drawPointerId = null;
+            eraserPointerId = null;
+        }
+    }));
+
+    document.getElementById('drawBtn').addEventListener('click', () => {
+        if (drawMode) {
+            stopDraw();
+        } else {
+            if (eraserMode) stopEraser();
+            document.getElementById('picPanel').classList.remove('visible');
+            document.getElementById('addPicBtn').classList.remove('open');
+            document.getElementById('znakPanel').classList.remove('visible');
+            document.getElementById('addZnakBtn').classList.remove('open');
+            const dlTlP = document.getElementById('tlPanel');
+            const dlTlB = document.getElementById('addTlBtn');
+            if (dlTlP) dlTlP.classList.remove('visible');
+            if (dlTlB) dlTlB.classList.remove('open');
+            if (textMode) stopTextMode();
+            startDraw();
+        }
+    });
+
+    document.getElementById('eraserBtn').addEventListener('pointerdown', () => {
+        eraserLongPressFired = false;
+        eraserLongPress = setTimeout(() => {
+            eraserLongPressFired = true;
+            clearEverything();
+        }, 1000);
+    });
+    const cancelEraserLongPress = () => {
+        if (eraserLongPress) { clearTimeout(eraserLongPress); eraserLongPress = null; }
+    };
+    document.getElementById('eraserBtn').addEventListener('pointerup', cancelEraserLongPress);
+    document.getElementById('eraserBtn').addEventListener('pointercancel', cancelEraserLongPress);
+    document.getElementById('eraserBtn').addEventListener('click', () => {
+        if (eraserLongPressFired) {
+            eraserLongPressFired = false;
+            return;
+        }
+        if (eraserMode) {
+            stopEraser();
+        } else {
+            if (drawMode) stopDraw();
+            document.getElementById('picPanel').classList.remove('visible');
+            document.getElementById('addPicBtn').classList.remove('open');
+            document.getElementById('znakPanel').classList.remove('visible');
+            document.getElementById('addZnakBtn').classList.remove('open');
+            const elTlP = document.getElementById('tlPanel');
+            const elTlB = document.getElementById('addTlBtn');
+            if (elTlP) elTlP.classList.remove('visible');
+            if (elTlB) elTlB.classList.remove('open');
+            if (textMode) stopTextMode();
+            startEraser();
+        }
+    });
+
+    document.getElementById('textBtn').addEventListener('click', () => {
+        if (textMode) {
+            stopTextMode();
+        } else {
+            if (drawMode) stopDraw();
+            if (eraserMode) stopEraser();
+            document.getElementById('picPanel').classList.remove('visible');
+            document.getElementById('addPicBtn').classList.remove('open');
+            document.getElementById('znakPanel').classList.remove('visible');
+            document.getElementById('addZnakBtn').classList.remove('open');
+            const txTlP = document.getElementById('tlPanel');
+            const txTlB = document.getElementById('addTlBtn');
+            if (txTlP) txTlP.classList.remove('visible');
+            if (txTlB) txTlB.classList.remove('open');
+            startTextMode();
+        }
+    });
+
+    document.querySelectorAll('.color-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            drawColor = btn.dataset.color;
+            document.querySelectorAll('.color-btn').forEach(b => b.classList.toggle('active', b === btn));
+        });
+    });
+
+    document.getElementById('widthSlider').addEventListener('input', e => {
+        drawWidth = parseInt(e.target.value, 10);
+    });
+
+    // Регулярное онлайн-обновление синего маркера (без перемещения камеры).
+    let userWatchId = null;
+    let flyPending = false;
+    function flyToUser() {
+        if (!lastPos) return;
+        flyPending = false;
+        map.update({ location: { center: [lastPos[1], lastPos[0]], duration: 400 } });
+    }
+    function startUserTracking() {
+        if (userWatchId != null) return;
+        userWatchId = navigator.geolocation.watchPosition(p => {
+            lastPos = [p.coords.latitude, p.coords.longitude];
+            updateMarker();
+            if (flyPending) flyToUser();
+        }, () => { userWatchId = null; }, { enableHighAccuracy: true, maximumAge: 5000, timeout: 10000 });
+    }
+
+    document.getElementById('locateBtn').addEventListener('click', () => {
+        startUserTracking();
+        if (lastPos) flyToUser();
+        else flyPending = true;
+    });
+
+    document.getElementById('undoBtn').addEventListener('click', undoAction);
+    document.getElementById('redoBtn').addEventListener('click', redoAction);
+
+    document.getElementById('sigLeftBtn').addEventListener('pointerdown', e => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (activeCar) setBlink(activeCar, 'left');
+    });
+    document.getElementById('sigRightBtn').addEventListener('pointerdown', e => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (activeCar) setBlink(activeCar, 'right');
+    });
+    document.getElementById('sigHazBtn').addEventListener('pointerdown', e => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (activeCar) setHazard(activeCar);
+    });
+    document.getElementById('sigDelBtn').addEventListener('pointerdown', e => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (activeCar) {
+            removeMarker(activeCar);
+            commit();
+        }
+    });
+    {
+        const pb = document.getElementById('sigPlayBtn');
+        let lpTimer = null, lpFired = false, lpId = null, lpX = 0, lpY = 0;
+        pb.addEventListener('pointerdown', e => {
+            e.preventDefault();
+            e.stopPropagation();
+            if (!activeCar) return;
+            lpFired = false;
+            lpId = e.pointerId;
+            lpX = e.clientX; lpY = e.clientY;
+            clearTimeout(lpTimer);
+            // Долгое нажатие — открыть шторку записи
+            lpTimer = setTimeout(() => {
+                lpTimer = null;
+                lpFired = true;
+                if (window.openScrubber && activeCar) window.openScrubber(activeCar);
+            }, LP_DURATION_MS);
+        });
+        pb.addEventListener('pointermove', e => {
+            if (e.pointerId !== lpId || lpFired) return;
+            if (Math.hypot(e.clientX - lpX, e.clientY - lpY) > LP_MOVE_TOLERANCE_PX) {
+                clearTimeout(lpTimer); lpTimer = null;
+            }
+        });
+        pb.addEventListener('pointerup', e => {
+            if (e.pointerId !== lpId) return;
+            clearTimeout(lpTimer); lpTimer = null;
+            if (lpFired || !activeCar) return;
+            // Короткое нажатие — запуск/остановка одиночного воспроизведения
+            if (window.isSinglePlaying && window.isSinglePlaying(activeCar)) {
+                if (window.stopAll) window.stopAll();
+                updateSignalBtns();
+            } else if (window.startSinglePlay) {
+                window.startSinglePlay(activeCar);
+            }
+        });
+        pb.addEventListener('pointercancel', e => {
+            if (e.pointerId !== lpId) return;
+            clearTimeout(lpTimer); lpTimer = null;
+        });
+    }
+    document.getElementById('signLegBtn').addEventListener('pointerdown', e => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (activeCar && activeCar._isZnak) toggleSignLeg(activeCar);
+    });
+    document.getElementById('signDragBtn').addEventListener('pointerdown', e => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (activeCar && activeCar._isZnak) {
+            setMarkerDragEnabled(activeCar, !activeCar._dragEnabled);
+            updateSignalBtns();
+        }
+    });
+    // Мини-светофор: нажатие лампочки/стрелки переключает сигнал активного светофора
+    document.querySelectorAll('#tlMini .tlm-lamp, #tlMini .tlm-side').forEach(el => {
+        el.addEventListener('pointerdown', e => {
+            e.preventDefault();
+            e.stopPropagation();
+            if (!activeCar || !activeCar._isTl || !window.tlSetLamp) return;
+            const key = el.dataset.key;
+            window.tlSetLamp(activeCar, key, !activeCar._lampState[key]);
+            updateSignalBtns();
+        });
+    });
+    document.getElementById('tlLegBtn').addEventListener('pointerdown', e => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (activeCar && activeCar._isTl && window.toggleTlLeg) window.toggleTlLeg(activeCar);
+    });
+    document.getElementById('tlDragBtn').addEventListener('pointerdown', e => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (activeCar && activeCar._isTl) {
+            setMarkerDragEnabled(activeCar, !activeCar._dragEnabled);
+            updateSignalBtns();
+        }
+    });
+    document.getElementById('tlDelBtn').addEventListener('pointerdown', e => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (activeCar && activeCar._isTl) {
+            removeMarker(activeCar);
+            commit();
+        }
+    });
+
+    // Нажатие по пустому месту карты сбрасывает активную машинку
+    window.addEventListener('pointerdown', e => {
+        if (!activeCar) return;
+        const t = e.target;
+        if (!t || !t.closest) return;
+        if (!t.closest('#map')) return;
+        if (t.closest('.pic-marker')) return;
+        setActiveCar(null);
+    }, true);
+
+    // Нажатие вне редактируемого текстового поля фиксирует текст (сохраняет его)
+    // и выходит из режима текста
+    window.addEventListener('pointerdown', e => {
+        if (!textEditing) return;
+        const t = e.target;
+        if (t && t.closest && t.closest('.text-item')) return;
+        stopTextMode();
+    }, true);
+
+    const ROTATE_STEP = 5 * Math.PI / 180;
+    const ROTATE_HOLD_STEP = 1 * Math.PI / 180;
+    const ROTATE_HOLD_MS = 1000;
+    const ROTATE_HOLD_INTERVAL = 100;
+
+    function setupRotateBtn(btnId, dir) {
+        const btn = document.getElementById(btnId);
+        let holdTimer = null;
+        let longFired = false;
+        let raf = null;
+
+        const rotateBy = (angle, duration) => map.update({ camera: { azimuth: map.azimuth + dir * angle, duration } });
+
+        const spin = () => {
+            rotateBy(ROTATE_HOLD_STEP, 100);
+            raf = setTimeout(spin, ROTATE_HOLD_INTERVAL);
+        };
+
+        btn.addEventListener('pointerdown', () => {
+            longFired = false;
+            holdTimer = setTimeout(() => {
+                longFired = true;
+                spin();
+            }, ROTATE_HOLD_MS);
+        });
+
+        const stop = () => {
+            clearTimeout(holdTimer);
+            holdTimer = null;
+            clearTimeout(raf);
+            raf = null;
+        };
+
+        btn.addEventListener('pointerup', stop);
+        btn.addEventListener('pointercancel', stop);
+
+        btn.addEventListener('click', () => {
+            if (longFired) { longFired = false; return; }
+            rotateBy(ROTATE_STEP, 200);
+        });
+    }
+
+    setupRotateBtn('rotCCWBtn', -1);
+    setupRotateBtn('rotCWBtn', +1);
+
+    let pddStack = [{ type: 'sections' }];
+
+    const escapeRegExp = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const escapeHtml = s => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+    function pddSearchEntries(q) {
+        const low = q.toLowerCase();
+        if (!low) return [];
+        const out = [];
+        PDD_DATA.forEach(sec => {
+            const matches = [];
+            sec.entries.forEach(entry => {
+                if (entry.group) return;
+                const hay = (entry.num + ' ' + entry.text).toLowerCase();
+                if (hay.includes(low)) matches.push(entry);
+            });
+            if (matches.length) out.push({ sec, matches });
+        });
+        return out;
+    }
+
+    function pddSnippet(text, query) {
+        const low = query.toLowerCase();
+        const textLow = text.toLowerCase();
+        const idx = textLow.indexOf(low);
+        const start = Math.max(0, idx - 60);
+        const end = Math.min(text.length, (idx === -1 ? 0 : idx) + Math.max(low.length, 0) + 140);
+        let s = (start > 0 ? '…' : '') + text.slice(start, end) + (end < text.length ? '…' : '');
+        s = escapeHtml(s);
+        if (low) s = s.replace(new RegExp('(' + escapeRegExp(query) + ')', 'gi'), '<mark>$1</mark>');
+        return s;
+    }
+
+    function pddHighlightFull(text, query) {
+        let s = escapeHtml(text);
+        if (query) s = s.replace(new RegExp('(' + escapeRegExp(query) + ')', 'gi'), '<mark>$1</mark>');
+        return s;
+    }
+
+    function pddRender() {
+        const body = document.getElementById('pddBody');
+        const v = pddStack[pddStack.length - 1];
+        document.getElementById('pddTitle').textContent = v.type === 'sections' ? 'ПДД РФ' : v.type === 'items' ? v.sec.title : v.type === 'search' ? 'Поиск: «' + v.query + '»' : 'Пункт ' + v.entry.num;
+        document.getElementById('pddBack').style.visibility = pddStack.length > 1 ? 'visible' : 'hidden';
+        body.innerHTML = '';
+        if (v.type === 'sections') {
+            PDD_DATA.forEach(sec => {
+                const row = document.createElement('div');
+                row.className = 'pdd-row';
+                row.textContent = sec.title;
+                row.addEventListener('click', () => { pddStack.push({ type: 'items', sec }); pddRender(); });
+                body.appendChild(row);
+            });
+        } else if (v.type === 'items') {
+            v.sec.entries.forEach(entry => {
+                if (entry.group) {
+                    const g = document.createElement('div');
+                    g.className = 'pdd-group';
+                    g.textContent = entry.group;
+                    body.appendChild(g);
+                    return;
+                }
+                const row = document.createElement('div');
+                row.className = 'pdd-row';
+                const num = document.createElement('span');
+                num.className = 'pdd-row-num';
+                num.textContent = entry.num + '.';
+                const prev = document.createElement('span');
+                prev.className = 'pdd-row-prev';
+                prev.textContent = entry.text;
+                row.appendChild(num);
+                row.appendChild(prev);
+                row.addEventListener('click', () => { pddStack.push({ type: 'text', sec: v.sec, entry }); pddRender(); });
+                body.appendChild(row);
+            });
+        } else if (v.type === 'search') {
+            const results = pddSearchEntries(v.query);
+            if (!results.length) {
+                const e = document.createElement('div');
+                e.className = 'pdd-empty';
+                e.textContent = 'Ничего не найдено';
+                body.appendChild(e);
+            } else {
+                results.forEach(({ sec, matches }) => {
+                    const g = document.createElement('div');
+                    g.className = 'pdd-group';
+                    g.textContent = sec.title;
+                    body.appendChild(g);
+                    matches.forEach(entry => {
+                        const row = document.createElement('div');
+                        row.className = 'pdd-row';
+                        const num = document.createElement('span');
+                        num.className = 'pdd-row-num';
+                        num.textContent = entry.num + '.';
+                        const prev = document.createElement('span');
+                        prev.className = 'pdd-row-prev';
+                        prev.innerHTML = pddSnippet(entry.text, v.query);
+                        row.appendChild(num);
+                        row.appendChild(prev);
+                        row.addEventListener('click', () => { pddStack.push({ type: 'text', sec, entry, query: v.query }); pddRender(); });
+                        body.appendChild(row);
+                    });
+                });
+            }
+        } else {
+            const t = document.createElement('div');
+            t.className = 'pdd-text';
+            const num = document.createElement('span');
+            num.className = 'pdd-row-num';
+            num.textContent = v.entry.num + '.';
+            t.appendChild(num);
+            if (v.query) {
+                const txt = document.createElement('span');
+                txt.innerHTML = pddHighlightFull(v.entry.text, v.query);
+                t.appendChild(txt);
+                body.appendChild(t);
+                requestAnimationFrame(() => {
+                    const mark = t.querySelector('mark');
+                    if (mark) mark.scrollIntoView({ block: 'center' });
+                });
+            } else {
+                const txt = document.createElement('span');
+                txt.textContent = v.entry.text;
+                t.appendChild(txt);
+                body.appendChild(t);
+            }
+        }
+        body.scrollTop = 0;
+    }
+
+    const pddBtn = document.getElementById('pddBtn');
+    const pddModal = document.getElementById('pddModal');
+    const togglePdd = () => {
+        const open = !pddModal.classList.contains('visible');
+        pddModal.classList.toggle('visible', open);
+        pddBtn.classList.toggle('active', open);
+        document.body.classList.toggle('pdd-open', open);
+        if (open) { pddStack = [{ type: 'sections' }]; document.getElementById('pddSearch').value = ''; setSearchVisible(false); pddRender(); }
+        placeGalleryAbove();
+    };
+    // Переключение режима скрытия элементов управления (общая логика для
+    // кнопки #hideUiBtn и долгого нажатия на кнопку ПДД).
+    const setControlsHidden = (hidden) => {
+        document.body.classList.toggle('controls-hidden', hidden);
+        const hideUiBtn = document.getElementById('hideUiBtn');
+        if (hideUiBtn) hideUiBtn.classList.toggle('active', hidden);
+        // Блокировать перетаскивание в режиме скрытия не нужно: знаки, светофоры
+        // и текст и так перемещаются только через включаемый в их панелях режим,
+        // а панели в этом режиме скрыты. Машинки можно двигать всегда, кроме
+        // момента воспроизведения записи (играющие маркеры блокирует recplay.js).
+        placedMarkers.forEach(m => m.update({ draggable: markerDraggable(m) && !m._playing }));
+        // при скрытии закрываем шторку и все панели
+        if (hidden) {
+            if (pddModal.classList.contains('visible')) togglePdd();
+            ['picPanel', 'znakPanel', 'tlPanel'].forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.classList.remove('visible');
+            });
+            document.getElementById('addPicBtn').classList.remove('open');
+            document.getElementById('addZnakBtn').classList.remove('open');
+            const tlb = document.getElementById('addTlBtn');
+            if (tlb) tlb.classList.remove('open');
+        }
+    };
+    const toggleControlsHidden = () => {
+        const hidden = !document.body.classList.contains('controls-hidden');
+        setControlsHidden(hidden);
+    };
+    document.getElementById('hideUiBtn').addEventListener('click', toggleControlsHidden);
+    // Долгое нажатие на кнопку ПДД: скрыть/вернуть все элементы управления
+    let pddLpTimer = null, pddLpFired = false;
+    const pddLpClear = () => { if (pddLpTimer) { clearTimeout(pddLpTimer); pddLpTimer = null; } };
+    pddBtn.addEventListener('pointerdown', () => {
+        pddLpFired = false;
+        pddLpTimer = setTimeout(() => {
+            pddLpTimer = null;
+            pddLpFired = true;
+            toggleControlsHidden();
+        }, 500);
+    });
+    ['pointerup', 'pointercancel', 'pointerleave'].forEach(ev => pddBtn.addEventListener(ev, pddLpClear));
+    pddBtn.addEventListener('click', () => {
+        if (pddLpFired) { pddLpFired = false; return; } // это был long-press — не открываем шторку
+        togglePdd();
+    });
+    document.getElementById('pddClose').addEventListener('click', togglePdd);
+    document.getElementById('pddBack').addEventListener('click', () => {
+        if (pddStack[pddStack.length - 1].type === 'search') { exitSearch(); return; }
+        if (pddStack.length > 1) { pddStack.pop(); pddRender(); }
+        else togglePdd();
+    });
+
+    const pddSearchInput = document.getElementById('pddSearch');
+    const pddSearchBox = document.querySelector('.pdd-search');
+    const pddSearchBtn = document.getElementById('pddSearchBtn');
+    const setSearchVisible = (v) => {
+        pddSearchBox.classList.toggle('visible', v);
+        pddSearchBtn.classList.toggle('active', v);
+        if (v) pddSearchInput.focus();
+    };
+    const exitSearch = () => {
+        pddSearchInput.value = '';
+        setSearchVisible(false);
+        const si = pddStack.findIndex(x => x.type === 'search');
+        if (si !== -1) { pddStack = pddStack.slice(0, si); pddRender(); }
+    };
+    pddSearchBtn.addEventListener('click', () => {
+        if (pddSearchBox.classList.contains('visible')) exitSearch();
+        else setSearchVisible(true);
+    });
+    pddSearchInput.addEventListener('input', () => {
+        const q = pddSearchInput.value.trim().replace(/\s+/g, ' ');
+        const top = pddStack[pddStack.length - 1];
+        if (!q) {
+            if (top.type === 'search') { pddStack.pop(); pddRender(); }
+            return;
+        }
+        if (top.type === 'search') {
+            if (top.query !== q) { top.query = q; pddRender(); }
+        } else {
+            pddStack.push({ type: 'search', query: q });
+            pddRender();
+        }
+    });
+
+    const pddHeader = document.querySelector('.pdd-header');
+    let pddDrag = null;
+    pddHeader.addEventListener('pointerdown', (e) => {
+        if (e.target.closest('.pdd-nav')) return;
+        document.body.classList.add('pdd-drag');
+        pddDrag = { startY: e.clientY, startH: pddModal.offsetHeight };
+        pddHeader.setPointerCapture(e.pointerId);
+        e.preventDefault();
+    });
+    const galleryBtn = document.getElementById('addPicBtn');
+    const galleryPanel = document.getElementById('picPanel');
+    const znakBtn = document.getElementById('addZnakBtn');
+    const znakPanelEl = document.getElementById('znakPanel');
+    function placeGalleryAbove() {
+        // Кнопки нижнего ряда поднимаются вместе со шторкой ПДД, панели галерей — ещё выше (над кнопками)
+        const btns = ['addPicBtn', 'addZnakBtn', 'addTlBtn', 'textBtn', 'eraserBtn', 'drawBtn']
+            .map(id => document.getElementById(id)).filter(Boolean);
+        const panels = ['picPanel', 'znakPanel', 'tlPanel']
+            .map(id => document.getElementById(id)).filter(Boolean);
+        if (document.body.classList.contains('pdd-open')) {
+            const h = pddModal.offsetHeight + 12;
+            for (const el of btns) el.style.bottom = h + 'px';
+            for (const el of panels) el.style.bottom = (h + 64) + 'px';
+            const colorPanel = document.getElementById('colorPanel');
+            const widthSlider = document.getElementById('widthSlider');
+            if (colorPanel) colorPanel.style.bottom = (h + 64) + 'px';
+            if (widthSlider) widthSlider.style.bottom = (h + 128) + 'px';
+        } else {
+            for (const el of btns) el.style.bottom = '';
+            for (const el of panels) el.style.bottom = '';
+            const colorPanel = document.getElementById('colorPanel');
+            const widthSlider = document.getElementById('widthSlider');
+            if (colorPanel) colorPanel.style.bottom = '';
+            if (widthSlider) widthSlider.style.bottom = '';
+        }
+    }
+    pddHeader.addEventListener('pointermove', (e) => {
+        if (!pddDrag) return;
+        const h = pddDrag.startH + (pddDrag.startY - e.clientY);
+        const vh = window.innerHeight;
+        pddModal.style.height = Math.min(vh, Math.max(vh * 0.15, h)) + 'px';
+        placeGalleryAbove();
+    });
+    const endPddDrag = () => { pddDrag = null; document.body.classList.remove('pdd-drag'); };
+    pddHeader.addEventListener('pointerup', endPddDrag);
+    pddHeader.addEventListener('pointercancel', endPddDrag);
+
+    document.getElementById('addPicBtn').addEventListener('click', () => {
+        if (drawMode) stopDraw();
+        if (eraserMode) stopEraser();
+        if (textMode) stopTextMode();
+        const panel = document.getElementById('picPanel');
+        panel.classList.toggle('visible');
+        document.getElementById('addPicBtn').classList.toggle('open', panel.classList.contains('visible'));
+        if (panel.classList.contains('visible')) {
+            // Сетка строится один раз при старте; пересоздание заставляет картинки мигать
+            if (!document.getElementById('picGrid').children.length) buildPicGrid();
+            const znakPanel = document.getElementById('znakPanel');
+            znakPanel.classList.remove('visible');
+            document.getElementById('addZnakBtn').classList.remove('open');
+            const tlPanel = document.getElementById('tlPanel');
+            if (tlPanel) { tlPanel.classList.remove('visible'); }
+            const tlBtn = document.getElementById('addTlBtn');
+            if (tlBtn) tlBtn.classList.remove('open');
+        }
+    });
+
+    document.getElementById('addZnakBtn').addEventListener('click', () => {
+        if (drawMode) stopDraw();
+        if (eraserMode) stopEraser();
+        if (textMode) stopTextMode();
+        const panel = document.getElementById('znakPanel');
+        panel.classList.toggle('visible');
+        document.getElementById('addZnakBtn').classList.toggle('open', panel.classList.contains('visible'));
+        if (panel.classList.contains('visible')) {
+            if (!document.getElementById('znakGrid').children.length) buildZnakGrid();
+            if (window.updateZnakScrollbar) setTimeout(window.updateZnakScrollbar, 50);
+            const picPanel = document.getElementById('picPanel');
+            picPanel.classList.remove('visible');
+            document.getElementById('addPicBtn').classList.remove('open');
+            const tlPanel = document.getElementById('tlPanel');
+            if (tlPanel) { tlPanel.classList.remove('visible'); }
+            const tlBtn = document.getElementById('addTlBtn');
+            if (tlBtn) tlBtn.classList.remove('open');
+        }
+    });
+
+    const tlToggleBtn = document.getElementById('addTlBtn');
+    if (tlToggleBtn) tlToggleBtn.addEventListener('click', () => {
+        if (drawMode) stopDraw();
+        if (eraserMode) stopEraser();
+        if (textMode) stopTextMode();
+        const panel = document.getElementById('tlPanel');
+        panel.classList.toggle('visible');
+        tlToggleBtn.classList.toggle('open', panel.classList.contains('visible'));
+        if (panel.classList.contains('visible')) {
+            if (window.buildTlGrid) window.buildTlGrid();
+            document.getElementById('picPanel').classList.remove('visible');
+            document.getElementById('addPicBtn').classList.remove('open');
+            document.getElementById('znakPanel').classList.remove('visible');
+            document.getElementById('addZnakBtn').classList.remove('open');
+        }
+    });
+
+    buildPicGrid();
+    buildZnakGrid();
+    initZnakScrollbar();
+    // iOS: гасим нативный скролл на элементах галерей, иначе он обгоняет drag
+    // и приходит pointercancel — вместо перетаскивания листается панель
+    ['picGrid', 'znakGrid'].forEach(id => {
+        const g = document.getElementById(id);
+        g.addEventListener('touchstart', e => {
+            if (e.target.closest && e.target.closest('.pic-item')) e.preventDefault();
+        }, { passive: false });
+    });
+    document.getElementById('addPicThumb').src = 'pic/' + encodeURIComponent(PIC_FILES[0]);
+    document.getElementById('addZnakThumb').src = 'znaki/' + encodeURIComponent(ZNAKI_FILES[0]);
+    document.querySelector('.color-btn[data-color="#000000"]').classList.add('active');
+    commit();
+    document.getElementById('loading').classList.add('hidden');
+})();
+</script>
+<script>
+// Запрет встроенного зума браузера (iOS Safari игнорирует user-scalable=no).
+// Зум карты работает через touch-события и не затрагивается.
+['gesturestart', 'gesturechange'].forEach(ev =>
+    document.addEventListener(ev, e => e.preventDefault(), { passive: false }));
+</script>
+<script src="padtext.js"></script>
+<script src="recplay.js"></script>
+<script src="trafficlights.js"></script>
+<script src="saveState.js?v=4"></script>
+<script>
+// Обработка deep-link: сцена по ссылке t.me/E_ia_bot/pad?startapp=<payload>.
+// payload — base64url(ownerUserId:sceneName). Загружаем чужую сцену напрямую.
+(function () {
+    function b64urlDecode(s) {
+        if (!s) return null;
+        s = s.replace(/-/g, '+').replace(/_/g, '/');
+        while (s.length % 4) s += '=';
+        try {
+            return decodeURIComponent(escape(atob(s)));
+        } catch (e) { return null; }
+    }
+
+    let loadOverlay = null;
+    const FLY_PAUSE_MS = 900; // длительность полёта карты к сцене + запас на отработку
+
+    function showLoadOverlay() {
+        if (loadOverlay) return;
+        loadOverlay = document.createElement('div');
+        loadOverlay.id = 'loadOverlay';
+        const spin = document.createElement('div');
+        spin.className = 'load-spinner';
+        const label = document.createElement('div');
+        label.textContent = 'Загружаю сцену';
+        loadOverlay.appendChild(spin);
+        loadOverlay.appendChild(label);
+        document.body.appendChild(loadOverlay);
+    }
+
+    function hideLoadOverlay() {
+        if (!loadOverlay) return;
+        loadOverlay.remove();
+        loadOverlay = null;
+    }
+
+    function handleStartParam() {
+        try {
+            const urlParam = new URLSearchParams(location.search).get('startapp');
+            const wa = window.Telegram && window.Telegram.WebApp;
+            const tgParam = (wa && wa.initDataUnsafe && wa.initDataUnsafe.start_param) || null;
+            // В WebView startapp лежит в initDataUnsafe.start_param, который появляется
+            // только после загрузки SDK Telegram. Если SDK ещё не готов — ждём его.
+            if (!tgParam && !urlParam && !window._tgInitDone && typeof window.onTgReady === 'function') {
+                window.onTgReady(handleStartParam);
+                return;
+            }
+            const param = tgParam || urlParam;
+            if (!param) return;
+            const decoded = b64urlDecode(param);
+            if (!decoded) return;
+            const idx = decoded.indexOf(':');
+            if (idx === -1) return;
+            const ownerUserId = decoded.slice(0, idx);
+            const sceneName = decoded.slice(idx + 1);
+            if (!ownerUserId || !sceneName) return;
+            // Показываем спиннер «Загрузка», пока сцена грузится в карту.
+            showLoadOverlay();
+            if (!window.loadSharedScene) { setTimeout(handleStartParam, 100); return; }
+            // При запуске по ссылке с параметром сразу включаем режим прозрачности
+            if (document.body) {
+                document.body.classList.add('controls-hidden');
+                const hub = document.getElementById('hideUiBtn');
+                if (hub) hub.classList.add('active');
+            }
+            // Ждём готовности карты
+            const doLoad = () => {
+                window.loadSharedScene(ownerUserId, sceneName).then(() => {
+                    // Сцена применена — ждём завершения полёта карты к сцене.
+                    setTimeout(() => hideLoadOverlay(), FLY_PAUSE_MS);
+                    // Записи в сцене есть — включаем кнопку запуска воспроизведения
+                    // (имитация нажатия: тот же старт, что и по тапу пользователя).
+                    // Играющие машинки блокирует markPlaying() в recplay.js.
+                    const pb = document.getElementById('playAllBtn');
+                    if (pb && !pb.classList.contains('active')) pb.click();
+                });
+            };
+            if (map) {
+                doLoad();
+            } else {
+                const t = setInterval(() => {
+                    if (map) { clearInterval(t); doLoad(); }
+                }, 500);
+            }
+        } catch (e) { /* безвредно: ссылка с параметром не должна ломать запуск */ }
+    }
+    handleStartParam();
+})();
+</script>
+<script>
+// Нажатие любой кнопки интерфейса закрывает открытую шторку менеджера сцен.
+document.addEventListener('pointerdown', (e) => {
+    if (typeof window.closeSceneManager !== 'function') return;
+    const t = e.target;
+    if (!t || !t.closest) return;
+    if (t.closest('.scene-io-modal')) return; // клики внутри шторки её не закрывают
+    if (t.closest('#saveBtn')) return; // кнопка менеджера сама переключает шторку
+    if (t.closest('.fab') || t.closest('#pddBtn') || t.closest('#savePddGroup')) {
+        window.closeSceneManager();
+    }
+}, true);
+</script>
+</body>
+</html>
