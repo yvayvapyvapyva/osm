@@ -325,10 +325,12 @@
                 style: yandexStyle(),
                 center: center,
                 zoom: loc.zoom != null ? loc.zoom : 19,
+                pitch: 0,
+                maxPitch: 0,
                 minZoom: zoomRange.min != null ? zoomRange.min : 0,
                 maxZoom: zoomRange.max != null ? zoomRange.max : MAX_ZOOM,
                 attributionControl: false,
-                dragRotate: false,
+                dragRotate: true,
                 pitchWithRotate: false,
                 touchPitch: false,
                 fadeDuration: 0
@@ -429,8 +431,10 @@
             if (h.scrollZoom) { if (has('scrollZoom')) h.scrollZoom.enable(); else h.scrollZoom.disable(); }
             if (h.doubleClickZoom) { if (has('dblClick')) h.doubleClickZoom.enable(); else h.doubleClickZoom.disable(); }
             if (h.touchZoomRotate) {
-                h.touchZoomRotate.enable();
-                h.touchZoomRotate.disableRotation();
+                if (has('pinchZoom') || has('pinchRotate')) h.touchZoomRotate.enable();
+                else h.touchZoomRotate.disable();
+                if (has('pinchRotate')) h.touchZoomRotate.enableRotation();
+                else h.touchZoomRotate.disableRotation();
             }
             if (h.dragRotate) { if (has('mouseRotate')) h.dragRotate.enable(); else h.dragRotate.disable(); }
             if (h.boxZoom) h.boxZoom.disable();
@@ -479,7 +483,7 @@
                 if (cam.center) values.center = [cam.center[0], cam.center[1]];
                 if (cam.zoom != null) values.zoom = cam.zoom;
                 if (cam.azimuth != null) values.bearing = -cam.azimuth * 180 / Math.PI;
-                if (cam.tilt != null) values.pitch = cam.tilt * 180 / Math.PI;
+                values.pitch = 0;
                 this._queueMove(values, cam.duration);
             }
         }

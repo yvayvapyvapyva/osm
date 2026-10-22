@@ -1523,8 +1523,7 @@ function metersPerPixel(lat) {
 // начинается только с фиксации на границе изображения (см. setupTopDrag).
 
 let mapRot = 0;
-// pinchRotate отключён: вращение двумя пальцами реализовано кастомно (см. initCustomPinchRotate)
-let appBehaviors = ['drag', 'scrollZoom', 'dblClick', 'pinchZoom', 'pinchTilt', 'mouseTilt', 'mouseRotate'];
+let appBehaviors = ['drag', 'scrollZoom', 'dblClick', 'pinchZoom', 'pinchRotate', 'mouseRotate'];
 
 function updatePicSize(marker) {
     if (!marker) return;
@@ -1614,37 +1613,6 @@ function updateAllPicMarkers(event) {
     positionAllText();
 }
 
-// Кастомный пинч-поворот карты двумя пальцами: штатный pinchRotate отключён,
-// азимут задаётся напрямую по углу между пальцами — без привязки к фиксированным углам.
-function initCustomPinchRotate() {
-    const el = document.getElementById('map');
-    let baseAngle = null, baseAzimuth = 0;
-    const pair = e => e.touches.length >= 2 ? [e.touches[0], e.touches[1]] : null;
-    const angleOf = (a, b) => Math.atan2(b.clientY - a.clientY, b.clientX - a.clientX);
-    const norm = a => {
-        while (a > Math.PI) a -= 2 * Math.PI;
-        while (a < -Math.PI) a += 2 * Math.PI;
-        return a;
-    };
-    el.addEventListener('touchstart', e => {
-        const t = pair(e);
-        if (!t || drawMode || eraserMode || anyPanelOpen()) return;
-        baseAngle = angleOf(t[0], t[1]);
-        baseAzimuth = map.azimuth;
-    }, { passive: true });
-    el.addEventListener('touchmove', e => {
-        if (baseAngle == null) return;
-        const t = pair(e);
-        if (!t) return;
-        const d = norm(angleOf(t[0], t[1]) - baseAngle);
-        map.update({ camera: { azimuth: baseAzimuth + d } });
-    }, { passive: true });
-    ['touchend', 'touchcancel'].forEach(ev =>
-        el.addEventListener(ev, e => {
-            if (e.touches.length < 2) baseAngle = null;
-        }, { passive: true }));
-}
-
 (async () => {
     const { YMap, YMapDefaultFeaturesLayer, YMapMarker, YMapListener } = await ymaps3.ready;
 
@@ -1661,7 +1629,6 @@ function initCustomPinchRotate() {
     });
     // Базовый слой «Яндекс.Спутник» создаётся вместе с картой в mapEngine.js.
     map.addChild(new YMapDefaultFeaturesLayer({ zIndex: 100000 }));
-    initCustomPinchRotate();
     map.addChild(new YMapListener({
         onUpdate: updateAllPicMarkers
     }));
