@@ -948,8 +948,10 @@
     }
 
     // Текущие границы видимой области карты [[lngMin,latMin],[lngMax,latMax]] или null.
-    // Yandex Maps v3 не даёт готового getBounds(), поэтому вычисляем приблизительно
+    // Готового getBounds() адаптер не отдаёт, поэтому вычисляем приблизительно
     // из map.center/map.zoom и размера контейнера (Web Mercator).
+    // У MapLibre мир 512 px на нулевом зуме, а тайлы Яндекса 256 px
+    // запрашиваются на зум выше, поэтому в знаменателе zoom+1.
     function visibleBounds() {
         try {
             const m = map;
@@ -959,7 +961,7 @@
             const hpx = container ? container.clientHeight : window.innerHeight;
             const cLat = m.center[1], cLng = m.center[0];
             const latRad = cLat * Math.PI / 180;
-            const mpp = 156543.03392 * Math.cos(latRad) / Math.pow(2, m.zoom);
+            const mpp = 156543.03392 * Math.cos(latRad) / Math.pow(2, m.zoom + 1);
             const halfW = (wpx / 2) * mpp;
             const halfH = (hpx / 2) * mpp;
             const padM = 150; // небольшой запас, чтобы машинка у края не мигала

@@ -1502,11 +1502,14 @@ function setPanel(marker, open) {
     if (marker._isTl && window.setTlPanel) window.setTlPanel(marker, open);
 }
 
-// Метры на пиксель (Web Mercator, тайлы 256px)
+// Метры на пиксель в масштабе MapLibre (Web Mercator).
+// MapLibre считает мир 512 px на нулевом зуме (transform.tileSize = 512),
+// поэтому 256-пиксельные тайлы Яндекса запрашиваются на зум выше:
+// map.zoom 19 → тайлы Яндекса z20. Для шкалы 256px это соответствует zoom+1.
 function metersPerPixel(lat) {
     const zoom = map.zoom;
     if (zoom == null || !isFinite(zoom)) return 0;
-    return 156543.03392 * Math.cos(lat * Math.PI / 180) / Math.pow(2, zoom);
+    return 156543.03392 * Math.cos(lat * Math.PI / 180) / Math.pow(2, zoom + 1);
 }
 
 
