@@ -2379,12 +2379,6 @@ function initCustomPinchRotate() {
     document.getElementById('loading').classList.add('hidden');
 })();
 </script>
-<script>
-// Запрет встроенного зума браузера (iOS Safari игнорирует user-scalable=no).
-// Зум карты работает через touch-события и не затрагивается.
-['gesturestart', 'gesturechange'].forEach(ev =>
-    document.addEventListener(ev, e => e.preventDefault(), { passive: false }));
-</script>
 <script src="padtext.js"></script>
 <script src="recplay.js"></script>
 <script src="trafficlights.js"></script>
