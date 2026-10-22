@@ -13,6 +13,12 @@
 
     const REPORT_URL = 'https://pad-report.ivan43103.workers.dev/';
     const REPORT_KEY = ''; // если задан — добавляется в заголовок X-Report-Key
+    const isViewer = location.pathname.endsWith('/viewer.html')
+        || new URLSearchParams(location.search).get('viewer') === '1';
+
+    function appLabel() {
+        return isViewer ? 'PAD Viewer' : 'PAD';
+    }
 
     // Распознаёт короткий startapp-токен постоянного ID сцены.
     function decodeStartParam(param) {
@@ -63,7 +69,7 @@
     function sendLaunchReport() {
         try {
             const wa = window.Telegram && window.Telegram.WebApp;
-            const lines = ['🚀 PAD: ' + userSummary()];
+            const lines = ['🚀 ' + appLabel() + ': ' + userSummary()];
             const startParam = (wa && wa.initDataUnsafe && wa.initDataUnsafe.start_param)
                 || new URLSearchParams(location.search).get('startapp');
             if (startParam) {
@@ -90,7 +96,7 @@
     function sendSceneReport(sceneName, sceneId) {
         try {
             const wa = window.Telegram && window.Telegram.WebApp;
-            const lines = ['🚀 PAD: ' + userSummary()];
+            const lines = ['🚀 ' + appLabel() + ': ' + userSummary()];
             lines.push(sceneLinkLine(sceneName, 'из меню', sceneId));
             const chat = [];
             if (wa && wa.initDataUnsafe && wa.initDataUnsafe.chat_type) chat.push(wa.initDataUnsafe.chat_type);
