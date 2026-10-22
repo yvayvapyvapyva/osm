@@ -79,17 +79,6 @@
 </div>
 
 <div id="loadingSpinner"><div class="spinner-box"><div class="spinner-ring"></div><div class="spinner-text">Загрузка...</div></div></div>
-<div id="znakiModal" class="instruction-overlay" onclick="if(event.target===this) closeZnakiSelector()">
-    <div class="instruction-sheet" style="max-width:450px">
-        <div class="instruction-header">
-            <span class="instruction-title">Выберите знак</span>
-            <button class="instruction-close" onclick="closeZnakiSelector()">✕</button>
-        </div>
-        <div class="instruction-body">
-            <div class="znaki-grid" id="znakiGrid"></div>
-        </div>
-    </div>
-</div>
 
 <div id="loginModal" onclick="if(event.target===this) toggleM('loginModal')" style="display:none;"><div class="modal-sheet" style="max-width:360px;margin:0 auto;border-radius:20px;"><div class="modal-header"><h3 style="text-align:center;flex:1;">Авторизация</h3><button class="close-circle" onclick="toggleM('loginModal')">✕</button></div><div class="modal-body-scroll" style="padding:0 20px 20px;">
 <div class="auth-tabs" style="display:flex;margin-bottom:20px;background:rgba(255,255,255,0.06);border-radius:12px;padding:3px;">
@@ -259,14 +248,12 @@ const YC_FUNCTION_URL = 'https://functions.yandexcloud.net/d4e02ghbv31h6kpf8ddh'
 const TTS_API_URL = 'https://functions.yandexcloud.net/d4erngid6s4rf5oinnp1';
 const TG_BOT_LINK = 'https://t.me/E_ia_bot?startapp=m=';
 
-let map, points = [], cur = null, isAdd = false, isDrawing = false, isAddingInfo = false, curRoute = null, activeListPoint = null, modalMode = 'list', tempNewPointData = null, userLocPlacemark = null, activePoint = null, settingsRouteFiles = [];
+let map, points = [], cur = null, isAdd = false, isDrawing = false, curRoute = null, activeListPoint = null, modalMode = 'list', tempNewPointData = null, userLocPlacemark = null, activePoint = null, settingsRouteFiles = [];
 let historyStack = [], historyIndex = -1, lastSavedSnapshot = "[]", toastTimer = null;
 let pendingDeletePoint = null;
 let _currentFolderPrefix = null;
 let _emptyFolders = [];
 let _expandedFolders = new Set();
-let pendingInfoImage = null;
-let pendingInfoPlacemark = null;
 
 // Custom path editor state (API v3 has no built-in polyline editor)
 let _drawPathPoints = [];
@@ -507,14 +494,13 @@ function calcAzimuth(p1, p2) {
     const x = Math.cos(la1) * Math.sin(la2) - Math.sin(la1) * Math.cos(la2) * Math.cos(lo2 - lo1);
     return Math.round((Math.atan2(y, x) * 180 / Math.PI + 360) % 360);
 }
-const serializePoints = () => JSON.stringify(points.map(p => ({ id: p.id, color: p.color, pts: p.pts, cmd: p.cmd, comm: p.comm, info: p.info })));
+const serializePoints = () => JSON.stringify(points.map(p => ({ id: p.id, color: p.color, pts: p.pts, cmd: p.cmd, comm: p.comm })));
 
 const clearRouteObjects = () => {
     points.forEach(p => { 
         if (p.pm) map.removeChild(p.pm);
         if (p.line) map.removeChild(p.line);
         if (p._hitLine) map.removeChild(p._hitLine);
-        if (p.infoPlacemarks) p.infoPlacemarks.forEach(m => map.removeChild(m));
     });
     points = [];
     activePoint = null;
@@ -687,10 +673,6 @@ ymaps3.ready.then(async () => {
                 return;
             }
 
-            if(isAddingInfo && activePoint && pendingInfoImage) {
-                placeInfoPoint(latLon, activePoint);
-                return;
-            }
             if(isAdd && tempNewPointData) {
                 const newPoint = addP(latLon, { ...tempNewPointData });
                 if (!newPoint) return;
@@ -1183,7 +1165,7 @@ const loadRoute = async (routeName) => {
         const data = result.data || [];
         clearRouteObjects();
         curRoute = routeName;
-        data.forEach(d => { const p = addP(d.pts[0], d, true); renderInfoPlacemarks(p); });
+        data.forEach(d => { addP(d.pts[0], d, true); });
         if(points.length) map.update({ location: { center: [points[0].pts[0][1], points[0].pts[0][0]], duration: 0 } });
         recalculateIds();
         seedHistory();
@@ -1445,8 +1427,6 @@ function addP(coords, data = null, silent = false) {
             cmd: data?.cmd || '', 
             comm: data?.comm || '', 
             pts: ptsData,
-            info: data?.info || [],
-            infoPlacemarks: [],
             pm: new YMapMarker({ coordinates: [coords[1], coords[0]] }, el),
             line: null
         };
@@ -1475,146 +1455,6 @@ function addP(coords, data = null, silent = false) {
         showToast('Ошибка создания точки: ' + e.message, 'error');
         return null;
     }
-}
-
-function renderInfoPlacemarks(p) {
-    clearInfoPlacemarks(p);
-    if (!p.info || !p.info.length) return;
-    const { YMapMarker } = ymaps3;
-    p.info.forEach((inf, idx) => {
-        const el = document.createElement('div');
-        el.style.cssText = 'width:32px;height:32px;transform:translate(-50%,-50%);cursor:pointer;';
-        el.innerHTML = `<img src="znaki/${inf.image || ''}" width="32" height="32" class="marker-img" />`;
-        const pm = new YMapMarker({ coordinates: [inf.lon, inf.lat] }, el);
-        el.addEventListener('click', () => editInfoPoint(p, idx));
-        map.addChild(pm);
-        p.infoPlacemarks.push(pm);
-    });
-}
-
-function clearInfoPlacemarks(p) {
-    if (p.infoPlacemarks) {
-        p.infoPlacemarks.forEach(m => map.removeChild(m));
-        p.infoPlacemarks = [];
-    }
-}
-
-function updateInfoPointsUI(p) {
-    const modal = $('pointsOrderModal');
-    if (!modal || modal.style.display === 'none') return;
-    const cards = document.querySelectorAll('.sortable-point-item');
-    for (const card of cards) {
-        if (parseInt(card.dataset.id) === p.id) {
-            const listEl = card.querySelector('.info-points-list');
-            if (listEl && listEl.closest('.info-points-body')?.style.display !== 'none') {
-                rebuildInfoPointList(listEl, p, card);
-            }
-            break;
-        }
-    }
-}
-
-function rebuildInfoPointList(listEl, p, card) {
-    listEl.innerHTML = '';
-    if (!p.info) return;
-    p.info.forEach((inf, idx) => {
-        const row = document.createElement('div');
-        row.className = 'info-point-row';
-        const imgFile = inf.image || '';
-        row.innerHTML = `<img class="info-point-img" src="znaki/${imgFile}" alt="${imgFile}"><span class="info-point-filename">${imgFile}</span>
-<button class="info-del-btn" data-idx="${idx}">✕</button>`;
-        row.querySelector('.info-del-btn').addEventListener('click', () => {
-            deleteInfoPoint(idx, p);
-            rebuildInfoPointList(listEl, p, card);
-        });
-        listEl.appendChild(row);
-    });
-}
-
-function placeInfoPoint(coords, p) {
-    const image = pendingInfoImage;
-    if (!image) return;
-    if (pendingInfoPlacemark) {
-        map.removeChild(pendingInfoPlacemark);
-        pendingInfoPlacemark = null;
-    }
-    const { YMapMarker } = ymaps3;
-    const el = document.createElement('div');
-    el.style.cssText = 'width:32px;height:32px;transform:translate(-50%,-50%);';
-    el.innerHTML = `<img src="znaki/${image}" width="32" height="32" class="marker-img" />`;
-    pendingInfoPlacemark = new YMapMarker({
-        coordinates: [coords[1], coords[0]],
-        draggable: true,
-        onDragMove: (c) => { pendingInfoPlacemark._coords = [f6(c[1]), f6(c[0])]; }
-    }, el);
-    map.addChild(pendingInfoPlacemark);
-    pendingInfoPlacemark._coords = coords;
-    $('addText').textContent = "Завершить установку знака";
-}
-
-async function finalizeInfoPoint() {
-    if (!pendingInfoPlacemark || !activePoint) return;
-    try {
-        const coords = pendingInfoPlacemark._coords || [0, 0];
-        const lat = f6(coords[0]);
-        const lon = f6(coords[1]);
-        const image = pendingInfoImage || '';
-        activePoint.info.push({ lat, lon, image });
-        map.removeChild(pendingInfoPlacemark);
-        pendingInfoPlacemark = null;
-        renderInfoPlacemarks(activePoint);
-        updateInfoPointsUI(activePoint);
-        pushHistorySnapshot();
-        stopAddingInfo();
-        await saveGist();
-        showToast("Изменения сохранены", "success");
-    } catch (e) {
-        showToast("Ошибка: " + e.message, "error");
-    }
-}
-
-function deleteInfoPoint(idx, p) {
-    if (idx < 0 || idx >= p.info.length) return;
-    p.info.splice(idx, 1);
-    renderInfoPlacemarks(p);
-    pushHistorySnapshot();
-    updateSaveState();
-}
-
-function stopAddingInfo() {
-    isAddingInfo = false;
-    pendingInfoImage = null;
-    if (pendingInfoPlacemark) {
-        map.removeChild(pendingInfoPlacemark);
-        pendingInfoPlacemark = null;
-    }
-    $('addText').textContent = "Добавить новую точку";
-    $('addMarkerBtn').classList.remove('active');
-    document.getElementById('map').style.cursor = '';
-}
-
-function editInfoPoint(p, idx) {
-    const modal = $('pointsOrderModal');
-    if (modal.style.display !== 'none' && modal.style.display !== '') {
-        modal.style.display = 'none';
-    }
-    openEditPointModal(p);
-    requestAnimationFrame(() => {
-        const card = $('pointsSortList').firstElementChild;
-        if (!card) return;
-        const infoBody = card.querySelector('.info-points-body');
-        const infoToggle = card.querySelector('.info-points-toggle');
-        if (!infoBody || !infoToggle) return;
-        infoBody.style.display = 'block';
-        infoToggle.querySelector('.info-arrow').textContent = '▼';
-        const listEl = card.querySelector('.info-points-list');
-        if (listEl) rebuildInfoPointList(listEl, p, card);
-        const rows = card.querySelectorAll('.info-point-row');
-        if (rows[idx]) {
-            rows[idx].scrollIntoView({ behavior: 'smooth', block: 'center' });
-            rows[idx].classList.add('active');
-        }
-    });
 }
 
 const startDrawingForPoint = (p, isNewPoint = false) => {
@@ -1661,9 +1501,7 @@ const stopDrawingMode = async () => {
     showToast("Изменения сохранены", "success");
 };
 const handleAddBtnClick = async () => {
-    if (isAddingInfo && pendingInfoPlacemark) { await finalizeInfoPoint(); }
-    else if (isAddingInfo) { stopAddingInfo(); }
-    else if (isDrawing) { stopDrawingMode(); }
+    if (isDrawing) { stopDrawingMode(); }
     else if (isAdd) { stopAdd(); }
     else { openCreatePointModal(); }
 };
@@ -1738,7 +1576,7 @@ async function executeDeletePoint() {
 function createPointCard(p, single = false) {
     const item = document.createElement('div'); item.className = 'sortable-point-item'; item.dataset.id = p.id;
     const cat = COLORS[p.color] || { hex: '#FFD700', label: 'Маневры на перекрестке' };
-    item.innerHTML = `${!single ? '<div class="sort-handle">☰</div>' : ''}<div class="item-main-row"><div class="point-number-text">${p.id || '?'}</div><button class="color-indicator-btn"><span class="swatch" style="background:${cat.hex}"></span><span class="cat-label">${cat.label}</span></button></div><div style="display:flex;gap:6px;align-items:center;margin-top:8px"><input class="cmd-input" type="text" placeholder="Команда..." value="${String(p.cmd).replace(/"/g,'&quot;')}"><button class="play-cmd-btn" title="Прослушать">▶</button></div><div class="info-points-wrap"><div class="info-points-toggle"><span>Дополнительная информация</span><span class="info-arrow">▶</span></div><div class="info-points-body" style="display:none"><div style="display:flex;gap:6px;align-items:start"><textarea class="comm-input" placeholder="комментарий">${p.comm || ''}</textarea><button class="play-comm-btn" title="Прослушать комментарий">▶</button></div><div style="font-size:12px;color:rgba(255,255,255,0.5);padding:4px 8px 2px">Знаки</div><div class="info-points-list"></div><button class="btn-info-add">➕ Добавить знак</button></div></div><div class="item-actions"><button class="btn-item-action btn-path">🖋️ Изменить путь</button><button class="btn-item-action btn-del" style="color:var(--danger)">🗑️ Удалить</button></div>`;
+    item.innerHTML = `${!single ? '<div class="sort-handle">☰</div>' : ''}<div class="item-main-row"><div class="point-number-text">${p.id || '?'}</div><button class="color-indicator-btn"><span class="swatch" style="background:${cat.hex}"></span><span class="cat-label">${cat.label}</span></button></div><div style="display:flex;gap:6px;align-items:center;margin-top:8px"><input class="cmd-input" type="text" placeholder="Команда..." value="${String(p.cmd).replace(/"/g,'&quot;')}"><button class="play-cmd-btn" title="Прослушать">▶</button></div><div class="info-points-wrap"><div class="info-points-toggle"><span>Дополнительная информация</span><span class="info-arrow">▶</span></div><div class="info-points-body" style="display:none"><div style="display:flex;gap:6px;align-items:start"><textarea class="comm-input" placeholder="комментарий">${p.comm || ''}</textarea><button class="play-comm-btn" title="Прослушать комментарий">▶</button></div></div></div><div class="item-actions"><button class="btn-item-action btn-path">🖋️ Изменить путь</button><button class="btn-item-action btn-del" style="color:var(--danger)">🗑️ Удалить</button></div>`;
 
     const cmdInput = item.querySelector('.cmd-input');
     cmdInput.addEventListener('input', () => { p.cmd = cmdInput.value; updateSaveState(); });
@@ -1761,7 +1599,6 @@ function createPointCard(p, single = false) {
     const infoWrap = item.querySelector('.info-points-wrap');
     const infoToggle = infoWrap.querySelector('.info-points-toggle');
     const infoBody = infoWrap.querySelector('.info-points-body');
-    const infoList = infoWrap.querySelector('.info-points-list');
     infoToggle.onclick = () => {
         const isOpen = infoBody.style.display !== 'none';
         infoBody.style.display = isOpen ? 'none' : 'block';
@@ -1772,13 +1609,7 @@ function createPointCard(p, single = false) {
                 ta.style.height = 'auto';
                 ta.style.height = ta.scrollHeight + 'px';
             }
-            rebuildInfoPointList(infoList, p, item);
         }
-    };
-    infoWrap.querySelector('.btn-info-add').onclick = () => {
-        toggleM('pointsOrderModal');
-        activePoint = p;
-        openZnakiSelector();
     };
     return item;
 }
@@ -1787,7 +1618,6 @@ function delPoint(p) {
     if (p.pm) map.removeChild(p.pm);
     if (p.line) map.removeChild(p.line);
     if (p._hitLine) map.removeChild(p._hitLine);
-    clearInfoPlacemarks(p);
     if (activePoint === p) activePoint = null;
     recalculateIds();
     setActivePoint(points[0] || null);
@@ -1862,7 +1692,7 @@ async function saveGist() {
     btn.classList.add('loading');
     if (topSaveBtn) { topSaveBtn.disabled = true; topSaveBtn.textContent = 'Сохраняем...'; }
     try {
-        const data = points.map(p => ({ id: p.id, color: p.color, pts: p.pts, cmd: p.cmd, comm: p.comm, info: p.info }));
+        const data = points.map(p => ({ id: p.id, color: p.color, pts: p.pts, cmd: p.cmd, comm: p.comm }));
         const result = await callYcFunction('save', { m: curRoute }, { data });
         if(result && !result.error) {
             lastSavedSnapshot = serializePoints();
@@ -1883,32 +1713,6 @@ async function saveGist() {
         if (topSaveBtn) { topSaveBtn.disabled = false; topSaveBtn.textContent = 'Ошибка, повторить'; }
         showToast('Ошибка: ' + e.message, 'error');
     }
-}
-
-function openZnakiSelector() {
-    const grid = $('znakiGrid');
-    grid.innerHTML = '';
-    ZNAKI.forEach(f => {
-        const el = document.createElement('div');
-        el.className = 'znaki-item';
-        el.innerHTML = `<img class="znaki-thumb" src="znaki/${f}" alt="${f}"><span class="znaki-name">${f}</span>`;
-        el.onclick = () => selectZnak(f);
-        grid.appendChild(el);
-    });
-    $('znakiModal').classList.add('visible');
-}
-
-function selectZnak(file) {
-    pendingInfoImage = file;
-    isAddingInfo = true;
-    $('znakiModal').classList.remove('visible');
-    $('addText').textContent = "Кликните на карте для установки знака";
-    $('addMarkerBtn').classList.add('active');
-    document.getElementById('map').style.cursor = 'crosshair';
-}
-function closeZnakiSelector() {
-    if (isAddingInfo) stopAddingInfo();
-    $('znakiModal').classList.remove('visible');
 }
 
 window.createFolder = () => {
@@ -1948,8 +1752,6 @@ window.executeDeletePoint = executeDeletePoint;
 window.copyShareLink = copyShareLink;
 window.openInstruction = openInstruction;
 window.closeInstruction = closeInstruction;
-window.closeZnakiSelector = closeZnakiSelector;
-window.selectZnak = selectZnak;
 window.handleCreateFolder = handleCreateFolder;
 
 // ---- Login modal ----
