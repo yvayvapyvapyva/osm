@@ -3,8 +3,9 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>PAD</title>
     <script>
-        if (new URLSearchParams(location.search).get('viewer') === '1') {
+        if (location.pathname.endsWith('/viewer.html') || new URLSearchParams(location.search).get('viewer') === '1') {
             document.documentElement.classList.add('scene-viewer');
         }
     </script>
@@ -2349,7 +2350,7 @@ function updateAllPicMarkers(event) {
 <script src="padtext.js"></script>
 <script src="recplay.js"></script>
 <script src="trafficlights.js"></script>
-<script src="saveState.js?v=15"></script>
+<script src="saveState.js?v=16"></script>
 <script>
 // Deep-link сцены: startapp содержит s + постоянный ID сцены.
 // Сцены общие, привязки к аккаунту нет.

@@ -844,10 +844,50 @@
         btn.title = 'Сцены';
         btn.setAttribute('aria-label', 'Сцены');
         btn.innerHTML = '<svg viewBox="0 0 24 24" width="22" height="22" fill="#fff"><path d="M5,3A2,2 0 0,0 3,5V19A2,2 0 0,0 5,21H19A2,2 0 0,0 21,19V5.5L18.5,3H17V9A1,1 0 0,1 16,10H8A1,1 0 0,1 7,9V3H5M12,4V9H15V4H12M7,12H17A1,1 0 0,1 18,13V19H6V13A1,1 0 0,1 7,12Z"/></svg>';
+        let longPressTriggered = false;
         btn.addEventListener('click', () => {
+            if (longPressTriggered) {
+                longPressTriggered = false;
+                return;
+            }
             if (managerEl && managerEl.classList.contains('visible')) closeManager();
             else openManager();
         });
+        if (viewOnly) {
+            let holdTimer = null;
+            let holdPointer = null;
+            let holdStart = null;
+            const cancelHold = () => {
+                if (holdTimer !== null) clearTimeout(holdTimer);
+                holdTimer = null;
+                holdPointer = null;
+                holdStart = null;
+            };
+            btn.addEventListener('pointerdown', event => {
+                if (event.button !== 0 || event.isPrimary === false) return;
+                cancelHold();
+                longPressTriggered = false;
+                holdPointer = event.pointerId;
+                holdStart = [event.clientX, event.clientY];
+                try { btn.setPointerCapture(event.pointerId); } catch (e) {}
+                holdTimer = setTimeout(() => {
+                    longPressTriggered = true;
+                    window.top.location.assign(new URL('pad.html', location.href).href);
+                }, 700);
+            });
+            btn.addEventListener('pointermove', event => {
+                if (event.pointerId !== holdPointer || !holdStart) return;
+                if (Math.hypot(event.clientX - holdStart[0], event.clientY - holdStart[1]) > 10) {
+                    cancelHold();
+                }
+            });
+            ['pointerup', 'pointercancel', 'lostpointercapture'].forEach(type => {
+                btn.addEventListener(type, event => {
+                    if (event.pointerId === holdPointer) cancelHold();
+                });
+            });
+            btn.addEventListener('contextmenu', event => event.preventDefault());
+        }
         group.appendChild(btn);
 
         const css = document.createElement('style');

@@ -38,7 +38,10 @@ for (const directory of ['pic', 'znaki']) {
 }
 
 for (const page of ['pad.html', 'viewer.html']) {
-    let html = fs.readFileSync(path.join(root, page), 'utf8');
+    let html = fs.readFileSync(path.join(root, 'pad.html'), 'utf8');
+    if (page === 'viewer.html') {
+        html = html.replace('<title>PAD</title>', '<title>PAD — просмотр сцен</title>');
+    }
 
     for (const file of scripts) {
         const source = fs.readFileSync(path.join(root, file), 'utf8');
