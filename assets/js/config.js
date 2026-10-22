@@ -1,7 +1,6 @@
 // API конфигурация
 const API_CONFIG = {
-  YANDEX_MAPS_V2_KEY: 'YANDEX_API_KEY',
-  YANDEX_MAPS_V3_KEY: 'c0e28937-4e16-4d15-9b99-09a30cb8fc13'
+  MAPTILER_KEY: 'mveDsz0PeGC3zhA47AdM'
 };
 
 const ROUTE_DATA = {

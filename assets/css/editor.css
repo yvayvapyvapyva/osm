@@ -61,17 +61,6 @@ html, body {
     z-index: 1;
 }
 
-[class*="-controls-pane"] { display: none !important; }
-[class*="-gotoymaps"] { display: none !important; }
-[class*="-gototaxi"] { display: none !important; }
-[class*="-map-copyrights-promo"] { display: none !important; }
-[class*="-copyrights-pane"] { display: none !important; }
-[class*="-copyright"] { display: none !important; }
-[class*="-logo-wrap"] { display: none !important; }
-[class*="-powered"] { display: none !important; }
-[class*="-watermark"] { display: none !important; }
-.ymaps3--controls_bottom.ymaps3--controls_left { display: none !important; }
-
 #instructionBtn {
     position: fixed;
     bottom: calc(20px + env(safe-area-inset-bottom));

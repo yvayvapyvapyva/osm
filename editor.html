@@ -6,7 +6,8 @@
     <link rel="icon" href="ico.png" type="image/png">
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
     <meta name="robots" content="noindex, nofollow">
-    <link rel="stylesheet" href="assets/css/editor.css?v=2">
+    <link rel="stylesheet" href="assets/css/editor.css?v=3">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.css">
 </head>
 <body>
 
@@ -139,9 +140,9 @@
   tryLoad('https://unpkg.com/@vkontakte/vk-bridge/dist/browser.min.js', '__vkBridgeFailed');
 })(window);
 </script>
-    <script src="https://api-maps.yandex.ru/v3/?apikey=c0e28937-4e16-4d15-9b99-09a30cb8fc13&lang=ru_RU" onerror="window.__ycMapsFailed = true;"></script>
+    <script src="https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js" defer onerror="window.__sortableFailed = true;"></script>
-<script src="assets/js/config.js?v=1"></script>
+<script src="assets/js/config.js?v=2"></script>
 <script src="assets/js/report.js?v=3"></script>
 <script>
 (function (global) {
@@ -204,6 +205,237 @@ const YC_FUNCTION_URL = 'https://functions.yandexcloud.net/d4e02ghbv31h6kpf8ddh'
 const TTS_API_URL = 'https://functions.yandexcloud.net/d4erngid6s4rf5oinnp1';
 const TG_BOT_LINK = 'https://t.me/E_ia_bot?startapp=m=';
 
+// ---------- MapTiler / MapLibre ----------
+const MAPTILER_KEY = (typeof API_CONFIG !== 'undefined' && API_CONFIG.MAPTILER_KEY) || 'mveDsz0PeGC3zhA47AdM';
+const MAP_STYLES = {
+    satellite: { id: 'hybrid-v4', label: 'Спутник' },
+    scheme: { id: 'streets-v4', label: 'Схема' }
+};
+
+function maptilerStyleUrl(type) {
+    const st = MAP_STYLES[type] || MAP_STYLES.satellite;
+    return `https://api.maptiler.com/maps/${st.id}/style.json?key=${encodeURIComponent(MAPTILER_KEY)}`;
+}
+
+const EDITOR_LINE_SOURCE = 'editor-lines';
+const EDITOR_ACTIVE_PRIORITY = 10000;
+const editorLines = new Map();
+let _mapObjectSeq = 0;
+
+class MapMarker {
+    constructor(options, element) {
+        this.element = element;
+        this.coordinates = options?.coordinates || [0, 0];
+        this._onMap = false;
+        this._marker = new maplibregl.Marker({
+            element,
+            anchor: 'center',
+            rotationAlignment: 'viewport',
+            pitchAlignment: 'viewport',
+            draggable: !!options?.draggable
+        }).setLngLat(this.coordinates);
+
+        if (options?.onDragMove) {
+            this._marker.on('drag', () => {
+                const ll = this._marker.getLngLat();
+                options.onDragMove([ll.lng, ll.lat]);
+            });
+        }
+    }
+
+    update(options) {
+        if (options?.coordinates) {
+            this.coordinates = options.coordinates;
+            this._marker.setLngLat(this.coordinates);
+        }
+    }
+
+    _add(map) {
+        if (!this._onMap) {
+            this._marker.addTo(map);
+            this._onMap = true;
+        }
+    }
+
+    _remove() {
+        if (this._onMap) {
+            this._marker.remove();
+            this._onMap = false;
+        }
+    }
+}
+
+class MapLine {
+    constructor(options) {
+        this.id = ++_mapObjectSeq;
+        this.coordinates = options?.geometry?.coordinates || [];
+        this.kind = options?.kind || 'route';
+        this.color = options?.color || '#FFD700';
+        this.width = options?.width ?? 4;
+        this.casingColor = options?.casingColor || '#000000';
+        this.casingWidth = options?.casingWidth ?? 6;
+        this.priority = options?.priority ?? 0;
+        this._active = false;
+    }
+
+    _add() {
+        this._active = true;
+        editorLines.set(this.id, this);
+        ensureEditorLineLayers();
+        renderEditorLineFeatures();
+    }
+
+    _remove() {
+        this._active = false;
+        editorLines.delete(this.id);
+        renderEditorLineFeatures();
+    }
+
+    update(options) {
+        const coords = options?.geometry?.coordinates;
+        if (coords) this.coordinates = coords;
+        renderEditorLineFeatures();
+    }
+}
+
+function ensureEditorLineLayers() {
+    if (!map || typeof map.getSource !== 'function') return false;
+    if (typeof map.isStyleLoaded === 'function' && !map.isStyleLoaded()) return false;
+    try {
+        let changed = false;
+        if (!map.getSource(EDITOR_LINE_SOURCE)) {
+            map.addSource(EDITOR_LINE_SOURCE, {
+                type: 'geojson',
+                data: { type: 'FeatureCollection', features: [] }
+            });
+            changed = true;
+        }
+
+        const normalFilter = ['all', ['!=', ['get', 'kind'], 'hit'], ['<', ['get', 'priority'], EDITOR_ACTIVE_PRIORITY]];
+        const activeFilter = ['all', ['==', ['get', 'kind'], 'route'], ['>=', ['get', 'priority'], EDITOR_ACTIVE_PRIORITY]];
+        const hitFilter = ['==', ['get', 'kind'], 'hit'];
+        const sortKey = ['get', 'priority'];
+        const layout = { 'line-cap': 'round', 'line-join': 'round', 'line-sort-key': sortKey };
+
+        const add = (id, layer) => {
+            if (!map.getLayer(id)) {
+                map.addLayer(Object.assign({ id, source: EDITOR_LINE_SOURCE }, layer));
+                changed = true;
+            }
+        };
+
+        add('editor-lines-casing', {
+            type: 'line',
+            filter: normalFilter,
+            layout,
+            paint: {
+                'line-color': ['coalesce', ['get', 'casingColor'], '#000000'],
+                'line-width': ['coalesce', ['get', 'casingWidth'], 6]
+            }
+        });
+
+        add('editor-lines-main', {
+            type: 'line',
+            filter: normalFilter,
+            layout,
+            paint: {
+                'line-color': ['coalesce', ['get', 'color'], '#FFD700'],
+                'line-width': ['coalesce', ['get', 'width'], 4]
+            }
+        });
+
+        add('editor-lines-hit', {
+            type: 'line',
+            filter: hitFilter,
+            layout: { 'line-cap': 'round', 'line-join': 'round' },
+            paint: {
+                'line-color': '#808080',
+                'line-width': 30,
+                'line-opacity': 0.2
+            }
+        });
+
+        add('editor-lines-active-casing', {
+            type: 'line',
+            filter: activeFilter,
+            layout,
+            paint: {
+                'line-color': ['coalesce', ['get', 'casingColor'], '#000000'],
+                'line-width': ['coalesce', ['get', 'casingWidth'], 10]
+            }
+        });
+
+        add('editor-lines-active-glow', {
+            type: 'line',
+            filter: activeFilter,
+            layout,
+            paint: {
+                'line-color': '#A4E84A',
+                'line-width': ['-', ['coalesce', ['get', 'casingWidth'], 10], 2],
+                'line-opacity': 0.95,
+                'line-blur': 1
+            }
+        });
+
+        add('editor-lines-active-main', {
+            type: 'line',
+            filter: activeFilter,
+            layout,
+            paint: {
+                'line-color': ['coalesce', ['get', 'color'], '#FFD700'],
+                'line-width': ['coalesce', ['get', 'width'], 4]
+            }
+        });
+
+        return changed;
+    } catch (e) {
+        // Стиль ещё не готов — слои добавит следующий styledata/idle.
+        return false;
+    }
+}
+
+function renderEditorLineFeatures() {
+    if (!map || typeof map.getSource !== 'function') return;
+    const source = map.getSource(EDITOR_LINE_SOURCE);
+    if (!source) return;
+
+    const features = [];
+    for (const line of editorLines.values()) {
+        if (!line._active || !line.coordinates || line.coordinates.length < 2) continue;
+        features.push({
+            type: 'Feature',
+            id: line.id,
+            properties: {
+                kind: line.kind,
+                color: line.color,
+                width: line.width,
+                casingColor: line.casingColor,
+                casingWidth: line.casingWidth,
+                priority: line.priority
+            },
+            geometry: { type: 'LineString', coordinates: line.coordinates }
+        });
+    }
+
+    try {
+        source.setData({ type: 'FeatureCollection', features });
+    } catch (e) {}
+}
+
+function attachEditorMapApi() {
+    if (!map) return;
+    map.addChild = function(obj) {
+        if (obj?._add) obj._add(this);
+    };
+    map.removeChild = function(obj) {
+        if (obj?._remove) obj._remove();
+    };
+    map.update = function(options) {
+        const loc = options?.location;
+        if (loc?.center) this.easeTo({ center: loc.center, duration: loc.duration || 0 });
+    };
+}
+
 let map, points = [], cur = null, isAdd = false, isDrawing = false, curRoute = null, activeListPoint = null, modalMode = 'list', tempNewPointData = null, userLocPlacemark = null, activePoint = null, settingsRouteFiles = [];
 let historyStack = [], historyIndex = -1, lastSavedSnapshot = "[]", toastTimer = null;
 let pendingDeletePoint = null;
@@ -222,13 +454,13 @@ function setDrawMapClickHandler(handler) {
 
 function updateHitLine(p) {
     if (!p || !map) return;
-    if (p._hitLine && map) map.removeChild(p._hitLine);
+    if (p._hitLine) map.removeChild(p._hitLine);
     p._hitLine = null;
     if (!p.pts || p.pts.length < 2) return;
-    const { YMapFeature } = ymaps3;
-    p._hitLine = new YMapFeature({
+    p._hitLine = new MapLine({
         geometry: { type: 'LineString', coordinates: swapCoords(p.pts) },
-        style: { stroke: [{ width: 30, color: 'rgba(128,128,128,0.2)' }], zIndex: 5 }
+        kind: 'hit',
+        priority: EDITOR_ACTIVE_PRIORITY
     });
     map.addChild(p._hitLine);
 }
@@ -237,7 +469,6 @@ function updateDrawVertexMarkers(pts, colorHex) {
     _drawVertexMarkers.forEach(m => { if (map) map.removeChild(m); });
     _drawVertexMarkers = [];
     if (!pts || pts.length < 2 || !map) return;
-    const YMapMarker = ymaps3.YMapMarker;
     const col = colorHex || '#0066ff';
     pts.forEach((pt, i) => {
         const wrap = document.createElement('div');
@@ -255,7 +486,7 @@ function updateDrawVertexMarkers(pts, colorHex) {
         del.style.cssText = 'position:absolute;top:-50px;left:50%;transform:translateX(-50%);width:36px;height:36px;border-radius:4px;background:#ff3b30;color:#fff;font-size:24px;font-weight:700;line-height:36px;text-align:center;cursor:pointer;display:none;user-select:none;z-index:10;';
         wrap.appendChild(dot);
         wrap.appendChild(del);
-        const m = new YMapMarker({
+        const m = new MapMarker({
             coordinates: [pt[1], pt[0]],
             draggable: true,
             onDragMove: (newCoords) => {
@@ -454,19 +685,13 @@ const applySnapshot = (snapshot) => {
 
 let initialCenter = [56.3399, 43.9332];
 let currentLayerType = 'satellite';
-let schemeLayer = null, satelliteLayer = null;
 
 function toggleLayer() {
     if (!map) return;
-    if (currentLayerType === 'satellite') {
-        if (satelliteLayer) map.removeChild(satelliteLayer);
-        if (schemeLayer) map.addChild(schemeLayer);
-        currentLayerType = 'scheme';
-    } else {
-        if (schemeLayer) map.removeChild(schemeLayer);
-        if (satelliteLayer) map.addChild(satelliteLayer);
-        currentLayerType = 'satellite';
-    }
+    currentLayerType = currentLayerType === 'satellite' ? 'scheme' : 'satellite';
+    map.setStyle(maptilerStyleUrl(currentLayerType));
+    const st = MAP_STYLES[currentLayerType];
+    if (st) showToast(st.label, 'info', 1200);
 }
 
 function initMapWithGeolocation() {
@@ -484,18 +709,17 @@ function initMapWithGeolocation() {
     });
 }
 
-if (typeof ymaps3 === 'undefined' || !ymaps3.ready) {
-    showToast('Ошибка загрузки Яндекс.Карт (возможно, блокировка)', 'error', 8000);
+if (typeof maplibregl === 'undefined') {
+    showToast('Ошибка загрузки MapLibre (проверьте интернет)', 'error', 8000);
     const wsEl = document.getElementById('welcomeScreen');
     if (wsEl) wsEl.style.display = 'none';
 } else {
-ymaps3.ready.then(async () => {
-    const { YMap, YMapDefaultSchemeLayer, YMapDefaultSatelliteLayer, YMapDefaultFeaturesLayer, YMapMarker, YMapFeature, YMapListener } = ymaps3;
-
-    // Скрываем welcomeScreen сразу, не дожидаясь загрузки SDK (в браузере блокировки тянутся до ~10с)
+(async () => {
+    // Скрываем welcomeScreen сразу, не дожидаясь загрузки карты
     const wsEl0 = document.getElementById('welcomeScreen');
     if (wsEl0) wsEl0.style.display = 'none';
-    // Даём SDK короткую фору (1.5с); в TG/VK он приходит мгновенно, в браузере — продолжаем без него
+
+    // Даём SDK платформ короткую фору (1.5с)
     if (window.platformReady) {
         const grace = new Promise(r => setTimeout(r, 1500));
         try { await Promise.race([window.platformReady, grace]); } catch (e) {}
@@ -512,22 +736,42 @@ ymaps3.ready.then(async () => {
     }
 
     const center = await initMapWithGeolocation();
-    map = new YMap(document.getElementById('map'), {
-        location: { center: [center[1], center[0]], zoom: 17 },
-        zoomRange: { min: 3, max: 24 },
-        behaviors: ['drag', 'scrollZoom', 'dblClick', 'pinchZoom', 'pinchRotate']
+    map = new maplibregl.Map({
+        container: 'map',
+        style: maptilerStyleUrl(currentLayerType),
+        center: [center[1], center[0]],
+        zoom: 17,
+        minZoom: 3,
+        maxZoom: 24,
+        attributionControl: { compact: true },
+        dragRotate: true,
+        pitchWithRotate: true,
+        touchPitch: true
+    });
+    attachEditorMapApi();
+
+    let mapErrorShown = false;
+    map.on('error', (e) => {
+        if (mapErrorShown) return;
+        const msg = e && e.error ? String(e.error.message || '') : '';
+        if (/key|401|403|failed to fetch|load/i.test(msg)) {
+            mapErrorShown = true;
+            showToast('Ошибка карты: проверьте ключ MapTiler', 'error', 6000);
+        }
     });
 
-
-    satelliteLayer = new YMapDefaultSatelliteLayer({});
-    schemeLayer = new YMapDefaultSchemeLayer({});
-    map.addChild(satelliteLayer);
-    map.addChild(new YMapDefaultFeaturesLayer({ zIndex: 100000 }));
+    const restoreEditorLayers = () => {
+        if (ensureEditorLineLayers()) renderEditorLineFeatures();
+    };
+    map.once('load', restoreEditorLayers);
+    map.on('style.load', restoreEditorLayers);
+    map.on('styledata', restoreEditorLayers);
+    map.on('idle', restoreEditorLayers);
 
     const userEl = document.createElement('div');
-    userEl.style.cssText = 'width:16px;height:16px;transform:translate(-50%,-50%);';
+    userEl.style.cssText = 'width:16px;height:16px;';
     userEl.innerHTML = '<img src="' + getUserLocSvg() + '" width="16" height="16" class="marker-img" />';
-    userLocPlacemark = new YMapMarker({ coordinates: [0, 0] }, userEl);
+    userLocPlacemark = new MapMarker({ coordinates: [0, 0] }, userEl);
     map.addChild(userLocPlacemark);
     initGeolocation();
 
@@ -541,35 +785,40 @@ ymaps3.ready.then(async () => {
             if (dot) dot.style.borderColor = '#000';
         });
     }, true);
-    map.addChild(new YMapListener({
-        onFastClick: (object, event) => {
-            if (object?.type === 'marker' && !isDrawing) return;
-            if (!event || !event.coordinates) return;
-            const lonLat = event.coordinates;
-            const latLon = [f6(lonLat[1]), f6(lonLat[0])];
 
-            if (isDrawing && _drawMapClickHandler) {
-                if (object?.type === 'feature' && (object.entity === cur?.line || object.entity === cur?._hitLine) && _drawPathPoints.length >= 2) {
-                    const segIdx = findNearestSegment(_drawPathPoints, latLon);
-                    _drawPathPoints.splice(segIdx + 1, 0, latLon);
-                } else {
-                    _drawPathPoints.push(latLon);
-                }
-                _drawMapClickHandler(latLon);
-                return;
-            }
+    map.on('click', (e) => {
+        const target = e.originalEvent?.target;
+        if (target?.closest?.('.maplibregl-marker, .maplibregl-ctrl')) return;
+        if (!e.lngLat) return;
+        const latLon = [f6(e.lngLat.lat), f6(e.lngLat.lng)];
 
-            if(isAdd && tempNewPointData) {
-                const newPoint = addP(latLon, { ...tempNewPointData });
-                if (!newPoint) return;
-                pushHistorySnapshot();
-                updateSaveState();
-                setActivePoint(newPoint, false);
-                startDrawingForPoint(newPoint, true);
-                tempNewPointData = null;
+        if (isDrawing && _drawMapClickHandler) {
+            let onCurrentLine = false;
+            if (cur?._hitLine && map.getLayer('editor-lines-hit')) {
+                try {
+                    onCurrentLine = map.queryRenderedFeatures(e.point, { layers: ['editor-lines-hit'] }).length > 0;
+                } catch (_) {}
             }
+            if (onCurrentLine && _drawPathPoints.length >= 2) {
+                const segIdx = findNearestSegment(_drawPathPoints, latLon);
+                _drawPathPoints.splice(segIdx + 1, 0, latLon);
+            } else {
+                _drawPathPoints.push(latLon);
+            }
+            _drawMapClickHandler(latLon);
+            return;
         }
-    }));
+
+        if (isAdd && tempNewPointData) {
+            const newPoint = addP(latLon, { ...tempNewPointData });
+            if (!newPoint) return;
+            pushHistorySnapshot();
+            updateSaveState();
+            setActivePoint(newPoint, false);
+            startDrawingForPoint(newPoint, true);
+            tempNewPointData = null;
+        }
+    });
 
     initColorDropdown('listColorDropdown', (h, n) => {
         if(activeListPoint) {
@@ -591,7 +840,7 @@ ymaps3.ready.then(async () => {
     }
 
     handleInitialLoad();
-}).catch(e => {
+})().catch(e => {
     showToast('Ошибка загрузки карты: ' + e.message, 'error', 8000);
     const wsEl = document.getElementById('welcomeScreen');
     if (wsEl) wsEl.style.display = 'none';
@@ -1263,31 +1512,28 @@ function findNearestSegment(pts, latLon) {
 function updatePointLine(p) {
     if (p.line && map) { map.removeChild(p.line); p.line = null; }
     if (!p.pts || p.pts.length < 2) return;
-    const { YMapFeature } = ymaps3;
     const hex = COLORS[p.color]?.hex || '#FFD700';
     const isCurrent = p === activePoint;
-    const coords = swapCoords(p.pts);
-    const strokes = [];
-    strokes.push({ width: 4, color: hex });
-    if (isCurrent) strokes.push({ width: 6, color: '#A4E84A' });
-    strokes.push({ width: isCurrent ? 8 : 6, color: '#000000' });
     const pIdx = points.indexOf(p);
-    const z = isCurrent ? 10000 : (pIdx >= 0 ? points.length - pIdx : 0);
-    p.line = new YMapFeature({
-        geometry: { type: 'LineString', coordinates: coords },
-        style: { stroke: strokes, zIndex: z }
+    const priority = isCurrent ? EDITOR_ACTIVE_PRIORITY : (pIdx >= 0 ? points.length - pIdx : 0);
+    p.line = new MapLine({
+        geometry: { type: 'LineString', coordinates: swapCoords(p.pts) },
+        color: hex,
+        width: 4,
+        casingColor: '#000000',
+        casingWidth: isCurrent ? 10 : 6,
+        priority
     });
     map.addChild(p.line);
 }
 
 function addP(coords, data = null, silent = false) {
     try {
-        const { YMapMarker, YMapFeature } = ymaps3;
         const ptsData = data?.pts || [coords];
         const hex = COLORS[data?.color || 'Gold']?.hex || '#FFD700';
         
         const el = document.createElement('div');
-        el.style.cssText = 'width:40px;height:40px;transform:translate(-50%,-50%);cursor:pointer;';
+        el.style.cssText = 'width:40px;height:40px;cursor:pointer;';
         el.dataset.pointId = data?.id || (points.length + 1);
         
         const p = { 
@@ -1296,20 +1542,23 @@ function addP(coords, data = null, silent = false) {
             cmd: data?.cmd || '', 
             comm: data?.comm || '', 
             pts: ptsData,
-            pm: new YMapMarker({ coordinates: [coords[1], coords[0]] }, el),
+            pm: new MapMarker({ coordinates: [coords[1], coords[0]] }, el),
             line: null
         };
         
-        el.addEventListener('click', () => { if(!isDrawing) { setActivePoint(p, true); if(!isAdd) openEditPointModal(p); } });
+        el.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if(!isDrawing) { setActivePoint(p, true); if(!isAdd) openEditPointModal(p); }
+        });
         
         if (ptsData.length >= 2) {
-            const lineCoords = swapCoords(ptsData);
-            const strokes = [];
-            strokes.push({ width: 4, color: hex });
-            strokes.push({ width: 6, color: '#000000' });
-            p.line = new YMapFeature({
-                geometry: { type: 'LineString', coordinates: lineCoords },
-                style: { stroke: strokes }
+            p.line = new MapLine({
+                geometry: { type: 'LineString', coordinates: swapCoords(ptsData) },
+                color: hex,
+                width: 4,
+                casingColor: '#000000',
+                casingWidth: 6,
+                priority: 0
             });
         }
         
