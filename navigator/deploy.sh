@@ -8,13 +8,19 @@ FUNCTION_NAME="${FUNCTION_NAME:-osmn}"
 DATABASE="${YDB_DATABASE:-/ru-central1/b1gtnlal9r2s3rvqadjn/etnjvaftd6eakeq08kqr}"
 ENDPOINT="${YDB_ENDPOINT:-grpcs://ydb.serverless.yandexcloud.net:2135}"
 SERVICE_ACCOUNT_ID="${SERVICE_ACCOUNT_ID:-aje0hrd823msk3hqaikt}"
+ROUTE_ADMIN_PASSWORD="${ROUTE_ADMIN_PASSWORD:-}"
 
 cd "$(dirname "$0")"
+
+if [[ -z "${ROUTE_ADMIN_PASSWORD}" ]]; then
+  echo "Задайте ROUTE_ADMIN_PASSWORD перед деплоем; пароль не сохраняется в репозитории." >&2
+  exit 1
+fi
 
 echo "Деплой функции ${FUNCTION_NAME} (${FUNCTION_ID})"
 echo "База: ${DATABASE}"
 
-ENVIRONMENT="YDB_ENDPOINT=${ENDPOINT},YDB_DATABASE=${DATABASE}"
+ENVIRONMENT="YDB_ENDPOINT=${ENDPOINT},YDB_DATABASE=${DATABASE},ROUTE_ADMIN_PASSWORD=${ROUTE_ADMIN_PASSWORD}"
 
 yc serverless function version create \
   --function-id "${FUNCTION_ID}" \

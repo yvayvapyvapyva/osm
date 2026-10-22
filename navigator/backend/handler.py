@@ -6,17 +6,19 @@
   GET ?action=list_routes   — список видимых маршрутов
   GET ?action=get&m=<m>     — маршрут {name, m, data}
 
-API редактора (без авторизации, доступ по прямой ссылке):
+API редактора (просмотр и изменение доступны по прямой ссылке;
+удаление требует ROUTE_ADMIN_PASSWORD):
   GET  ?action=list                  — все маршруты
   GET  ?action=get&m=<m>             — данные маршрута
   GET  ?action=get_meta&m=<m>        — название, описание, видимость
   POST ?action=save&m=<m>            — тело {data: [...]}
   POST ?action=save_meta&m=<m>       — тело {name, description, visible[, new_m]}
-  GET  ?action=delete&m=<m>
+  POST ?action=delete&m=<m>       — заголовок X-Route-Admin-Password
 
 База — отдельная serverless-YDB (dbosm).
 """
 
+import hmac
 import json
 import os
 
@@ -177,7 +179,7 @@ def create_response(status_code, body, is_public=False):
         "Content-Type": "application/json; charset=utf-8",
         "Access-Control-Allow-Origin": "*",
         "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-        "Access-Control-Allow-Headers": "Content-Type, Origin, Accept",
+        "Access-Control-Allow-Headers": "Content-Type, Origin, Accept, X-Route-Admin-Password",
     }
     if is_public:
         headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
@@ -209,6 +211,21 @@ def handler(event, context):
 
     action = params.get("action") or "get"
     m_val = params.get("m")
+
+    if action == "delete":
+        admin_password = os.environ.get("ROUTE_ADMIN_PASSWORD")
+        headers = event.get("headers") or {}
+        provided_password = next(
+            (value for key, value in headers.items()
+             if str(key).lower() == "x-route-admin-password"),
+            "",
+        )
+        if not admin_password:
+            return create_response(503, {"error": "route_deletion_not_configured"})
+        if not isinstance(provided_password, str) or not hmac.compare_digest(
+            provided_password, admin_password
+        ):
+            return create_response(403, {"error": "invalid_admin_password"})
 
     try:
         if action == "list_routes":

@@ -62,7 +62,7 @@
 <button class="btn-action" onclick="shareRouteFromSettings();">🔗 Скопировать ссылку</button>
 <button class="btn-action btn-danger" onclick="confirmDeleteRoute();">🗑️ Удалить маршрут</button>
 </div></div></div>
-<div id="confirmDeleteModal" onclick="if(event.target===this) toggleM('confirmDeleteModal')"><div class="modal-sheet modal-sheet-compact"><h3 class="modal-title">Удалить маршрут?</h3><p id="confirmDeleteText" class="modal-desc-text" style="font-size:16px;"></p><div class="modal-actions"><button class="btn-action flex-1" onclick="toggleM('confirmDeleteModal')">Отмена</button><button class="btn-action btn-danger flex-1" onclick="executeDeleteRoute()">Удалить</button></div></div></div>
+<div id="confirmDeleteModal" onclick="if(event.target===this) toggleM('confirmDeleteModal')"><div class="modal-sheet modal-sheet-compact"><h3 class="modal-title">Удалить маршрут?</h3><p id="confirmDeleteText" class="modal-desc-text" style="font-size:16px;"></p><input id="routeAdminPassword" type="password" autocomplete="current-password" placeholder="Пароль администратора" aria-label="Пароль администратора" style="width:100%;padding:12px;border-radius:12px;border:1px solid rgba(255,255,255,0.2);background:rgba(255,255,255,0.08);color:#fff;font-size:16px;outline:none;"><div class="modal-actions"><button class="btn-action flex-1" onclick="toggleM('confirmDeleteModal')">Отмена</button><button id="confirmDeleteRouteBtn" class="btn-action btn-danger flex-1" onclick="executeDeleteRoute()">Удалить</button></div></div></div>
 <div id="confirmDeletePointModal" onclick="if(event.target===this) toggleM('confirmDeletePointModal')"><div class="modal-sheet modal-sheet-compact"><h3 class="modal-title">Удалить точку?</h3><p class="modal-desc-text" style="font-size:16px;">Вы уверены, что хотите удалить эту точку?</p><div class="modal-actions"><button class="btn-action flex-1" onclick="toggleM('confirmDeletePointModal')">Отмена</button><button class="btn-action btn-danger flex-1" onclick="executeDeletePoint()">Удалить</button></div></div></div>
 <div id="shareModal" onclick="if(event.target===this) toggleM('shareModal')"><div class="modal-sheet modal-sheet-compact"><h3 class="modal-title">Поделиться маршрутом</h3><p class="modal-desc-text">При открытии ссылки откроется навигатор с этим маршрутом.</p><div style="display:flex;flex-direction:column;gap:12px"><button class="btn-action flex-1" onclick="copyShareLink('vk')">VK</button><button class="btn-action flex-1" onclick="copyShareLink('tg')">Telegram</button><button class="btn-action flex-1" onclick="copyShareLink('web')">Браузер</button><button class="btn-action flex-1" onclick="toggleM('shareModal')">Отмена</button></div></div></div>
 <button id="instructionBtn" onclick="openInstruction()">📖 Инструкция</button>
@@ -670,7 +670,7 @@ const showToast = (text, type = 'info', duration = 2200) => {
         if (isBtn) openInstruction();
     }, { once: true });
 
-async function callYcFunction(action, params = {}, bodyData = null) {
+async function callYcFunction(action, params = {}, bodyData = null, headers = {}) {
     const url = new URL(YC_FUNCTION_URL);
     url.searchParams.set('action', action);
 
@@ -678,7 +678,7 @@ async function callYcFunction(action, params = {}, bodyData = null) {
     
     const options = {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' }
+        headers: Object.assign({ 'Content-Type': 'application/json' }, headers)
     };
     
     if (bodyData !== null) {
@@ -1490,15 +1490,30 @@ const saveRouteMeta = async () => {
 const confirmDeleteRoute = () => {
     if (!settingsRouteName) return;
     const displayName = currentRouteMeta.name || settingsRouteName;
-    $('confirmDeleteText').textContent = `Вы уверены, что хотите удалить маршрут "${displayName}"?`;
+    $('confirmDeleteText').textContent = `Вы уверены, что хотите удалить маршрут "${displayName}"? Введите пароль администратора.`;
+    $('routeAdminPassword').value = '';
     toggleM('settingsRouteModal');
-    setTimeout(() => toggleM('confirmDeleteModal'), 100);
+    setTimeout(() => {
+        toggleM('confirmDeleteModal');
+        $('routeAdminPassword').focus();
+    }, 100);
 };
 const executeDeleteRoute = async () => {
     if (!settingsRouteName) return;
-    toggleM('confirmDeleteModal');
+    const passwordInput = $('routeAdminPassword');
+    const password = passwordInput.value;
+    if (!password) {
+        showToast('Введите пароль администратора', 'error');
+        passwordInput.focus();
+        return;
+    }
+    const deleteBtn = $('confirmDeleteRouteBtn');
+    deleteBtn.disabled = true;
     try {
-        await callYcFunction('delete', { m: settingsRouteName });
+        await callYcFunction('delete', { m: settingsRouteName }, null, {
+            'X-Route-Admin-Password': password
+        });
+        toggleM('confirmDeleteModal');
         if (curRoute === settingsRouteName) {
             clearRouteObjects();
             curRoute = null;
@@ -1508,8 +1523,12 @@ const executeDeleteRoute = async () => {
         refreshFileList();
         showToast("Маршрут удален", 'success');
     } catch (e) {
-        
-        showToast('Ошибка удаления', 'error');
+        showToast(e.message === 'HTTP 403'
+            ? 'Неверный пароль администратора'
+            : 'Ошибка удаления: ' + e.message, 'error');
+    } finally {
+        passwordInput.value = '';
+        deleteBtn.disabled = false;
     }
 };
 const shareRouteFromSettings = () => {
