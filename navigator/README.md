@@ -124,10 +124,16 @@ python3 tts/navigator/sync_routes.py
 
 ```
 GET ?action=list_routes
+GET ?action=list_routes&full=1
 ```
 
 Возвращает массив `{m, name, description}` только для
 `visible = true AND name IS NOT NULL`.
+
+С `full=1` в каждый элемент добавляется `data` — геометрия маршрута.
+Навигатор запрашивает список именно так: один запрос при запуске вместо
+отдельного `action=get` на каждый выбор маршрута (без кэша, данные живут
+в памяти до перезагрузки страницы).
 
 **Маршрут**
 

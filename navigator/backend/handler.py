@@ -3,8 +3,9 @@
 Маршруты не привязаны к аккаунтам. Единственный идентификатор маршрута — `m`.
 
 Публичное API:
-  GET ?action=list_routes   — список видимых маршрутов
-  GET ?action=get&m=<m>     — маршрут {name, m, data}
+  GET ?action=list_routes        — список видимых маршрутов
+  GET ?action=list_routes&full=1 — то же + геометрия (data) каждого маршрута
+  GET ?action=get&m=<m>          — маршрут {name, m, data}
 
 API редактора (операции изменения требуют ROUTE_ADMIN_PASSWORD):
   GET  ?action=list                  — все маршруты
@@ -45,10 +46,11 @@ def get_pool():
     return _pool
 
 
-def execute_list_routes(session, visible_only):
+def execute_list_routes(session, visible_only, include_json=False):
     where = "WHERE visible = true AND name IS NOT NULL" if visible_only else ""
+    columns = "m, name, description, json" if include_json else "m, name, description"
     query = f"""
-        SELECT m, name, description
+        SELECT {columns}
         FROM roads
         {where}
         ORDER BY name;
@@ -231,17 +233,22 @@ def handler(event, context):
 
     try:
         if action == "list_routes":
+            # full=1 — отдать геометрию всех видимых маршрутов одним запросом,
+            # чтобы клиент не ходил в action=get по каждому маршруту.
+            include_json = params.get("full") == "1"
             result = get_pool().retry_operation_sync(
-                execute_list_routes, visible_only=True
+                execute_list_routes, visible_only=True, include_json=include_json
             )
-            routes = [
-                {
+            routes = []
+            for row in result[0].rows:
+                route = {
                     "m": _text(row.m),
                     "name": _text(row.name),
                     "description": _text(row.description),
                 }
-                for row in result[0].rows
-            ]
+                if include_json:
+                    route["data"] = _json_value(row.json)
+                routes.append(route)
             return create_response(200, routes, is_public=True)
 
         if action == "get":

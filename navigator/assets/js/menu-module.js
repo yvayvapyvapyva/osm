@@ -144,7 +144,9 @@ const MenuModule = {
      * Запрос к Яндекс-функции за списком маршрутов
      */
     async _fetchFromAPI() {
-        const response = await fetch(`${this.API_URL_V2}?action=list_routes`);
+        // full=1: геометрия всех видимых маршрутов одним запросом — при выборе
+        // маршрута из каталога сетевые запросы уже не нужны.
+        const response = await fetch(`${this.API_URL_V2}?action=list_routes&full=1`);
 
         if (!response.ok) {
             throw new Error(`HTTP ${response.status}`);
@@ -160,7 +162,8 @@ const MenuModule = {
             routesFlat[key] = {
                 m: route.m,
                 name: route.name || route.m,
-                description: route.description || ''
+                description: route.description || '',
+                data: route.data
             };
         }
 
@@ -544,11 +547,21 @@ const MenuModule = {
 
             this.hide();
 
-            const url = this.API_URL_V2 + '?action=get&m=' + encodeURIComponent(routeM);
-            const res = await fetch(url);
+            let data;
+            const cached = this.routesDescriptions && this.routesDescriptions[routeM];
 
-            if (!res.ok) throw new Error('HTTP ' + res.status);
-            const data = await res.json();
+            if (cached && cached.data) {
+                // Данные уже загружены списком (list_routes&full=1) — без запроса.
+                data = { name: cached.name, m: routeM, data: cached.data };
+            } else {
+                // Fallback: маршрута нет в списке (скрыт/удалён) или бэкенд ещё
+                // не умеет full=1 — грузим по одному.
+                const url = this.API_URL_V2 + '?action=get&m=' + encodeURIComponent(routeM);
+                const res = await fetch(url);
+
+                if (!res.ok) throw new Error('HTTP ' + res.status);
+                data = await res.json();
+            }
 
             // Отчёт об открытии маршрута — после получения данных маршрута.
             try {
