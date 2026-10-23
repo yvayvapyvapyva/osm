@@ -777,9 +777,10 @@ html, body {
 
 .route-item {
     display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    padding: 14px;
+    flex-direction: row;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 14px;
     border-radius: 14px;
     background: rgba(255, 255, 255, 0.08);
     border: 1px solid rgba(255, 255, 255, 0.12);
@@ -789,6 +790,25 @@ html, body {
     width: 100%;
     box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
     position: relative;
+}
+
+/* Миниатюра маршрута: квадрат 54×54 со схемой трассы */
+.route-thumb {
+    flex: 0 0 54px;
+    width: 54px;
+    height: 54px;
+    border-radius: 10px;
+    overflow: hidden;
+    background: #fff;
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+.route-thumb svg {
+    display: block;
 }
 
 .route-item:active {
@@ -833,7 +853,10 @@ html, body {
     color: #fff;
     line-height: 1.3;
     letter-spacing: -0.1px;
-    padding-right: 36px;
+    padding-right: 40px;
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow-wrap: break-word;
 }
 
 /* ============================================
