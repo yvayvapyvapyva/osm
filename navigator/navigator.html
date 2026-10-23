@@ -1380,7 +1380,7 @@ function updateHud() {
 
     $('hudCmdNum').innerHTML = `<svg width="44" height="44" viewBox="0 0 20 20"><circle cx="10" cy="10" r="9" fill="${t.hex}" opacity="0.3"/><circle cx="10" cy="10" r="9" fill="none" stroke="${t.hex}" stroke-width="1.5"/><text x="10" y="10.5" font-size="8" font-family="Arial" font-weight="900" text-anchor="middle" dominant-baseline="middle" fill="#fff">${escapeHtml(t.id)}</text></svg>`;
     $('hudCmdTextInner').textContent = t.cmd;
-    $('hudCmdTextInner').style.opacity = APP._audioCache.has(ttsCacheKey(t.cmd, 'command')) ? '1' : '0.35';
+    $('hudCmdTextInner').style.opacity = NavigatorTTS.has(t.cmd, 'command') ? '1' : '0.35';
     $('hudCmdNum').onclick = (e) => {
         e.stopPropagation();
         const el = $('hudCmdNum');
@@ -1420,7 +1420,7 @@ function updateHud() {
     $('commentText').textContent = t.comm || '';
     const hasComm = t.comm && t.comm.trim() !== '';
     $('commentText').style.display = hasComm && APP._commentEnabled ? 'block' : 'none';
-    $('commentText').style.opacity = (t.comm && APP._audioCache.has(ttsCacheKey(t.comm, 'comment'))) ? '1' : '0.35';
+    $('commentText').style.opacity = (t.comm && NavigatorTTS.has(t.comm, 'comment')) ? '1' : '0.35';
 
     // Панель предыдущей команды — та же вёрстка над основной, полупрозрачная
     const prevHeader = $('hudPrevHeader');
@@ -1432,7 +1432,7 @@ function updateHud() {
             prevHeader.style.display = '';
             $('hudPrevCmdNum').innerHTML = `<svg width="44" height="44" viewBox="0 0 20 20"><circle cx="10" cy="10" r="9" fill="${prev.hex}" opacity="0.3"/><circle cx="10" cy="10" r="9" fill="none" stroke="${prev.hex}" stroke-width="1.5"/><text x="10" y="10.5" font-size="8" font-family="Arial" font-weight="900" text-anchor="middle" dominant-baseline="middle" fill="#fff">${escapeHtml(prev.id)}</text></svg>`;
             $('hudPrevCmdTextInner').textContent = prev.cmd;
-            $('hudPrevCmdTextInner').style.opacity = APP._audioCache.has(ttsCacheKey(prev.cmd, 'command')) ? '1' : '0.35';
+            $('hudPrevCmdTextInner').style.opacity = NavigatorTTS.has(prev.cmd, 'command') ? '1' : '0.35';
             $('hudPrevCmdNum').onclick = (e) => {
                 e.stopPropagation();
                 const el = $('hudPrevCmdNum');
@@ -1445,7 +1445,7 @@ function updateHud() {
             $('prevCommentText').textContent = prev.comm || '';
             const hasPrevComm = prev.comm && prev.comm.trim() !== '';
             $('prevCommentText').style.display = hasPrevComm && APP._commentEnabled ? 'block' : 'none';
-            $('prevCommentText').style.opacity = (prev.comm && APP._audioCache.has(ttsCacheKey(prev.comm, 'comment'))) ? '1' : '0.35';
+            $('prevCommentText').style.opacity = (prev.comm && NavigatorTTS.has(prev.comm, 'comment')) ? '1' : '0.35';
         }
     }
 }
@@ -1753,8 +1753,9 @@ async function processRouteData(data) {
 async function precacheRouteAudio(data) {
     const cmdTexts = [...new Set(data.map(d => d.cmd).filter(t => t && t.trim()))];
     const commTexts = [...new Set(data.map(d => d.comm).filter(t => t && t.trim()))];
-    cmdTexts.push(APP.navConfig.SHOCK_PHRASE || 'Сильный удар');
-    cmdTexts.push(APP.navConfig.SPEED_ALERT_PHRASE || 'Превышена максимальная скорость');
+    const shockPhrase = APP.navConfig.SHOCK_PHRASE || 'Сильный удар';
+    const speedPhrase = APP.navConfig.SPEED_ALERT_PHRASE || 'Превышена максимальная скорость';
+    cmdTexts.push(shockPhrase, speedPhrase);
     const uncachedCmd = cmdTexts.filter(t => !APP._audioCache.has(ttsCacheKey(t, 'command')));
     const uncachedComm = commTexts.filter(t => !APP._audioCache.has(ttsCacheKey(t, 'comment')));
     if (uncachedCmd.length + uncachedComm.length === 0) return;
