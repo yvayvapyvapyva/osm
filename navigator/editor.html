@@ -221,8 +221,7 @@ const MAP_STYLES = {
         label: 'Яндекс.Спутник',
         // Keyless-тайлы Яндекса отдаются в эллипсоидном Меркаторе (EPSG:3395).
         // Кастомный протокол ниже пересчитывает их в Web Mercator для MapLibre.
-        tiles: ['yandexsat://sat/{z}/{x}/{y}'],
-        attribution: '© <a href="https://yandex.ru/maps">Яндекс</a>'
+        tiles: ['yandexsat://sat/{z}/{x}/{y}']
     },
     scheme: { id: 'streets-v4', label: 'Схема' }
 };
@@ -234,7 +233,7 @@ function maptilerStyleUrl(type) {
         return {
             version: 8,
             sources: {
-                [srcId]: { type: 'raster', tiles: st.tiles, tileSize: 256, attribution: st.attribution }
+                [srcId]: { type: 'raster', tiles: st.tiles, tileSize: 256 }
             },
             layers: [{ id: srcId, type: 'raster', source: srcId }]
         };
@@ -880,7 +879,7 @@ if (typeof maplibregl === 'undefined') {
         zoom: 17,
         minZoom: 3,
         maxZoom: 24,
-        attributionControl: { compact: true },
+        attributionControl: false,
         dragRotate: true,
         pitchWithRotate: true,
         touchPitch: true

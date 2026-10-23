@@ -102,8 +102,7 @@
                     tiles: ['yandexsat://sat/{z}/{x}/{y}'],
                     tileSize: 256,
                     minzoom: 0,
-                    maxzoom: MAX_ZOOM,
-                    attribution: '© Яндекс'
+                    maxzoom: MAX_ZOOM
                 }
             },
             layers: [

@@ -182,8 +182,7 @@ const MAP_STYLES = {
     // Меркаторе (EPSG:3395), а MapLibre рисует Web Mercator (EPSG:3857).
     // Схему 'yandexsat://' перехватывает кастомный протокол ниже: он сам берёт
     // нужный тайл Яндекса и сдвигает его по широте, компенсируя разницу проекций.
-    tiles: ['yandexsat://sat/{z}/{x}/{y}'],
-    attribution: '© <a href="https://yandex.ru/maps">Яндекс</a>'
+    tiles: ['yandexsat://sat/{z}/{x}/{y}']
   }
 };
 
@@ -823,7 +822,7 @@ function maptilerStyleUrl(type) {
         return {
             version: 8,
             sources: {
-                [srcId]: { type: 'raster', tiles: st.tiles, tileSize: 256, attribution: st.attribution }
+                [srcId]: { type: 'raster', tiles: st.tiles, tileSize: 256 }
             },
             layers: [{ id: srcId, type: 'raster', source: srcId }]
         };
@@ -1918,7 +1917,7 @@ if (typeof maplibregl === 'undefined' || typeof MAPTILER_KEY === 'undefined' || 
         zoom: 17,
         minZoom: 3,
         maxZoom: 20,
-        attributionControl: { compact: true },
+        attributionControl: false,
         dragRotate: true,
         pitchWithRotate: true,
         touchPitch: true
