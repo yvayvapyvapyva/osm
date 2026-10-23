@@ -3,7 +3,8 @@ const MenuModule = {
     callback: null,
     isLoaded: false,
     currentRoute: null,
-    routesDescriptions: {}, // { "m": { name, description, m } }
+    routesDescriptions: {}, // { "m": { name, description, m, data } }
+    _routesLoaded: false,   // список с геометрией уже получен
     _isFetchingRoutes: false,
     _categoryTree: null,
     _expandedFolders: new Set(),
@@ -107,12 +108,16 @@ const MenuModule = {
 
         const container = document.getElementById('routesListContainer');
 
-        const showSpinner = () => {
+        // Показываем индикацию сразу: полный список с геометрией — ~80 КБ,
+        // на медленной сети это заметно.
+        this._showListLoading();
+
+        const showLoadError = () => {
             if (container) {
                 container.innerHTML = `
                     <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:30px;gap:12px;">
                         <div class="spinner-ring" style="width:28px;height:28px;border-width:3px;"></div>
-                        <div style="color:rgba(255,255,255,0.5);font-size:14px;">Загрузка списка маршрутов...</div>
+                        <div style="color:rgba(255,255,255,0.5);font-size:14px;">Не удалось загрузить. Повторяем...</div>
                     </div>
                 `;
             }
@@ -121,12 +126,13 @@ const MenuModule = {
         const attempt = async () => {
             try {
                 await this._fetchFromAPI();
+                this._routesLoaded = true;
                 this._expandCurrentRoutePath();
                 this._buildRoutesList();
                 return true;
             } catch (e) {
                 console.warn('Не удалось загрузить список маршрутов:', e);
-                showSpinner();
+                showLoadError();
                 return false;
             }
         };
@@ -219,9 +225,31 @@ const MenuModule = {
         }
     },
 
+    // Индикация загрузки списка маршрутов
+    _showListLoading() {
+        const container = document.getElementById('routesListContainer');
+        if (!container) return;
+        container.innerHTML = `
+            <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:30px;gap:12px;">
+                <div class="spinner-ring" style="width:28px;height:28px;border-width:3px;"></div>
+                <div style="color:rgba(255,255,255,0.5);font-size:14px;">Загрузка маршрутов...</div>
+            </div>
+        `;
+    },
+
     _buildRoutesList() {
         const container = document.getElementById('routesListContainer');
-        if (!container || !this.routesDescriptions) return;
+        if (!container) return;
+
+        // Список ещё не получен — показываем спиннер, а не «Нет маршрутов».
+        if (!this._routesLoaded) {
+            if (this._isFetchingRoutes) {
+                this._showListLoading();
+            } else {
+                this._loadRoutesList();
+            }
+            return;
+        }
 
         const tree = this._categoryTree;
         const hasRoutes = tree && (Object.keys(tree.folders).length > 0 || tree.routes.length > 0);
@@ -640,11 +668,7 @@ const MenuModule = {
         this._hideRouteDescription();
         this._expandedFolders = new Set();
         this._expandCurrentRoutePath();
-        if (!this.routesDescriptions && !this._isFetchingRoutes) {
-            this._loadRoutesList();
-        } else {
-            this._buildRoutesList();
-        }
+        this._buildRoutesList();
     },
 
     showSpinner() {
