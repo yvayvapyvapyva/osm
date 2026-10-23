@@ -153,6 +153,7 @@
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js" defer onerror="window.__sortableFailed = true;"></script>
 <script src="assets/js/config.js?v=2"></script>
 <script src="assets/js/report.js?v=3"></script>
+<script src="assets/js/tts-client.js"></script>
 <script>
 (function (global) {
   const byId = (id) => document.getElementById(id);
@@ -211,7 +212,6 @@ const f6 = round6;
 // -------------------------
 
 const YC_FUNCTION_URL = 'https://functions.yandexcloud.net/d4e02ghbv31h6kpf8ddh';
-const TTS_API_URL = 'https://functions.yandexcloud.net/d4erngid6s4rf5oinnp1';
 const TG_BOT_LINK = 'https://t.me/E_ia_bot/navigator?startapp=m=';
 
 // ---------- MapTiler / MapLibre ----------
@@ -1609,21 +1609,10 @@ async function playText(text, voice_type = 'command', btn = null) {
     if (!text || !text.trim()) return;
     if (btn) btn.classList.add('loading');
     try {
-        const resp = await fetch(TTS_API_URL, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ batches: [{ voice_type, texts: [text] }] })
-        });
-        const data = await resp.json();
-        if (data.audios && data.audios[text]) {
-            const binaryStr = atob(data.audios[text]);
-            const bytes = new Uint8Array(binaryStr.length);
-            for (let i = 0; i < binaryStr.length; i++) bytes[i] = binaryStr.charCodeAt(i);
-            const blob = new Blob([bytes], { type: 'audio/mp3' });
-            const audio = new Audio();
-            audio.src = URL.createObjectURL(blob);
-            await audio.play().catch(() => {});
-        }
+        const url = await NavigatorTTS.getAudioUrl(text, voice_type);
+        if (!url) return;
+        const audio = new Audio(url);
+        await audio.play().catch(() => {});
     } catch (e) {
         console.warn('TTS error:', e);
     } finally {

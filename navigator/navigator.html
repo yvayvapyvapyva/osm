@@ -102,6 +102,7 @@
 <div id="toast"></div>
 
 <script src="assets/js/report.js?v=3"></script>
+<script src="assets/js/tts-client.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
 <script>
 // Грузим Telegram/VK SDK асинхронно с таймаутом 10с.
@@ -221,7 +222,9 @@ const COLORS = {
   Lime: { hex: '#34C759' }
 };
 
-const TTS_API_URL = 'https://functions.yandexcloud.net/d4erngid6s4rf5oinnp1';
+function ttsCacheKey(text, voiceType) {
+    return `${voiceType}\0${String(text || '').trim()}`;
+}
 
 const APP = {
     map: null, userMarker: null, lastPos: null, lastAz: 0, rawAz: 0, lastTilt: 0, autoCenter: false, currentSpeed: 0,
@@ -1377,7 +1380,7 @@ function updateHud() {
 
     $('hudCmdNum').innerHTML = `<svg width="44" height="44" viewBox="0 0 20 20"><circle cx="10" cy="10" r="9" fill="${t.hex}" opacity="0.3"/><circle cx="10" cy="10" r="9" fill="none" stroke="${t.hex}" stroke-width="1.5"/><text x="10" y="10.5" font-size="8" font-family="Arial" font-weight="900" text-anchor="middle" dominant-baseline="middle" fill="#fff">${escapeHtml(t.id)}</text></svg>`;
     $('hudCmdTextInner').textContent = t.cmd;
-    $('hudCmdTextInner').style.opacity = APP._audioCache.has(t.cmd) ? '1' : '0.35';
+    $('hudCmdTextInner').style.opacity = APP._audioCache.has(ttsCacheKey(t.cmd, 'command')) ? '1' : '0.35';
     $('hudCmdNum').onclick = (e) => {
         e.stopPropagation();
         const el = $('hudCmdNum');
@@ -1417,7 +1420,7 @@ function updateHud() {
     $('commentText').textContent = t.comm || '';
     const hasComm = t.comm && t.comm.trim() !== '';
     $('commentText').style.display = hasComm && APP._commentEnabled ? 'block' : 'none';
-    $('commentText').style.opacity = (t.comm && APP._audioCache.has(t.comm)) ? '1' : '0.35';
+    $('commentText').style.opacity = (t.comm && APP._audioCache.has(ttsCacheKey(t.comm, 'comment'))) ? '1' : '0.35';
 
     // Панель предыдущей команды — та же вёрстка над основной, полупрозрачная
     const prevHeader = $('hudPrevHeader');
@@ -1429,7 +1432,7 @@ function updateHud() {
             prevHeader.style.display = '';
             $('hudPrevCmdNum').innerHTML = `<svg width="44" height="44" viewBox="0 0 20 20"><circle cx="10" cy="10" r="9" fill="${prev.hex}" opacity="0.3"/><circle cx="10" cy="10" r="9" fill="none" stroke="${prev.hex}" stroke-width="1.5"/><text x="10" y="10.5" font-size="8" font-family="Arial" font-weight="900" text-anchor="middle" dominant-baseline="middle" fill="#fff">${escapeHtml(prev.id)}</text></svg>`;
             $('hudPrevCmdTextInner').textContent = prev.cmd;
-            $('hudPrevCmdTextInner').style.opacity = APP._audioCache.has(prev.cmd) ? '1' : '0.35';
+            $('hudPrevCmdTextInner').style.opacity = APP._audioCache.has(ttsCacheKey(prev.cmd, 'command')) ? '1' : '0.35';
             $('hudPrevCmdNum').onclick = (e) => {
                 e.stopPropagation();
                 const el = $('hudPrevCmdNum');
@@ -1442,7 +1445,7 @@ function updateHud() {
             $('prevCommentText').textContent = prev.comm || '';
             const hasPrevComm = prev.comm && prev.comm.trim() !== '';
             $('prevCommentText').style.display = hasPrevComm && APP._commentEnabled ? 'block' : 'none';
-            $('prevCommentText').style.opacity = (prev.comm && APP._audioCache.has(prev.comm)) ? '1' : '0.35';
+            $('prevCommentText').style.opacity = (prev.comm && APP._audioCache.has(ttsCacheKey(prev.comm, 'comment'))) ? '1' : '0.35';
         }
     }
 }
@@ -1587,33 +1590,15 @@ async function playTTS(text, voice_type = 'command') {
     APP._audioPending++;
     try {
         APP.navAudio.pause();
-        const cached = APP._audioCache.get(text);
-        if (cached) {
-            APP.navAudio.src = cached;
-            await APP.navAudio.play().catch(() => {});
-            return;
-        }
-        try {
-            const resp = await fetch(TTS_API_URL, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ batches: [{ voice_type, texts: [text] }] })
-            });
-            const data = await resp.json();
-            if (data.audios && data.audios[text]) {
-                const binaryStr = atob(data.audios[text]);
-                const bytes = new Uint8Array(binaryStr.length);
-                for (let i = 0; i < binaryStr.length; i++) bytes[i] = binaryStr.charCodeAt(i);
-                const blob = new Blob([bytes], { type: 'audio/mp3' });
-                const url = URL.createObjectURL(blob);
-                APP._audioCache.set(text, url);
-                updateHud();
-                APP.navAudio.src = url;
-                await APP.navAudio.play().catch(() => {});
-            }
-        } catch (e) {
-            console.warn('TTS error:', e);
-        }
+        const key = ttsCacheKey(text, voice_type);
+        const url = APP._audioCache.get(key) || await NavigatorTTS.getAudioUrl(text, voice_type);
+        if (!url) return;
+        APP._audioCache.set(key, url);
+        updateHud();
+        APP.navAudio.src = url;
+        await APP.navAudio.play().catch(() => {});
+    } catch (e) {
+        console.warn('TTS error:', e);
     } finally {
         APP._audioPending--;
     }
@@ -1770,29 +1755,21 @@ async function precacheRouteAudio(data) {
     const commTexts = [...new Set(data.map(d => d.comm).filter(t => t && t.trim()))];
     cmdTexts.push(APP.navConfig.SHOCK_PHRASE || 'Сильный удар');
     cmdTexts.push(APP.navConfig.SPEED_ALERT_PHRASE || 'Превышена максимальная скорость');
-    const uncachedCmd = cmdTexts.filter(t => !APP._audioCache.has(t));
-    const uncachedComm = commTexts.filter(t => !APP._audioCache.has(t));
+    const uncachedCmd = cmdTexts.filter(t => !APP._audioCache.has(ttsCacheKey(t, 'command')));
+    const uncachedComm = commTexts.filter(t => !APP._audioCache.has(ttsCacheKey(t, 'comment')));
     if (uncachedCmd.length + uncachedComm.length === 0) return;
     try {
-        const resp = await fetch(TTS_API_URL, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                batches: [
-                    { voice_type: 'command', texts: uncachedCmd },
-                    { voice_type: 'comment', texts: uncachedComm },
-                ]
-            })
-        });
-        const result = await resp.json();
-        if (result.audios) {
-            for (const [text, b64] of Object.entries(result.audios)) {
-                const binaryStr = atob(b64);
-                const bytes = new Uint8Array(binaryStr.length);
-                for (let i = 0; i < binaryStr.length; i++) bytes[i] = binaryStr.charCodeAt(i);
-                const blob = new Blob([bytes], { type: 'audio/mp3' });
-                APP._audioCache.set(text, URL.createObjectURL(blob));
-            }
+        await NavigatorTTS.preload([
+            { voice_type: 'command', texts: uncachedCmd },
+            { voice_type: 'comment', texts: uncachedComm },
+        ]);
+        for (const text of uncachedCmd) {
+            const url = await NavigatorTTS.getAudioUrl(text, 'command');
+            if (url) APP._audioCache.set(ttsCacheKey(text, 'command'), url);
+        }
+        for (const text of uncachedComm) {
+            const url = await NavigatorTTS.getAudioUrl(text, 'comment');
+            if (url) APP._audioCache.set(ttsCacheKey(text, 'comment'), url);
         }
     } catch (e) {
         console.warn('Precache error:', e);

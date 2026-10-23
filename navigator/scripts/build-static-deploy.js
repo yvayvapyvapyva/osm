@@ -7,12 +7,12 @@ const output = path.join(root, 'deploy-2files');
 const pageBundles = {
     'navigator.html': {
         stylesheet: 'assets/css/navigator.css',
-        scripts: ['assets/js/report.js', 'assets/js/menu-module.js'],
+        scripts: ['assets/js/report.js', 'assets/js/tts-client.js', 'assets/js/menu-module.js'],
         instruction: 'instr.html',
     },
     'editor.html': {
         stylesheet: 'assets/css/editor.css',
-        scripts: ['assets/js/config.js', 'assets/js/report.js'],
+        scripts: ['assets/js/config.js', 'assets/js/report.js', 'assets/js/tts-client.js'],
         instruction: 'instr_editor.html',
     },
 };

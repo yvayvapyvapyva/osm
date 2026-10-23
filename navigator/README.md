@@ -17,7 +17,9 @@
 | HTTP-эндпоинт | — | https://functions.yandexcloud.net/d4e02ghbv31h6kpf8ddh |
 | Редактор (прямая ссылка) | — | `navigator/editor.html` на том же домене, где лежит навигатор |
 | База-источник (не используется клиентом) | `dbnav` | `etn3ppn9gdj01le0ep1v` |
-| TTS (общая для версий) | `tts` | `d4erngid6s4rf5oinnp1` |
+| Cloud Function TTS | `navigator-tts-cache` | `d4e3cj3q3ff36qlrhbg8` |
+| HTTP TTS endpoint | — | https://functions.yandexcloud.net/d4e3cj3q3ff36qlrhbg8 |
+| TTS bucket | `eia-tts` | `e3e25m6j2oqle9jrpjge`; публичное чтение MP3, запись только от service account функции |
 
 База и функция не пересекаются с `dbnav`/`vknav`: изменения в OSM-версии не влияют
 на остальные приложения, и наоборот.
@@ -60,12 +62,17 @@ osm/
 │   ├── instr_editor.html   # инструкция редактора
 │   ├── assets/             # стили и клиентские модули
 │   │   ├── css/editor.css
-│   │   └── js/config.js    # константы редактора (цвета, ключ карт)
+│   │   ├── js/config.js    # константы редактора (цвета, ключ карт)
+│   │   └── js/tts-client.js # общая загрузка TTS из бакета и синтез при промахе
 │   ├── backend/
 │   │   ├── handler.py      # код функции osmn
 │   │   └── requirements.txt
 │   ├── scripts/init_db.py  # создание схемы и перенос маршрутов
 │   └── deploy.sh           # деплой новой версии функции
+├── tts/navigator/
+│   ├── handler.py          # отдельная bucket-backed TTS-функция
+│   ├── requirements.txt
+│   └── deploy.sh
 └── pad/                    # отдельное приложение PAD
 ```
 
@@ -83,6 +90,15 @@ node navigator/scripts/build-static-deploy.js
 MapLibre и Sortable.js, а также на картографические и API-сервисы.
 Backend в сборку не входит: он деплоится отдельно через `navigator/deploy.sh`.
 После изменения исходников пересоберите папку перед публикацией.
+
+Навигатор и редактор сначала проверяют адрес MP3 напрямую в бакете `eia-tts`.
+Функция `navigator-tts-cache` вызывается только при отсутствии файла; она
+генерирует речь и сохраняет MP3 в бакет. Эта функция и бакет не используют
+старый TTS endpoint или YDB-кэш.
+
+Новая функция публично вызываема для клиентского приложения; один запрос
+ограничен 100 фразами длиной до 1000 символов. Для деплоя её исходников выполните
+из корня репозитория `sh tts/navigator/deploy.sh`.
 
 ## API функции
 
