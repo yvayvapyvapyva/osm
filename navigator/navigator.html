@@ -1406,16 +1406,9 @@ function updatePointsListActive() {
 function fitMapToCurrentTarget() {
     const p = APP.navPoints[APP.navCurrentIndex];
     if (!p || !p.pts || p.pts.length < 1 || !APP.map) return;
-    let minLat = Infinity, maxLat = -Infinity, minLon = Infinity, maxLon = -Infinity;
-    for (const pt of p.pts) {
-        const lat = pt[0], lon = pt[1];
-        if (lat < minLat) minLat = lat;
-        if (lat > maxLat) maxLat = lat;
-        if (lon < minLon) minLon = lon;
-        if (lon > maxLon) maxLon = lon;
-    }
-    if (minLat === Infinity) return;
-    APP.map.fitBounds([[minLon, minLat], [maxLon, maxLat]], { padding: 40, maxZoom: 19, duration: 400 });
+    const [latitude, longitude] = p.pts[0];
+    if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return;
+    setMapLocation([latitude, longitude], undefined, undefined, 400);
 }
 
 
