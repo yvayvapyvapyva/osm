@@ -8,6 +8,10 @@ const MenuModule = {
     _isFetchingRoutes: false,
     _categoryTree: null,
     _expandedFolders: new Set(),
+    _previewObserver: null,
+    _previewMaps: new Set(),
+    _previewImages: new Map(),
+    _previewJobs: new Map(),
 
     // URL Яндекс-функции OSM-версии (отдельная БД dbosm)
     API_URL_V2: 'https://functions.yandexcloud.net/d4e02ghbv31h6kpf8ddh',
@@ -229,6 +233,7 @@ const MenuModule = {
     _showListLoading() {
         const container = document.getElementById('routesListContainer');
         if (!container) return;
+        this._destroyRoutePreviews();
         container.innerHTML = `
             <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:30px;gap:12px;">
                 <div class="spinner-ring" style="width:28px;height:28px;border-width:3px;"></div>
@@ -240,6 +245,7 @@ const MenuModule = {
     _buildRoutesList() {
         const container = document.getElementById('routesListContainer');
         if (!container) return;
+        this._destroyRoutePreviews();
 
         // Список ещё не получен — показываем спиннер, а не «Нет маршрутов».
         if (!this._routesLoaded) {
@@ -263,6 +269,218 @@ const MenuModule = {
 
         container.innerHTML = '';
         container.appendChild(frag);
+        this._observeRoutePreviews(container);
+    },
+
+    _destroyRoutePreviews() {
+        if (this._previewObserver) {
+            this._previewObserver.disconnect();
+            this._previewObserver = null;
+        }
+    },
+
+    _observeRoutePreviews(container) {
+        const previews = container.querySelectorAll('.route-preview-map');
+        if (!previews.length || typeof maplibregl === 'undefined') return;
+
+        const styleKey = window.getNavigatorMapStyleKey();
+        const showPreviewImage = (element, key, imageUrl) => {
+            if (!element.isConnected || element.dataset.previewKey !== key) return;
+            const image = document.createElement('img');
+            image.className = 'route-preview-image';
+            image.alt = '';
+            image.src = imageUrl;
+            element.replaceChildren(image);
+        };
+
+        previews.forEach(element => {
+            const key = `${styleKey}\0${element.dataset.routeKey}`;
+            element.dataset.previewKey = key;
+            const image = this._previewImages.get(key);
+            if (image) showPreviewImage(element, key, image);
+        });
+
+        const createPreview = element => {
+            if (!element.isConnected) return;
+            const key = element.dataset.previewKey;
+            const cachedImage = this._previewImages.get(key);
+            if (cachedImage) {
+                showPreviewImage(element, key, cachedImage);
+                return;
+            }
+            if (this._previewJobs.has(key)) return;
+
+            const routeData = this.routesDescriptions[element.dataset.routeKey]?.data;
+            if (!Array.isArray(routeData)) return;
+            const host = document.createElement('div');
+            const previewWidth = Math.max(1, element.clientWidth);
+            const previewHeight = Math.max(1, element.clientHeight);
+            host.style.cssText = `position:fixed;left:-10000px;top:0;width:${previewWidth}px;height:${previewHeight}px;visibility:hidden;pointer-events:none;`;
+            document.body.appendChild(host);
+            element.textContent = 'Подготавливаем кадр карты…';
+            const map = new maplibregl.Map({
+                container: host,
+                style: window.getNavigatorMapStyle(),
+                center: [0, 0],
+                zoom: 2,
+                attributionControl: false,
+                interactive: false,
+                fadeDuration: 0,
+                preserveDrawingBuffer: true
+            });
+            element._routePreviewMap = map;
+            this._previewMaps.add(map);
+
+            let pointFeatures = [];
+            let captureTimer = null;
+            let captured = false;
+            const finishPreview = async () => {
+                if (captured) return;
+                captured = true;
+                if (captureTimer) clearTimeout(captureTimer);
+                try {
+                    const pointIcons = await Promise.all(pointFeatures.map(feature => new Promise((resolve, reject) => {
+                        const icon = new Image();
+                        icon.onload = () => resolve(icon);
+                        icon.onerror = () => reject(new Error('Could not load route point icon'));
+                        icon.src = window.getNavigatorPointIcon(
+                            feature.properties.color,
+                            feature.properties.number,
+                            feature.properties.current,
+                            feature.properties.hasComment
+                        );
+                    })));
+                    const mapCanvas = map.getCanvas();
+                    const composite = document.createElement('canvas');
+                    composite.width = mapCanvas.width;
+                    composite.height = mapCanvas.height;
+                    const context = composite.getContext('2d');
+                    if (!context) throw new Error('Could not create preview snapshot canvas');
+                    context.drawImage(mapCanvas, 0, 0);
+
+                    const pixelRatio = mapCanvas.width / map.getContainer().clientWidth || 1;
+                    context.scale(pixelRatio, pixelRatio);
+                    for (let index = pointFeatures.length - 1; index >= 0; index--) {
+                        const feature = pointFeatures[index];
+                        const point = map.project(feature.geometry.coordinates);
+                        context.drawImage(pointIcons[index], point.x - 20, point.y - 20, 40, 40);
+                    }
+
+                    const imageUrl = composite.toDataURL('image/jpeg', 0.88);
+                    this._previewImages.set(key, imageUrl);
+                    container.querySelectorAll('.route-preview-map').forEach(candidate => {
+                        showPreviewImage(candidate, key, imageUrl);
+                    });
+                } catch (error) {
+                    console.warn('Не удалось сохранить кадр маршрута:', error);
+                } finally {
+                    this._previewJobs.delete(key);
+                    this._previewMaps.delete(map);
+                    map.remove();
+                    host.remove();
+                }
+            };
+            this._previewJobs.set(key, map);
+            captureTimer = setTimeout(finishPreview, 15000);
+
+            map.once('load', () => {
+                const lineFeatures = [];
+                pointFeatures = [];
+                const bounds = new maplibregl.LngLatBounds();
+                let pointNumber = 0;
+                for (const segment of routeData) {
+                    if (!segment || !Array.isArray(segment.pts)) continue;
+                    const coordinates = segment.pts
+                        .filter(point =>
+                            Array.isArray(point) &&
+                            Number.isFinite(point[0]) &&
+                            Number.isFinite(point[1]) &&
+                            Math.abs(point[0]) <= 90 &&
+                            Math.abs(point[1]) <= 180
+                        )
+                        .map(point => [point[1], point[0]]);
+                    if (!coordinates.length) continue;
+
+                    coordinates.forEach(coordinate => bounds.extend(coordinate));
+                    const color = this._ROUTE_COLORS[segment.color] || '#FFD700';
+                    if (coordinates.length > 1) {
+                        lineFeatures.push({
+                            type: 'Feature',
+                            properties: { color: color },
+                            geometry: { type: 'LineString', coordinates: coordinates }
+                        });
+                    }
+
+                    pointNumber++;
+                    pointFeatures.push({
+                        type: 'Feature',
+                        properties: {
+                            number: String(segment.id || pointNumber),
+                            color: color,
+                            current: pointNumber === 1,
+                            hasComment: typeof segment.comm === 'string' && segment.comm.trim() !== ''
+                        },
+                        geometry: { type: 'Point', coordinates: coordinates[0] }
+                    });
+                }
+
+                if (lineFeatures.length) {
+                    map.addSource('route-preview-lines', {
+                        type: 'geojson',
+                        data: { type: 'FeatureCollection', features: lineFeatures }
+                    });
+                    map.addLayer({
+                        id: 'route-preview-casing',
+                        type: 'line',
+                        source: 'route-preview-lines',
+                        layout: { 'line-join': 'round', 'line-cap': 'round' },
+                        paint: {
+                            'line-color': '#101820',
+                            'line-width': 7,
+                            'line-opacity': 0.85
+                        }
+                    });
+                    map.addLayer({
+                        id: 'route-preview-route',
+                        type: 'line',
+                        source: 'route-preview-lines',
+                        layout: { 'line-join': 'round', 'line-cap': 'round' },
+                        paint: {
+                            'line-color': ['get', 'color'],
+                            'line-width': 4
+                        }
+                    });
+                }
+
+                if (!bounds.isEmpty()) {
+                    map.fitBounds(bounds, {
+                        padding: { top: 28, right: 28, bottom: 28, left: 28 },
+                        maxZoom: 15,
+                        duration: 0
+                    });
+                }
+                map.once('idle', finishPreview);
+            });
+        };
+
+        if (typeof IntersectionObserver === 'undefined') {
+            Array.from(previews).slice(0, 2).forEach(createPreview);
+            return;
+        }
+
+        this._previewObserver = new IntersectionObserver(entries => {
+            for (const entry of entries) {
+                const element = entry.target;
+                if (entry.isIntersecting) {
+                    this._previewObserver.unobserve(element);
+                    createPreview(element);
+                }
+            }
+        }, {
+            root: container,
+            rootMargin: '240px 0px'
+        });
+        previews.forEach(element => this._previewObserver.observe(element));
     },
 
     // Цвета сегментов маршрута (те же, что в навигаторе и редакторе)
@@ -270,97 +488,6 @@ const MenuModule = {
         Gold: '#FFD700', Blue: '#007AFF', Red: '#FF3B30', Fuchsia: '#AF52DE',
         Orange: '#FF9500', Purple: '#5856D6', Cyan: '#5AC8FA', Brown: '#A2845E',
         Lime: '#34C759'
-    },
-
-    /**
-     * SVG-превью маршрута: полилиния по сегментам с сохранением их цветов,
-     * обводка для контраста, точки старта/финиша.
-     * Геометрия берётся из уже загруженного списка — без сетевых запросов.
-     * Возвращает строку '' если данных нет.
-     */
-    _routePreviewSVG(routeData, size) {
-        const S = size || 54;
-        if (!Array.isArray(routeData) || routeData.length === 0) return '';
-
-        const segs = [];
-        for (const seg of routeData) {
-            if (!seg || !Array.isArray(seg.pts)) continue;
-            const pts = seg.pts.filter(p =>
-                Array.isArray(p) && p.length >= 2 &&
-                isFinite(p[0]) && isFinite(p[1])
-            );
-            if (pts.length) {
-                segs.push({ color: this._ROUTE_COLORS[seg.color] || '#FFD700', pts: pts });
-            }
-        }
-        if (!segs.length) return '';
-
-        // На миниатюре 54px сотни точек не нужны — режем шагом, сохраняя концы.
-        const total = segs.reduce((n, s) => n + s.pts.length, 0);
-        const MAX_PTS = 300;
-        if (total > MAX_PTS) {
-            const keep = Math.max(2, Math.ceil(MAX_PTS / segs.length));
-            for (const s of segs) {
-                if (s.pts.length <= keep) continue;
-                const stride = Math.ceil((s.pts.length - 1) / (keep - 1));
-                const out = [];
-                for (let i = 0; i < s.pts.length - 1; i += stride) out.push(s.pts[i]);
-                out.push(s.pts[s.pts.length - 1]);
-                s.pts = out;
-            }
-        }
-
-        // bbox по всем точкам
-        let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
-        for (const s of segs) {
-            for (const p of s.pts) {
-                if (p[1] < minX) minX = p[1];
-                if (p[1] > maxX) maxX = p[1];
-                if (p[0] < minY) minY = p[0];
-                if (p[0] > maxY) maxY = p[0];
-            }
-        }
-
-        // Эквидистантная проекция с поправкой на широту, чтобы форма
-        // маршрута не растягивалась по вертикали.
-        const pad = S * 0.12;
-        const kx = Math.cos(((minY + maxY) / 2) * Math.PI / 180) || 1e-6;
-        const gx = (maxX - minX) * kx;
-        const gy = (maxY - minY);
-        const span = Math.max(gx, gy) || 1e-6;
-        const scale = (S - 2 * pad) / span;
-        const offX = (S - gx * scale) / 2;
-        const offY = (S - gy * scale) / 2;
-        const px = (p) => [
-            offX + (p[1] - minX) * kx * scale,
-            S - offY - (p[0] - minY) * scale
-        ];
-
-        const dOf = (s) => 'M' + s.pts.map(p => {
-            const xy = px(p);
-            return xy[0].toFixed(1) + ',' + xy[1].toFixed(1);
-        }).join('L');
-
-        const all = segs.map(dOf).join(' ');
-        const sw = Math.max(2, S * 0.05);
-
-        let inner = `<rect width="${S}" height="${S}" fill="#fff"/>`;
-        // Тёмная подложка под цветными линиями — контраст на любом фоне.
-        inner += `<path d="${all}" stroke="#1b2430" stroke-width="${(sw + 2.5).toFixed(1)}" fill="none" stroke-linecap="round" stroke-linejoin="round" opacity="0.9"/>`;
-        for (const s of segs) {
-            inner += `<path d="${dOf(s)}" stroke="${s.color}" stroke-width="${sw.toFixed(1)}" fill="none" stroke-linecap="round" stroke-linejoin="round"/>`;
-        }
-
-        // Старт / финиш
-        const start = px(segs[0].pts[0]);
-        const lastSeg = segs[segs.length - 1];
-        const end = px(lastSeg.pts[lastSeg.pts.length - 1]);
-        const r = Math.max(3, S * 0.065);
-        const dot = (xy, fill) =>
-            `<circle cx="${xy[0].toFixed(1)}" cy="${xy[1].toFixed(1)}" r="${r.toFixed(1)}" fill="${fill}" stroke="#fff" stroke-width="${(r * 0.45).toFixed(1)}"/>`;
-        inner += dot(start, '#34C759') + dot(end, '#FF3B30');
-
-        return `<svg width="${S}" height="${S}" viewBox="0 0 ${S} ${S}" xmlns="http://www.w3.org/2000/svg">${inner}</svg>`;
     },
 
     _renderTreeNode(node, container, path, isRoot = !path) {
@@ -440,13 +567,11 @@ const MenuModule = {
             btn.className = 'route-item' + (isActive ? ' active' : '');
             if (isActive) btn.style.cssText = 'background:rgba(48,209,88,0.2);border-color:rgba(48,209,88,0.4);';
 
-            const svg = this._routePreviewSVG(route.data, 54);
-            if (svg) {
-                const thumb = document.createElement('span');
-                thumb.className = 'route-thumb';
-                thumb.innerHTML = svg;
-                btn.appendChild(thumb);
-            }
+            const preview = document.createElement('div');
+            preview.className = 'route-preview-map';
+            preview.dataset.routeKey = routeKey;
+            preview.setAttribute('aria-hidden', 'true');
+            btn.appendChild(preview);
 
             const nameSpan = document.createElement('span');
             nameSpan.className = 'route-name';
@@ -753,6 +878,7 @@ const MenuModule = {
 
     // Скрыть модальное окно
     hide() {
+        this._destroyRoutePreviews();
         const modal = document.getElementById('jsonModal');
         if (modal) {
             const sheet = document.getElementById('jsonModalSheet');
