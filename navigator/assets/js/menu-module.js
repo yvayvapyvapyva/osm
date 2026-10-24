@@ -600,7 +600,6 @@ const MenuModule = {
 
         for (const route of node.routes) {
             const routeKey = route.key;
-            const hasDesc = route.description && route.description.trim() !== '';
             const isActive = routeKey === this.currentRoute;
             const btn = document.createElement('button');
             btn.className = 'route-item' + (isActive ? ' active' : '');
@@ -626,17 +625,6 @@ const MenuModule = {
             }
             btn.appendChild(details);
 
-            if (hasDesc) {
-                const infoBtn = document.createElement('span');
-                infoBtn.className = 'route-info-btn';
-                infoBtn.textContent = '?';
-                infoBtn.addEventListener('click', e => {
-                    e.stopPropagation();
-                    this._showRouteDescription(routeKey);
-                });
-                btn.appendChild(infoBtn);
-            }
-
             btn.addEventListener('click', e => {
                 e.stopPropagation();
                 if (route.m) this.loadRouteByName(route.m);
@@ -653,62 +641,6 @@ const MenuModule = {
             .replace(/>/g, '&gt;')
             .replace(/"/g, '&quot;')
             .replace(/'/g, '&#39;');
-    },
-
-    /**
-     * Показать описание маршрута
-     */
-    _showRouteDescription(routeKey) {
-        const routeData = this.routesDescriptions[routeKey];
-        if (!routeData || !routeData.description) return;
-
-        // Создаём модальное окно если его нет
-        let descModal = document.getElementById('routeDescModal');
-        if (!descModal) {
-            descModal = document.createElement('div');
-            descModal.id = 'routeDescModal';
-            descModal.innerHTML = `
-                <div class="desc-modal-overlay" id="routeDescOverlay">
-                    <div class="desc-modal-content">
-                        <div class="desc-modal-header">
-                            <span id="routeDescTitle"></span>
-                            <button id="routeDescCloseBtn" class="desc-close-btn">×</button>
-                        </div>
-                        <div class="desc-modal-body" id="routeDescText"></div>
-                    </div>
-                </div>
-            `;
-            document.body.appendChild(descModal);
-
-            // Закрытие по клику на overlay
-            document.getElementById('routeDescOverlay').addEventListener('click', (e) => {
-                if (e.target === e.currentTarget) {
-                    this._hideRouteDescription();
-                }
-            });
-
-            // Закрытие по кнопке
-            document.getElementById('routeDescCloseBtn').addEventListener('click', () => {
-                this._hideRouteDescription();
-            });
-        }
-
-        const routeData2 = this.routesDescriptions[routeKey];
-        document.getElementById('routeDescTitle').textContent = (routeData2.name || routeKey).trim();
-        document.getElementById('routeDescText').textContent = routeData2.description;
-        descModal.style.display = 'block';
-        requestAnimationFrame(() => descModal.classList.add('visible'));
-    },
-
-    /**
-     * Скрыть описание маршрута
-     */
-    _hideRouteDescription() {
-        const descModal = document.getElementById('routeDescModal');
-        if (descModal) {
-            descModal.classList.remove('visible');
-            setTimeout(() => descModal.style.display = 'none', 300);
-        }
     },
 
     // Создание модального окна
@@ -776,25 +708,12 @@ const MenuModule = {
             window.addEventListener('pointercancel', onEnd);
         })();
 
-        // Закрытие при клике на любую кнопку приложения (кроме кнопки меню и модалки описания)
+        // Закрытие меню при клике вне панели.
         document.addEventListener('click', (e) => {
-            const descModal = document.getElementById('routeDescModal');
-            if (descModal && descModal.style.display === 'block') {
-                const descOverlay = document.getElementById('routeDescOverlay');
-                if (descOverlay && descOverlay.contains(e.target)) {
-                    this._hideRouteDescription();
-                    return;
-                }
-            }
-
             const modal = document.getElementById('jsonModal');
             if (modal && !modal.classList.contains('hidden')) {
                 const sheet = modal.querySelector('.modal-sheet');
                 const menuBtn = document.getElementById('menuBtn');
-                const descModalEl = document.getElementById('routeDescModal');
-                if (descModalEl && descModalEl.contains(e.target)) {
-                    return; // Не закрываем меню если клик внутри модалки описания
-                }
                 if (sheet && !sheet.contains(e.target) && e.target !== menuBtn && !menuBtn.contains(e.target)) {
                     this.hide();
                 }
@@ -933,7 +852,6 @@ const MenuModule = {
             if (sheet) { sheet.style.transform = ''; sheet.style.transition = ''; }
             modal.classList.add('hidden');
         }
-        this._hideRouteDescription();
         if (this._retryTimer) {
             clearTimeout(this._retryTimer);
             this._retryTimer = null;
@@ -945,7 +863,6 @@ const MenuModule = {
         if (typeof closeAllSheets === 'function') closeAllSheets();
         const modal = document.getElementById('jsonModal');
         if (modal) modal.classList.remove('hidden');
-        this._hideRouteDescription();
         this._expandedFolders = new Set();
         this._expandCurrentRoutePath();
         this._buildRoutesList();
