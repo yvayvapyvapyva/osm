@@ -1523,12 +1523,10 @@ async function loadRouteFromJSON(data) {
 }
 
 async function processRouteData(data) {
-    startWakeLock();
-    APP._simFirstRun = true;
     if (!data || !Array.isArray(data)) throw new Error('Неверный формат данных: ожидается массив');
     if (data.length === 0) throw new Error('Маршрут пуст');
 
-    APP.navPoints = data.map((d, i) => {
+    const navPoints = data.map((d, i) => {
         const pts = d.pts || [];
         if (!pts || pts.length === 0) return null;
         return {
@@ -1540,7 +1538,12 @@ async function processRouteData(data) {
         };
     }).filter(p => p !== null);
 
-    if (APP.navPoints.length === 0) throw new Error('Нет валидных точек в маршруте');
+    if (navPoints.length === 0) throw new Error('Нет валидных точек в маршруте');
+
+    APP.navPoints = navPoints;
+
+    startWakeLock();
+    APP._simFirstRun = true;
 
     let totalDist = 0;
     for (const p of APP.navPoints) {
@@ -1580,36 +1583,34 @@ async function processRouteData(data) {
             }
         }, 100);
     }
-    await precacheRouteAudio(data);
     updateRouteNameDisplay();
+    precacheRouteAudio(data).catch(e => console.warn('Background audio caching failed:', e));
 }
 
 async function precacheRouteAudio(data) {
-    const cmdTexts = [...new Set(data.map(d => d.cmd).filter(t => t && t.trim()))];
+    const cmdTexts = [...new Set(data.map((d, i) => d.cmd || d.comm || `Т${i + 1}`).filter(t => t && t.trim()))];
     const commTexts = [...new Set(data.map(d => d.comm).filter(t => t && t.trim()))];
     const shockPhrase = APP.navConfig.SHOCK_PHRASE || 'Сильный удар';
     const speedPhrase = APP.navConfig.SPEED_ALERT_PHRASE || 'Превышена максимальная скорость';
     cmdTexts.push(shockPhrase, speedPhrase);
-    const uncachedCmd = cmdTexts.filter(t => !APP._audioCache.has(ttsCacheKey(t, 'command')));
-    const uncachedComm = commTexts.filter(t => !APP._audioCache.has(ttsCacheKey(t, 'comment')));
-    if (uncachedCmd.length + uncachedComm.length === 0) return;
     try {
         await NavigatorTTS.preload([
-            { voice_type: 'command', texts: uncachedCmd },
-            { voice_type: 'comment', texts: uncachedComm },
+            { voice_type: 'command', texts: cmdTexts },
+            { voice_type: 'comment', texts: commTexts },
         ]);
-        for (const text of uncachedCmd) {
+        for (const text of cmdTexts) {
             const url = await NavigatorTTS.getAudioUrl(text, 'command');
             if (url) APP._audioCache.set(ttsCacheKey(text, 'command'), url);
         }
-        for (const text of uncachedComm) {
+        for (const text of commTexts) {
             const url = await NavigatorTTS.getAudioUrl(text, 'comment');
             if (url) APP._audioCache.set(ttsCacheKey(text, 'comment'), url);
         }
+        updateHud();
     } catch (e) {
-        console.warn('Precache error:', e);
+        console.error('Precache error:', e);
+        throw new Error('Не удалось подготовить аудио маршрута: ' + e.message);
     }
-    updateHud();
 }
 
 let _wakeLock = null, wakeLockInterval = null, wakeCanvas = null, wakeCanvasStream = null;

@@ -11,6 +11,7 @@
     };
     const urls = new Map();
     const pending = new Map();
+    const downloaded = new Set();
 
     function cacheKey(text, voiceType) {
         return voiceType + '\0' + text.trim();
@@ -78,31 +79,52 @@
     async function preload(batches) {
         const missing = { command: new Set(), comment: new Set() };
         const checks = [];
+        const seen = new Set();
         batches.forEach(batch => {
             const type = VOICES[batch.voice_type] ? batch.voice_type : 'command';
             (batch.texts || []).forEach(value => {
                 const text = String(value || '').trim();
-                if (!text || urls.has(cacheKey(text, type))) return;
+                const key = cacheKey(text, type);
+                if (!text || seen.has(key)) return;
+                seen.add(key);
                 checks.push({ text: text, type: type });
             });
         });
 
-        await Promise.all(checks.map(async item => {
-            const key = cacheKey(item.text, item.type);
-            if (urls.has(key)) return;
-            if (pending.has(key)) {
-                await pending.get(key);
-                return;
-            }
-            const url = await objectUrl(item.text, item.type);
-            if (await existsInBucket(url)) urls.set(key, url);
-            else missing[item.type].add(item.text);
-        }));
+        for (let i = 0; i < checks.length; i += 3) {
+            await Promise.all(checks.slice(i, i + 3).map(async item => {
+                const key = cacheKey(item.text, item.type);
+                if (urls.has(key)) return;
+                if (pending.has(key)) await pending.get(key);
+                if (urls.has(key)) return;
+                const url = await objectUrl(item.text, item.type);
+                if (await existsInBucket(url)) urls.set(key, url);
+                else missing[item.type].add(item.text);
+            }));
+        }
 
         const missingBatches = Object.keys(missing)
             .filter(type => missing[type].size)
             .map(type => ({ voice_type: type, texts: Array.from(missing[type]) }));
         if (missingBatches.length) await synthesize(missingBatches);
+
+        const downloads = checks.map(item => {
+            const url = urls.get(cacheKey(item.text, item.type));
+            if (!url) throw new Error('TTS did not return an audio URL');
+            return url;
+        }).filter((url, index, all) => all.indexOf(url) === index && !downloaded.has(url));
+
+        for (let i = 0; i < downloads.length; i += 3) {
+            await Promise.all(downloads.slice(i, i + 3).map(async url => {
+                const response = await fetch(url, { mode: 'cors', cache: 'force-cache' });
+                if (!response.ok) {
+                    throw new Error('Не удалось загрузить аудио (HTTP ' + response.status + ')');
+                }
+                const audio = await response.arrayBuffer();
+                if (audio.byteLength === 0) throw new Error('Аудиофайл пуст');
+                downloaded.add(url);
+            }));
+        }
     }
 
     window.NavigatorTTS = {

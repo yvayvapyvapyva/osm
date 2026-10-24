@@ -802,8 +802,8 @@ const MenuModule = {
                 console.warn('[report] ошибка отправки отчёта навигатора:', re);
             }
 
+            await this.loadRoute(data);
             this.hideSpinner();
-            this.loadRoute(data);
         } catch (e) {
             this.hideSpinner();
             console.error('[MenuModule] Ошибка загрузки маршрута:', e);
@@ -814,7 +814,7 @@ const MenuModule = {
     },
 
     // Загрузка маршрута (публичный метод, передаёт JSON в навигатор)
-    loadRoute(jsonData) {
+    async loadRoute(jsonData) {
         // Очищаем предыдущий маршрут
         if (typeof clearRoute === 'function') {
             clearRoute();
@@ -837,7 +837,7 @@ const MenuModule = {
 
         // Передаём JSON данные в навигатор
         if (typeof this.callback === 'function') {
-            this.callback(routeData);
+            await this.callback(routeData);
         }
         this.isLoaded = true;
         this.hide();
