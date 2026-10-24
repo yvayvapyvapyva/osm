@@ -524,23 +524,33 @@ const MenuModule = {
 
             const header = document.createElement('div');
             header.className = 'category-header' + (isExpanded ? ' expanded' : '') + (isRoot ? ' root' : '');
+            header.setAttribute('role', 'button');
+            header.setAttribute('tabindex', '0');
+            header.setAttribute('aria-expanded', String(isExpanded));
             header.innerHTML = `
-                <span class="category-icon">${isExpanded ? '📂' : '📁'}</span>
+                <span class="category-chevron" aria-hidden="true"></span>
+                <svg class="category-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6.5A1.5 1.5 0 0 1 4.5 5H10l2 2h7.5A1.5 1.5 0 0 1 21 8.5v9a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 17.5z"/></svg>
                 <span class="category-name">${this._escape(name)}</span>
                 <span class="category-count">${total}</span>
             `;
-            header.addEventListener('click', e => {
+            const toggleFolder = e => {
                 e.stopPropagation();
                 if (this._expandedFolders.has(folderPath)) this._expandedFolders.delete(folderPath);
                 else this._expandedFolders.add(folderPath);
                 this._buildRoutesList();
+            };
+            header.addEventListener('click', toggleFolder);
+            header.addEventListener('keydown', e => {
+                if (e.key !== 'Enter' && e.key !== ' ') return;
+                e.preventDefault();
+                toggleFolder(e);
             });
             el.appendChild(header);
             container.appendChild(el);
 
             if (isExpanded) {
                 const childWrap = document.createElement('div');
-                childWrap.style.cssText = 'padding-left:16px;display:flex;flex-direction:column;gap:6px;';
+                childWrap.className = 'route-tree-children';
                 this._renderTreeNode(sub, childWrap, folderPath, false);
                 container.appendChild(childWrap);
             }
@@ -556,23 +566,33 @@ const MenuModule = {
 
             const fcHdr = document.createElement('div');
             fcHdr.className = 'category-header' + (fcExpanded ? ' expanded' : '') + (isRoot ? ' root' : '');
+            fcHdr.setAttribute('role', 'button');
+            fcHdr.setAttribute('tabindex', '0');
+            fcHdr.setAttribute('aria-expanded', String(fcExpanded));
             fcHdr.innerHTML = `
-                <span class="category-icon">${fcExpanded ? '📂' : '📁'}</span>
+                <span class="category-chevron" aria-hidden="true"></span>
+                <svg class="category-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6.5A1.5 1.5 0 0 1 4.5 5H10l2 2h7.5A1.5 1.5 0 0 1 21 8.5v9a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 17.5z"/></svg>
                 <span class="category-name">Без категории</span>
                 <span class="category-count">${fcTotal}</span>
             `;
-            fcHdr.addEventListener('click', e => {
+            const toggleUncategorized = e => {
                 e.stopPropagation();
                 if (this._expandedFolders.has(fcPath)) this._expandedFolders.delete(fcPath);
                 else this._expandedFolders.add(fcPath);
                 this._buildRoutesList();
+            };
+            fcHdr.addEventListener('click', toggleUncategorized);
+            fcHdr.addEventListener('keydown', e => {
+                if (e.key !== 'Enter' && e.key !== ' ') return;
+                e.preventDefault();
+                toggleUncategorized(e);
             });
             fcEl.appendChild(fcHdr);
             container.appendChild(fcEl);
 
             if (fcExpanded) {
                 const childWrap = document.createElement('div');
-                childWrap.style.cssText = 'padding-left:16px;display:flex;flex-direction:column;gap:6px;';
+                childWrap.className = 'route-tree-children';
                 this._renderTreeNode(uncat, childWrap, fcPath, false);
                 container.appendChild(childWrap);
             }
@@ -584,7 +604,7 @@ const MenuModule = {
             const isActive = routeKey === this.currentRoute;
             const btn = document.createElement('button');
             btn.className = 'route-item' + (isActive ? ' active' : '');
-            if (isActive) btn.style.cssText = 'background:rgba(48,209,88,0.2);border-color:rgba(48,209,88,0.4);';
+            if (isActive) btn.setAttribute('aria-current', 'true');
 
             const preview = document.createElement('div');
             preview.className = 'route-preview-map';
@@ -592,10 +612,19 @@ const MenuModule = {
             preview.setAttribute('aria-hidden', 'true');
             btn.appendChild(preview);
 
+            const details = document.createElement('span');
+            details.className = 'route-item-details';
             const nameSpan = document.createElement('span');
             nameSpan.className = 'route-name';
             nameSpan.textContent = route.name || route.m;
-            btn.appendChild(nameSpan);
+            details.appendChild(nameSpan);
+            if (isActive) {
+                const loadedLabel = document.createElement('span');
+                loadedLabel.className = 'route-loaded-label';
+                loadedLabel.textContent = 'Загружен';
+                details.appendChild(loadedLabel);
+            }
+            btn.appendChild(details);
 
             if (hasDesc) {
                 const infoBtn = document.createElement('span');
