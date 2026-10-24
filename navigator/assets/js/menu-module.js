@@ -9,7 +9,6 @@ const MenuModule = {
     _categoryTree: null,
     _expandedFolders: new Set(),
     _previewObserver: null,
-    _previewMaps: new Set(),
     _previewImages: new Map(),
     _previewJobs: new Map(),
     _previewQueue: [],
@@ -284,9 +283,8 @@ const MenuModule = {
 
     _observeRoutePreviews(container) {
         const previews = container.querySelectorAll('.route-preview-map');
-        if (!previews.length || typeof maplibregl === 'undefined') return;
+        if (!previews.length) return;
 
-        const styleKey = window.getNavigatorMapStyleKey();
         const showPreviewImage = (element, key, imageUrl) => {
             if (!element.isConnected || element.dataset.previewKey !== key) return;
             const image = document.createElement('img');
@@ -297,11 +295,143 @@ const MenuModule = {
         };
 
         previews.forEach(element => {
-            const key = `${styleKey}\0${element.dataset.routeKey}`;
+            const key = `route-preview-v5\0${element.dataset.routeKey}`;
             element.dataset.previewKey = key;
             const image = this._previewImages.get(key);
             if (image) showPreviewImage(element, key, image);
         });
+
+        const renderPreview = async (element, key, routeData) => {
+            try {
+                const points = [];
+                const project = point => {
+                    const latitude = Math.max(-85.0511, Math.min(85.0511, point[0]));
+                    const longitude = point[1];
+                    const sinLatitude = Math.sin(latitude * Math.PI / 180);
+                    return {
+                        x: (longitude + 180) / 360,
+                        y: 0.5 - Math.log((1 + sinLatitude) / (1 - sinLatitude)) / (4 * Math.PI)
+                    };
+                };
+
+                let pointNumber = 0;
+                for (const segment of routeData) {
+                    if (!segment || !Array.isArray(segment.pts)) continue;
+                    const coordinates = segment.pts.filter(point =>
+                        Array.isArray(point) &&
+                        Number.isFinite(point[0]) &&
+                        Number.isFinite(point[1]) &&
+                        Math.abs(point[0]) <= 90 &&
+                        Math.abs(point[1]) <= 180
+                    );
+                    if (!coordinates.length) continue;
+                    pointNumber++;
+                    points.push({
+                        coordinates,
+                        color: this._ROUTE_COLORS[segment.color] || '#FFD700',
+                        number: String(segment.id || pointNumber),
+                        current: pointNumber === 1,
+                        hasComment: typeof segment.comm === 'string' && segment.comm.trim() !== ''
+                    });
+                }
+
+                if (!points.length) {
+                    element.textContent = 'Нет геометрии маршрута';
+                    return;
+                }
+
+                const icons = await Promise.all(points.map(point => new Promise((resolve, reject) => {
+                    const icon = new Image();
+                    icon.onload = () => resolve(icon);
+                    icon.onerror = () => reject(new Error('Could not load route point icon'));
+                    icon.src = window.getNavigatorPointIcon(
+                        point.color,
+                        point.number,
+                        point.current,
+                        point.hasComment
+                    );
+                })));
+
+                const width = Math.max(1, element.clientWidth);
+                const height = Math.max(1, element.clientHeight);
+                const pixelRatio = 2;
+                const canvas = document.createElement('canvas');
+                canvas.width = Math.round(width * pixelRatio);
+                canvas.height = Math.round(height * pixelRatio);
+                const context = canvas.getContext('2d');
+                if (!context) throw new Error('Could not create preview canvas');
+                context.scale(pixelRatio, pixelRatio);
+
+                const background = context.createLinearGradient(0, 0, width, height);
+                background.addColorStop(0, '#303840');
+                background.addColorStop(1, '#20262d');
+                context.fillStyle = background;
+                context.fillRect(0, 0, width, height);
+
+                const projected = points.map(point => ({
+                    ...point,
+                    path: point.coordinates.map(project)
+                }));
+                let minX = Infinity;
+                let maxX = -Infinity;
+                let minY = Infinity;
+                let maxY = -Infinity;
+                for (const point of projected) {
+                    for (const coordinate of point.path) {
+                        minX = Math.min(minX, coordinate.x);
+                        maxX = Math.max(maxX, coordinate.x);
+                        minY = Math.min(minY, coordinate.y);
+                        maxY = Math.max(maxY, coordinate.y);
+                    }
+                }
+                const padding = 30;
+                const scale = Math.min(
+                    (width - padding * 2) / Math.max(maxX - minX, 1e-9),
+                    (height - padding * 2) / Math.max(maxY - minY, 1e-9)
+                );
+                const offsetX = (width - (maxX - minX) * scale) / 2;
+                const offsetY = (height - (maxY - minY) * scale) / 2;
+                const toCanvas = point => ({
+                    x: offsetX + (point.x - minX) * scale,
+                    y: offsetY + (point.y - minY) * scale
+                });
+
+                for (const point of projected) {
+                    if (point.path.length < 2) continue;
+                    context.beginPath();
+                    point.path.forEach((coordinate, index) => {
+                        const position = toCanvas(coordinate);
+                        if (index === 0) context.moveTo(position.x, position.y);
+                        else context.lineTo(position.x, position.y);
+                    });
+                    context.lineCap = 'round';
+                    context.lineJoin = 'round';
+                    context.strokeStyle = 'rgba(0, 0, 0, 0.75)';
+                    context.lineWidth = 8;
+                    context.stroke();
+                    context.strokeStyle = point.color;
+                    context.lineWidth = 4;
+                    context.stroke();
+                }
+
+                for (let index = projected.length - 1; index >= 0; index--) {
+                    const position = toCanvas(projected[index].path[0]);
+                    context.drawImage(icons[index], position.x - 20, position.y - 20, 40, 40);
+                }
+
+                const imageUrl = canvas.toDataURL('image/jpeg', 0.92);
+                this._previewImages.set(key, imageUrl);
+                document.querySelectorAll('.route-preview-map').forEach(candidate => {
+                    showPreviewImage(candidate, key, imageUrl);
+                });
+            } catch (error) {
+                console.warn('Не удалось создать превью маршрута:', error);
+            } finally {
+                this._previewJobs.delete(key);
+                this._previewActive = false;
+                startNextPreview();
+            }
+        };
 
         const startNextPreview = () => {
             if (this._previewActive) return;
@@ -316,186 +446,11 @@ const MenuModule = {
                 }
                 if (this._previewJobs.has(job.key)) continue;
                 this._previewActive = true;
-                try {
-                    job.start();
-                    return;
-                } catch (error) {
-                    this._previewActive = false;
-                    console.warn('Не удалось создать карту превью:', error);
-                }
+                this._previewJobs.set(job.key, true);
+                job.element.textContent = 'Подготавливаем превью…';
+                void renderPreview(job.element, job.key, job.routeData);
+                return;
             }
-        };
-
-        const startPreview = (element, key, routeData) => {
-            const host = document.createElement('div');
-            const previewWidth = Math.max(1, element.clientWidth);
-            const previewHeight = Math.max(1, element.clientHeight);
-            host.style.cssText = `position:fixed;left:-10000px;top:0;width:${previewWidth}px;height:${previewHeight}px;visibility:hidden;pointer-events:none;`;
-            document.body.appendChild(host);
-            element.textContent = 'Подготавливаем кадр карты…';
-            let map;
-            try {
-                map = new maplibregl.Map({
-                    container: host,
-                    style: window.getNavigatorMapStyle(),
-                    center: [0, 0],
-                    zoom: 2,
-                    attributionControl: false,
-                    interactive: false,
-                    fadeDuration: 0,
-                    preserveDrawingBuffer: true,
-                    pixelRatio: 2
-                });
-            } catch (error) {
-                host.remove();
-                throw error;
-            }
-            element._routePreviewMap = map;
-            this._previewMaps.add(map);
-
-            let pointFeatures = [];
-            let captureTimer = null;
-            let captured = false;
-            const finishPreview = async () => {
-                if (captured) return;
-                captured = true;
-                if (captureTimer) clearTimeout(captureTimer);
-                try {
-                    const pointIcons = await Promise.all(pointFeatures.map(feature => new Promise((resolve, reject) => {
-                        const icon = new Image();
-                        icon.onload = () => resolve(icon);
-                        icon.onerror = () => reject(new Error('Could not load route point icon'));
-                        icon.src = window.getNavigatorPointIcon(
-                            feature.properties.color,
-                            feature.properties.number,
-                            feature.properties.current,
-                            feature.properties.hasComment
-                        );
-                    })));
-                    const mapCanvas = map.getCanvas();
-                    const composite = document.createElement('canvas');
-                    composite.width = mapCanvas.width;
-                    composite.height = mapCanvas.height;
-                    const context = composite.getContext('2d');
-                    if (!context) throw new Error('Could not create preview snapshot canvas');
-                    context.drawImage(mapCanvas, 0, 0);
-
-                    const pixelRatio = mapCanvas.width / map.getContainer().clientWidth || 1;
-                    context.scale(pixelRatio, pixelRatio);
-                    for (let index = pointFeatures.length - 1; index >= 0; index--) {
-                        const feature = pointFeatures[index];
-                        const point = map.project(feature.geometry.coordinates);
-                        context.drawImage(pointIcons[index], point.x - 20, point.y - 20, 40, 40);
-                    }
-                    if (styleKey === 'osm' || styleKey === 'osm_vector') {
-                        const attribution = '© OpenStreetMap contributors';
-                        context.font = '10px Arial, sans-serif';
-                        const textWidth = context.measureText(attribution).width;
-                        const right = map.getContainer().clientWidth;
-                        const bottom = map.getContainer().clientHeight;
-                        context.fillStyle = 'rgba(0, 0, 0, 0.72)';
-                        context.fillRect(right - textWidth - 10, bottom - 19, textWidth + 8, 16);
-                        context.fillStyle = '#fff';
-                        context.fillText(attribution, right - textWidth - 6, bottom - 7);
-                    }
-
-                    const imageUrl = composite.toDataURL('image/jpeg', 0.88);
-                    this._previewImages.set(key, imageUrl);
-                    document.querySelectorAll('.route-preview-map').forEach(candidate => {
-                        showPreviewImage(candidate, key, imageUrl);
-                    });
-                } catch (error) {
-                    console.warn('Не удалось сохранить кадр маршрута:', error);
-                } finally {
-                    this._previewJobs.delete(key);
-                    this._previewMaps.delete(map);
-                    map.remove();
-                    host.remove();
-                    this._previewActive = false;
-                    startNextPreview();
-                }
-            };
-            this._previewJobs.set(key, map);
-            captureTimer = setTimeout(finishPreview, 15000);
-
-            map.once('load', () => {
-                const lineFeatures = [];
-                pointFeatures = [];
-                const bounds = new maplibregl.LngLatBounds();
-                let pointNumber = 0;
-                for (const segment of routeData) {
-                    if (!segment || !Array.isArray(segment.pts)) continue;
-                    const coordinates = segment.pts
-                        .filter(point =>
-                            Array.isArray(point) &&
-                            Number.isFinite(point[0]) &&
-                            Number.isFinite(point[1]) &&
-                            Math.abs(point[0]) <= 90 &&
-                            Math.abs(point[1]) <= 180
-                        )
-                        .map(point => [point[1], point[0]]);
-                    if (!coordinates.length) continue;
-
-                    coordinates.forEach(coordinate => bounds.extend(coordinate));
-                    const color = this._ROUTE_COLORS[segment.color] || '#FFD700';
-                    if (coordinates.length > 1) {
-                        lineFeatures.push({
-                            type: 'Feature',
-                            properties: { color: color },
-                            geometry: { type: 'LineString', coordinates: coordinates }
-                        });
-                    }
-
-                    pointNumber++;
-                    pointFeatures.push({
-                        type: 'Feature',
-                        properties: {
-                            number: String(segment.id || pointNumber),
-                            color: color,
-                            current: pointNumber === 1,
-                            hasComment: typeof segment.comm === 'string' && segment.comm.trim() !== ''
-                        },
-                        geometry: { type: 'Point', coordinates: coordinates[0] }
-                    });
-                }
-
-                if (lineFeatures.length) {
-                    map.addSource('route-preview-lines', {
-                        type: 'geojson',
-                        data: { type: 'FeatureCollection', features: lineFeatures }
-                    });
-                    map.addLayer({
-                        id: 'route-preview-casing',
-                        type: 'line',
-                        source: 'route-preview-lines',
-                        layout: { 'line-join': 'round', 'line-cap': 'round' },
-                        paint: {
-                            'line-color': '#101820',
-                            'line-width': 7,
-                            'line-opacity': 0.85
-                        }
-                    });
-                    map.addLayer({
-                        id: 'route-preview-route',
-                        type: 'line',
-                        source: 'route-preview-lines',
-                        layout: { 'line-join': 'round', 'line-cap': 'round' },
-                        paint: {
-                            'line-color': ['get', 'color'],
-                            'line-width': 4
-                        }
-                    });
-                }
-
-                if (!bounds.isEmpty()) {
-                    map.fitBounds(bounds, {
-                        padding: { top: 28, right: 28, bottom: 28, left: 28 },
-                        maxZoom: 15,
-                        duration: 0
-                    });
-                }
-                map.once('idle', finishPreview);
-            });
         };
 
         const createPreview = element => {
@@ -514,8 +469,8 @@ const MenuModule = {
             this._previewQueue.push({
                 key,
                 element,
+                routeData,
                 showCached: image => showPreviewImage(element, key, image),
-                start: () => startPreview(element, key, routeData)
             });
             startNextPreview();
         };
