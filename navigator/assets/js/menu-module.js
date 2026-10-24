@@ -344,7 +344,7 @@ const MenuModule = {
                     interactive: false,
                     fadeDuration: 0,
                     preserveDrawingBuffer: true,
-                    pixelRatio: 1
+                    pixelRatio: 2
                 });
             } catch (error) {
                 host.remove();
