@@ -12,6 +12,9 @@ const MenuModule = {
     _previewMaps: new Set(),
     _previewImages: new Map(),
     _previewJobs: new Map(),
+    _previewQueue: [],
+    _previewQueuedKeys: new Set(),
+    _previewActive: false,
 
     // URL Яндекс-функции OSM-версии (отдельная БД dbosm)
     API_URL_V2: 'https://functions.yandexcloud.net/d4e02ghbv31h6kpf8ddh',
@@ -300,34 +303,53 @@ const MenuModule = {
             if (image) showPreviewImage(element, key, image);
         });
 
-        const createPreview = element => {
-            if (!element.isConnected) return;
-            const key = element.dataset.previewKey;
-            const cachedImage = this._previewImages.get(key);
-            if (cachedImage) {
-                showPreviewImage(element, key, cachedImage);
-                return;
+        const startNextPreview = () => {
+            if (this._previewActive) return;
+            while (this._previewQueue.length) {
+                const job = this._previewQueue.shift();
+                this._previewQueuedKeys.delete(job.key);
+                if (!job.element.isConnected) continue;
+                const cachedImage = this._previewImages.get(job.key);
+                if (cachedImage) {
+                    job.showCached(cachedImage);
+                    continue;
+                }
+                if (this._previewJobs.has(job.key)) continue;
+                this._previewActive = true;
+                try {
+                    job.start();
+                    return;
+                } catch (error) {
+                    this._previewActive = false;
+                    console.warn('Не удалось создать карту превью:', error);
+                }
             }
-            if (this._previewJobs.has(key)) return;
+        };
 
-            const routeData = this.routesDescriptions[element.dataset.routeKey]?.data;
-            if (!Array.isArray(routeData)) return;
+        const startPreview = (element, key, routeData) => {
             const host = document.createElement('div');
             const previewWidth = Math.max(1, element.clientWidth);
             const previewHeight = Math.max(1, element.clientHeight);
             host.style.cssText = `position:fixed;left:-10000px;top:0;width:${previewWidth}px;height:${previewHeight}px;visibility:hidden;pointer-events:none;`;
             document.body.appendChild(host);
             element.textContent = 'Подготавливаем кадр карты…';
-            const map = new maplibregl.Map({
-                container: host,
-                style: window.getNavigatorMapStyle(),
-                center: [0, 0],
-                zoom: 2,
-                attributionControl: false,
-                interactive: false,
-                fadeDuration: 0,
-                preserveDrawingBuffer: true
-            });
+            let map;
+            try {
+                map = new maplibregl.Map({
+                    container: host,
+                    style: window.getNavigatorMapStyle(),
+                    center: [0, 0],
+                    zoom: 2,
+                    attributionControl: false,
+                    interactive: false,
+                    fadeDuration: 0,
+                    preserveDrawingBuffer: true,
+                    pixelRatio: 1
+                });
+            } catch (error) {
+                host.remove();
+                throw error;
+            }
             element._routePreviewMap = map;
             this._previewMaps.add(map);
 
@@ -368,7 +390,7 @@ const MenuModule = {
 
                     const imageUrl = composite.toDataURL('image/jpeg', 0.88);
                     this._previewImages.set(key, imageUrl);
-                    container.querySelectorAll('.route-preview-map').forEach(candidate => {
+                    document.querySelectorAll('.route-preview-map').forEach(candidate => {
                         showPreviewImage(candidate, key, imageUrl);
                     });
                 } catch (error) {
@@ -378,6 +400,8 @@ const MenuModule = {
                     this._previewMaps.delete(map);
                     map.remove();
                     host.remove();
+                    this._previewActive = false;
+                    startNextPreview();
                 }
             };
             this._previewJobs.set(key, map);
@@ -461,6 +485,28 @@ const MenuModule = {
                 }
                 map.once('idle', finishPreview);
             });
+        };
+
+        const createPreview = element => {
+            if (!element.isConnected) return;
+            const key = element.dataset.previewKey;
+            const cachedImage = this._previewImages.get(key);
+            if (cachedImage) {
+                showPreviewImage(element, key, cachedImage);
+                return;
+            }
+            if (this._previewJobs.has(key) || this._previewQueuedKeys.has(key)) return;
+
+            const routeData = this.routesDescriptions[element.dataset.routeKey]?.data;
+            if (!Array.isArray(routeData)) return;
+            this._previewQueuedKeys.add(key);
+            this._previewQueue.push({
+                key,
+                element,
+                showCached: image => showPreviewImage(element, key, image),
+                start: () => startPreview(element, key, routeData)
+            });
+            startNextPreview();
         };
 
         if (typeof IntersectionObserver === 'undefined') {
