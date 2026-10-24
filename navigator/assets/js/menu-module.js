@@ -295,7 +295,7 @@ const MenuModule = {
         };
 
         previews.forEach(element => {
-            const key = `route-preview-v5\0${element.dataset.routeKey}`;
+            const key = `route-preview-v10\0${element.dataset.routeKey}`;
             element.dataset.previewKey = key;
             const image = this._previewImages.get(key);
             if (image) showPreviewImage(element, key, image);
@@ -384,7 +384,8 @@ const MenuModule = {
                         maxY = Math.max(maxY, coordinate.y);
                     }
                 }
-                const padding = 30;
+                const markerSize = Math.min(40, Math.max(20, Math.min(width, height) * 0.2));
+                const padding = markerSize / 2 + 2;
                 const scale = Math.min(
                     (width - padding * 2) / Math.max(maxX - minX, 1e-9),
                     (height - padding * 2) / Math.max(maxY - minY, 1e-9)
@@ -407,16 +408,22 @@ const MenuModule = {
                     context.lineCap = 'round';
                     context.lineJoin = 'round';
                     context.strokeStyle = 'rgba(0, 0, 0, 0.75)';
-                    context.lineWidth = 8;
+                    context.lineWidth = markerSize * 0.2;
                     context.stroke();
                     context.strokeStyle = point.color;
-                    context.lineWidth = 4;
+                    context.lineWidth = markerSize * 0.1;
                     context.stroke();
                 }
 
                 for (let index = projected.length - 1; index >= 0; index--) {
                     const position = toCanvas(projected[index].path[0]);
-                    context.drawImage(icons[index], position.x - 20, position.y - 20, 40, 40);
+                    context.drawImage(
+                        icons[index],
+                        position.x - markerSize / 2,
+                        position.y - markerSize / 2,
+                        markerSize,
+                        markerSize
+                    );
                 }
 
                 const imageUrl = canvas.toDataURL('image/jpeg', 0.92);
@@ -679,7 +686,7 @@ const MenuModule = {
     createModal() {
         const html = `
             <div id="jsonModal" class="sheet-modal">
-                <div class="modal-sheet" id="jsonModalSheet">
+                <div class="modal-sheet compact-route-menu" id="jsonModalSheet">
                     <div class="sheet-drag-area" id="jsonModalDragArea">
                         <div class="sheet-handle"><svg viewBox="0 0 24 24"><path d="M3 9L12 14.2L21 9" stroke="#fff" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
                     </div>

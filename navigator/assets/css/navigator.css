@@ -737,7 +737,7 @@ html, body {
 }
 
 #jsonModal .routes-list {
-    padding: 8px 8px 16px;
+    padding: 4px 2px 16px;
     margin-top: 0;
 }
 
@@ -757,15 +757,15 @@ html, body {
 }
 
 .routes-list {
-    margin-top: 8px;
+    margin-top: 4px;
     flex: 1 1 0%;
     min-height: 0;
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
     display: flex;
     flex-direction: column;
-    gap: 6px;
-    padding: 8px 4px 0;
+    gap: 4px;
+    padding: 4px 2px 0;
 }
 .routes-list::after {
     content: '';
@@ -844,6 +844,39 @@ html, body {
     padding: 0;
     line-height: 1;
     z-index: 10;
+}
+
+.compact-route-menu .route-item {
+    flex-direction: row;
+    align-items: center;
+    gap: 8px;
+    min-height: 138px;
+    padding: 5px;
+    border-radius: 12px;
+}
+
+.compact-route-menu .route-preview-map {
+    width: 126px;
+    height: 126px;
+    align-self: auto;
+    border-radius: 8px;
+}
+
+.compact-route-menu .route-item .route-name {
+    display: -webkit-box;
+    flex: 1 1 auto;
+    min-width: 0;
+    padding: 0 38px 0 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+}
+
+.compact-route-menu .route-info-btn {
+    top: 6px;
+    right: 6px;
 }
 
 .route-info-btn:active {
