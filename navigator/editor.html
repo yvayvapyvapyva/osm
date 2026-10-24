@@ -154,6 +154,7 @@
 <script src="assets/js/config.js?v=2"></script>
 <script src="assets/js/report.js?v=3"></script>
 <script src="assets/js/tts-client.js"></script>
+<script src="assets/js/map-styles.js?v=1"></script>
 <script>
 (function (global) {
   const byId = (id) => document.getElementById(id);
@@ -213,40 +214,6 @@ const f6 = round6;
 
 const YC_FUNCTION_URL = 'https://functions.yandexcloud.net/d4e02ghbv31h6kpf8ddh';
 const TG_BOT_LINK = 'https://t.me/E_ia_bot/navigator?startapp=m=';
-
-// ---------- OpenStreetMap / MapLibre ----------
-const MAP_STYLES = {
-    yandex_sat: {
-        label: 'Яндекс.Спутник',
-        // Keyless-тайлы Яндекса отдаются в эллипсоидном Меркаторе (EPSG:3395).
-        // Кастомный протокол ниже пересчитывает их в Web Mercator для MapLibre.
-        tiles: ['yandexsat://sat/{z}/{x}/{y}']
-    },
-    osm: {
-        label: 'OpenStreetMap',
-        tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
-        attribution: '© <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap contributors</a>'
-    }
-};
-
-function mapStyleDefinition(type) {
-    const styleKey = MAP_STYLES[type] ? type : 'yandex_sat';
-    const st = MAP_STYLES[styleKey];
-    const sourceId = styleKey === 'yandex_sat' ? 'editor-yandex-base' : 'editor-osm';
-    return {
-        version: 8,
-        sources: {
-            [sourceId]: {
-                type: 'raster',
-                tiles: st.tiles,
-                tileSize: 256,
-                maxzoom: 19,
-                attribution: st.attribution || '© Яндекс'
-            }
-        },
-        layers: [{ id: sourceId, type: 'raster', source: sourceId }]
-    };
-}
 
 /* ---------- Яндекс.Спутник: проекция EPSG:3395 -> Web Mercator ---------- */
 const YANDEX_MERC_E = 0.0818191908426;
@@ -830,7 +797,8 @@ let currentLayerType = 'yandex_sat';
 
 function toggleLayer() {
     if (!map) return;
-    currentLayerType = currentLayerType === 'yandex_sat' ? 'osm' : 'yandex_sat';
+    const styles = Object.keys(MAP_STYLES);
+    currentLayerType = styles[(styles.indexOf(currentLayerType) + 1) % styles.length];
     map.setStyle(mapStyleDefinition(currentLayerType));
     const st = MAP_STYLES[currentLayerType];
     if (st) showToast(st.label, 'info', 1200);
@@ -900,9 +868,11 @@ if (typeof maplibregl === 'undefined') {
         const url = e && e.error && e.error.url ? String(e.error.url) : String((e && e.url) || '');
         if (!/401|403|failed to fetch|load/i.test(msg + ' ' + url)) return;
         mapErrorShown = true;
-        showToast(/tile\.openstreetmap\.org/i.test(url)
+        showToast(/(?:tile|vector)\.openstreetmap\.org/i.test(url)
             ? 'Ошибка загрузки тайлов OpenStreetMap'
-            : 'Ошибка загрузки тайлов Яндекса', 'error', 6000);
+            : currentLayerType === 'yandex_sat'
+                ? 'Ошибка загрузки тайлов Яндекса'
+                : 'Ошибка загрузки OpenStreetMap', 'error', 6000);
     });
 
     const restoreEditorLayers = () => {

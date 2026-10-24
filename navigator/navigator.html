@@ -104,6 +104,7 @@
 <script src="assets/js/report.js?v=3"></script>
 <script src="assets/js/tts-client.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+<script src="assets/js/map-styles.js?v=1"></script>
 <script>
 // Грузим Telegram/VK SDK асинхронно с таймаутом 10с.
 // Если telegram.org / unpkg.com заблокированы или недоступны — не блокируем загрузку приложения.
@@ -165,30 +166,19 @@
 </script>
 <script src="assets/js/menu-module.js?v=7" defer></script>
 <script>
-// Подложки без ключей сторонних картографических сервисов.
-const MAP_STYLES = {
-  osm: {
-    label: 'OpenStreetMap',
-    tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
-    attribution: '© <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap contributors</a>'
-  },
-  yandex_sat: {
-    label: 'Яндекс.Спутник',
-    // Keyless-тайлы Яндекса отдаются без ключа и с CORS, но в эллипсоидном
-    // Меркаторе (EPSG:3395), а MapLibre рисует Web Mercator (EPSG:3857).
-    // Схему 'yandexsat://' перехватывает кастомный протокол ниже: он сам берёт
-    // нужный тайл Яндекса и сдвигает его по широте, компенсируя разницу проекций.
-    tiles: ['yandexsat://sat/{z}/{x}/{y}']
-  }
-};
-
 const MAP_PREFS_KEY = 'osm_map_prefs_v1';
 
 function loadMapPrefs() {
   const prefs = { style: 'yandex_sat' };
   try {
     const saved = JSON.parse(localStorage.getItem(MAP_PREFS_KEY) || '{}');
-    if (saved && saved.style) prefs.style = saved.style === 'yandex_sat' ? 'yandex_sat' : 'osm';
+    if (saved && saved.style) {
+      prefs.style = MAP_STYLES[saved.style]
+        ? saved.style
+        : ['scheme', 'base', 'sat', 'topo', 'dark', 'openstreetmap'].includes(saved.style)
+          ? 'osm_vector'
+          : 'osm';
+    }
   } catch (e) {}
   return prefs;
 }
@@ -799,25 +789,6 @@ function checkSpeedAlert(speed) {
         APP._lastSpeedAlertTime = now;
         playCommand(APP.navConfig.SPEED_ALERT_PHRASE || 'Превышена максимальная скорость').catch(() => {});
     }
-}
-
-function mapStyleDefinition(type) {
-    const styleKey = MAP_STYLES[type] ? type : 'yandex_sat';
-    const st = MAP_STYLES[styleKey];
-    const sourceId = styleKey === 'yandex_sat' ? 'osm-yandex-base' : 'osm-raster';
-    return {
-        version: 8,
-        sources: {
-            [sourceId]: {
-                type: 'raster',
-                tiles: st.tiles,
-                tileSize: 256,
-                maxzoom: 19,
-                attribution: st.attribution || '© Яндекс'
-            }
-        },
-        layers: [{ id: sourceId, type: 'raster', source: sourceId }]
-    };
 }
 
 window.getNavigatorMapStyle = () => mapStyleDefinition(APP._mapStyle);
@@ -1808,7 +1779,8 @@ if (typeof maplibregl === 'undefined') {
         const sourceId = e && e.sourceId;
         const isYandexError = sourceId === 'osm-yandex-base'
             || /yandexsat:|core-sat\.maps\.yandex\.net/i.test(url);
-        const isOsmError = sourceId === 'osm-raster' || /tile\.openstreetmap\.org/i.test(url);
+        const isOsmError = sourceId === 'osm-raster' || sourceId === 'shortbread'
+            || /(?:tile|vector)\.openstreetmap\.org/i.test(url);
         const errorType = isYandexError ? 'yandex' : isOsmError ? 'osm' : null;
         if (!errorType || shownMapErrors.has(errorType)) return;
         shownMapErrors.add(errorType);
