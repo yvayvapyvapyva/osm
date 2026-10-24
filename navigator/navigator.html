@@ -1361,28 +1361,10 @@ function updatePointsListDist() {
 
 
 function setTarget(i) {
-    const previousPoint = APP.navPoints[APP.navCurrentIndex];
-    const nextPoint = APP.navPoints[i];
-    const previousStart = previousPoint?.pts?.[0];
-    const nextStart = nextPoint?.pts?.[0];
-    let transitionDuration = 400;
-
-    if (
-        Array.isArray(previousStart) &&
-        Array.isArray(nextStart) &&
-        Number.isFinite(previousStart[0]) &&
-        Number.isFinite(previousStart[1]) &&
-        Number.isFinite(nextStart[0]) &&
-        Number.isFinite(nextStart[1])
-    ) {
-        const distance = getGeoDistance(previousStart, nextStart);
-        transitionDuration = Math.min(1500, Math.max(350, 350 + distance * 2.3));
-    }
-
     APP.navCurrentIndex = i;
     renderRoutePoints();
     updateHud();
-    fitMapToCurrentTarget(transitionDuration);
+    fitMapToCurrentTarget();
     updatePointsListActive();
 }
 
@@ -1421,12 +1403,12 @@ function updatePointsListActive() {
     if (active) active.scrollIntoView({ block: 'center', behavior: 'smooth' });
 }
 
-function fitMapToCurrentTarget(duration = 400) {
+function fitMapToCurrentTarget() {
     const p = APP.navPoints[APP.navCurrentIndex];
     if (!p || !p.pts || p.pts.length < 1 || !APP.map) return;
     const [latitude, longitude] = p.pts[0];
     if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return;
-    setMapLocation([latitude, longitude], undefined, undefined, duration);
+    setMapLocation([latitude, longitude], undefined, undefined, 400);
 }
 
 
