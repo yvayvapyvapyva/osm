@@ -387,6 +387,17 @@ const MenuModule = {
                         const point = map.project(feature.geometry.coordinates);
                         context.drawImage(pointIcons[index], point.x - 20, point.y - 20, 40, 40);
                     }
+                    if (styleKey === 'osm') {
+                        const attribution = '© OpenStreetMap contributors';
+                        context.font = '10px Arial, sans-serif';
+                        const textWidth = context.measureText(attribution).width;
+                        const right = map.getContainer().clientWidth;
+                        const bottom = map.getContainer().clientHeight;
+                        context.fillStyle = 'rgba(0, 0, 0, 0.72)';
+                        context.fillRect(right - textWidth - 10, bottom - 19, textWidth + 8, 16);
+                        context.fillStyle = '#fff';
+                        context.fillText(attribution, right - textWidth - 6, bottom - 7);
+                    }
 
                     const imageUrl = composite.toDataURL('image/jpeg', 0.88);
                     this._previewImages.set(key, imageUrl);

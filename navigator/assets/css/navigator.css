@@ -1089,27 +1089,6 @@ html, body {
     box-shadow: 0 0 12px rgba(48, 209, 88, 0.2);
 }
 
-.map-overlay-list {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-}
-.map-overlay-row {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 14px;
-    padding: 6px 2px;
-    cursor: pointer;
-}
-
-.map-overlay-row .label {
-    font-size: 14px;
-    font-weight: 600;
-    color: #fff;
-    flex: 1;
-}
-
 /* ---- Trigger settings ---- */
 .trigger-setting-row {
     display: flex;

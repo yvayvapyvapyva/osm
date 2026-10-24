@@ -1,8 +1,3 @@
-// API конфигурация
-const API_CONFIG = {
-  MAPTILER_KEY: 'mveDsz0PeGC3zhA47AdM'
-};
-
 const ROUTE_DATA = {
   Gold: { hex: '#FFD700', label: 'Маневры на перекрестке' },
   Blue: { hex: '#007AFF', label: 'Разворот вне перекрестка' },

@@ -165,17 +165,13 @@
 </script>
 <script src="assets/js/menu-module.js?v=7" defer></script>
 <script>
-// Ключ MapTiler для навигатора (карта, схема, спутник)
-const MAPTILER_KEY = 'mveDsz0PeGC3zhA47AdM';
-
-// Доступные подложки. id можно посмотреть/поменять в кабинете MapTiler.
+// Подложки без ключей сторонних картографических сервисов.
 const MAP_STYLES = {
-  scheme:    { id: 'streets-v4',      label: 'Схема' },
-  base:      { id: 'base-v4',         label: 'Базовая' },
-  sat:       { id: 'hybrid-v4',       label: 'Спутник' },
-  topo:      { id: 'topo-v4',         label: 'Топо' },
-  dark:      { id: 'streets-v4-dark', label: 'Тёмная' },
-  osm:       { id: 'openstreetmap',   label: 'OSM' },
+  osm: {
+    label: 'OpenStreetMap',
+    tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
+    attribution: '© <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap contributors</a>'
+  },
   yandex_sat: {
     label: 'Яндекс.Спутник',
     // Keyless-тайлы Яндекса отдаются без ключа и с CORS, но в эллипсоидном
@@ -186,23 +182,13 @@ const MAP_STYLES = {
   }
 };
 
-// Дополнительные слои поверх любой подложки.
-const MAP_OVERLAYS = {
-  buildings: { label: '3D-здания' }
-};
-
 const MAP_PREFS_KEY = 'osm_map_prefs_v1';
 
 function loadMapPrefs() {
-  const prefs = { style: 'yandex_sat', overlays: {} };
+  const prefs = { style: 'yandex_sat' };
   try {
     const saved = JSON.parse(localStorage.getItem(MAP_PREFS_KEY) || '{}');
-    if (saved && MAP_STYLES[saved.style]) prefs.style = saved.style;
-    if (saved && saved.overlays && typeof saved.overlays === 'object') {
-      for (const key of Object.keys(MAP_OVERLAYS)) {
-        if (saved.overlays[key]) prefs.overlays[key] = true;
-      }
-    }
+    if (saved && saved.style) prefs.style = saved.style === 'yandex_sat' ? 'yandex_sat' : 'osm';
   } catch (e) {}
   return prefs;
 }
@@ -230,7 +216,7 @@ const APP = {
     navPoints: [],     navCurrentIndex: 0, _routeTotalDistance: 0,
     navAudio: new Audio(), _commentAudio: new Audio(),
     navConfig: { TRIGGER_DIST: 25, AZ_TOLERANCE: 45, SPEED_THRESHOLD: 2, SHOCK_THRESHOLD: 1, SHOCK_PHRASE: 'Сильный удар', SPEED_ALERT_THRESHOLD: 58, SPEED_ALERT_PHRASE: 'Превышена максимальная скорость' },
-    _mapStyle: MAP_PREFS.style, _overlays: Object.assign({}, MAP_PREFS.overlays), _overlayRestoreDirty: true,
+    _mapStyle: MAP_PREFS.style,
     _routeFeatures: [], _routeDataSource: null, _routeDataDirty: false,
     _driveActive: false, _driveRaf: null, _driveMarker: null, _driveShowFrom: -1,
     _driveState: null, _driveResume: null,
@@ -815,22 +801,26 @@ function checkSpeedAlert(speed) {
     }
 }
 
-function maptilerStyleUrl(type) {
-    const st = MAP_STYLES[type] || MAP_STYLES.scheme;
-    if (st.tiles) {
-        const srcId = 'osm-yandex-base';
-        return {
-            version: 8,
-            sources: {
-                [srcId]: { type: 'raster', tiles: st.tiles, tileSize: 256 }
-            },
-            layers: [{ id: srcId, type: 'raster', source: srcId }]
-        };
-    }
-    return `https://api.maptiler.com/maps/${st.id}/style.json?key=${encodeURIComponent(MAPTILER_KEY)}`;
+function mapStyleDefinition(type) {
+    const styleKey = MAP_STYLES[type] ? type : 'yandex_sat';
+    const st = MAP_STYLES[styleKey];
+    const sourceId = styleKey === 'yandex_sat' ? 'osm-yandex-base' : 'osm-raster';
+    return {
+        version: 8,
+        sources: {
+            [sourceId]: {
+                type: 'raster',
+                tiles: st.tiles,
+                tileSize: 256,
+                maxzoom: 19,
+                attribution: st.attribution || '© Яндекс'
+            }
+        },
+        layers: [{ id: sourceId, type: 'raster', source: sourceId }]
+    };
 }
 
-window.getNavigatorMapStyle = () => maptilerStyleUrl(APP._mapStyle);
+window.getNavigatorMapStyle = () => mapStyleDefinition(APP._mapStyle);
 window.getNavigatorMapStyleKey = () => APP._mapStyle;
 
 /* ---------- Яндекс.Спутник: пересчёт проекции EPSG:3395 -> Web Mercator ----------
@@ -917,10 +907,7 @@ function registerYandexProtocol() {
 
 function saveMapPrefs() {
     try {
-        localStorage.setItem(MAP_PREFS_KEY, JSON.stringify({
-            style: APP._mapStyle,
-            overlays: APP._overlays
-        }));
+        localStorage.setItem(MAP_PREFS_KEY, JSON.stringify({ style: APP._mapStyle }));
     } catch (e) {}
 }
 
@@ -938,31 +925,6 @@ function renderMapSettings() {
             grid.appendChild(btn);
         });
     }
-    const list = $('mapOverlayList');
-    if (list) {
-        list.innerHTML = '';
-        Object.keys(MAP_OVERLAYS).forEach(key => {
-            const row = document.createElement('label');
-            row.className = 'map-overlay-row';
-            const label = document.createElement('span');
-            label.className = 'label';
-            label.textContent = MAP_OVERLAYS[key].label;
-            const sw = document.createElement('span');
-            sw.className = 'toggle-switch';
-            const input = document.createElement('input');
-            input.type = 'checkbox';
-            input.className = 'toggle-input';
-            input.checked = !!APP._overlays[key];
-            input.addEventListener('change', () => setOverlay(key, input.checked));
-            const slider = document.createElement('span');
-            slider.className = 'toggle-slider';
-            sw.appendChild(input);
-            sw.appendChild(slider);
-            row.appendChild(label);
-            row.appendChild(sw);
-            list.appendChild(row);
-        });
-    }
 }
 
 function syncMapStyleButtons() {
@@ -977,103 +939,8 @@ function setMapType(type) {
     saveMapPrefs();
     syncMapStyleButtons();
     APP._routeDataSource = null;
-    APP._overlayRestoreDirty = true;
-    APP.map.setStyle(maptilerStyleUrl(type));
+    APP.map.setStyle(mapStyleDefinition(type));
     showToast(MAP_STYLES[type].label, 'info', 1500);
-}
-
-/* ---------- Дополнительные слои карты ---------- */
-const BUILDINGS_SOURCE_ID = 'osm-buildings';
-const BUILDINGS_LAYER_ID = 'osm-3d-buildings';
-// Векторный тайлсет MapTiler со слоем building (render_height/render_min_height).
-// Нужен, чтобы рисовать 3D-здания поверх растровых подложек без векторных данных.
-const BUILDINGS_TILES_URL = `https://api.maptiler.com/tiles/v3/tiles.json?key=${encodeURIComponent(MAPTILER_KEY)}`;
-
-function firstSymbolLayerId() {
-    try {
-        const layers = APP.map.getStyle().layers || [];
-        const sym = layers.find(l => l.type === 'symbol' && l.id.indexOf('osm-') !== 0);
-        return sym ? sym.id : undefined;
-    } catch (e) { return undefined; }
-}
-
-// Куда вставлять доп. слои: под подписи, а если их нет (растровые подложки) —
-// под маршруты, чтобы 3D-здания и прочие слои не перекрывали линии маршрута.
-function overlayInsertBefore() {
-    const sym = firstSymbolLayerId();
-    if (sym) return sym;
-    if (APP.map.getLayer('nav-routes-casing')) return 'nav-routes-casing';
-    return undefined;
-}
-
-function addMapLayer(layer, beforeId) {
-    if (APP.map.getLayer(layer.id)) return;
-    APP.map.addLayer(layer, beforeId);
-}
-
-function removeMapLayer(id) {
-    if (APP.map.getLayer(id)) APP.map.removeLayer(id);
-}
-
-function removeMapSource(id) {
-    if (APP.map.getSource(id)) APP.map.removeSource(id);
-}
-
-function applyBuildings(beforeId) {
-    let src = null;
-    try {
-        const b = (APP.map.getStyle().layers || []).find(l => l['source-layer'] === 'building');
-        src = b && b.source;
-    } catch (e) { src = null; }
-    // На растровых подложках (Яндекс.Спутник, OSM) в стиле нет
-    // векторных данных — берём контуры и высоты из тайлсета MapTiler v3.
-    if (!src) {
-        src = BUILDINGS_SOURCE_ID;
-        if (!APP.map.getSource(src)) {
-            APP.map.addSource(src, {
-                type: 'vector',
-                url: BUILDINGS_TILES_URL,
-                maxzoom: 15
-            });
-        }
-    }
-    addMapLayer({
-        id: BUILDINGS_LAYER_ID,
-        type: 'fill-extrusion',
-        source: src,
-        'source-layer': 'building',
-        minzoom: 14,
-        paint: {
-            'fill-extrusion-color': '#cfcfcf',
-            'fill-extrusion-height': ['coalesce', ['get', 'render_height'], ['get', 'height'], 8],
-            'fill-extrusion-base': ['coalesce', ['get', 'render_min_height'], ['get', 'min_height'], 0],
-            'fill-extrusion-opacity': 0.75
-        }
-    }, beforeId);
-}
-
-function setOverlay(key, enabled) {
-    if (!MAP_OVERLAYS[key]) return;
-    APP._overlays[key] = !!enabled;
-    saveMapPrefs();
-    APP._overlayRestoreDirty = true;
-    restoreMapOverlays(true);
-}
-
-function restoreMapOverlays(force) {
-    if (!APP.map) return;
-    if (!APP.map.isStyleLoaded()) return;
-    if (!force && !APP._overlayRestoreDirty) return;
-    const o = APP._overlays || {};
-    const b = overlayInsertBefore();
-    let ok = true;
-    const step = fn => { try { fn(); } catch (e) { ok = false; } };
-
-    step(() => {
-        if (o.buildings) applyBuildings(b);
-        else { removeMapLayer(BUILDINGS_LAYER_ID); removeMapSource(BUILDINGS_SOURCE_ID); }
-    });
-    APP._overlayRestoreDirty = !ok;
 }
 
 function setTilt(mode) {
@@ -1262,7 +1129,6 @@ function restoreRouteLayers() {
     if (!APP.map) return;
     ensureRouteLayers();
     updateRouteLines();
-    restoreMapOverlays(false);
 }
 
 
@@ -1899,8 +1765,8 @@ document.addEventListener('DOMContentLoaded', () => {
     setTimeout(startWakeLock, 500);
 });
 
-if (typeof maplibregl === 'undefined' || typeof MAPTILER_KEY === 'undefined' || !MAPTILER_KEY) {
-    showToast('Ошибка загрузки карты (MapLibre/MapTiler)', 'error', 8000);
+if (typeof maplibregl === 'undefined') {
+    showToast('Ошибка загрузки карты (MapLibre)', 'error', 8000);
     $('loading').classList.add('hidden');
 } else {
 (async () => {
@@ -1917,12 +1783,12 @@ if (typeof maplibregl === 'undefined' || typeof MAPTILER_KEY === 'undefined' || 
     registerYandexProtocol();
     APP.map = new maplibregl.Map({
         container: 'map',
-        style: maptilerStyleUrl(APP._mapStyle),
+        style: mapStyleDefinition(APP._mapStyle),
         center: [initCenter[0], initCenter[1]],
         zoom: 17,
         minZoom: 3,
         maxZoom: 20,
-        attributionControl: false,
+        attributionControl: { compact: false },
         dragRotate: true,
         pitchWithRotate: true,
         touchPitch: true
@@ -1942,20 +1808,15 @@ if (typeof maplibregl === 'undefined' || typeof MAPTILER_KEY === 'undefined' || 
         const sourceId = e && e.sourceId;
         const isYandexError = sourceId === 'osm-yandex-base'
             || /yandexsat:|core-sat\.maps\.yandex\.net/i.test(url);
-        const isBuildingsError = sourceId === BUILDINGS_SOURCE_ID
-            || /api\.maptiler\.com\/tiles\/v3/i.test(url);
-        const isMapTilerStyleError = !MAP_STYLES[APP._mapStyle].tiles
-            && (sourceId || /api\.maptiler\.com/i.test(url));
-        const errorType = isBuildingsError ? 'buildings' : isYandexError ? 'yandex' : isMapTilerStyleError ? 'maptiler' : null;
+        const isOsmError = sourceId === 'osm-raster' || /tile\.openstreetmap\.org/i.test(url);
+        const errorType = isYandexError ? 'yandex' : isOsmError ? 'osm' : null;
         if (!errorType || shownMapErrors.has(errorType)) return;
         shownMapErrors.add(errorType);
 
-        if (errorType === 'buildings') {
-            showToast('Не загрузились 3D-здания MapTiler; подложка карты может работать', 'error', 6000);
-        } else if (errorType === 'yandex') {
+        if (errorType === 'yandex') {
             showToast('Ошибка загрузки тайлов Яндекса', 'error', 6000);
         } else {
-            showToast('Ошибка загрузки подложки MapTiler: проверьте ключ и доступность сети', 'error', 6000);
+            showToast('Ошибка загрузки тайлов OpenStreetMap', 'error', 6000);
         }
     });
 
@@ -2138,8 +1999,6 @@ if (typeof maplibregl === 'undefined' || typeof MAPTILER_KEY === 'undefined' || 
             <div class="settings-group">
                 <div class="settings-label">Вид карты</div>
                 <div id="mapStyleGrid" class="map-style-grid"></div>
-                <div class="settings-sublabel">Дополнительные слои</div>
-                <div id="mapOverlayList" class="map-overlay-list"></div>
             </div>
 
             <div class="settings-group">
