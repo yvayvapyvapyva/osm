@@ -101,70 +101,10 @@
 
 <div id="toast"></div>
 
-<script src="assets/js/report.js?v=3"></script>
 <script src="assets/js/tts-client.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/pmtiles@3.2.1/dist/pmtiles.js"></script>
 <script src="assets/js/map-styles.js?v=10"></script>
-<script>
-// Грузим Telegram/VK SDK асинхронно с таймаутом 10с.
-// Если telegram.org / unpkg.com заблокированы или недоступны — не блокируем загрузку приложения.
-(function (g) {
-  var finished = false, pending = 0, cbs = [];
-  function finish() {
-    if (finished) return;
-    finished = true;
-    var list = cbs.splice(0);
-    for (var i = 0; i < list.length; i++) { try { list[i](); } catch (e) {} }
-  }
-  function tryLoad(url) {
-    pending++;
-    var settled = false;
-    var controller = null;
-    var timeout = null;
-    function settle() {
-      if (settled) return; settled = true;
-      if (timeout) { clearTimeout(timeout); timeout = null; }
-      if (controller) { try { controller.abort(); } catch (e) {} controller = null; }
-      if (--pending === 0) finish();
-    }
-    timeout = setTimeout(settle, 10000);
-    if (typeof fetch === 'function' && typeof AbortController !== 'undefined') {
-      // Реально отменяем запрос через 10с, чтобы браузер не крутил спиннер
-      controller = new AbortController();
-      fetch(url, { signal: controller.signal })
-        .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.text(); })
-        .then(function (code) {
-          if (settled) return;
-          try {
-            var s = document.createElement('script');
-            s.text = code;
-            (document.head || document.documentElement).appendChild(s);
-          } catch (e) {}
-          settle();
-        })
-        .catch(settle);
-    } else {
-      var s = document.createElement('script');
-      s.async = true;
-      var done = false;
-      function done_() { if (done) return; done = true; settle(); }
-      s.onload = done_;
-      s.onerror = done_;
-      s.src = url;
-      try { (document.head || document.documentElement).appendChild(s); }
-      catch (e) { done_(); }
-    }
-  }
-  g.bootPlatforms = function (cb) {
-    if (finished) { try { cb(); } catch (e) {} }
-    else cbs.push(cb);
-  };
-  g.platformReady = new Promise(function (r) { g.bootPlatforms(r); });
-  tryLoad('https://telegram.org/js/telegram-web-app.js');
-  tryLoad('https://unpkg.com/@vkontakte/vk-bridge/dist/browser.min.js');
-})(window);
-</script>
 <script src="assets/js/menu-module.js?v=7" defer></script>
 <script>
 const MAP_PREFS_KEY = 'osm_map_prefs_v1';
@@ -272,45 +212,6 @@ function mapRemoveChild(obj) {
     if (!obj) return;
     if (obj._remove) obj._remove();
 }
-
-// Определение платформы (Telegram/VK SDK). Нужно только для UI и отчётов,
-// аккаунты и привязка маршрутов к пользователям не используются.
-(function() {
-    const runPlatform = () => {
-        if (window._platformRan) return;
-        window._platformRan = true;
-        if (typeof Telegram !== 'undefined' && Telegram.WebApp) {
-            try {
-                Telegram.WebApp.ready();
-                Telegram.WebApp.expand();
-                if (Telegram.WebApp.version && parseFloat(Telegram.WebApp.version) >= 7.0) {
-                    try { Telegram.WebApp.requestFullscreen?.(); } catch (e) {}
-                    try { Telegram.WebApp.disableVerticalSwipes?.(); } catch (e) {}
-                }
-                const user = Telegram.WebApp.initDataUnsafe?.user;
-                if (user) {
-                    window.platformType = 'tg';
-                    window.tgUser = user;
-                }
-            } catch (e) {}
-        }
-        if (typeof vkBridge !== 'undefined') {
-            try {
-                vkBridge.send('VKWebAppInit');
-                vkBridge.send('VKWebAppGetUserInfo').then(data => {
-                    if (data?.id) {
-                        window.platformType = 'vk';
-                        window.vkUser = data;
-                    }
-                });
-            } catch (e) {}
-        }
-        if (navigator.userAgent.includes('Android') && window.platformType === 'tg') {
-            document.documentElement.classList.add('android-app');
-        }
-    };
-    if (window.bootPlatforms) window.bootPlatforms(runPlatform); else runPlatform();
-})();
 
 let toastTimer = null;
 function showToast(text, type = 'info', duration = 2000) {
@@ -1916,13 +1817,8 @@ if (typeof maplibregl === 'undefined') {
         }
     });
 
-    // Скрываем оверлей сразу, не дожидаясь загрузки SDK (в браузере блокировки тянутся до ~10с)
+    // Скрываем оверлей сразу, не дожидаясь загрузки карты
     $('loading').classList.add('hidden');
-    // Даём SDK короткую фору (1.5с); в TG/VK он приходит мгновенно, в браузере — продолжаем без него
-    if (window.platformReady) {
-        const grace = new Promise(r => setTimeout(r, 1500));
-        try { await Promise.race([window.platformReady, grace]); } catch (e) {}
-    }
     MenuModule.init(loadRouteFromJSON);
     ensureMotionTracking();
 

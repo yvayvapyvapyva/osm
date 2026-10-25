@@ -7,7 +7,7 @@ const output = path.join(root, 'deploy-2files');
 const pageBundles = {
     'navigator.html': {
         stylesheet: 'assets/css/navigator.css',
-        scripts: ['assets/js/report.js', 'assets/js/tts-client.js', 'assets/js/map-styles.js', 'assets/js/menu-module.js'],
+        scripts: ['assets/js/tts-client.js', 'assets/js/map-styles.js', 'assets/js/menu-module.js'],
         instruction: 'instr.html',
     },
 };

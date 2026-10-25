@@ -117,10 +117,6 @@ html, body {
     pointer-events: none;
 }
 
-.android-app #instructionBtn {
-    bottom: calc(180px + env(safe-area-inset-bottom));
-}
-
 #instructionModal { z-index: 20000; }
 
 #instructionModal .modal-sheet {
@@ -355,10 +351,6 @@ html, body {
 
 #hud.active {
     display: flex;
-}
-
-.android-app #hud {
-    bottom: calc(30px + env(safe-area-inset-bottom));
 }
 
 .hud-header {

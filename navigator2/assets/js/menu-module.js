@@ -59,46 +59,9 @@ const MenuModule = {
         // Загружаем список маршрутов динамически
         await this._loadRoutesList();
 
-        // Проверяем параметры сразу и при получении данных от VK Bridge
+        // Проверяем параметр #m=<маршрут> в адресе
         this.checkUrlParam();
 
-        // Подписка на события VK Bridge для параметров запуска
-        if (typeof vkBridge !== 'undefined') {
-            vkBridge.subscribe((event) => {
-                if (!this.isLoaded && (event && event.type === 'VKWebAppUpdateConfig' || event.detail)) {
-                    this.checkUrlParam();
-                }
-            });
-
-            // Пробуем получить параметры из launchParams
-            try {
-                vkBridge.send('VKWebAppGetLaunchParams')
-                    .then(params => {
-                        if (!this.isLoaded && params && params.m) {
-                            this.isLoaded = true;
-                            this.hide();
-                            this.loadRouteByName(params.m);
-                        }
-                    })
-                    .catch(e => {});
-            } catch (e) {
-            }
-        }
-
-        // Проверка start_param от Telegram Mini App (на конкретный маршрут)
-        if (typeof Telegram !== 'undefined' && Telegram.WebApp) {
-            try {
-                const startParam = Telegram.WebApp.initDataUnsafe?.start_param;
-                if (startParam && !this.isLoaded && startParam.startsWith('m=')) {
-                    const mValue = startParam.substring(2);
-                    if (mValue) {
-                        this.isLoaded = true;
-                        this.hide();
-                        this.loadRouteByName(mValue);
-                    }
-                }
-            } catch (e) {}
-        }
     },
 
     /**
@@ -787,19 +750,6 @@ const MenuModule = {
 
                 if (!res.ok) throw new Error('HTTP ' + res.status);
                 data = await res.json();
-            }
-
-            // Отчёт об открытии маршрута — после получения данных маршрута.
-            try {
-                if (typeof REPORT !== 'undefined') {
-                    REPORT.send({
-                        m_val: routeM,
-                        report_type: 'navigator',
-                        route_name: data && data.name ? data.name : ''
-                    });
-                }
-            } catch (re) {
-                console.warn('[report] ошибка отправки отчёта навигатора:', re);
             }
 
             await this.loadRoute(data);
