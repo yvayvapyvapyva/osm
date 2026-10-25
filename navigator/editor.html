@@ -854,7 +854,7 @@ if (typeof maplibregl === 'undefined') {
         zoom: 17,
         minZoom: 3,
         maxZoom: 24,
-        attributionControl: { compact: false },
+        attributionControl: { compact: true },
         dragRotate: true,
         pitchWithRotate: true,
         touchPitch: true
@@ -878,6 +878,15 @@ if (typeof maplibregl === 'undefined') {
     const restoreEditorLayers = () => {
         if (ensureEditorLineLayers()) renderEditorLineFeatures();
     };
+
+    // Копирайт держим свёрнутым (кнопка ⓘ), как на gdebenz.ru
+    const collapseAttribution = () => {
+        document.querySelectorAll('.maplibregl-ctrl-attrib.maplibregl-compact-show')
+            .forEach(el => el.classList.remove('maplibregl-compact-show'));
+    };
+    collapseAttribution();
+    map.once('load', collapseAttribution);
+
     map.once('load', restoreEditorLayers);
     map.on('style.load', restoreEditorLayers);
     map.on('styledata', restoreEditorLayers);

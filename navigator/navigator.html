@@ -1760,11 +1760,20 @@ if (typeof maplibregl === 'undefined') {
         zoom: 17,
         minZoom: 3,
         maxZoom: 20,
-        attributionControl: { compact: false },
+        attributionControl: { compact: true },
         dragRotate: true,
         pitchWithRotate: true,
         touchPitch: true
     });
+
+
+    // Копирайт держим свёрнутым (кнопка ⓘ), как на gdebenz.ru
+    const collapseAttribution = () => {
+        document.querySelectorAll('.maplibregl-ctrl-attrib.maplibregl-compact-show')
+            .forEach(el => el.classList.remove('maplibregl-compact-show'));
+    };
+    collapseAttribution();
+    APP.map.once('load', collapseAttribution);
 
     APP.map.once('load', restoreRouteLayers);
     APP.map.on('styledata', restoreRouteLayers);
