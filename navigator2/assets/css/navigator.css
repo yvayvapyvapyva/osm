@@ -14,13 +14,13 @@
     --radius-sm: 14px;
     --radius-full: 100px;
 
-    /* Нижняя навигация */
+    /* Верхняя навигация */
     --nav-h: 64px;
     --nav-gap: 10px;
-    --nav-space: calc(var(--nav-h) + var(--nav-gap) * 2 + env(safe-area-inset-bottom));
+    --nav-space: calc(var(--nav-h) + var(--nav-gap) * 2 + env(safe-area-inset-top));
 
-    /* Полноэкранные разделы: контент заканчивается над таб-баром */
-    --screen-bottom: calc(var(--nav-h) + var(--nav-gap) + env(safe-area-inset-bottom) + 8px);
+    /* Полноэкранные разделы: контент начинается под таб-баром */
+    --screen-top: calc(48px + var(--nav-gap) + env(safe-area-inset-top) + 10px);
 }
 
 * {
@@ -330,7 +330,7 @@ html, body {
    ============================================ */
 #hud {
     position: absolute;
-    bottom: calc(var(--nav-space) + 8px);
+    bottom: 8px;
     left: 12px;
     right: 12px;
     z-index: 9000;
@@ -1453,13 +1453,14 @@ html, body {
 }
 
 /* ============================================
-   Полноэкранные разделы
+   Полноэкранные разделы (модалки в стиле gdebenz.ru)
    ============================================ */
 .screen-modal {
     position: fixed;
     inset: 0;
     z-index: 11000;
-    background: #0f0f0f;
+    background: rgba(15, 15, 15, 0.45);
+    backdrop-filter: blur(4px);
 }
 
 .screen-modal.hidden {
@@ -1467,25 +1468,31 @@ html, body {
 }
 
 .screen-panel {
+    position: absolute;
+    top: var(--screen-top);
+    bottom: env(safe-area-inset-bottom);
+    left: 0;
+    right: 0;
     width: 100%;
-    height: 100%;
     display: flex;
     flex-direction: column;
     gap: 0;
-    padding-bottom: var(--screen-bottom);
+    padding-top: 0;
     background: #0f0f0f;
     box-sizing: border-box;
     overflow: hidden;
+    border-radius: 20px 20px 0 0;
+    box-shadow: 0 -24px 48px rgba(0, 0, 0, 0.55), inset 0 0.5px 0 rgba(255, 255, 255, 0.06);
 }
 
 .screen-modal:not(.hidden) .screen-panel {
-    animation: screen-in 0.22s cubic-bezier(0.22, 1, 0.36, 1);
+    animation: screen-in 0.28s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 @keyframes screen-in {
     from {
         opacity: 0;
-        transform: translateY(10px);
+        transform: translateY(100%);
     }
     to {
         opacity: 1;
@@ -1501,7 +1508,7 @@ html, body {
     align-items: center;
     gap: 8px;
     min-height: 52px;
-    padding: calc(env(safe-area-inset-top) + 6px) 8px 6px 16px;
+    padding: 10px 12px 8px 16px;
     box-sizing: border-box;
     border-bottom: 1px solid rgba(255, 255, 255, 0.07);
     background: rgba(15, 15, 15, 0.92);
@@ -1683,7 +1690,7 @@ html, body {
 }
 
 /* ============================================
-   Нижняя навигация
+   Верхняя навигация: отдельные кнопки (как на gdebenz.ru)
    ============================================ */
 /* Верхние дубли кнопок «Маршруты» и «Настройки» больше не нужны. */
 #menuBtn,
@@ -1699,48 +1706,22 @@ html, body {
     right: auto;
 }
 
-.bottom-nav {
+.top-actions {
     position: fixed;
     left: 50%;
-    bottom: calc(var(--nav-gap) + env(safe-area-inset-bottom));
+    top: calc(var(--nav-gap) + env(safe-area-inset-top));
     transform: translateX(-50%);
     z-index: 12000;
-    width: min(460px, calc(100% - 24px));
-    pointer-events: none;
-}
-
-.bottom-nav-inner {
-    position: relative;
-    display: grid;
-    grid-template-columns: repeat(var(--nav-count, 3), 1fr);
-    height: var(--nav-h);
-    padding: 6px;
+    display: flex;
+    gap: 8px;
+    padding: 0;
     box-sizing: border-box;
-    border-radius: 22px;
-    background: rgba(15, 19, 24, 0.86);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.05);
-    -webkit-backdrop-filter: blur(24px) saturate(160%);
-    backdrop-filter: blur(24px) saturate(160%);
-    overflow: hidden;
     pointer-events: auto;
+    max-width: min(340px, calc(100% - 24px));
+    width: max-content;
 }
 
-.bottom-nav-indicator {
-    position: absolute;
-    top: 6px;
-    bottom: 6px;
-    left: 6px;
-    width: calc((100% - 12px) / var(--nav-count, 3));
-    border-radius: 16px;
-    background: rgba(52, 199, 89, 0.16);
-    box-shadow: inset 0 0 0 1px rgba(52, 199, 89, 0.22);
-    transform: translateX(calc(var(--tab-index, 0) * 100%));
-    transition: transform 0.32s cubic-bezier(0.22, 1, 0.36, 1);
-    pointer-events: none;
-}
-
-.bottom-nav-item {
+.top-action-btn {
     position: relative;
     z-index: 1;
     display: flex;
@@ -1751,9 +1732,9 @@ html, body {
     min-width: 0;
     padding: 0;
     margin: 0;
-    border: 0;
+    border: 1px solid rgba(255, 255, 255, 0.08);
     border-radius: 16px;
-    background: transparent;
+    background: rgba(15, 19, 24, 0.86);
     color: rgba(235, 240, 245, 0.58);
     font-family: inherit;
     font-size: 11px;
@@ -1763,37 +1744,41 @@ html, body {
     cursor: pointer;
     touch-action: manipulation;
     -webkit-tap-highlight-color: transparent;
-    transition: color 0.18s ease, transform 0.12s ease;
+    width: 96px;
+    flex: 0 0 auto;
+    transition: color 0.18s ease, border-color 0.18s ease, background 0.18s ease, transform 0.12s ease;
+    height: 48px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+    -webkit-backdrop-filter: blur(20px) saturate(140%);
+    backdrop-filter: blur(20px) saturate(140%);
 }
 
-.bottom-nav-item svg {
+.top-action-btn svg {
     display: block;
     width: 22px;
     height: 22px;
     flex-shrink: 0;
 }
 
-.bottom-nav-item.active {
+.top-action-btn.active {
     color: #F4FBF6;
+    border-color: rgba(52, 199, 89, 0.45);
+    background: rgba(15, 19, 24, 0.95);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35), inset 0 0 0 1px rgba(52, 199, 89, 0.25);
 }
 
-.bottom-nav-item.active svg {
+.top-action-btn.active svg {
     color: #34C759;
 }
 
-.bottom-nav-item:active {
+.top-action-btn:active {
     transform: scale(0.94);
+    background: rgba(30, 30, 30, 0.5);
 }
 
-.bottom-nav-item:focus-visible {
+.top-action-btn:focus-visible {
     outline: 2px solid rgba(52, 199, 89, 0.7);
     outline-offset: -2px;
-}
-
-@supports not ((backdrop-filter: blur(12px)) or (-webkit-backdrop-filter: blur(12px))) {
-    .bottom-nav-inner {
-        background: #121820;
-    }
 }
 
 @media (max-height: 520px) {
@@ -1801,26 +1786,27 @@ html, body {
         --nav-h: 56px;
     }
 
-    .bottom-nav-item svg {
+    .top-action-btn svg {
         width: 20px;
         height: 20px;
     }
 }
 
 @media (max-width: 380px) {
-    .bottom-nav-item {
+    .top-action-btn {
         font-size: 10px;
         letter-spacing: 0;
+        min-width: 50px;
     }
 
-    .bottom-nav-item svg {
+    .top-action-btn svg {
         width: 20px;
         height: 20px;
     }
 }
 
 @media (prefers-reduced-motion: reduce) {
-    .bottom-nav-indicator {
+    .top-action-btn {
         transition: none;
     }
 }

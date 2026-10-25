@@ -43,6 +43,33 @@
 </head>
 <body>
 
+<div id="topActions" class="top-actions" aria-label="Разделы">
+        <button type="button" class="top-action-btn active" data-tab="routes">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <circle cx="6" cy="19" r="2.5"/>
+                <circle cx="18" cy="5" r="2.5"/>
+                <path d="M8.5 19H15a4 4 0 0 0 0-8H9a4 4 0 0 1 0-8h6"/>
+            </svg>
+            <span>Маршруты</span>
+        </button>
+        <button type="button" class="top-action-btn" data-tab="instruction">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M12 6.2C10.4 4.9 8.2 4.2 5.5 4.2H4.5a1 1 0 0 0-1 1v11.6a1 1 0 0 0 1 1h1c2.7 0 4.9.7 6.5 2 1.6-1.3 3.8-2 6.5-2h1a1 1 0 0 0 1-1V5.2a1 1 0 0 0-1-1h-1c-2.7 0-4.9.7-6.5 2Z"/>
+                <path d="M12 6.2v13.6"/>
+            </svg>
+            <span>Инструкция</span>
+        </button>
+        <button type="button" class="top-action-btn" data-tab="settings">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M4 7h10M18 7h2M4 17h2M10 17h10M4 12h4M12 12h8"/>
+                <circle cx="16" cy="7" r="2"/>
+                <circle cx="8" cy="17" r="2"/>
+                <circle cx="10" cy="12" r="2"/>
+            </svg>
+            <span>Настройки</span>
+        </button>
+    </div>
+
 <div id="loading" class="loading-overlay">
     <div>ЗАГРУЗКА...</div>
 </div>
@@ -1905,52 +1932,14 @@ if (typeof maplibregl === 'undefined') {
     </div>
 </div>
 
-<nav id="bottomNav" class="bottom-nav" aria-label="Разделы">
-    <div class="bottom-nav-inner">
-        <span class="bottom-nav-indicator" aria-hidden="true"></span>
-        <button type="button" class="bottom-nav-item active" data-tab="map" aria-current="page">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                <path d="M9 3 3 6v15l6-3 6 3 6-3V3l-6 3-6-3Z"/>
-                <path d="M9 3v15M15 6v15"/>
-            </svg>
-            <span>Карта</span>
-        </button>
-        <button type="button" class="bottom-nav-item" data-tab="routes">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                <circle cx="6" cy="19" r="2.5"/>
-                <circle cx="18" cy="5" r="2.5"/>
-                <path d="M8.5 19H15a4 4 0 0 0 0-8H9a4 4 0 0 1 0-8h6"/>
-            </svg>
-            <span>Маршруты</span>
-        </button>
-        <button type="button" class="bottom-nav-item" data-tab="instruction">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                <path d="M12 6.2C10.4 4.9 8.2 4.2 5.5 4.2H4.5a1 1 0 0 0-1 1v11.6a1 1 0 0 0 1 1h1c2.7 0 4.9.7 6.5 2 1.6-1.3 3.8-2 6.5-2h1a1 1 0 0 0 1-1V5.2a1 1 0 0 0-1-1h-1c-2.7 0-4.9.7-6.5 2Z"/>
-                <path d="M12 6.2v13.6"/>
-            </svg>
-            <span>Инструкция</span>
-        </button>
-        <button type="button" class="bottom-nav-item" data-tab="settings">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                <path d="M4 7h10M18 7h2M4 17h2M10 17h10M4 12h4M12 12h8"/>
-                <circle cx="16" cy="7" r="2"/>
-                <circle cx="8" cy="17" r="2"/>
-                <circle cx="10" cy="12" r="2"/>
-            </svg>
-            <span>Настройки</span>
-        </button>
-    </div>
-</nav>
-
 <script>
-/* Нижняя навигация: карта / маршруты / настройки */
+/* Верхняя навигация: отдельные кнопки (как на gdebenz.ru) */
 (function () {
-    const nav = document.getElementById('bottomNav');
+    const nav = document.getElementById('topActions');
     if (!nav) return;
 
-    const tabs = Array.from(nav.querySelectorAll('.bottom-nav-item'));
+    const tabs = Array.from(nav.querySelectorAll('.top-action-btn'));
     const order = tabs.map(tab => tab.dataset.tab);
-    nav.style.setProperty('--nav-count', tabs.length);
 
     const isOpen = id => {
         const el = document.getElementById(id);
@@ -1958,7 +1947,6 @@ if (typeof maplibregl === 'undefined') {
     };
 
     const setActive = name => {
-        nav.style.setProperty('--tab-index', Math.max(0, order.indexOf(name)));
         tabs.forEach(tab => {
             const active = tab.dataset.tab === name;
             tab.classList.toggle('active', active);
@@ -1971,7 +1959,10 @@ if (typeof maplibregl === 'undefined') {
         if (isOpen('jsonModal')) setActive('routes');
         else if (isOpen('navSettingsModal')) setActive('settings');
         else if (isOpen('instructionModal')) setActive('instruction');
-        else setActive('map');
+        else tabs.forEach(tab => {
+            tab.classList.remove('active');
+            tab.removeAttribute('aria-current');
+        });
     };
 
     const closeInstructionScreen = () => {
@@ -1981,7 +1972,7 @@ if (typeof maplibregl === 'undefined') {
     };
 
     nav.addEventListener('click', e => {
-        const tab = e.target.closest('.bottom-nav-item');
+        const tab = e.target.closest('.top-action-btn');
         if (!tab || !nav.contains(tab)) return;
 
         const name = tab.dataset.tab;
@@ -2006,8 +1997,6 @@ if (typeof maplibregl === 'undefined') {
         }
     });
 
-    // Панели открываются не только из таб-бара (например, HUD), поэтому
-    // активную вкладку синхронизируем по классу модальных окон.
     const observe = id => {
         const el = document.getElementById(id);
         if (!el) return false;
