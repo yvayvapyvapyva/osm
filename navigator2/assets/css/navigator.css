@@ -92,39 +92,6 @@ html, body {
     transition: opacity 0.6s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-#instructionBtn {
-    position: fixed;
-    bottom: calc(var(--nav-space) + 8px);
-    left: 50%;
-    transform: translateX(-50%);
-    z-index: 9005;
-    height: 52px;
-    padding: 0 16px;
-    border-radius: var(--radius-sm);
-    border: 1px solid rgba(255, 255, 255, 0.25);
-    background: var(--glass-bg);
-    color: #ffffff;
-    cursor: pointer;
-    transition: background 0.15s, opacity 0.25s, visibility 0.25s;
-    font-size: 15px;
-    font-weight: 600;
-    outline: none;
-    touch-action: manipulation;
-    -webkit-tap-highlight-color: transparent;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2), inset 0 0.5px 0 rgba(255, 255, 255, 0.15);
-}
-
-#instructionBtn:active {
-    transform: translateX(-50%) scale(0.95);
-    background: rgba(80, 80, 80, 0.6);
-}
-
-#instructionBtn.is-hidden {
-    opacity: 0;
-    visibility: hidden;
-    pointer-events: none;
-}
-
 /* Инструкция — полноэкранный раздел; таб-бар остаётся поверх него. */
 #instructionModal { z-index: 11000; }
 
@@ -1369,13 +1336,6 @@ html, body {
     display: none;
 }
 
-/* Инструкция живёт в настройках; на карте она уступает место HUD. */
-body.route-active #instructionBtn {
-    opacity: 0;
-    visibility: hidden;
-    pointer-events: none;
-}
-
 /* Свёрнутая атрибуция карты переезжает из-под таб-бара в свободный левый верх. */
 .maplibregl-ctrl-bottom-right {
     top: calc(12px + env(safe-area-inset-top));
@@ -1484,6 +1444,18 @@ body.route-active #instructionBtn {
 @media (max-height: 520px) {
     :root {
         --nav-h: 56px;
+    }
+
+    .bottom-nav-item svg {
+        width: 20px;
+        height: 20px;
+    }
+}
+
+@media (max-width: 380px) {
+    .bottom-nav-item {
+        font-size: 10px;
+        letter-spacing: 0;
     }
 
     .bottom-nav-item svg {

@@ -5,7 +5,7 @@
     <title>Автоинструктор</title>
     <link rel="icon" href="ico.png" type="image/png">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <link rel="stylesheet" href="assets/css/navigator.css?v=4">
+    <link rel="stylesheet" href="assets/css/navigator.css?v=5">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.css">
     <style>
 .toggle-switch {
@@ -75,7 +75,6 @@
     <div class="tel-item"><span class="tel-label">КМ/Ч</span><span class="tel-value" id="telSpeed">0</span></div>
 </div>
 <div id="topCenterControls"><div id="routeNameDisplay"></div></div>
-<button id="instructionBtn">📖 Инструкция</button>
 
 <div id="hud">
     <div class="hud-header hud-prev-header" id="hudPrevHeader" style="display:none">
@@ -1625,21 +1624,6 @@ function closeInstruction() {
     hideScreen('instructionModal');
 }
 
-document.addEventListener('click', e => {
-    const btn = $('instructionBtn');
-    if (btn && btn.contains(e.target)) openInstruction();
-});
-
-// Кнопка инструкции скрывается после первого клика в любом месте,
-// кроме самой этой кнопки. Capture нужен, чтобы срабатывало даже если
-// другой обработчик остановит всплытие.
-document.addEventListener('click', e => {
-    const btn = $('instructionBtn');
-    if (!btn || btn.classList.contains('is-hidden')) return;
-    if (btn.contains(e.target)) return;
-    btn.classList.add('is-hidden');
-}, true);
-
 document.addEventListener('DOMContentLoaded', () => {
     setTimeout(startWakeLock, 500);
 });
@@ -1909,10 +1893,6 @@ if (typeof maplibregl === 'undefined') {
                     </div>
                 </div>
             </div>
-
-            <div class="settings-group" style="cursor:pointer" onclick="closeSettings(); setTimeout(openInstruction, 350)">
-                <div class="settings-label" style="text-align:center;color:rgba(255,255,255,0.6)">📖 Инструкция</div>
-            </div>
         </div>
     </div>
 </div>
@@ -1934,6 +1914,13 @@ if (typeof maplibregl === 'undefined') {
                 <path d="M8.5 19H15a4 4 0 0 0 0-8H9a4 4 0 0 1 0-8h6"/>
             </svg>
             <span>Маршруты</span>
+        </button>
+        <button type="button" class="bottom-nav-item" data-tab="instruction">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M12 6.2C10.4 4.9 8.2 4.2 5.5 4.2H4.5a1 1 0 0 0-1 1v11.6a1 1 0 0 0 1 1h1c2.7 0 4.9.7 6.5 2 1.6-1.3 3.8-2 6.5-2h1a1 1 0 0 0 1-1V5.2a1 1 0 0 0-1-1h-1c-2.7 0-4.9.7-6.5 2Z"/>
+                <path d="M12 6.2v13.6"/>
+            </svg>
+            <span>Инструкция</span>
         </button>
         <button type="button" class="bottom-nav-item" data-tab="settings">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -1975,6 +1962,7 @@ if (typeof maplibregl === 'undefined') {
     const sync = () => {
         if (isOpen('jsonModal')) setActive('routes');
         else if (isOpen('navSettingsModal')) setActive('settings');
+        else if (isOpen('instructionModal')) setActive('instruction');
         else setActive('map');
     };
 
@@ -1987,13 +1975,18 @@ if (typeof maplibregl === 'undefined') {
     nav.addEventListener('click', e => {
         const tab = e.target.closest('.bottom-nav-item');
         if (!tab || !nav.contains(tab)) return;
-        closeInstructionScreen();
 
         const name = tab.dataset.tab;
+        if (name !== 'instruction') closeInstructionScreen();
+
         if (name === 'routes') {
             if (typeof MenuModule === 'undefined') return;
             if (isOpen('jsonModal')) MenuModule.hide();
             else MenuModule.show();
+        } else if (name === 'instruction') {
+            if (typeof openInstruction !== 'function') return;
+            if (isOpen('instructionModal')) closeInstruction();
+            else openInstruction();
         } else if (name === 'settings') {
             if (typeof openSettings === 'function') openSettings();
         } else if (typeof closeAllSheets === 'function') {
@@ -2015,6 +2008,7 @@ if (typeof maplibregl === 'undefined') {
     };
 
     observe('navSettingsModal');
+    observe('instructionModal');
     if (!observe('jsonModal')) {
         const wait = new MutationObserver(() => {
             if (observe('jsonModal')) {
