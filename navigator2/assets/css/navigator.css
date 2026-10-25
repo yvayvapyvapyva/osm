@@ -831,6 +831,52 @@ html, body {
     color: #d2f8d9;
 }
 
+.routes-breadcrumb {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    min-width: 0;
+    padding: 1px 14px 2px;
+    overflow-x: auto;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+}
+
+.routes-breadcrumb::-webkit-scrollbar {
+    display: none;
+}
+
+.routes-breadcrumb[hidden] {
+    display: none;
+}
+
+.routes-breadcrumb-item {
+    flex: 0 0 auto;
+    max-width: 42vw;
+    overflow: hidden;
+    padding: 3px 0;
+    border: 0;
+    background: transparent;
+    color: #9adfa8;
+    font: inherit;
+    font-size: 12px;
+    font-weight: 600;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    cursor: pointer;
+}
+
+.routes-breadcrumb-item.current {
+    color: rgba(255, 255, 255, 0.88);
+    font-weight: 700;
+}
+
+.routes-breadcrumb-separator {
+    flex: 0 0 auto;
+    color: rgba(255, 255, 255, 0.32);
+    font-size: 15px;
+}
+
 .routes-search-clear svg {
     width: 14px;
     height: 14px;
@@ -976,6 +1022,73 @@ html, body {
     font-size: 11px;
     font-weight: 600;
     letter-spacing: 0.1px;
+}
+
+.routes-folder-list {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.routes-folder-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    min-height: 54px;
+    padding: 7px 12px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.045);
+    color: #fff;
+    text-align: left;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.routes-folder-row:active {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.routes-folder-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 30px;
+    width: 30px;
+    height: 30px;
+    border-radius: 9px;
+    background: rgba(255, 200, 87, 0.12);
+    color: #ffd166;
+}
+
+.routes-folder-icon svg {
+    width: 19px;
+    height: 19px;
+}
+
+.routes-folder-name {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    font-size: 14px;
+    font-weight: 650;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.routes-folder-count {
+    flex: 0 0 auto;
+    color: rgba(255, 255, 255, 0.48);
+    font-size: 11px;
+    font-weight: 600;
+}
+
+.routes-folder-chevron {
+    flex: 0 0 auto;
+    color: rgba(255, 255, 255, 0.36);
+    font-size: 22px;
+    line-height: 1;
 }
 
 .route-row {

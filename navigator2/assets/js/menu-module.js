@@ -7,9 +7,8 @@ const MenuModule = {
     _routesLoaded: false,   // список с геометрией уже получен
     _isFetchingRoutes: false,
     _catalog: [],           // плоский список маршрутов с путём и категориями
-    _categories: [],        // { name, count, subs: Map }
     _activeCategory: 'all',
-    _activeSub: 'all',
+    _folderPath: [],
     _searchQuery: '',
     _searchScope: 'all',
     _recentRouteKeys: [],
@@ -190,41 +189,23 @@ const MenuModule = {
         catalog.sort((a, b) => a.fullPath.localeCompare(b.fullPath, 'ru'));
         this._catalog = catalog;
 
-        const categories = new Map();
-        for (const item of catalog) {
-            let category = categories.get(item.top);
-            if (!category) {
-                category = { name: item.top, count: 0, subs: new Map() };
-                categories.set(item.top, category);
-            }
-            category.count++;
-            if (item.sub) {
-                category.subs.set(item.sub, (category.subs.get(item.sub) || 0) + 1);
-            }
-        }
-
-        this._categories = Array.from(categories.values()).sort((a, b) => {
-            if (a.name === 'Без категории') return 1;
-            if (b.name === 'Без категории') return -1;
-            return a.name.localeCompare(b.name, 'ru');
-        });
-
-        const validCategories = new Set(this._categories.map(c => 'cat:' + c.name));
-        if (this._activeCategory !== 'all' &&
-            this._activeCategory !== 'recent' &&
-            !validCategories.has(this._activeCategory)) {
+        if (this._activeCategory !== 'all' && this._activeCategory !== 'recent') {
             this._activeCategory = 'all';
         }
         if (this._activeCategory === 'recent' && !this._getRecentRoutes().length) {
             this._activeCategory = 'all';
         }
-        if (this._activeCategory === 'all' || this._activeCategory === 'recent') {
+        if (this._activeCategory === 'recent') {
+            this._folderPath = [];
             this._searchScope = 'all';
         }
-        const activeCategory = this._getActiveCategory();
-        if (this._activeSub !== 'all' && (!activeCategory || !activeCategory.subs.has(this._activeSub))) {
-            this._activeSub = 'all';
+        let validPath = [];
+        for (const folder of this._folderPath) {
+            const children = this._getChildFolders(validPath);
+            if (!children.some(child => child.name === folder)) break;
+            validPath.push(folder);
         }
+        this._folderPath = validPath;
         this._saveMenuState();
     },
 
@@ -267,15 +248,29 @@ const MenuModule = {
         try {
             const saved = JSON.parse(localStorage.getItem(this._MENU_STATE_KEY) || '{}');
             if (!saved || typeof saved !== 'object') return;
-            if (typeof saved.category === 'string') this._activeCategory = saved.category;
-            if (typeof saved.subcategory === 'string') this._activeSub = saved.subcategory;
+            if (Array.isArray(saved.folderPath) &&
+                saved.folderPath.every(folder => typeof folder === 'string')) {
+                this._folderPath = saved.folderPath;
+                this._activeCategory = 'all';
+            } else {
+                if (saved.category === 'recent') this._activeCategory = 'recent';
+                if (typeof saved.category === 'string' && saved.category.startsWith('cat:')) {
+                    this._folderPath = [
+                        saved.category.slice(4),
+                        ...(typeof saved.subcategory === 'string' && saved.subcategory !== 'all'
+                            ? saved.subcategory.split(' / ')
+                            : [])
+                    ];
+                    this._activeCategory = 'all';
+                }
+            }
             if (typeof saved.query === 'string') this._searchQuery = saved.query;
             if (saved.searchScope === 'all' || saved.searchScope === 'category') {
                 this._searchScope = saved.searchScope;
             }
         } catch (e) {
             this._activeCategory = 'all';
-            this._activeSub = 'all';
+            this._folderPath = [];
             this._searchQuery = '';
             this._searchScope = 'all';
         }
@@ -285,17 +280,32 @@ const MenuModule = {
         try {
             localStorage.setItem(this._MENU_STATE_KEY, JSON.stringify({
                 category: this._activeCategory,
-                subcategory: this._activeSub,
+                folderPath: this._folderPath,
                 query: this._searchQuery,
                 searchScope: this._searchScope
             }));
         } catch (e) {}
     },
 
-    _getActiveCategory() {
-        if (!this._activeCategory.startsWith('cat:')) return null;
-        const name = this._activeCategory.slice(4);
-        return this._categories.find(category => category.name === name) || null;
+    _getChildFolders(parentPath) {
+        const folders = new Map();
+        for (const item of this._catalog) {
+            if (item.folders.length <= parentPath.length ||
+                !parentPath.every((folder, index) => item.folders[index] === folder)) continue;
+            const name = item.folders[parentPath.length];
+            folders.set(name, (folders.get(name) || 0) + 1);
+        }
+        return Array.from(folders, ([name, count]) => ({ name, count }))
+            .sort((a, b) => {
+                if (a.name === 'Без категории') return 1;
+                if (b.name === 'Без категории') return -1;
+                return a.name.localeCompare(b.name, 'ru');
+            });
+    },
+
+    _isWithinFolder(item, path) {
+        return item.folders.length >= path.length &&
+            path.every((folder, index) => item.folders[index] === folder);
     },
 
     _loadRecentRoutes() {
@@ -338,26 +348,20 @@ const MenuModule = {
 
         if (this._searchQuery) {
             const tokens = this._normalizeSearch(this._searchQuery).split(' ').filter(Boolean);
-            const category = this._getActiveCategory();
             routes = !tokens.length
                 ? this._catalog
                 : this._catalog.filter(item =>
                     tokens.every(token => item.search.includes(token)) &&
-                    (this._searchScope !== 'category' || !category ||
-                        (item.top === category.name &&
-                            (this._activeSub === 'all' || item.sub === this._activeSub)))
+                    (this._searchScope !== 'category' || !this._folderPath.length ||
+                        this._isWithinFolder(item, this._folderPath))
                 );
         } else if (this._activeCategory === 'recent') {
             routes = this._getRecentRoutes();
         } else {
-            const category = this._getActiveCategory();
-            routes = !category
-                ? this._catalog
-                : this._catalog.filter(item => {
-                    if (item.top !== category.name) return false;
-                    if (this._activeSub !== 'all' && item.sub !== this._activeSub) return false;
-                    return true;
-                });
+            routes = this._catalog.filter(item =>
+                item.folders.length === this._folderPath.length &&
+                this._isWithinFolder(item, this._folderPath)
+            );
         }
 
         return this._pinCurrentRoute(routes);
@@ -393,6 +397,7 @@ const MenuModule = {
         if (!this._routesLoaded) {
             this._renderCategoryChips();
             this._renderSubcategoryChips();
+            this._renderBreadcrumbs();
             if (this._isFetchingRoutes) {
                 this._showListLoading();
             } else {
@@ -404,6 +409,7 @@ const MenuModule = {
         const routes = this._getFilteredRoutes();
         this._renderCategoryChips();
         this._renderSubcategoryChips();
+        this._renderBreadcrumbs();
 
         container.innerHTML = '';
 
@@ -412,7 +418,10 @@ const MenuModule = {
             return;
         }
 
-        if (!routes.length) {
+        const childFolders = !this._searchQuery && this._activeCategory !== 'recent'
+            ? this._getChildFolders(this._folderPath)
+            : [];
+        if (!routes.length && !childFolders.length) {
             const empty = document.createElement('div');
             empty.className = 'routes-empty';
             empty.innerHTML = this._searchQuery
@@ -428,12 +437,40 @@ const MenuModule = {
             ? `${routes.length} ${this._pluralize(routes.length, 'маршрут найден', 'маршрута найдено', 'маршрутов найдено')}`
             : `${routes.length} ${this._pluralize(routes.length, 'маршрут', 'маршрута', 'маршрутов')}`;
         const searchContext = this._searchQuery
-            ? this._searchScope === 'category' && this._getActiveCategory()
-                ? `в разделе «${this._getActiveCategory().name}${this._activeSub !== 'all' ? ` / ${this._activeSub}` : ''}»`
+            ? this._searchScope === 'category' && this._folderPath.length
+                ? `в папке «${this._folderPath.join(' / ')}»`
                 : 'во всех маршрутах'
             : '';
-        summary.textContent = this._searchQuery ? `${countLabel} ${searchContext}` : countLabel;
+        summary.textContent = this._searchQuery
+            ? `${countLabel} ${searchContext}`
+            : childFolders.length
+                ? `${childFolders.length} ${this._pluralize(childFolders.length, 'папка', 'папки', 'папок')} · ${countLabel}`
+                : countLabel;
         container.appendChild(summary);
+        if (childFolders.length) {
+            const folderList = document.createElement('div');
+            folderList.className = 'routes-folder-list';
+            for (const folder of childFolders) {
+                const button = document.createElement('button');
+                button.type = 'button';
+                button.className = 'routes-folder-row';
+                button.dataset.folder = folder.name;
+                button.innerHTML = `
+                    <span class="routes-folder-icon" aria-hidden="true">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M3 6.5A1.5 1.5 0 0 1 4.5 5h5l2 2h8A1.5 1.5 0 0 1 21 8.5v9a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 17.5z"/>
+                        </svg>
+                    </span>
+                    <span class="routes-folder-name">${this._escape(folder.name)}</span>
+                    <span class="routes-folder-count" aria-label="${folder.count} ${this._pluralize(folder.count, 'маршрут', 'маршрута', 'маршрутов')}">
+                        ${folder.count} ${this._pluralize(folder.count, 'маршрут', 'маршрута', 'маршрутов')}
+                    </span>
+                    <span class="routes-folder-chevron" aria-hidden="true">›</span>
+                `;
+                folderList.appendChild(button);
+            }
+            container.appendChild(folderList);
+        }
         const frag = document.createDocumentFragment();
         for (const route of routes) frag.appendChild(this._createRouteRow(route));
         container.appendChild(frag);
@@ -444,7 +481,7 @@ const MenuModule = {
         const el = document.getElementById('routesCategoryChips');
         if (!el) return;
 
-        if (!this._catalog.length || this._getActiveCategory()) {
+        if (!this._catalog.length || this._folderPath.length || this._activeCategory === 'recent') {
             el.innerHTML = '';
             el.hidden = true;
             return;
@@ -453,14 +490,10 @@ const MenuModule = {
         const scrollLeft = el.scrollLeft;
         el.innerHTML = '';
 
-        const chips = [{ key: 'all', label: 'Все', count: this._catalog.length }];
         const recent = this._getRecentRoutes();
-        if (recent.length) {
-            chips.push({ key: 'recent', label: 'Недавние', count: recent.length });
-        }
-        for (const category of this._categories) {
-            chips.push({ key: 'cat:' + category.name, label: category.name, count: category.count });
-        }
+        const chips = recent.length
+            ? [{ key: 'recent', label: 'Недавние', count: recent.length }]
+            : [];
 
         for (const chip of chips) {
             const button = document.createElement('button');
@@ -477,7 +510,7 @@ const MenuModule = {
             el.appendChild(button);
         }
 
-        el.hidden = !!this._searchQuery;
+        el.hidden = !!this._searchQuery || !chips.length;
         el.scrollLeft = scrollLeft;
         this._ensureActiveChipVisible(el);
         this._updateChipFades(el);
@@ -499,54 +532,35 @@ const MenuModule = {
     _renderSubcategoryChips() {
         const el = document.getElementById('routesSubcategoryChips');
         if (!el) return;
-
-        const category = this._getActiveCategory();
-        const show = !this._searchQuery && category;
-
-        if (!show) {
-            el.innerHTML = '';
-            el.hidden = true;
-            return;
-        }
-
-        if (this._activeSub !== 'all' && !category.subs.has(this._activeSub)) {
-            this._activeSub = 'all';
-        }
-
         el.innerHTML = '';
-        const back = document.createElement('button');
-        back.type = 'button';
-        back.className = 'routes-chip routes-chip-back';
-        back.dataset.action = 'categories';
-        back.setAttribute('aria-label', 'Назад к районам');
-        back.textContent = '← Районы';
-        el.appendChild(back);
+        el.hidden = true;
+    },
 
-        const chips = [{ key: 'all', label: category.name, count: category.count }];
-        const subs = Array.from(category.subs.entries())
-            .sort((a, b) => a[0].localeCompare(b[0], 'ru'));
-        for (const [name, count] of subs) {
-            chips.push({ key: name, label: name, count });
-        }
-
-        for (const chip of chips) {
-            const button = document.createElement('button');
-            button.type = 'button';
-            const isActive = this._activeSub === chip.key;
-            button.className = 'routes-chip' + (isActive ? ' active' : '');
-            button.dataset.sub = chip.key;
-            button.setAttribute('role', 'tab');
-            button.setAttribute('aria-selected', String(isActive));
-            button.innerHTML = `
-                <span class="routes-chip-label">${this._escape(chip.label)}</span>
-                <span class="routes-chip-count">${chip.count}</span>
-            `;
-            el.appendChild(button);
-        }
-
+    _renderBreadcrumbs() {
+        const el = document.getElementById('routesBreadcrumb');
+        if (!el) return;
+        el.innerHTML = '';
+        const labels = this._activeCategory === 'recent'
+            ? ['Все маршруты', 'Недавние']
+            : ['Все маршруты', ...this._folderPath];
         el.hidden = false;
-        this._ensureActiveChipVisible(el);
-        this._updateChipFades(el);
+
+        labels.forEach((label, index) => {
+            if (index > 0) {
+                const separator = document.createElement('span');
+                separator.className = 'routes-breadcrumb-separator';
+                separator.textContent = '›';
+                separator.setAttribute('aria-hidden', 'true');
+                el.appendChild(separator);
+            }
+            const item = document.createElement('button');
+            item.type = 'button';
+            item.className = 'routes-breadcrumb-item' + (index === labels.length - 1 ? ' current' : '');
+            item.textContent = label;
+            item.dataset.breadcrumbIndex = String(index);
+            if (index === labels.length - 1) item.setAttribute('aria-current', 'location');
+            el.appendChild(item);
+        });
     },
 
     _pluralize(count, one, few, many) {
@@ -563,15 +577,14 @@ const MenuModule = {
 
     _updateSearchScopeButton() {
         const button = document.getElementById('routesSearchScope');
-        const category = this._getActiveCategory();
         if (!button) return;
-        button.hidden = !category || !this._searchQuery;
-        button.textContent = this._searchScope === 'category' ? 'В разделе' : 'Везде';
+        button.hidden = !this._folderPath.length || !this._searchQuery;
+        button.textContent = this._searchScope === 'category' ? 'В этой папке' : 'Везде';
         button.setAttribute('aria-pressed', String(this._searchScope === 'category'));
         button.setAttribute(
             'aria-label',
             this._searchScope === 'category'
-                ? `Искать в разделе «${category ? category.name : ''}»`
+                ? `Искать в этой папке и её подпапках: ${this._folderPath.join(' / ')}`
                 : 'Искать во всех маршрутах'
         );
     },
@@ -927,7 +940,8 @@ const MenuModule = {
                             </button>
                             <button type="button" class="routes-search-scope" id="routesSearchScope" hidden>Везде</button>
                         </div>
-                        <div id="routesCategoryChips" class="routes-chips" role="tablist" aria-label="Районы" hidden></div>
+                        <nav id="routesBreadcrumb" class="routes-breadcrumb" aria-label="Путь к папке" hidden></nav>
+                        <div id="routesCategoryChips" class="routes-chips" role="tablist" aria-label="Быстрые фильтры" hidden></div>
                         <div id="routesSubcategoryChips" class="routes-chips routes-chips-sub" role="tablist" aria-label="Подкатегории" hidden></div>
                     </div>
                     <div id="routesListContainer" class="routes-list">
@@ -996,35 +1010,48 @@ const MenuModule = {
                 const key = chip.dataset.category;
                 if (!key || key === this._activeCategory) return;
                 this._activeCategory = key;
-                this._activeSub = 'all';
+                this._folderPath = [];
                 this._searchScope = 'all';
                 this._saveMenuState();
                 this._buildRoutesList();
             });
         }
 
-        const subcategoryChips = document.getElementById('routesSubcategoryChips');
-        if (subcategoryChips) {
-            subcategoryChips.addEventListener('click', event => {
-                const chip = event.target.closest('.routes-chip');
-                if (!chip) return;
-                if (chip.dataset.action === 'categories') {
+        const breadcrumb = document.getElementById('routesBreadcrumb');
+        if (breadcrumb) {
+            breadcrumb.addEventListener('click', event => {
+                const item = event.target.closest('[data-breadcrumb-index]');
+                if (!item) return;
+                const index = Number(item.dataset.breadcrumbIndex);
+                if (!Number.isInteger(index)) return;
+                if (this._activeCategory === 'recent') {
+                    if (index !== 0) return;
                     this._activeCategory = 'all';
-                    this._activeSub = 'all';
-                    this._searchScope = 'all';
-                    this._saveMenuState();
-                    this._buildRoutesList();
-                    return;
+                    this._folderPath = [];
+                } else {
+                    this._activeCategory = 'all';
+                    this._folderPath = index === 0 ? [] : this._folderPath.slice(0, index);
                 }
-                const key = chip.dataset.sub;
-                if (!key || key === this._activeSub) return;
-                this._activeSub = key;
+                this._searchScope = 'all';
                 this._saveMenuState();
                 this._buildRoutesList();
             });
         }
 
-        [categoryChips, subcategoryChips].forEach(chips => {
+        const routesList = document.getElementById('routesListContainer');
+        if (routesList) {
+            routesList.addEventListener('click', event => {
+                const folder = event.target.closest('[data-folder]');
+                if (!folder || !routesList.contains(folder)) return;
+                this._activeCategory = 'all';
+                this._folderPath = [...this._folderPath, folder.dataset.folder];
+                this._searchScope = 'all';
+                this._saveMenuState();
+                this._buildRoutesList();
+            });
+        }
+
+        [categoryChips].forEach(chips => {
             if (!chips) return;
             chips.addEventListener('scroll', () => this._updateChipFades(chips), { passive: true });
         });
