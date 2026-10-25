@@ -105,7 +105,7 @@
 <script src="assets/js/tts-client.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/pmtiles@3.2.1/dist/pmtiles.js"></script>
-<script src="assets/js/map-styles.js?v=9"></script>
+<script src="assets/js/map-styles.js?v=10"></script>
 <script>
 // Грузим Telegram/VK SDK асинхронно с таймаутом 10с.
 // Если telegram.org / unpkg.com заблокированы или недоступны — не блокируем загрузку приложения.
@@ -176,11 +176,9 @@ function loadMapPrefs() {
     if (saved && saved.style) {
       prefs.style = MAP_STYLES[saved.style]
         ? saved.style
-        : saved.style === 'nn_vector' || saved.style === 'ofm_3d'
+        : ['nn_vector', 'ofm_3d', 'osm_vector', 'scheme', 'base', 'topo', 'dark', 'openstreetmap'].includes(saved.style)
           ? 'nn_3d'
-          : ['scheme', 'base', 'sat', 'topo', 'dark', 'openstreetmap'].includes(saved.style)
-            ? 'osm_vector'
-            : 'osm';
+          : 'yandex_sat';
     }
   } catch (e) {}
   return prefs;
@@ -1782,14 +1780,17 @@ if (typeof maplibregl === 'undefined') {
         const sourceId = e && e.sourceId;
         const isYandexError = sourceId === 'osm-yandex-base'
             || /yandexsat:|core-sat\.maps\.yandex\.net/i.test(url);
+        const isVersaError = sourceId === 'versa' || /versatiles\.org/i.test(url);
         const isOsmError = sourceId === 'osm-raster' || sourceId === 'shortbread'
             || /(?:tile|vector)\.openstreetmap\.org/i.test(url);
-        const errorType = isYandexError ? 'yandex' : isOsmError ? 'osm' : null;
+        const errorType = isYandexError ? 'yandex' : isVersaError ? 'versa' : isOsmError ? 'osm' : null;
         if (!errorType || shownMapErrors.has(errorType)) return;
         shownMapErrors.add(errorType);
 
         if (errorType === 'yandex') {
             showToast('Ошибка загрузки тайлов Яндекса', 'error', 6000);
+        } else if (errorType === 'versa') {
+            showToast('Ошибка загрузки карты VersaTiles', 'error', 6000);
         } else {
             showToast('Ошибка загрузки тайлов OpenStreetMap', 'error', 6000);
         }
