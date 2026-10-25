@@ -1,0 +1,98 @@
+# Навигатор — фронтенд (рабочая копия для оптимизации)
+
+Копия клиентской части навигатора из `navigator/` для экспериментов с
+производительностью и интерфейсом. Основная версия в `navigator/` при этом не
+меняется, пока изменения не проверены здесь.
+
+Бэкенд (Cloud Function `osmn`, YDB `dbosm`, TTS), скрипты деплоя и редактор
+маршрутов остались в `navigator/` — в этой папке их нет.
+
+## Состав
+
+```
+navigator2/
+├── navigator.html          # клиент навигатора
+├── instr.html              # инструкция (вшивается в бандл)
+├── ico.png                 # иконка (вшивается base64)
+├── assets/
+│   ├── css/navigator.css
+│   └── js/
+│       ├── map-styles.js   # стили карт
+│       ├── menu-module.js  # меню, список маршрутов, API
+│       ├── report.js       # отчёты о запуске
+│       └── tts-client.js   # кэш TTS из бакета + синтез при промахе
+├── scripts/
+│   └── build-static-deploy.js
+└── deploy-2files/
+    └── navigator.html      # собранный одностраничный бандл
+```
+
+## Карты
+
+Три стиля, ключи не нужны:
+
+| Стиль | Источник | Особенности |
+|---|---|---|
+| Яндекс.Спутник | `yandexsat://` | растровые тайлы |
+| Россия 3D (VersaTiles) | `tiles.versatiles.org` | планета, схема Shortbread, 3D по `height`/`min_height` |
+| Нижегородская обл. 3D | `storage.yandexcloud.net/nn-map-tiles/nn-omt.pmtiles` | своя сборка planetiler (OpenMapTiles), обрезка по области, PMTiles + HTTP Range |
+
+Рендер — MapLibre GL JS 4.7.1 (CDN jsdelivr). Шрифты для подписей берутся из
+своего бакета (`.../fonts/NotoSansRegular|NotoSansBold/{range}.pbf`), поэтому
+кириллица не зависит от зарубежных CDN. Спрайты не используются: подписи
+текстовые, без иконок POI.
+
+Атрибуция OpenStreetMap свёрнута в кнопку ⓘ в правом нижнем углу.
+
+## Локальный запуск
+
+```sh
+cd navigator2
+python3 -m http.server 8125
+# http://127.0.0.1:8125/navigator.html
+```
+
+## Сборка
+
+Нужен Node.js и Terser:
+
+```sh
+cd navigator2
+node scripts/build-static-deploy.js
+```
+
+В `deploy-2files/navigator.html` получается один файл: встроены стили,
+минифицированные скрипты, иконка и инструкция. Внешними остаются только CDN
+MapLibre, картографические тайлы и API. Повторно собирайте после правок в
+исходниках.
+
+## API
+
+Адрес функции задан в `assets/js/menu-module.js`:
+
+```js
+API_URL_V2: 'https://functions.yandexcloud.net/d4e02ghbv31h6kpf8ddh',
+```
+
+Публичные методы без авторизации:
+
+```
+GET ?action=list_routes          # список видимых маршрутов {m, name, description}
+GET ?action=list_routes&full=1   # то же + data (геометрия)
+GET ?action=get&m=<m>            # один маршрут {name, m, data}
+```
+
+Навигатор запрашивает `list_routes&full=1` один раз при запуске и держит данные
+в памяти до перезагрузки.
+
+Ссылка на маршрут: `navigator.html#m=<m>`.
+
+## Что проверять при оптимизациях
+
+- первый экран: спутник + маршруты (сеть, TTFB, LCP);
+- переключение на 3D: время до первого кадра с домами;
+- повторный заход (кэш тайлов и шрифтов);
+- мобильный интернет РФ: доступность `tiles.versatiles.org`.
+
+После проверки изменения переносятся в `navigator/` и собираются там тем же
+скриптом.
