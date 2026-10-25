@@ -6,8 +6,14 @@ const MenuModule = {
     routesDescriptions: {}, // { "m": { name, description, m, data } }
     _routesLoaded: false,   // список с геометрией уже получен
     _isFetchingRoutes: false,
-    _categoryTree: null,
-    _expandedFolders: new Set(),
+    _catalog: [],           // плоский список маршрутов с путём и категориями
+    _categories: [],        // { name, count, subs: Map }
+    _activeCategory: 'all',
+    _activeSub: 'all',
+    _searchQuery: '',
+    _recentRouteKeys: [],
+    _recentLimit: 6,
+    _RECENT_KEY: 'osm_recent_routes_v1',
     _previewObserver: null,
     _previewImages: new Map(),
     _previewJobs: new Map(),
@@ -52,6 +58,7 @@ const MenuModule = {
     // Инициализация
     async init(onRouteLoaded) {
         this.callback = onRouteLoaded;
+        this._loadRecentRoutes();
         this.createModal();
         this.createButton();
         this.hide();
@@ -96,7 +103,7 @@ const MenuModule = {
             try {
                 await this._fetchFromAPI();
                 this._routesLoaded = true;
-                this._expandCurrentRoutePath();
+                this._buildCatalog();
                 this._buildRoutesList();
                 return true;
             } catch (e) {
@@ -143,55 +150,143 @@ const MenuModule = {
         }
 
         this.routesDescriptions = routesFlat;
-        this._categoryTree = this._buildCategoryTree();
+        this._buildCatalog();
     },
 
-    _countTreeRoutes(node) {
-        let count = node.routes.length;
-        for (const folder of Object.values(node.folders)) {
-            count += this._countTreeRoutes(folder);
-        }
-        return count;
-    },
-
-    _buildCategoryTree() {
-        const root = { folders: {}, routes: [] };
+    /**
+     * Плоский каталог вместо дерева. Путь по-прежнему строится по "/",
+     * но хранится как категория + подкатегория для чипов и поиска.
+     */
+    _buildCatalog() {
+        const catalog = [];
 
         for (const [key, route] of Object.entries(this.routesDescriptions)) {
-            // Звёздочка больше не выделяет маршрут в отдельный блок,
-            // но остаётся частью названия. Папки строятся по символу "/".
             const fullPath = (route.name || key).trim() || key;
             const parts = fullPath.split('/').map(s => s.trim()).filter(Boolean);
-            const leafName = parts.pop() || fullPath;
+            const leafName = parts.length ? parts.pop() : fullPath;
+            const folders = parts;
+            const top = folders[0] || 'Без категории';
+            const sub = folders.length > 1 ? folders.slice(1).join(' / ') : null;
 
-            let node = root;
-            for (const part of parts) {
-                if (!node.folders[part]) node.folders[part] = { folders: {}, routes: [] };
-                node = node.folders[part];
+            catalog.push({
+                key,
+                m: route.m || key,
+                name: leafName,
+                fullPath,
+                top,
+                sub,
+                folders,
+                search: this._normalizeSearch(fullPath)
+            });
+        }
+
+        catalog.sort((a, b) => a.fullPath.localeCompare(b.fullPath, 'ru'));
+        this._catalog = catalog;
+
+        const categories = new Map();
+        for (const item of catalog) {
+            let category = categories.get(item.top);
+            if (!category) {
+                category = { name: item.top, count: 0, subs: new Map() };
+                categories.set(item.top, category);
             }
-            node.routes.push({ ...route, name: leafName, fullPath, key });
+            category.count++;
+            if (item.sub) {
+                category.subs.set(item.sub, (category.subs.get(item.sub) || 0) + 1);
+            }
         }
 
-        if (root.routes.length > 0) {
-            root.folders['Без категории'] = root.folders['Без категории'] || { folders: {}, routes: [] };
-            root.folders['Без категории'].routes.push(...root.routes);
-            root.routes = [];
+        this._categories = Array.from(categories.values()).sort((a, b) => {
+            if (a.name === 'Без категории') return 1;
+            if (b.name === 'Без категории') return -1;
+            return a.name.localeCompare(b.name, 'ru');
+        });
+
+        const validCategories = new Set(this._categories.map(c => 'cat:' + c.name));
+        if (this._activeCategory !== 'all' &&
+            this._activeCategory !== 'recent' &&
+            !validCategories.has(this._activeCategory)) {
+            this._activeCategory = 'all';
         }
-        return root;
+        if (this._activeCategory === 'recent' && !this._getRecentRoutes().length) {
+            this._activeCategory = 'all';
+        }
+        const activeCategory = this._getActiveCategory();
+        if (this._activeSub !== 'all' && (!activeCategory || !activeCategory.subs.has(this._activeSub))) {
+            this._activeSub = 'all';
+        }
     },
 
-    _expandCurrentRoutePath() {
-        if (!this.currentRoute) return;
-        const route = this.routesDescriptions[this.currentRoute];
-        if (!route || !route.name) return;
-        const rawName = route.name.trim();
-        const parts = rawName.split('/').filter(Boolean);
-        parts.pop();
-        let path = '';
-        for (const part of parts) {
-            path = path ? path + '/' + part : part;
-            this._expandedFolders.add(path);
+    _getActiveCategory() {
+        if (!this._activeCategory.startsWith('cat:')) return null;
+        const name = this._activeCategory.slice(4);
+        return this._categories.find(category => category.name === name) || null;
+    },
+
+    _loadRecentRoutes() {
+        try {
+            const saved = JSON.parse(localStorage.getItem(this._RECENT_KEY) || '[]');
+            if (Array.isArray(saved)) {
+                this._recentRouteKeys = saved
+                    .filter(key => typeof key === 'string' && key)
+                    .slice(0, this._recentLimit);
+            }
+        } catch (e) {
+            this._recentRouteKeys = [];
         }
+    },
+
+    _rememberRecent(routeM) {
+        if (!routeM) return;
+        this._recentRouteKeys = [routeM, ...this._recentRouteKeys.filter(key => key !== routeM)]
+            .slice(0, this._recentLimit);
+        try {
+            localStorage.setItem(this._RECENT_KEY, JSON.stringify(this._recentRouteKeys));
+        } catch (e) {}
+    },
+
+    _getRecentRoutes() {
+        const byKey = new Map(this._catalog.map(item => [item.key, item]));
+        return this._recentRouteKeys.map(key => byKey.get(key)).filter(Boolean);
+    },
+
+    _normalizeSearch(value) {
+        return String(value || '')
+            .toLocaleLowerCase('ru')
+            .replace(/ё/g, 'е')
+            .replace(/\s+/g, ' ')
+            .trim();
+    },
+
+    _getFilteredRoutes() {
+        let routes;
+
+        if (this._searchQuery) {
+            const tokens = this._normalizeSearch(this._searchQuery).split(' ').filter(Boolean);
+            routes = !tokens.length
+                ? this._catalog
+                : this._catalog.filter(item => tokens.every(token => item.search.includes(token)));
+        } else if (this._activeCategory === 'recent') {
+            routes = this._getRecentRoutes();
+        } else {
+            const category = this._getActiveCategory();
+            routes = !category
+                ? this._catalog
+                : this._catalog.filter(item => {
+                    if (item.top !== category.name) return false;
+                    if (this._activeSub !== 'all' && item.sub !== this._activeSub) return false;
+                    return true;
+                });
+        }
+
+        return this._pinCurrentRoute(routes);
+    },
+
+    _pinCurrentRoute(routes) {
+        if (!this.currentRoute || routes.length < 2) return routes;
+        const index = routes.findIndex(route => route.key === this.currentRoute);
+        if (index <= 0) return routes;
+        return [routes[index], ...routes.slice(0, index), ...routes.slice(index + 1)];
     },
 
     // Индикация загрузки списка маршрутов
@@ -214,6 +309,8 @@ const MenuModule = {
 
         // Список ещё не получен — показываем спиннер, а не «Нет маршрутов».
         if (!this._routesLoaded) {
+            this._renderCategoryChips();
+            this._renderSubcategoryChips();
             if (this._isFetchingRoutes) {
                 this._showListLoading();
             } else {
@@ -222,19 +319,191 @@ const MenuModule = {
             return;
         }
 
-        const tree = this._categoryTree;
-        const hasRoutes = tree && (Object.keys(tree.folders).length > 0 || tree.routes.length > 0);
-        if (!hasRoutes) {
-            container.innerHTML = '<div style="text-align:center;padding:20px;color:rgba(255,255,255,0.5);font-size:14px;">Нет маршрутов</div>';
+        const routes = this._getFilteredRoutes();
+        this._renderCategoryChips();
+        this._renderSubcategoryChips();
+
+        container.innerHTML = '';
+
+        if (!this._catalog.length) {
+            container.innerHTML = '<div class="routes-empty"><div class="routes-empty-title">Нет маршрутов</div></div>';
+            return;
+        }
+
+        if (!routes.length) {
+            const empty = document.createElement('div');
+            empty.className = 'routes-empty';
+            empty.innerHTML = this._searchQuery
+                ? '<div class="routes-empty-title">Ничего не найдено</div><div class="routes-empty-hint">Попробуйте изменить запрос</div>'
+                : '<div class="routes-empty-title">В этом разделе нет маршрутов</div>';
+            container.appendChild(empty);
             return;
         }
 
         const frag = document.createDocumentFragment();
-        this._renderTreeNode(tree, frag, '', true);
-
-        container.innerHTML = '';
+        for (const route of routes) frag.appendChild(this._createRouteRow(route));
         container.appendChild(frag);
         this._observeRoutePreviews(container);
+    },
+
+    _renderCategoryChips() {
+        const el = document.getElementById('routesCategoryChips');
+        if (!el) return;
+
+        if (!this._catalog.length) {
+            el.innerHTML = '';
+            el.hidden = true;
+            return;
+        }
+
+        const scrollLeft = el.scrollLeft;
+        el.innerHTML = '';
+
+        const chips = [{ key: 'all', label: 'Все', count: this._catalog.length }];
+        const recent = this._getRecentRoutes();
+        if (recent.length) {
+            chips.push({ key: 'recent', label: 'Недавние', count: recent.length });
+        }
+        for (const category of this._categories) {
+            chips.push({ key: 'cat:' + category.name, label: category.name, count: category.count });
+        }
+
+        for (const chip of chips) {
+            const button = document.createElement('button');
+            button.type = 'button';
+            const isActive = this._activeCategory === chip.key;
+            button.className = 'routes-chip' + (isActive ? ' active' : '');
+            button.dataset.category = chip.key;
+            button.setAttribute('role', 'tab');
+            button.setAttribute('aria-selected', String(isActive));
+            button.innerHTML = `
+                <span class="routes-chip-label">${this._escape(chip.label)}</span>
+                <span class="routes-chip-count">${chip.count}</span>
+            `;
+            el.appendChild(button);
+        }
+
+        el.hidden = !!this._searchQuery;
+        el.scrollLeft = scrollLeft;
+        this._ensureActiveChipVisible(el);
+        this._updateChipFades(el);
+    },
+
+    _ensureActiveChipVisible(el) {
+        if (!el || el.hidden) return;
+        const active = el.querySelector('.routes-chip.active');
+        if (!active) return;
+        const elRect = el.getBoundingClientRect();
+        const activeRect = active.getBoundingClientRect();
+        if (activeRect.left < elRect.left) {
+            el.scrollLeft -= elRect.left - activeRect.left + 12;
+        } else if (activeRect.right > elRect.right) {
+            el.scrollLeft += activeRect.right - elRect.right + 12;
+        }
+    },
+
+    _renderSubcategoryChips() {
+        const el = document.getElementById('routesSubcategoryChips');
+        if (!el) return;
+
+        const category = this._getActiveCategory();
+        const show = !this._searchQuery && category && category.subs.size > 0;
+
+        if (!show) {
+            el.innerHTML = '';
+            el.hidden = true;
+            return;
+        }
+
+        if (this._activeSub !== 'all' && !category.subs.has(this._activeSub)) {
+            this._activeSub = 'all';
+        }
+
+        el.innerHTML = '';
+        const chips = [{ key: 'all', label: 'Все', count: category.count }];
+        const subs = Array.from(category.subs.entries())
+            .sort((a, b) => a[0].localeCompare(b[0], 'ru'));
+        for (const [name, count] of subs) {
+            chips.push({ key: name, label: name, count });
+        }
+
+        for (const chip of chips) {
+            const button = document.createElement('button');
+            button.type = 'button';
+            const isActive = this._activeSub === chip.key;
+            button.className = 'routes-chip' + (isActive ? ' active' : '');
+            button.dataset.sub = chip.key;
+            button.setAttribute('role', 'tab');
+            button.setAttribute('aria-selected', String(isActive));
+            button.innerHTML = `
+                <span class="routes-chip-label">${this._escape(chip.label)}</span>
+                <span class="routes-chip-count">${chip.count}</span>
+            `;
+            el.appendChild(button);
+        }
+
+        el.hidden = false;
+        this._ensureActiveChipVisible(el);
+        this._updateChipFades(el);
+    },
+
+    _updateChipFades(el) {
+        if (!el || el.hidden) return;
+        const maxScroll = el.scrollWidth - el.clientWidth;
+        el.classList.toggle('can-scroll-left', el.scrollLeft > 1);
+        el.classList.toggle('can-scroll-right', el.scrollLeft < maxScroll - 1);
+    },
+
+    _createRouteRow(route) {
+        const isActive = route.key === this.currentRoute;
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'route-row' + (isActive ? ' is-active' : '');
+        btn.dataset.routeKey = route.key;
+        if (isActive) btn.setAttribute('aria-current', 'true');
+
+        const preview = document.createElement('span');
+        preview.className = 'route-preview';
+        preview.dataset.routeKey = route.key;
+        preview.setAttribute('aria-hidden', 'true');
+
+        const main = document.createElement('span');
+        main.className = 'route-row-main';
+
+        const title = document.createElement('span');
+        title.className = 'route-row-title';
+
+        const name = document.createElement('span');
+        name.className = 'route-row-name';
+        name.textContent = route.name || route.m;
+        title.appendChild(name);
+
+        if (isActive) {
+            const badge = document.createElement('span');
+            badge.className = 'route-row-badge';
+            badge.textContent = 'Загружен';
+            title.appendChild(badge);
+        }
+
+        const meta = document.createElement('span');
+        meta.className = 'route-row-meta';
+        meta.textContent = route.folders.length ? route.folders.join(' · ') : 'Без категории';
+
+        main.append(title, meta);
+
+        const tail = document.createElement('span');
+        tail.className = 'route-row-tail';
+        tail.setAttribute('aria-hidden', 'true');
+        tail.innerHTML = isActive
+            ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>'
+            : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg>';
+
+        btn.append(preview, main, tail);
+        btn.addEventListener('click', event => {
+            event.stopPropagation();
+            if (route.m) this.loadRouteByName(route.m);
+        });
+        return btn;
     },
 
     _destroyRoutePreviews() {
@@ -245,7 +514,7 @@ const MenuModule = {
     },
 
     _observeRoutePreviews(container) {
-        const previews = container.querySelectorAll('.route-preview-map');
+        const previews = container.querySelectorAll('.route-preview');
         if (!previews.length) return;
 
         const showPreviewImage = (element, key, imageUrl) => {
@@ -255,10 +524,11 @@ const MenuModule = {
             image.alt = '';
             image.src = imageUrl;
             element.replaceChildren(image);
+            element.classList.remove('is-loading', 'is-empty');
         };
 
         previews.forEach(element => {
-            const key = `route-preview-v10\0${element.dataset.routeKey}`;
+            const key = `route-preview-v11\0${element.dataset.routeKey}`;
             element.dataset.previewKey = key;
             const image = this._previewImages.get(key);
             if (image) showPreviewImage(element, key, image);
@@ -299,7 +569,8 @@ const MenuModule = {
                 }
 
                 if (!points.length) {
-                    element.textContent = 'Нет геометрии маршрута';
+                    element.classList.remove('is-loading');
+                    element.classList.add('is-empty');
                     return;
                 }
 
@@ -391,11 +662,13 @@ const MenuModule = {
 
                 const imageUrl = canvas.toDataURL('image/jpeg', 0.92);
                 this._previewImages.set(key, imageUrl);
-                document.querySelectorAll('.route-preview-map').forEach(candidate => {
+                document.querySelectorAll('.route-preview').forEach(candidate => {
                     showPreviewImage(candidate, key, imageUrl);
                 });
             } catch (error) {
                 console.warn('Не удалось создать превью маршрута:', error);
+                element.classList.remove('is-loading');
+                element.classList.add('is-empty');
             } finally {
                 this._previewJobs.delete(key);
                 this._previewActive = false;
@@ -417,7 +690,8 @@ const MenuModule = {
                 if (this._previewJobs.has(job.key)) continue;
                 this._previewActive = true;
                 this._previewJobs.set(job.key, true);
-                job.element.textContent = 'Подготавливаем превью…';
+                job.element.replaceChildren();
+                job.element.classList.add('is-loading');
                 void renderPreview(job.element, job.key, job.routeData);
                 return;
             }
@@ -472,130 +746,6 @@ const MenuModule = {
         Lime: '#34C759'
     },
 
-    _renderTreeNode(node, container, path, isRoot = !path) {
-        const folderNames = Object.keys(node.folders).sort((a, b) => a.localeCompare(b));
-
-        for (const name of folderNames) {
-            if (name === 'Без категории') continue;
-            const folderPath = path ? path + '/' + name : name;
-            const sub = node.folders[name];
-            const total = this._countTreeRoutes(sub);
-            const isExpanded = this._expandedFolders.has(folderPath);
-
-            const el = document.createElement('div');
-            el.className = 'category-folder';
-
-            const header = document.createElement('div');
-            header.className = 'category-header' + (isExpanded ? ' expanded' : '') + (isRoot ? ' root' : '');
-            header.setAttribute('role', 'button');
-            header.setAttribute('tabindex', '0');
-            header.setAttribute('aria-expanded', String(isExpanded));
-            header.innerHTML = `
-                <span class="category-chevron" aria-hidden="true"></span>
-                <svg class="category-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6.5A1.5 1.5 0 0 1 4.5 5H10l2 2h7.5A1.5 1.5 0 0 1 21 8.5v9a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 17.5z"/></svg>
-                <span class="category-name">${this._escape(name)}</span>
-                <span class="category-count">${total}</span>
-            `;
-            const toggleFolder = e => {
-                e.stopPropagation();
-                if (this._expandedFolders.has(folderPath)) this._expandedFolders.delete(folderPath);
-                else this._expandedFolders.add(folderPath);
-                this._buildRoutesList();
-            };
-            header.addEventListener('click', toggleFolder);
-            header.addEventListener('keydown', e => {
-                if (e.key !== 'Enter' && e.key !== ' ') return;
-                e.preventDefault();
-                toggleFolder(e);
-            });
-            el.appendChild(header);
-            container.appendChild(el);
-
-            if (isExpanded) {
-                const childWrap = document.createElement('div');
-                childWrap.className = 'route-tree-children';
-                this._renderTreeNode(sub, childWrap, folderPath, false);
-                container.appendChild(childWrap);
-            }
-        }
-
-        const uncat = node.folders['Без категории'];
-        if (uncat) {
-            const fcPath = path ? path + '/Без категории' : 'Без категории';
-            const fcExpanded = this._expandedFolders.has(fcPath);
-            const fcTotal = this._countTreeRoutes(uncat);
-            const fcEl = document.createElement('div');
-            fcEl.className = 'category-folder';
-
-            const fcHdr = document.createElement('div');
-            fcHdr.className = 'category-header' + (fcExpanded ? ' expanded' : '') + (isRoot ? ' root' : '');
-            fcHdr.setAttribute('role', 'button');
-            fcHdr.setAttribute('tabindex', '0');
-            fcHdr.setAttribute('aria-expanded', String(fcExpanded));
-            fcHdr.innerHTML = `
-                <span class="category-chevron" aria-hidden="true"></span>
-                <svg class="category-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6.5A1.5 1.5 0 0 1 4.5 5H10l2 2h7.5A1.5 1.5 0 0 1 21 8.5v9a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 17.5z"/></svg>
-                <span class="category-name">Без категории</span>
-                <span class="category-count">${fcTotal}</span>
-            `;
-            const toggleUncategorized = e => {
-                e.stopPropagation();
-                if (this._expandedFolders.has(fcPath)) this._expandedFolders.delete(fcPath);
-                else this._expandedFolders.add(fcPath);
-                this._buildRoutesList();
-            };
-            fcHdr.addEventListener('click', toggleUncategorized);
-            fcHdr.addEventListener('keydown', e => {
-                if (e.key !== 'Enter' && e.key !== ' ') return;
-                e.preventDefault();
-                toggleUncategorized(e);
-            });
-            fcEl.appendChild(fcHdr);
-            container.appendChild(fcEl);
-
-            if (fcExpanded) {
-                const childWrap = document.createElement('div');
-                childWrap.className = 'route-tree-children';
-                this._renderTreeNode(uncat, childWrap, fcPath, false);
-                container.appendChild(childWrap);
-            }
-        }
-
-        for (const route of node.routes) {
-            const routeKey = route.key;
-            const isActive = routeKey === this.currentRoute;
-            const btn = document.createElement('button');
-            btn.className = 'route-item' + (isActive ? ' active' : '');
-            if (isActive) btn.setAttribute('aria-current', 'true');
-
-            const preview = document.createElement('div');
-            preview.className = 'route-preview-map';
-            preview.dataset.routeKey = routeKey;
-            preview.setAttribute('aria-hidden', 'true');
-            btn.appendChild(preview);
-
-            const details = document.createElement('span');
-            details.className = 'route-item-details';
-            const nameSpan = document.createElement('span');
-            nameSpan.className = 'route-name';
-            nameSpan.textContent = route.name || route.m;
-            details.appendChild(nameSpan);
-            if (isActive) {
-                const loadedLabel = document.createElement('span');
-                loadedLabel.className = 'route-loaded-label';
-                loadedLabel.textContent = 'Загружен';
-                details.appendChild(loadedLabel);
-            }
-            btn.appendChild(details);
-
-            btn.addEventListener('click', e => {
-                e.stopPropagation();
-                if (route.m) this.loadRouteByName(route.m);
-            });
-            container.appendChild(btn);
-        }
-    },
-
     // HTML-экранирование для вставки в innerHTML.
     _escape(str) {
         return String(str)
@@ -617,6 +767,19 @@ const MenuModule = {
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
                         </button>
                     </header>
+                    <div id="routesToolbar" class="routes-toolbar">
+                        <div class="routes-search">
+                            <svg class="routes-search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+                                <circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>
+                            </svg>
+                            <input id="routesSearchInput" class="routes-search-input" type="search" placeholder="Поиск маршрута" aria-label="Поиск маршрута" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="search">
+                            <button type="button" class="routes-search-clear" id="routesSearchClear" aria-label="Очистить поиск" hidden>
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+                            </button>
+                        </div>
+                        <div id="routesCategoryChips" class="routes-chips" role="tablist" aria-label="Районы" hidden></div>
+                        <div id="routesSubcategoryChips" class="routes-chips routes-chips-sub" role="tablist" aria-label="Подкатегории" hidden></div>
+                    </div>
                     <div id="routesListContainer" class="routes-list">
                         <div style="text-align:center; padding:20px; color:rgba(255,255,255,0.5); font-size:14px;">
                             Загрузка списка маршрутов...
@@ -641,6 +804,67 @@ const MenuModule = {
 
         const closeBtn = document.getElementById('jsonModalClose');
         if (closeBtn) closeBtn.addEventListener('click', () => this.hide());
+
+        const searchInput = document.getElementById('routesSearchInput');
+        if (searchInput) {
+            searchInput.addEventListener('input', () => {
+                this._searchQuery = searchInput.value.trim();
+                this._updateSearchClear();
+                this._buildRoutesList();
+            });
+            searchInput.addEventListener('keydown', event => {
+                if (event.key === 'Escape') {
+                    event.preventDefault();
+                    this._clearSearch();
+                }
+            });
+        }
+
+        const searchClear = document.getElementById('routesSearchClear');
+        if (searchClear) {
+            searchClear.addEventListener('click', () => {
+                this._clearSearch();
+                if (searchInput) searchInput.focus();
+            });
+        }
+
+        const categoryChips = document.getElementById('routesCategoryChips');
+        if (categoryChips) {
+            categoryChips.addEventListener('click', event => {
+                const chip = event.target.closest('.routes-chip');
+                if (!chip) return;
+                const key = chip.dataset.category;
+                if (!key || key === this._activeCategory) return;
+                this._activeCategory = key;
+                this._activeSub = 'all';
+                this._buildRoutesList();
+            });
+        }
+
+        const subcategoryChips = document.getElementById('routesSubcategoryChips');
+        if (subcategoryChips) {
+            subcategoryChips.addEventListener('click', event => {
+                const chip = event.target.closest('.routes-chip');
+                if (!chip) return;
+                const key = chip.dataset.sub;
+                if (!key || key === this._activeSub) return;
+                this._activeSub = key;
+                this._buildRoutesList();
+            });
+        }
+
+        [categoryChips, subcategoryChips].forEach(chips => {
+            if (!chips) return;
+            chips.addEventListener('scroll', () => this._updateChipFades(chips), { passive: true });
+        });
+    },
+
+    _clearSearch() {
+        this._searchQuery = '';
+        const input = document.getElementById('routesSearchInput');
+        if (input) input.value = '';
+        this._updateSearchClear();
+        this._buildRoutesList();
     },
 
     // Создание кнопки меню
@@ -712,6 +936,7 @@ const MenuModule = {
             }
 
             await this.loadRoute(data);
+            this._rememberRecent(routeM);
             this.hideSpinner();
         } catch (e) {
             this.hideSpinner();
@@ -768,9 +993,20 @@ const MenuModule = {
         if (typeof closeAllSheets === 'function') closeAllSheets();
         const modal = document.getElementById('jsonModal');
         if (modal) modal.classList.remove('hidden');
-        this._expandedFolders = new Set();
-        this._expandCurrentRoutePath();
+
+        this._activeCategory = 'all';
+        this._activeSub = 'all';
+        this._searchQuery = '';
+
+        const input = document.getElementById('routesSearchInput');
+        if (input) input.value = '';
+        this._updateSearchClear();
         this._buildRoutesList();
+    },
+
+    _updateSearchClear() {
+        const clear = document.getElementById('routesSearchClear');
+        if (clear) clear.hidden = !this._searchQuery;
     },
 
     showSpinner() {
