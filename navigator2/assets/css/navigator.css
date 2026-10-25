@@ -729,8 +729,8 @@ html, body {
     flex-shrink: 0;
     display: flex;
     flex-direction: column;
-    gap: 8px;
-    padding: 10px 0 8px;
+    gap: 6px;
+    padding: 8px 0 7px;
     background: #0f0f0f;
     border-bottom: 1px solid rgba(255, 255, 255, 0.06);
 }
@@ -738,7 +738,7 @@ html, body {
 .routes-search {
     display: flex;
     align-items: center;
-    height: 42px;
+    height: 40px;
     margin: 0 12px;
     border-radius: 12px;
     background: rgba(255, 255, 255, 0.08);
@@ -806,6 +806,31 @@ html, body {
     display: none;
 }
 
+.routes-search-scope {
+    flex: 0 0 auto;
+    height: 28px;
+    margin: 0 6px 0 2px;
+    padding: 0 10px;
+    border: 1px solid rgba(48, 209, 88, 0.28);
+    border-radius: 999px;
+    background: rgba(48, 209, 88, 0.12);
+    color: #a4efb4;
+    font: inherit;
+    font-size: 11px;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.routes-search-scope[hidden] {
+    display: none;
+}
+
+.routes-search-scope[aria-pressed="true"] {
+    background: rgba(48, 209, 88, 0.24);
+    border-color: rgba(48, 209, 88, 0.55);
+    color: #d2f8d9;
+}
+
 .routes-search-clear svg {
     width: 14px;
     height: 14px;
@@ -848,7 +873,7 @@ html, body {
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    height: 34px;
+    height: 32px;
     padding: 0 12px;
     border: 1px solid rgba(255, 255, 255, 0.1);
     border-radius: 999px;
@@ -895,6 +920,12 @@ html, body {
     font-size: 12px;
 }
 
+.routes-chip-back {
+    border-color: rgba(255, 255, 255, 0.06);
+    background: transparent;
+    color: rgba(255, 255, 255, 0.62);
+}
+
 @media (max-width: 380px) {
     .routes-chips {
         gap: 6px;
@@ -936,6 +967,15 @@ html, body {
     height: 12px;
     flex-shrink: 0;
     pointer-events: none;
+}
+
+.routes-results-meta {
+    flex: 0 0 auto;
+    padding: 2px 4px 3px;
+    color: rgba(255, 255, 255, 0.42);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.1px;
 }
 
 .route-row {
@@ -1013,7 +1053,7 @@ html, body {
 .route-row-main {
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: 3px;
     flex: 1 1 auto;
     min-width: 0;
 }
@@ -1051,14 +1091,29 @@ html, body {
     line-height: 1.4;
 }
 
+.route-row-details {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+}
+
 .route-row-meta {
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
     color: rgba(255, 255, 255, 0.44);
-    font-size: 12px;
+    font-size: 11px;
     font-weight: 500;
+}
+
+.route-row-stats {
+    flex: 0 0 auto;
+    color: rgba(255, 255, 255, 0.58);
+    font-size: 10px;
+    font-weight: 600;
+    white-space: nowrap;
 }
 
 .route-row-tail {
@@ -1639,4 +1694,3 @@ html, body {
         transition: none;
     }
 }
-

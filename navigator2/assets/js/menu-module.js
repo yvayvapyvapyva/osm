@@ -11,9 +11,11 @@ const MenuModule = {
     _activeCategory: 'all',
     _activeSub: 'all',
     _searchQuery: '',
+    _searchScope: 'all',
     _recentRouteKeys: [],
     _recentLimit: 6,
     _RECENT_KEY: 'osm_recent_routes_v1',
+    _MENU_STATE_KEY: 'osm_routes_menu_state_v1',
     _previewObserver: null,
     _previewImages: new Map(),
     _previewJobs: new Map(),
@@ -59,6 +61,7 @@ const MenuModule = {
     async init(onRouteLoaded) {
         this.callback = onRouteLoaded;
         this._loadRecentRoutes();
+        this._loadMenuState();
         this.createModal();
         this.createButton();
         this.hide();
@@ -144,7 +147,7 @@ const MenuModule = {
             routesFlat[key] = {
                 m: route.m,
                 name: route.name || route.m,
-                description: route.description || '',
+                description: typeof route.description === 'string' ? route.description.trim() : '',
                 data: route.data
             };
         }
@@ -176,7 +179,11 @@ const MenuModule = {
                 top,
                 sub,
                 folders,
-                search: this._normalizeSearch(fullPath)
+                description: typeof route.description === 'string' ? route.description.trim() : '',
+                ...this._measureRoute(route.data),
+                search: this._normalizeSearch(
+                    `${fullPath} ${typeof route.description === 'string' ? route.description : ''}`
+                )
             });
         }
 
@@ -211,10 +218,78 @@ const MenuModule = {
         if (this._activeCategory === 'recent' && !this._getRecentRoutes().length) {
             this._activeCategory = 'all';
         }
+        if (this._activeCategory === 'all' || this._activeCategory === 'recent') {
+            this._searchScope = 'all';
+        }
         const activeCategory = this._getActiveCategory();
         if (this._activeSub !== 'all' && (!activeCategory || !activeCategory.subs.has(this._activeSub))) {
             this._activeSub = 'all';
         }
+        this._saveMenuState();
+    },
+
+    _measureRoute(data) {
+        if (!Array.isArray(data)) return { pointCount: 0, distanceMeters: 0 };
+
+        let pointCount = 0;
+        let distanceMeters = 0;
+        for (const segment of data) {
+            if (!segment || !Array.isArray(segment.pts)) continue;
+            let previous = null;
+            let hasPoint = false;
+            for (const point of segment.pts) {
+                if (!Array.isArray(point) ||
+                    !Number.isFinite(point[0]) ||
+                    !Number.isFinite(point[1]) ||
+                    Math.abs(point[0]) > 90 ||
+                    Math.abs(point[1]) > 180) continue;
+                hasPoint = true;
+                if (previous) {
+                    const radians = Math.PI / 180;
+                    const dLat = (point[0] - previous[0]) * radians;
+                    const dLon = (point[1] - previous[1]) * radians;
+                    const a = Math.sin(dLat / 2) ** 2 +
+                        Math.cos(previous[0] * radians) *
+                        Math.cos(point[0] * radians) *
+                        Math.sin(dLon / 2) ** 2;
+                    const arc = Math.min(1, Math.max(0, a));
+                    distanceMeters += 6371000 * 2 *
+                        Math.atan2(Math.sqrt(arc), Math.sqrt(1 - arc));
+                }
+                previous = point;
+            }
+            if (hasPoint) pointCount++;
+        }
+        return { pointCount, distanceMeters };
+    },
+
+    _loadMenuState() {
+        try {
+            const saved = JSON.parse(localStorage.getItem(this._MENU_STATE_KEY) || '{}');
+            if (!saved || typeof saved !== 'object') return;
+            if (typeof saved.category === 'string') this._activeCategory = saved.category;
+            if (typeof saved.subcategory === 'string') this._activeSub = saved.subcategory;
+            if (typeof saved.query === 'string') this._searchQuery = saved.query;
+            if (saved.searchScope === 'all' || saved.searchScope === 'category') {
+                this._searchScope = saved.searchScope;
+            }
+        } catch (e) {
+            this._activeCategory = 'all';
+            this._activeSub = 'all';
+            this._searchQuery = '';
+            this._searchScope = 'all';
+        }
+    },
+
+    _saveMenuState() {
+        try {
+            localStorage.setItem(this._MENU_STATE_KEY, JSON.stringify({
+                category: this._activeCategory,
+                subcategory: this._activeSub,
+                query: this._searchQuery,
+                searchScope: this._searchScope
+            }));
+        } catch (e) {}
     },
 
     _getActiveCategory() {
@@ -263,9 +338,15 @@ const MenuModule = {
 
         if (this._searchQuery) {
             const tokens = this._normalizeSearch(this._searchQuery).split(' ').filter(Boolean);
+            const category = this._getActiveCategory();
             routes = !tokens.length
                 ? this._catalog
-                : this._catalog.filter(item => tokens.every(token => item.search.includes(token)));
+                : this._catalog.filter(item =>
+                    tokens.every(token => item.search.includes(token)) &&
+                    (this._searchScope !== 'category' || !category ||
+                        (item.top === category.name &&
+                            (this._activeSub === 'all' || item.sub === this._activeSub)))
+                );
         } else if (this._activeCategory === 'recent') {
             routes = this._getRecentRoutes();
         } else {
@@ -306,6 +387,7 @@ const MenuModule = {
         const container = document.getElementById('routesListContainer');
         if (!container) return;
         this._destroyRoutePreviews();
+        this._updateSearchScopeButton();
 
         // Список ещё не получен — показываем спиннер, а не «Нет маршрутов».
         if (!this._routesLoaded) {
@@ -340,6 +422,18 @@ const MenuModule = {
             return;
         }
 
+        const summary = document.createElement('div');
+        summary.className = 'routes-results-meta';
+        const countLabel = this._searchQuery
+            ? `${routes.length} ${this._pluralize(routes.length, 'маршрут найден', 'маршрута найдено', 'маршрутов найдено')}`
+            : `${routes.length} ${this._pluralize(routes.length, 'маршрут', 'маршрута', 'маршрутов')}`;
+        const searchContext = this._searchQuery
+            ? this._searchScope === 'category' && this._getActiveCategory()
+                ? `в разделе «${this._getActiveCategory().name}${this._activeSub !== 'all' ? ` / ${this._activeSub}` : ''}»`
+                : 'во всех маршрутах'
+            : '';
+        summary.textContent = this._searchQuery ? `${countLabel} ${searchContext}` : countLabel;
+        container.appendChild(summary);
         const frag = document.createDocumentFragment();
         for (const route of routes) frag.appendChild(this._createRouteRow(route));
         container.appendChild(frag);
@@ -350,7 +444,7 @@ const MenuModule = {
         const el = document.getElementById('routesCategoryChips');
         if (!el) return;
 
-        if (!this._catalog.length) {
+        if (!this._catalog.length || this._getActiveCategory()) {
             el.innerHTML = '';
             el.hidden = true;
             return;
@@ -407,7 +501,7 @@ const MenuModule = {
         if (!el) return;
 
         const category = this._getActiveCategory();
-        const show = !this._searchQuery && category && category.subs.size > 0;
+        const show = !this._searchQuery && category;
 
         if (!show) {
             el.innerHTML = '';
@@ -420,7 +514,15 @@ const MenuModule = {
         }
 
         el.innerHTML = '';
-        const chips = [{ key: 'all', label: 'Все', count: category.count }];
+        const back = document.createElement('button');
+        back.type = 'button';
+        back.className = 'routes-chip routes-chip-back';
+        back.dataset.action = 'categories';
+        back.setAttribute('aria-label', 'Назад к районам');
+        back.textContent = '← Районы';
+        el.appendChild(back);
+
+        const chips = [{ key: 'all', label: category.name, count: category.count }];
         const subs = Array.from(category.subs.entries())
             .sort((a, b) => a[0].localeCompare(b[0], 'ru'));
         for (const [name, count] of subs) {
@@ -445,6 +547,33 @@ const MenuModule = {
         el.hidden = false;
         this._ensureActiveChipVisible(el);
         this._updateChipFades(el);
+    },
+
+    _pluralize(count, one, few, many) {
+        const mod100 = count % 100;
+        if (mod100 >= 11 && mod100 <= 14) return many;
+        switch (count % 10) {
+            case 1: return one;
+            case 2:
+            case 3:
+            case 4: return few;
+            default: return many;
+        }
+    },
+
+    _updateSearchScopeButton() {
+        const button = document.getElementById('routesSearchScope');
+        const category = this._getActiveCategory();
+        if (!button) return;
+        button.hidden = !category || !this._searchQuery;
+        button.textContent = this._searchScope === 'category' ? 'В разделе' : 'Везде';
+        button.setAttribute('aria-pressed', String(this._searchScope === 'category'));
+        button.setAttribute(
+            'aria-label',
+            this._searchScope === 'category'
+                ? `Искать в разделе «${category ? category.name : ''}»`
+                : 'Искать во всех маршрутах'
+        );
     },
 
     _updateChipFades(el) {
@@ -489,7 +618,27 @@ const MenuModule = {
         meta.className = 'route-row-meta';
         meta.textContent = route.folders.length ? route.folders.join(' · ') : 'Без категории';
 
-        main.append(title, meta);
+        main.appendChild(title);
+        const details = document.createElement('span');
+        details.className = 'route-row-details';
+        details.appendChild(meta);
+        const stats = [];
+        if (route.pointCount) {
+            stats.push(`${route.pointCount} ${this._pluralize(route.pointCount, 'точка', 'точки', 'точек')}`);
+        }
+        if (route.distanceMeters >= 10) {
+            const distanceLabel = route.distanceMeters >= 1000
+                ? `${(route.distanceMeters / 1000).toLocaleString('ru-RU', { maximumFractionDigits: 1 })} км`
+                : `${Math.round(route.distanceMeters)} м`;
+            stats.push(`≈ ${distanceLabel}`);
+        }
+        if (stats.length) {
+            const statsEl = document.createElement('span');
+            statsEl.className = 'route-row-stats';
+            statsEl.textContent = stats.join(' · ');
+            details.appendChild(statsEl);
+        }
+        main.append(title, details);
 
         const tail = document.createElement('span');
         tail.className = 'route-row-tail';
@@ -528,7 +677,7 @@ const MenuModule = {
         };
 
         previews.forEach(element => {
-            const key = `route-preview-v11\0${element.dataset.routeKey}`;
+            const key = `route-preview-v12\0${element.dataset.routeKey}`;
             element.dataset.previewKey = key;
             const image = this._previewImages.get(key);
             if (image) showPreviewImage(element, key, image);
@@ -574,18 +723,6 @@ const MenuModule = {
                     return;
                 }
 
-                const icons = await Promise.all(points.map(point => new Promise((resolve, reject) => {
-                    const icon = new Image();
-                    icon.onload = () => resolve(icon);
-                    icon.onerror = () => reject(new Error('Could not load route point icon'));
-                    icon.src = window.getNavigatorPointIcon(
-                        point.color,
-                        point.number,
-                        point.current,
-                        point.hasComment
-                    );
-                })));
-
                 const width = Math.max(1, element.clientWidth);
                 const height = Math.max(1, element.clientHeight);
                 const pixelRatio = 2;
@@ -618,6 +755,33 @@ const MenuModule = {
                         maxY = Math.max(maxY, coordinate.y);
                     }
                 }
+                const maxPathPoints = 80;
+                projected.forEach(point => {
+                    if (point.path.length > maxPathPoints) {
+                        const lastIndex = point.path.length - 1;
+                        point.path = Array.from({ length: maxPathPoints }, (_, index) =>
+                            point.path[Math.round(index * lastIndex / (maxPathPoints - 1))]
+                        );
+                    }
+                });
+                const maxMarkers = 8;
+                const markerIndices = projected.length <= maxMarkers
+                    ? projected.map((_point, index) => index)
+                    : Array.from({ length: maxMarkers }, (_, index) =>
+                        Math.round(index * (projected.length - 1) / (maxMarkers - 1))
+                    );
+                const icons = await Promise.all(markerIndices.map(index => new Promise((resolve, reject) => {
+                    const point = projected[index];
+                    const icon = new Image();
+                    icon.onload = () => resolve({ index, icon });
+                    icon.onerror = () => reject(new Error('Could not load route point icon'));
+                    icon.src = window.getNavigatorPointIcon(
+                        point.color,
+                        point.number,
+                        point.current,
+                        point.hasComment
+                    );
+                })));
                 const markerSize = Math.min(40, Math.max(20, Math.min(width, height) * 0.2));
                 const padding = markerSize / 2 + 2;
                 const scale = Math.min(
@@ -649,10 +813,10 @@ const MenuModule = {
                     context.stroke();
                 }
 
-                for (let index = projected.length - 1; index >= 0; index--) {
+                for (const { index, icon } of icons) {
                     const position = toCanvas(projected[index].path[0]);
                     context.drawImage(
-                        icons[index],
+                        icon,
                         position.x - markerSize / 2,
                         position.y - markerSize / 2,
                         markerSize,
@@ -776,6 +940,7 @@ const MenuModule = {
                             <button type="button" class="routes-search-clear" id="routesSearchClear" aria-label="Очистить поиск" hidden>
                                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
                             </button>
+                            <button type="button" class="routes-search-scope" id="routesSearchScope" hidden>Везде</button>
                         </div>
                         <div id="routesCategoryChips" class="routes-chips" role="tablist" aria-label="Районы" hidden></div>
                         <div id="routesSubcategoryChips" class="routes-chips routes-chips-sub" role="tablist" aria-label="Подкатегории" hidden></div>
@@ -809,6 +974,7 @@ const MenuModule = {
         if (searchInput) {
             searchInput.addEventListener('input', () => {
                 this._searchQuery = searchInput.value.trim();
+                this._saveMenuState();
                 this._updateSearchClear();
                 this._buildRoutesList();
             });
@@ -828,6 +994,15 @@ const MenuModule = {
             });
         }
 
+        const searchScope = document.getElementById('routesSearchScope');
+        if (searchScope) {
+            searchScope.addEventListener('click', () => {
+                this._searchScope = this._searchScope === 'category' ? 'all' : 'category';
+                this._saveMenuState();
+                this._buildRoutesList();
+            });
+        }
+
         const categoryChips = document.getElementById('routesCategoryChips');
         if (categoryChips) {
             categoryChips.addEventListener('click', event => {
@@ -837,6 +1012,8 @@ const MenuModule = {
                 if (!key || key === this._activeCategory) return;
                 this._activeCategory = key;
                 this._activeSub = 'all';
+                this._searchScope = 'all';
+                this._saveMenuState();
                 this._buildRoutesList();
             });
         }
@@ -846,9 +1023,18 @@ const MenuModule = {
             subcategoryChips.addEventListener('click', event => {
                 const chip = event.target.closest('.routes-chip');
                 if (!chip) return;
+                if (chip.dataset.action === 'categories') {
+                    this._activeCategory = 'all';
+                    this._activeSub = 'all';
+                    this._searchScope = 'all';
+                    this._saveMenuState();
+                    this._buildRoutesList();
+                    return;
+                }
                 const key = chip.dataset.sub;
                 if (!key || key === this._activeSub) return;
                 this._activeSub = key;
+                this._saveMenuState();
                 this._buildRoutesList();
             });
         }
@@ -863,6 +1049,7 @@ const MenuModule = {
         this._searchQuery = '';
         const input = document.getElementById('routesSearchInput');
         if (input) input.value = '';
+        this._saveMenuState();
         this._updateSearchClear();
         this._buildRoutesList();
     },
@@ -994,12 +1181,8 @@ const MenuModule = {
         const modal = document.getElementById('jsonModal');
         if (modal) modal.classList.remove('hidden');
 
-        this._activeCategory = 'all';
-        this._activeSub = 'all';
-        this._searchQuery = '';
-
         const input = document.getElementById('routesSearchInput');
-        if (input) input.value = '';
+        if (input) input.value = this._searchQuery;
         this._updateSearchClear();
         this._buildRoutesList();
     },

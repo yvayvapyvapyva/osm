@@ -728,57 +728,305 @@ html, body {
 }
 
 #jsonModal .routes-list {
-    padding: 4px 8px 16px;
+    padding: 8px 10px 0;
     margin-top: 0;
 }
 
+.routes-toolbar {
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 8px 0 7px;
+    background: #0f0f0f;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.routes-search {
+    display: flex;
+    align-items: center;
+    height: 40px;
+    margin: 0 12px;
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.09);
+    box-sizing: border-box;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+}
+
+.routes-search:focus-within {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: rgba(48, 209, 88, 0.6);
+    box-shadow: 0 0 0 3px rgba(48, 209, 88, 0.12);
+}
+
+.routes-search-icon {
+    flex: 0 0 auto;
+    width: 18px;
+    height: 18px;
+    margin-left: 12px;
+    color: rgba(255, 255, 255, 0.42);
+}
+
+.routes-search-input {
+    flex: 1 1 auto;
+    min-width: 0;
+    height: 100%;
+    padding: 0 8px;
+    border: 0;
+    outline: 0;
+    background: transparent;
+    color: #fff;
+    font: inherit;
+    font-size: 16px;
+    -webkit-appearance: none;
+    appearance: none;
+}
+
+.routes-search-input::placeholder {
+    color: rgba(255, 255, 255, 0.38);
+}
+
+.routes-search-input::-webkit-search-cancel-button,
+.routes-search-input::-webkit-search-decoration {
+    -webkit-appearance: none;
+    display: none;
+}
+
+.routes-search-clear {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    margin-right: 7px;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.12);
+    color: rgba(255, 255, 255, 0.72);
+    cursor: pointer;
+}
+
+.routes-search-clear[hidden] {
+    display: none;
+}
+
+.routes-search-scope {
+    flex: 0 0 auto;
+    height: 28px;
+    margin: 0 6px 0 2px;
+    padding: 0 10px;
+    border: 1px solid rgba(48, 209, 88, 0.28);
+    border-radius: 999px;
+    background: rgba(48, 209, 88, 0.12);
+    color: #a4efb4;
+    font: inherit;
+    font-size: 11px;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.routes-search-scope[hidden] {
+    display: none;
+}
+
+.routes-search-scope[aria-pressed="true"] {
+    background: rgba(48, 209, 88, 0.24);
+    border-color: rgba(48, 209, 88, 0.55);
+    color: #d2f8d9;
+}
+
+.routes-search-clear svg {
+    width: 14px;
+    height: 14px;
+}
+
+.routes-chips {
+    display: flex;
+    gap: 7px;
+    padding: 0 20px 0 12px;
+    overflow-x: auto;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+}
+
+.routes-chips.can-scroll-left {
+    -webkit-mask-image: linear-gradient(to right, transparent, #000 16px, #000 100%);
+    mask-image: linear-gradient(to right, transparent, #000 16px, #000 100%);
+}
+
+.routes-chips.can-scroll-right {
+    -webkit-mask-image: linear-gradient(to right, #000 0, #000 calc(100% - 16px), transparent);
+    mask-image: linear-gradient(to right, #000 0, #000 calc(100% - 16px), transparent);
+}
+
+.routes-chips.can-scroll-left.can-scroll-right {
+    -webkit-mask-image: linear-gradient(to right, transparent, #000 16px, #000 calc(100% - 16px), transparent);
+    mask-image: linear-gradient(to right, transparent, #000 16px, #000 calc(100% - 16px), transparent);
+}
+
+.routes-chips::-webkit-scrollbar {
+    display: none;
+}
+
+.routes-chips[hidden] {
+    display: none;
+}
+
+.routes-chip {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 32px;
+    padding: 0 12px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.07);
+    color: rgba(255, 255, 255, 0.78);
+    font: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    line-height: 1;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease, transform 0.1s ease;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.routes-chip:active {
+    transform: scale(0.96);
+}
+
+.routes-chip.active {
+    background: rgba(48, 209, 88, 0.18);
+    border-color: rgba(48, 209, 88, 0.65);
+    color: #fff;
+}
+
+.routes-chip-count {
+    padding: 2px 6px;
+    border-radius: 999px;
+    background: rgba(0, 0, 0, 0.25);
+    color: rgba(255, 255, 255, 0.55);
+    font-size: 11px;
+    font-weight: 700;
+    line-height: 1;
+}
+
+.routes-chip.active .routes-chip-count {
+    background: rgba(48, 209, 88, 0.28);
+    color: #b9f7c8;
+}
+
+.routes-chips-sub .routes-chip {
+    height: 30px;
+    padding: 0 10px;
+    font-size: 12px;
+}
+
+.routes-chip-back {
+    border-color: rgba(255, 255, 255, 0.06);
+    background: transparent;
+    color: rgba(255, 255, 255, 0.62);
+}
+
+@media (max-width: 380px) {
+    .routes-chips {
+        gap: 6px;
+    }
+
+    .routes-chip {
+        height: 32px;
+        padding: 0 9px;
+        font-size: 12px;
+    }
+
+    .routes-chips-sub .routes-chip {
+        height: 28px;
+        padding: 0 9px;
+        font-size: 11.5px;
+    }
+
+    .routes-chip-count {
+        padding: 2px 5px;
+        font-size: 10px;
+    }
+}
+
 .routes-list {
-    margin-top: 4px;
     flex: 1 1 0%;
     min-height: 0;
+    margin-top: 0;
+    padding: 8px 10px 0;
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
     display: flex;
     flex-direction: column;
-    gap: 8px;
-    padding: 4px 2px 0;
+    gap: 6px;
 }
+
 .routes-list::after {
     content: '';
     display: block;
-    height: 8px;
-    pointer-events: none;
+    height: 12px;
     flex-shrink: 0;
+    pointer-events: none;
 }
 
-.route-item {
-    display: flex;
-    flex-direction: column;
-    align-items: stretch;
-    gap: 0;
-    padding: 8px;
-    border-radius: 14px;
-    background: rgba(255, 255, 255, 0.08);
-    border: 1px solid rgba(255, 255, 255, 0.12);
-    cursor: pointer;
-    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-    text-align: left;
-    width: 100%;
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
-    position: relative;
-}
-
-.route-preview-map {
-    width: 180px;
-    height: 180px;
-    align-self: center;
+.routes-results-meta {
     flex: 0 0 auto;
+    padding: 2px 4px 3px;
+    color: rgba(255, 255, 255, 0.42);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.1px;
+}
+
+.route-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    min-height: 74px;
+    padding: 7px 10px 7px 7px;
+    border: 1px solid rgba(255, 255, 255, 0.09);
+    border-radius: 14px;
+    background: rgba(255, 255, 255, 0.06);
+    color: #fff;
+    text-align: left;
     box-sizing: border-box;
-    border-radius: 12px;
+    cursor: pointer;
+    transition: background 0.15s ease, border-color 0.15s ease, transform 0.1s ease;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.route-row:active {
+    transform: scale(0.985);
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.route-row.is-active {
+    background: rgba(48, 209, 88, 0.12);
+    border-color: rgba(48, 209, 88, 0.5);
+    box-shadow: inset 3px 0 0 #30d158;
+}
+
+.route-preview {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 60px;
+    width: 60px;
+    height: 60px;
+    border-radius: 10px;
     overflow: hidden;
-    background: #252a30;
-    border: 1px solid rgba(255, 255, 255, 0.25);
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+    background: linear-gradient(145deg, #303840, #20262d);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    box-sizing: border-box;
 }
 
 .route-preview-image {
@@ -786,180 +1034,142 @@ html, body {
     width: 100%;
     height: 100%;
     object-fit: cover;
-    outline: none;
 }
 
-.route-item .route-name {
-    padding: 10px 40px 4px 4px;
+.route-preview.is-loading::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(100deg, transparent 20%, rgba(255, 255, 255, 0.13) 50%, transparent 80%);
+    animation: route-preview-shimmer 1.2s ease-in-out infinite;
 }
 
-.route-item:active {
-    transform: scale(0.98);
-    background: rgba(48, 209, 88, 0.2);
-    border-color: rgba(48, 209, 88, 0.4);
-}
-
-.compact-route-menu .route-item {
-    flex-direction: row;
-    align-items: center;
-    gap: 8px;
-    min-height: 138px;
-    padding: 5px;
-    border-radius: 12px;
-}
-
-.compact-route-menu .route-item.active {
-    background: rgba(48, 209, 88, 0.16);
-    border-color: rgba(48, 209, 88, 0.72);
-    box-shadow: inset 3px 0 0 #30d158, 0 2px 8px rgba(0, 0, 0, 0.2);
-}
-
-.compact-route-menu .route-preview-map {
-    width: 126px;
-    height: 126px;
-    align-self: auto;
-    border-radius: 8px;
-}
-
-.compact-route-menu .route-item-details {
-    display: flex;
-    flex: 1 1 auto;
-    min-width: 0;
-    flex-direction: column;
-    align-items: flex-start;
-    justify-content: center;
-    gap: 6px;
-}
-
-.compact-route-menu .route-item .route-name {
-    display: -webkit-box;
-    flex: 0 1 auto;
-    width: 100%;
-    min-width: 0;
-    box-sizing: border-box;
-    padding: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    -webkit-box-orient: vertical;
-    -webkit-line-clamp: 4;
-    line-clamp: 4;
-}
-
-.route-loaded-label {
-    display: inline-flex;
-    align-items: center;
-    min-height: 22px;
-    padding: 0 8px;
-    border-radius: 999px;
-    background: rgba(48, 209, 88, 0.2);
-    color: #8ff0a4;
-    font-size: 11px;
-    font-weight: 700;
-    line-height: 1;
-}
-
-.route-name {
-    font-size: 16px;
-    font-weight: 600;
-    color: #fff;
-    line-height: 1.3;
-    letter-spacing: -0.1px;
-    padding-right: 40px;
-    flex: 1 1 auto;
-    min-width: 0;
-    overflow-wrap: break-word;
-}
-
-/* ============================================
-   Категории
-   ============================================ */
-.category-folder {
-    width: 100%;
-}
-
-.category-header {
-    display: flex;
-    align-items: center;
-    gap: 9px;
-    min-height: 48px;
-    padding: 9px 12px;
-    border-radius: 12px;
-    background: rgba(31, 50, 76, 0.72);
-    border: 1px solid rgba(112, 163, 220, 0.3);
-    border-left: 3px solid rgba(78, 151, 235, 0.85);
-    cursor: pointer;
-    transition: all 0.2s;
-    width: 100%;
-    box-sizing: border-box;
-}
-
-.category-header.expanded {
-    background: rgba(38, 64, 96, 0.82);
-    border-color: rgba(112, 163, 220, 0.42);
-    border-left-color: #63a9ff;
-}
-.category-header:active {
-    transform: scale(0.98);
-    background: rgba(48, 82, 124, 0.9);
-}
-
-.category-header.root {
-    min-height: 52px;
-    background: rgba(39, 63, 94, 0.86);
-    border-color: rgba(112, 163, 220, 0.42);
-}
-
-.category-icon {
+.route-preview.is-empty::after {
+    content: '';
     width: 20px;
     height: 20px;
-    fill: rgba(157, 197, 243, 0.18);
-    stroke: #a8ceff;
-    stroke-width: 1.6;
-    stroke-linejoin: round;
-    flex-shrink: 0;
+    border: 2px dashed rgba(255, 255, 255, 0.22);
+    border-radius: 50%;
 }
 
-.category-chevron {
-    width: 7px;
-    height: 7px;
-    border-right: 1.5px solid rgba(224, 238, 255, 0.8);
-    border-bottom: 1.5px solid rgba(224, 238, 255, 0.8);
-    transform: rotate(-45deg);
-    transition: transform 0.18s ease;
-    flex: 0 0 7px;
+@keyframes route-preview-shimmer {
+    from { transform: translateX(-100%); }
+    to { transform: translateX(100%); }
 }
 
-.category-header.expanded .category-chevron {
-    transform: rotate(45deg) translate(-2px, -2px);
-}
-
-.category-name {
-    flex: 1;
+.route-row-main {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    flex: 1 1 auto;
     min-width: 0;
+}
+
+.route-row-title {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+}
+
+.route-row-name {
+    flex: 0 1 auto;
+    min-width: 0;
+    display: -webkit-box;
+    overflow: hidden;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
     font-size: 15px;
-    font-weight: 700;
-    color: #fff;
-    text-align: left;
+    font-weight: 650;
+    line-height: 1.25;
+    letter-spacing: -0.1px;
     overflow-wrap: anywhere;
 }
 
-.category-count {
-    font-size: 12px;
-    font-weight: 600;
-    color: rgba(226, 239, 255, 0.8);
-    background: rgba(5, 19, 36, 0.38);
-    padding: 2px 8px;
-    border-radius: 10px;
-    flex-shrink: 0;
+.route-row-badge {
+    flex: 0 0 auto;
+    padding: 2px 6px;
+    border-radius: 999px;
+    background: rgba(48, 209, 88, 0.18);
+    color: #8ff0a4;
+    font-size: 10px;
+    font-weight: 700;
+    line-height: 1.4;
 }
 
-.route-tree-children {
+.route-row-details {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+}
+
+.route-row-meta {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: rgba(255, 255, 255, 0.44);
+    font-size: 11px;
+    font-weight: 500;
+}
+
+.route-row-stats {
+    flex: 0 0 auto;
+    color: rgba(255, 255, 255, 0.58);
+    font-size: 10px;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.route-row-tail {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 20px;
+    width: 20px;
+    height: 20px;
+    color: rgba(255, 255, 255, 0.32);
+}
+
+.route-row.is-active .route-row-tail {
+    color: #30d158;
+}
+
+.route-row-tail svg {
+    display: block;
+    width: 18px;
+    height: 18px;
+}
+
+.routes-empty {
     display: flex;
     flex-direction: column;
-    gap: 8px;
-    margin: 8px 0 8px 12px;
-    padding-left: 10px;
-    border-left: 1px solid rgba(119, 168, 222, 0.4);
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 48px 20px;
+    color: rgba(255, 255, 255, 0.5);
+    text-align: center;
+    font-size: 14px;
+}
+
+.routes-empty-title {
+    color: rgba(255, 255, 255, 0.72);
+    font-size: 15px;
+    font-weight: 600;
+}
+
+.routes-empty-hint {
+    color: rgba(255, 255, 255, 0.4);
+    font-size: 13px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .route-preview.is-loading::after {
+        animation: none;
+    }
 }
 
 /* ============================================
@@ -1117,11 +1327,6 @@ html, body {
     background: #30D158;
     border: none;
     box-shadow: 0 2px 8px rgba(0,0,0,0.3);
-}
-
-/* ---- Tree view for route list ---- */
-.route-item.dragging {
-    opacity: 0.5;
 }
 
 /* ============================================
@@ -1496,7 +1701,6 @@ html, body {
         transition: none;
     }
 }
-
 </style>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.css">
     <style>
@@ -1936,6 +2140,6 @@ html, body {
     </p>
 
 </div>
-</template><script>const MenuModule={callback:null,isLoaded:!1,currentRoute:null,routesDescriptions:{},_routesLoaded:!1,_isFetchingRoutes:!1,_categoryTree:null,_expandedFolders:new Set,_previewObserver:null,_previewImages:new Map,_previewJobs:new Map,_previewQueue:[],_previewQueuedKeys:new Set,_previewActive:!1,API_URL_V2:"https://functions.yandexcloud.net/d4e02ghbv31h6kpf8ddh",getUrlParam(e){if("m"!==e)return null;let t=new URLSearchParams(window.location.search).get(e);if(t)return t;const n=window.location.hash.slice(1);if(n){if(t=new URLSearchParams(n).get(e),t)return t;const s=n.indexOf("?");if(s>-1){const o=n.substring(s+1);if(t=new URLSearchParams(o).get(e),t)return t}}return null},async init(e){this.callback=e,this.createModal(),this.createButton(),this.hide(),await this._loadRoutesList(),this.checkUrlParam()},async _loadRoutesList(){if(this._isFetchingRoutes)return;this._retryTimer&&(clearTimeout(this._retryTimer),this._retryTimer=null),this._isFetchingRoutes=!0;const e=document.getElementById("routesListContainer");this._showListLoading(),await(async()=>{try{return await this._fetchFromAPI(),this._routesLoaded=!0,this._expandCurrentRoutePath(),this._buildRoutesList(),!0}catch(t){return console.warn("Не удалось загрузить список маршрутов:",t),e&&(e.innerHTML='\n                    <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:30px;gap:12px;">\n                        <div class="spinner-ring" style="width:28px;height:28px;border-width:3px;"></div>\n                        <div style="color:rgba(255,255,255,0.5);font-size:14px;">Не удалось загрузить. Повторяем...</div>\n                    </div>\n                '),!1}})()?this._isFetchingRoutes=!1:(this._isFetchingRoutes=!1,this._retryTimer=setTimeout(()=>this._loadRoutesList(),5e3))},async _fetchFromAPI(){const e=await fetch(`${this.API_URL_V2}?action=list_routes&full=1`);if(!e.ok)throw new Error(`HTTP ${e.status}`);const t=await e.json(),n={};for(const e of t){const t=e.m;t&&(n[t]={m:e.m,name:e.name||e.m,description:e.description||"",data:e.data})}this.routesDescriptions=n,this._categoryTree=this._buildCategoryTree()},_countTreeRoutes(e){let t=e.routes.length;for(const n of Object.values(e.folders))t+=this._countTreeRoutes(n);return t},_buildCategoryTree(){const e={folders:{},routes:[]};for(const[t,n]of Object.entries(this.routesDescriptions)){const s=(n.name||t).trim()||t,o=s.split("/").map(e=>e.trim()).filter(Boolean),i=o.pop()||s;let r=e;for(const e of o)r.folders[e]||(r.folders[e]={folders:{},routes:[]}),r=r.folders[e];r.routes.push({...n,name:i,fullPath:s,key:t})}return e.routes.length>0&&(e.folders["Без категории"]=e.folders["Без категории"]||{folders:{},routes:[]},e.folders["Без категории"].routes.push(...e.routes),e.routes=[]),e},_expandCurrentRoutePath(){if(!this.currentRoute)return;const e=this.routesDescriptions[this.currentRoute];if(!e||!e.name)return;const t=e.name.trim().split("/").filter(Boolean);t.pop();let n="";for(const e of t)n=n?n+"/"+e:e,this._expandedFolders.add(n)},_showListLoading(){const e=document.getElementById("routesListContainer");e&&(this._destroyRoutePreviews(),e.innerHTML='\n            <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:30px;gap:12px;">\n                <div class="spinner-ring" style="width:28px;height:28px;border-width:3px;"></div>\n                <div style="color:rgba(255,255,255,0.5);font-size:14px;">Загрузка маршрутов...</div>\n            </div>\n        ')},_buildRoutesList(){const e=document.getElementById("routesListContainer");if(!e)return;if(this._destroyRoutePreviews(),!this._routesLoaded)return void(this._isFetchingRoutes?this._showListLoading():this._loadRoutesList());const t=this._categoryTree;if(!t||!(Object.keys(t.folders).length>0||t.routes.length>0))return void(e.innerHTML='<div style="text-align:center;padding:20px;color:rgba(255,255,255,0.5);font-size:14px;">Нет маршрутов</div>');const n=document.createDocumentFragment();this._renderTreeNode(t,n,"",!0),e.innerHTML="",e.appendChild(n),this._observeRoutePreviews(e)},_destroyRoutePreviews(){this._previewObserver&&(this._previewObserver.disconnect(),this._previewObserver=null)},_observeRoutePreviews(e){const t=e.querySelectorAll(".route-preview-map");if(!t.length)return;const n=(e,t,n)=>{if(!e.isConnected||e.dataset.previewKey!==t)return;const s=document.createElement("img");s.className="route-preview-image",s.alt="",s.src=n,e.replaceChildren(s)};t.forEach(e=>{const t=`route-preview-v10\0${e.dataset.routeKey}`;e.dataset.previewKey=t;const s=this._previewImages.get(t);s&&n(e,t,s)});const s=async(e,t,s)=>{try{const o=[],i=e=>{const t=Math.max(-85.0511,Math.min(85.0511,e[0])),n=e[1],s=Math.sin(t*Math.PI/180);return{x:(n+180)/360,y:.5-Math.log((1+s)/(1-s))/(4*Math.PI)}};let r=0;for(const e of s){if(!e||!Array.isArray(e.pts))continue;const t=e.pts.filter(e=>Array.isArray(e)&&Number.isFinite(e[0])&&Number.isFinite(e[1])&&Math.abs(e[0])<=90&&Math.abs(e[1])<=180);t.length&&(r++,o.push({coordinates:t,color:this._ROUTE_COLORS[e.color]||"#FFD700",number:String(e.id||r),current:1===r,hasComment:"string"==typeof e.comm&&""!==e.comm.trim()}))}if(!o.length)return void(e.textContent="Нет геометрии маршрута");const a=await Promise.all(o.map(e=>new Promise((t,n)=>{const s=new Image;s.onload=()=>t(s),s.onerror=()=>n(new Error("Could not load route point icon")),s.src=window.getNavigatorPointIcon(e.color,e.number,e.current,e.hasComment)}))),d=Math.max(1,e.clientWidth),c=Math.max(1,e.clientHeight),l=2,h=document.createElement("canvas");h.width=Math.round(d*l),h.height=Math.round(c*l);const u=h.getContext("2d");if(!u)throw new Error("Could not create preview canvas");u.scale(l,l);const p=u.createLinearGradient(0,0,d,c);p.addColorStop(0,"#303840"),p.addColorStop(1,"#20262d"),u.fillStyle=p,u.fillRect(0,0,d,c);const m=o.map(e=>({...e,path:e.coordinates.map(i)}));let v=1/0,g=-1/0,f=1/0,y=-1/0;for(const e of m)for(const t of e.path)v=Math.min(v,t.x),g=Math.max(g,t.x),f=Math.min(f,t.y),y=Math.max(y,t.y);const w=Math.min(40,Math.max(20,.2*Math.min(d,c))),_=w/2+2,b=Math.min((d-2*_)/Math.max(g-v,1e-9),(c-2*_)/Math.max(y-f,1e-9)),x=(d-(g-v)*b)/2,L=(c-(y-f)*b)/2,R=e=>({x:x+(e.x-v)*b,y:L+(e.y-f)*b});for(const e of m)e.path.length<2||(u.beginPath(),e.path.forEach((e,t)=>{const n=R(e);0===t?u.moveTo(n.x,n.y):u.lineTo(n.x,n.y)}),u.lineCap="round",u.lineJoin="round",u.strokeStyle="rgba(0, 0, 0, 0.75)",u.lineWidth=.2*w,u.stroke(),u.strokeStyle=e.color,u.lineWidth=.1*w,u.stroke());for(let e=m.length-1;e>=0;e--){const t=R(m[e].path[0]);u.drawImage(a[e],t.x-w/2,t.y-w/2,w,w)}const M=h.toDataURL("image/jpeg",.92);this._previewImages.set(t,M),document.querySelectorAll(".route-preview-map").forEach(e=>{n(e,t,M)})}catch(e){console.warn("Не удалось создать превью маршрута:",e)}finally{this._previewJobs.delete(t),this._previewActive=!1,o()}},o=()=>{if(!this._previewActive)for(;this._previewQueue.length;){const e=this._previewQueue.shift();if(this._previewQueuedKeys.delete(e.key),!e.element.isConnected)continue;const t=this._previewImages.get(e.key);if(t)e.showCached(t);else if(!this._previewJobs.has(e.key))return this._previewActive=!0,this._previewJobs.set(e.key,!0),e.element.textContent="Подготавливаем превью…",void s(e.element,e.key,e.routeData)}},i=e=>{if(!e.isConnected)return;const t=e.dataset.previewKey,s=this._previewImages.get(t);if(s)return void n(e,t,s);if(this._previewJobs.has(t)||this._previewQueuedKeys.has(t))return;const i=this.routesDescriptions[e.dataset.routeKey]?.data;Array.isArray(i)&&(this._previewQueuedKeys.add(t),this._previewQueue.push({key:t,element:e,routeData:i,showCached:s=>n(e,t,s)}),o())};"undefined"!=typeof IntersectionObserver?(this._previewObserver=new IntersectionObserver(e=>{for(const t of e){const e=t.target;t.isIntersecting&&(this._previewObserver.unobserve(e),i(e))}},{root:e,rootMargin:"240px 0px"}),t.forEach(e=>this._previewObserver.observe(e))):Array.from(t).slice(0,2).forEach(i)},_ROUTE_COLORS:{Gold:"#FFD700",Blue:"#007AFF",Red:"#FF3B30",Fuchsia:"#AF52DE",Orange:"#FF9500",Purple:"#5856D6",Cyan:"#5AC8FA",Brown:"#A2845E",Lime:"#34C759"},_renderTreeNode(e,t,n,s=!n){const o=Object.keys(e.folders).sort((e,t)=>e.localeCompare(t));for(const i of o){if("Без категории"===i)continue;const o=n?n+"/"+i:i,r=e.folders[i],a=this._countTreeRoutes(r),d=this._expandedFolders.has(o),c=document.createElement("div");c.className="category-folder";const l=document.createElement("div");l.className="category-header"+(d?" expanded":"")+(s?" root":""),l.setAttribute("role","button"),l.setAttribute("tabindex","0"),l.setAttribute("aria-expanded",String(d)),l.innerHTML=`\n                <span class="category-chevron" aria-hidden="true"></span>\n                <svg class="category-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6.5A1.5 1.5 0 0 1 4.5 5H10l2 2h7.5A1.5 1.5 0 0 1 21 8.5v9a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 17.5z"/></svg>\n                <span class="category-name">${this._escape(i)}</span>\n                <span class="category-count">${a}</span>\n            `;const h=e=>{e.stopPropagation(),this._expandedFolders.has(o)?this._expandedFolders.delete(o):this._expandedFolders.add(o),this._buildRoutesList()};if(l.addEventListener("click",h),l.addEventListener("keydown",e=>{"Enter"!==e.key&&" "!==e.key||(e.preventDefault(),h(e))}),c.appendChild(l),t.appendChild(c),d){const e=document.createElement("div");e.className="route-tree-children",this._renderTreeNode(r,e,o,!1),t.appendChild(e)}}const i=e.folders["Без категории"];if(i){const e=n?n+"/Без категории":"Без категории",o=this._expandedFolders.has(e),r=this._countTreeRoutes(i),a=document.createElement("div");a.className="category-folder";const d=document.createElement("div");d.className="category-header"+(o?" expanded":"")+(s?" root":""),d.setAttribute("role","button"),d.setAttribute("tabindex","0"),d.setAttribute("aria-expanded",String(o)),d.innerHTML=`\n                <span class="category-chevron" aria-hidden="true"></span>\n                <svg class="category-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6.5A1.5 1.5 0 0 1 4.5 5H10l2 2h7.5A1.5 1.5 0 0 1 21 8.5v9a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 17.5z"/></svg>\n                <span class="category-name">Без категории</span>\n                <span class="category-count">${r}</span>\n            `;const c=t=>{t.stopPropagation(),this._expandedFolders.has(e)?this._expandedFolders.delete(e):this._expandedFolders.add(e),this._buildRoutesList()};if(d.addEventListener("click",c),d.addEventListener("keydown",e=>{"Enter"!==e.key&&" "!==e.key||(e.preventDefault(),c(e))}),a.appendChild(d),t.appendChild(a),o){const n=document.createElement("div");n.className="route-tree-children",this._renderTreeNode(i,n,e,!1),t.appendChild(n)}}for(const n of e.routes){const e=n.key,s=e===this.currentRoute,o=document.createElement("button");o.className="route-item"+(s?" active":""),s&&o.setAttribute("aria-current","true");const i=document.createElement("div");i.className="route-preview-map",i.dataset.routeKey=e,i.setAttribute("aria-hidden","true"),o.appendChild(i);const r=document.createElement("span");r.className="route-item-details";const a=document.createElement("span");if(a.className="route-name",a.textContent=n.name||n.m,r.appendChild(a),s){const e=document.createElement("span");e.className="route-loaded-label",e.textContent="Загружен",r.appendChild(e)}o.appendChild(r),o.addEventListener("click",e=>{e.stopPropagation(),n.m&&this.loadRouteByName(n.m)}),t.appendChild(o)}},_escape:e=>String(e).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;"),createModal(){const e='\n            <div id="jsonModal" class="screen-modal">\n                <div class="screen-panel compact-route-menu" id="jsonModalScreen">\n                    <header class="screen-head">\n                        <h1 class="screen-title">Маршруты</h1>\n                        <button type="button" class="screen-close" id="jsonModalClose" aria-label="Закрыть">\n                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>\n                        </button>\n                    </header>\n                    <div id="routesListContainer" class="routes-list">\n                        <div style="text-align:center; padding:20px; color:rgba(255,255,255,0.5); font-size:14px;">\n                            Загрузка списка маршрутов...\n                        </div>\n                    </div>\n                </div>\n            </div>\n            <div id="loadingSpinner">\n                <div class="spinner-box">\n                    <div class="spinner-ring"></div>\n                    <div class="spinner-text">Загрузка маршрута...</div>\n                </div>\n            </div>\n        ',t=document.getElementById("loading");t?t.insertAdjacentHTML("afterend",e):document.body.insertAdjacentHTML("afterbegin",e);const n=document.getElementById("jsonModalClose");n&&n.addEventListener("click",()=>this.hide())},createButton(){const e='\n            <button id="menuBtn" class="circle-btn">\n                <span>Маршруты</span>\n            </button>\n        ',t=document.getElementById("topCenterControls");if(t)t.insertAdjacentHTML("afterbegin",e);else{const t=document.getElementById("loading");t?t.insertAdjacentHTML("afterend",e):document.body.insertAdjacentHTML("afterbegin",e)}document.getElementById("menuBtn").addEventListener("click",()=>{"function"==typeof closeInstruction&&closeInstruction();const e=document.getElementById("jsonModal");e&&e.classList.contains("hidden")?this.show():this.hide()})},checkUrlParam(){const e=this.getUrlParam("m");e&&(this.currentRoute=e,this.isLoaded=!0,this.hide(),this.loadRouteByName(e))},async loadRouteByName(e){this.showSpinner();try{if(!e)throw new Error("Не указан маршрут");let t;this.currentRoute=e,this.hide();const n=this.routesDescriptions&&this.routesDescriptions[e];if(n&&n.data)t={name:n.name,m:e,data:n.data};else{const n=this.API_URL_V2+"?action=get&m="+encodeURIComponent(e),s=await fetch(n);if(!s.ok)throw new Error("HTTP "+s.status);t=await s.json()}await this.loadRoute(t),this.hideSpinner()}catch(e){this.hideSpinner(),console.error("[MenuModule] Ошибка загрузки маршрута:",e),"function"==typeof showToast&&showToast("Ошибка загрузки: "+e.message,"error",5e3)}},async loadRoute(e){"function"==typeof clearRoute&&clearRoute();let t=e;if(e&&"object"==typeof e&&"data"in e){t=e.data;const n=this.currentRoute;n&&e.name&&(this.routesDescriptions||(this.routesDescriptions={}),this.routesDescriptions[n]?this.routesDescriptions[n].name=e.name:this.routesDescriptions[n]={name:e.name,m:e.m||n})}"function"==typeof this.callback&&await this.callback(t),this.isLoaded=!0,this.hide()},hide(){this._destroyRoutePreviews();const e=document.getElementById("jsonModal");e&&e.classList.add("hidden"),this._retryTimer&&(clearTimeout(this._retryTimer),this._retryTimer=null)},show(){"function"==typeof closeAllSheets&&closeAllSheets();const e=document.getElementById("jsonModal");e&&e.classList.remove("hidden"),this._expandedFolders=new Set,this._expandCurrentRoutePath(),this._buildRoutesList()},showSpinner(){const e=document.getElementById("loadingSpinner");e&&e.classList.add("active")},hideSpinner(){const e=document.getElementById("loadingSpinner");e&&e.classList.remove("active")}};
+</template><script>const MenuModule={callback:null,isLoaded:!1,currentRoute:null,routesDescriptions:{},_routesLoaded:!1,_isFetchingRoutes:!1,_catalog:[],_categories:[],_activeCategory:"all",_activeSub:"all",_searchQuery:"",_searchScope:"all",_recentRouteKeys:[],_recentLimit:6,_RECENT_KEY:"osm_recent_routes_v1",_MENU_STATE_KEY:"osm_routes_menu_state_v1",_previewObserver:null,_previewImages:new Map,_previewJobs:new Map,_previewQueue:[],_previewQueuedKeys:new Set,_previewActive:!1,API_URL_V2:"https://functions.yandexcloud.net/d4e02ghbv31h6kpf8ddh",getUrlParam(e){if("m"!==e)return null;let t=new URLSearchParams(window.location.search).get(e);if(t)return t;const s=window.location.hash.slice(1);if(s){if(t=new URLSearchParams(s).get(e),t)return t;const i=s.indexOf("?");if(i>-1){const r=s.substring(i+1);if(t=new URLSearchParams(r).get(e),t)return t}}return null},async init(e){this.callback=e,this._loadRecentRoutes(),this._loadMenuState(),this.createModal(),this.createButton(),this.hide(),await this._loadRoutesList(),this.checkUrlParam()},async _loadRoutesList(){if(this._isFetchingRoutes)return;this._retryTimer&&(clearTimeout(this._retryTimer),this._retryTimer=null),this._isFetchingRoutes=!0;const e=document.getElementById("routesListContainer");this._showListLoading(),await(async()=>{try{return await this._fetchFromAPI(),this._routesLoaded=!0,this._buildCatalog(),this._buildRoutesList(),!0}catch(t){return console.warn("Не удалось загрузить список маршрутов:",t),e&&(e.innerHTML='\n                    <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:30px;gap:12px;">\n                        <div class="spinner-ring" style="width:28px;height:28px;border-width:3px;"></div>\n                        <div style="color:rgba(255,255,255,0.5);font-size:14px;">Не удалось загрузить. Повторяем...</div>\n                    </div>\n                '),!1}})()?this._isFetchingRoutes=!1:(this._isFetchingRoutes=!1,this._retryTimer=setTimeout(()=>this._loadRoutesList(),5e3))},async _fetchFromAPI(){const e=await fetch(`${this.API_URL_V2}?action=list_routes&full=1`);if(!e.ok)throw new Error(`HTTP ${e.status}`);const t=await e.json(),s={};for(const e of t){const t=e.m;t&&(s[t]={m:e.m,name:e.name||e.m,description:"string"==typeof e.description?e.description.trim():"",data:e.data})}this.routesDescriptions=s,this._buildCatalog()},_buildCatalog(){const e=[];for(const[t,s]of Object.entries(this.routesDescriptions)){const i=(s.name||t).trim()||t,r=i.split("/").map(e=>e.trim()).filter(Boolean),n=r.length?r.pop():i,a=r,o=a[0]||"Без категории",c=a.length>1?a.slice(1).join(" / "):null;e.push({key:t,m:s.m||t,name:n,fullPath:i,top:o,sub:c,folders:a,description:"string"==typeof s.description?s.description.trim():"",...this._measureRoute(s.data),search:this._normalizeSearch(`${i} ${"string"==typeof s.description?s.description:""}`)})}e.sort((e,t)=>e.fullPath.localeCompare(t.fullPath,"ru")),this._catalog=e;const t=new Map;for(const s of e){let e=t.get(s.top);e||(e={name:s.top,count:0,subs:new Map},t.set(s.top,e)),e.count++,s.sub&&e.subs.set(s.sub,(e.subs.get(s.sub)||0)+1)}this._categories=Array.from(t.values()).sort((e,t)=>"Без категории"===e.name?1:"Без категории"===t.name?-1:e.name.localeCompare(t.name,"ru"));const s=new Set(this._categories.map(e=>"cat:"+e.name));"all"===this._activeCategory||"recent"===this._activeCategory||s.has(this._activeCategory)||(this._activeCategory="all"),"recent"!==this._activeCategory||this._getRecentRoutes().length||(this._activeCategory="all"),"all"!==this._activeCategory&&"recent"!==this._activeCategory||(this._searchScope="all");const i=this._getActiveCategory();"all"===this._activeSub||i&&i.subs.has(this._activeSub)||(this._activeSub="all"),this._saveMenuState()},_measureRoute(e){if(!Array.isArray(e))return{pointCount:0,distanceMeters:0};let t=0,s=0;for(const i of e){if(!i||!Array.isArray(i.pts))continue;let e=null,r=!1;for(const t of i.pts)if(!(!Array.isArray(t)||!Number.isFinite(t[0])||!Number.isFinite(t[1])||Math.abs(t[0])>90||Math.abs(t[1])>180)){if(r=!0,e){const i=Math.PI/180,r=(t[0]-e[0])*i,n=(t[1]-e[1])*i,a=Math.sin(r/2)**2+Math.cos(e[0]*i)*Math.cos(t[0]*i)*Math.sin(n/2)**2,o=Math.min(1,Math.max(0,a));s+=12742e3*Math.atan2(Math.sqrt(o),Math.sqrt(1-o))}e=t}r&&t++}return{pointCount:t,distanceMeters:s}},_loadMenuState(){try{const e=JSON.parse(localStorage.getItem(this._MENU_STATE_KEY)||"{}");if(!e||"object"!=typeof e)return;"string"==typeof e.category&&(this._activeCategory=e.category),"string"==typeof e.subcategory&&(this._activeSub=e.subcategory),"string"==typeof e.query&&(this._searchQuery=e.query),"all"!==e.searchScope&&"category"!==e.searchScope||(this._searchScope=e.searchScope)}catch(e){this._activeCategory="all",this._activeSub="all",this._searchQuery="",this._searchScope="all"}},_saveMenuState(){try{localStorage.setItem(this._MENU_STATE_KEY,JSON.stringify({category:this._activeCategory,subcategory:this._activeSub,query:this._searchQuery,searchScope:this._searchScope}))}catch(e){}},_getActiveCategory(){if(!this._activeCategory.startsWith("cat:"))return null;const e=this._activeCategory.slice(4);return this._categories.find(t=>t.name===e)||null},_loadRecentRoutes(){try{const e=JSON.parse(localStorage.getItem(this._RECENT_KEY)||"[]");Array.isArray(e)&&(this._recentRouteKeys=e.filter(e=>"string"==typeof e&&e).slice(0,this._recentLimit))}catch(e){this._recentRouteKeys=[]}},_rememberRecent(e){if(e){this._recentRouteKeys=[e,...this._recentRouteKeys.filter(t=>t!==e)].slice(0,this._recentLimit);try{localStorage.setItem(this._RECENT_KEY,JSON.stringify(this._recentRouteKeys))}catch(e){}}},_getRecentRoutes(){const e=new Map(this._catalog.map(e=>[e.key,e]));return this._recentRouteKeys.map(t=>e.get(t)).filter(Boolean)},_normalizeSearch:e=>String(e||"").toLocaleLowerCase("ru").replace(/ё/g,"е").replace(/\s+/g," ").trim(),_getFilteredRoutes(){let e;if(this._searchQuery){const t=this._normalizeSearch(this._searchQuery).split(" ").filter(Boolean),s=this._getActiveCategory();e=t.length?this._catalog.filter(e=>t.every(t=>e.search.includes(t))&&("category"!==this._searchScope||!s||e.top===s.name&&("all"===this._activeSub||e.sub===this._activeSub))):this._catalog}else if("recent"===this._activeCategory)e=this._getRecentRoutes();else{const t=this._getActiveCategory();e=t?this._catalog.filter(e=>e.top===t.name&&("all"===this._activeSub||e.sub===this._activeSub)):this._catalog}return this._pinCurrentRoute(e)},_pinCurrentRoute(e){if(!this.currentRoute||e.length<2)return e;const t=e.findIndex(e=>e.key===this.currentRoute);return t<=0?e:[e[t],...e.slice(0,t),...e.slice(t+1)]},_showListLoading(){const e=document.getElementById("routesListContainer");e&&(this._destroyRoutePreviews(),e.innerHTML='\n            <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:30px;gap:12px;">\n                <div class="spinner-ring" style="width:28px;height:28px;border-width:3px;"></div>\n                <div style="color:rgba(255,255,255,0.5);font-size:14px;">Загрузка маршрутов...</div>\n            </div>\n        ')},_buildRoutesList(){const e=document.getElementById("routesListContainer");if(!e)return;if(this._destroyRoutePreviews(),this._updateSearchScopeButton(),!this._routesLoaded)return this._renderCategoryChips(),this._renderSubcategoryChips(),void(this._isFetchingRoutes?this._showListLoading():this._loadRoutesList());const t=this._getFilteredRoutes();if(this._renderCategoryChips(),this._renderSubcategoryChips(),e.innerHTML="",!this._catalog.length)return void(e.innerHTML='<div class="routes-empty"><div class="routes-empty-title">Нет маршрутов</div></div>');if(!t.length){const t=document.createElement("div");return t.className="routes-empty",t.innerHTML=this._searchQuery?'<div class="routes-empty-title">Ничего не найдено</div><div class="routes-empty-hint">Попробуйте изменить запрос</div>':'<div class="routes-empty-title">В этом разделе нет маршрутов</div>',void e.appendChild(t)}const s=document.createElement("div");s.className="routes-results-meta";const i=this._searchQuery?`${t.length} ${this._pluralize(t.length,"маршрут найден","маршрута найдено","маршрутов найдено")}`:`${t.length} ${this._pluralize(t.length,"маршрут","маршрута","маршрутов")}`,r=this._searchQuery?"category"===this._searchScope&&this._getActiveCategory()?`в разделе «${this._getActiveCategory().name}${"all"!==this._activeSub?` / ${this._activeSub}`:""}»`:"во всех маршрутах":"";s.textContent=this._searchQuery?`${i} ${r}`:i,e.appendChild(s);const n=document.createDocumentFragment();for(const e of t)n.appendChild(this._createRouteRow(e));e.appendChild(n),this._observeRoutePreviews(e)},_renderCategoryChips(){const e=document.getElementById("routesCategoryChips");if(!e)return;if(!this._catalog.length||this._getActiveCategory())return e.innerHTML="",void(e.hidden=!0);const t=e.scrollLeft;e.innerHTML="";const s=[{key:"all",label:"Все",count:this._catalog.length}],i=this._getRecentRoutes();i.length&&s.push({key:"recent",label:"Недавние",count:i.length});for(const e of this._categories)s.push({key:"cat:"+e.name,label:e.name,count:e.count});for(const t of s){const s=document.createElement("button");s.type="button";const i=this._activeCategory===t.key;s.className="routes-chip"+(i?" active":""),s.dataset.category=t.key,s.setAttribute("role","tab"),s.setAttribute("aria-selected",String(i)),s.innerHTML=`\n                <span class="routes-chip-label">${this._escape(t.label)}</span>\n                <span class="routes-chip-count">${t.count}</span>\n            `,e.appendChild(s)}e.hidden=!!this._searchQuery,e.scrollLeft=t,this._ensureActiveChipVisible(e),this._updateChipFades(e)},_ensureActiveChipVisible(e){if(!e||e.hidden)return;const t=e.querySelector(".routes-chip.active");if(!t)return;const s=e.getBoundingClientRect(),i=t.getBoundingClientRect();i.left<s.left?e.scrollLeft-=s.left-i.left+12:i.right>s.right&&(e.scrollLeft+=i.right-s.right+12)},_renderSubcategoryChips(){const e=document.getElementById("routesSubcategoryChips");if(!e)return;const t=this._getActiveCategory();if(this._searchQuery||!t)return e.innerHTML="",void(e.hidden=!0);"all"===this._activeSub||t.subs.has(this._activeSub)||(this._activeSub="all"),e.innerHTML="";const s=document.createElement("button");s.type="button",s.className="routes-chip routes-chip-back",s.dataset.action="categories",s.setAttribute("aria-label","Назад к районам"),s.textContent="← Районы",e.appendChild(s);const i=[{key:"all",label:t.name,count:t.count}],r=Array.from(t.subs.entries()).sort((e,t)=>e[0].localeCompare(t[0],"ru"));for(const[e,t]of r)i.push({key:e,label:e,count:t});for(const t of i){const s=document.createElement("button");s.type="button";const i=this._activeSub===t.key;s.className="routes-chip"+(i?" active":""),s.dataset.sub=t.key,s.setAttribute("role","tab"),s.setAttribute("aria-selected",String(i)),s.innerHTML=`\n                <span class="routes-chip-label">${this._escape(t.label)}</span>\n                <span class="routes-chip-count">${t.count}</span>\n            `,e.appendChild(s)}e.hidden=!1,this._ensureActiveChipVisible(e),this._updateChipFades(e)},_pluralize(e,t,s,i){const r=e%100;if(r>=11&&r<=14)return i;switch(e%10){case 1:return t;case 2:case 3:case 4:return s;default:return i}},_updateSearchScopeButton(){const e=document.getElementById("routesSearchScope"),t=this._getActiveCategory();e&&(e.hidden=!t||!this._searchQuery,e.textContent="category"===this._searchScope?"В разделе":"Везде",e.setAttribute("aria-pressed",String("category"===this._searchScope)),e.setAttribute("aria-label","category"===this._searchScope?`Искать в разделе «${t?t.name:""}»`:"Искать во всех маршрутах"))},_updateChipFades(e){if(!e||e.hidden)return;const t=e.scrollWidth-e.clientWidth;e.classList.toggle("can-scroll-left",e.scrollLeft>1),e.classList.toggle("can-scroll-right",e.scrollLeft<t-1)},_createRouteRow(e){const t=e.key===this.currentRoute,s=document.createElement("button");s.type="button",s.className="route-row"+(t?" is-active":""),s.dataset.routeKey=e.key,t&&s.setAttribute("aria-current","true");const i=document.createElement("span");i.className="route-preview",i.dataset.routeKey=e.key,i.setAttribute("aria-hidden","true");const r=document.createElement("span");r.className="route-row-main";const n=document.createElement("span");n.className="route-row-title";const a=document.createElement("span");if(a.className="route-row-name",a.textContent=e.name||e.m,n.appendChild(a),t){const e=document.createElement("span");e.className="route-row-badge",e.textContent="Загружен",n.appendChild(e)}const o=document.createElement("span");o.className="route-row-meta",o.textContent=e.folders.length?e.folders.join(" · "):"Без категории",r.appendChild(n);const c=document.createElement("span");c.className="route-row-details",c.appendChild(o);const l=[];if(e.pointCount&&l.push(`${e.pointCount} ${this._pluralize(e.pointCount,"точка","точки","точек")}`),e.distanceMeters>=10){const t=e.distanceMeters>=1e3?`${(e.distanceMeters/1e3).toLocaleString("ru-RU",{maximumFractionDigits:1})} км`:`${Math.round(e.distanceMeters)} м`;l.push(`≈ ${t}`)}if(l.length){const e=document.createElement("span");e.className="route-row-stats",e.textContent=l.join(" · "),c.appendChild(e)}r.append(n,c);const h=document.createElement("span");return h.className="route-row-tail",h.setAttribute("aria-hidden","true"),h.innerHTML=t?'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>':'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg>',s.append(i,r,h),s.addEventListener("click",t=>{t.stopPropagation(),e.m&&this.loadRouteByName(e.m)}),s},_destroyRoutePreviews(){this._previewObserver&&(this._previewObserver.disconnect(),this._previewObserver=null)},_observeRoutePreviews(e){const t=e.querySelectorAll(".route-preview");if(!t.length)return;const s=(e,t,s)=>{if(!e.isConnected||e.dataset.previewKey!==t)return;const i=document.createElement("img");i.className="route-preview-image",i.alt="",i.src=s,e.replaceChildren(i),e.classList.remove("is-loading","is-empty")};t.forEach(e=>{const t=`route-preview-v12\0${e.dataset.routeKey}`;e.dataset.previewKey=t;const i=this._previewImages.get(t);i&&s(e,t,i)});const i=async(e,t,i)=>{try{const r=[],n=e=>{const t=Math.max(-85.0511,Math.min(85.0511,e[0])),s=e[1],i=Math.sin(t*Math.PI/180);return{x:(s+180)/360,y:.5-Math.log((1+i)/(1-i))/(4*Math.PI)}};let a=0;for(const e of i){if(!e||!Array.isArray(e.pts))continue;const t=e.pts.filter(e=>Array.isArray(e)&&Number.isFinite(e[0])&&Number.isFinite(e[1])&&Math.abs(e[0])<=90&&Math.abs(e[1])<=180);t.length&&(a++,r.push({coordinates:t,color:this._ROUTE_COLORS[e.color]||"#FFD700",number:String(e.id||a),current:1===a,hasComment:"string"==typeof e.comm&&""!==e.comm.trim()}))}if(!r.length)return e.classList.remove("is-loading"),void e.classList.add("is-empty");const o=Math.max(1,e.clientWidth),c=Math.max(1,e.clientHeight),l=2,h=document.createElement("canvas");h.width=Math.round(o*l),h.height=Math.round(c*l);const u=h.getContext("2d");if(!u)throw new Error("Could not create preview canvas");u.scale(l,l);const d=u.createLinearGradient(0,0,o,c);d.addColorStop(0,"#303840"),d.addColorStop(1,"#20262d"),u.fillStyle=d,u.fillRect(0,0,o,c);const p=r.map(e=>({...e,path:e.coordinates.map(n)}));let m=1/0,g=-1/0,_=1/0,y=-1/0;for(const e of p)for(const t of e.path)m=Math.min(m,t.x),g=Math.max(g,t.x),_=Math.min(_,t.y),y=Math.max(y,t.y);const v=80;p.forEach(e=>{if(e.path.length>v){const t=e.path.length-1;e.path=Array.from({length:v},(s,i)=>e.path[Math.round(i*t/(v-1))])}});const f=8,b=p.length<=f?p.map((e,t)=>t):Array.from({length:f},(e,t)=>Math.round(t*(p.length-1)/(f-1))),C=await Promise.all(b.map(e=>new Promise((t,s)=>{const i=p[e],r=new Image;r.onload=()=>t({index:e,icon:r}),r.onerror=()=>s(new Error("Could not load route point icon")),r.src=window.getNavigatorPointIcon(i.color,i.number,i.current,i.hasComment)}))),w=Math.min(40,Math.max(20,.2*Math.min(o,c))),S=w/2+2,M=Math.min((o-2*S)/Math.max(g-m,1e-9),(c-2*S)/Math.max(y-_,1e-9)),L=(o-(g-m)*M)/2,R=(c-(y-_)*M)/2,E=e=>({x:L+(e.x-m)*M,y:R+(e.y-_)*M});for(const e of p)e.path.length<2||(u.beginPath(),e.path.forEach((e,t)=>{const s=E(e);0===t?u.moveTo(s.x,s.y):u.lineTo(s.x,s.y)}),u.lineCap="round",u.lineJoin="round",u.strokeStyle="rgba(0, 0, 0, 0.75)",u.lineWidth=.2*w,u.stroke(),u.strokeStyle=e.color,u.lineWidth=.1*w,u.stroke());for(const{index:e,icon:t}of C){const s=E(p[e].path[0]);u.drawImage(t,s.x-w/2,s.y-w/2,w,w)}const A=h.toDataURL("image/jpeg",.92);this._previewImages.set(t,A),document.querySelectorAll(".route-preview").forEach(e=>{s(e,t,A)})}catch(t){console.warn("Не удалось создать превью маршрута:",t),e.classList.remove("is-loading"),e.classList.add("is-empty")}finally{this._previewJobs.delete(t),this._previewActive=!1,r()}},r=()=>{if(!this._previewActive)for(;this._previewQueue.length;){const e=this._previewQueue.shift();if(this._previewQueuedKeys.delete(e.key),!e.element.isConnected)continue;const t=this._previewImages.get(e.key);if(t)e.showCached(t);else if(!this._previewJobs.has(e.key))return this._previewActive=!0,this._previewJobs.set(e.key,!0),e.element.replaceChildren(),e.element.classList.add("is-loading"),void i(e.element,e.key,e.routeData)}},n=e=>{if(!e.isConnected)return;const t=e.dataset.previewKey,i=this._previewImages.get(t);if(i)return void s(e,t,i);if(this._previewJobs.has(t)||this._previewQueuedKeys.has(t))return;const n=this.routesDescriptions[e.dataset.routeKey]?.data;Array.isArray(n)&&(this._previewQueuedKeys.add(t),this._previewQueue.push({key:t,element:e,routeData:n,showCached:i=>s(e,t,i)}),r())};"undefined"!=typeof IntersectionObserver?(this._previewObserver=new IntersectionObserver(e=>{for(const t of e){const e=t.target;t.isIntersecting&&(this._previewObserver.unobserve(e),n(e))}},{root:e,rootMargin:"240px 0px"}),t.forEach(e=>this._previewObserver.observe(e))):Array.from(t).slice(0,2).forEach(n)},_ROUTE_COLORS:{Gold:"#FFD700",Blue:"#007AFF",Red:"#FF3B30",Fuchsia:"#AF52DE",Orange:"#FF9500",Purple:"#5856D6",Cyan:"#5AC8FA",Brown:"#A2845E",Lime:"#34C759"},_escape:e=>String(e).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;"),createModal(){const e='\n            <div id="jsonModal" class="screen-modal">\n                <div class="screen-panel compact-route-menu" id="jsonModalScreen">\n                    <header class="screen-head">\n                        <h1 class="screen-title">Маршруты</h1>\n                        <button type="button" class="screen-close" id="jsonModalClose" aria-label="Закрыть">\n                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>\n                        </button>\n                    </header>\n                    <div id="routesToolbar" class="routes-toolbar">\n                        <div class="routes-search">\n                            <svg class="routes-search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">\n                                <circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>\n                            </svg>\n                            <input id="routesSearchInput" class="routes-search-input" type="search" placeholder="Поиск маршрута" aria-label="Поиск маршрута" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="search">\n                            <button type="button" class="routes-search-clear" id="routesSearchClear" aria-label="Очистить поиск" hidden>\n                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>\n                            </button>\n                            <button type="button" class="routes-search-scope" id="routesSearchScope" hidden>Везде</button>\n                        </div>\n                        <div id="routesCategoryChips" class="routes-chips" role="tablist" aria-label="Районы" hidden></div>\n                        <div id="routesSubcategoryChips" class="routes-chips routes-chips-sub" role="tablist" aria-label="Подкатегории" hidden></div>\n                    </div>\n                    <div id="routesListContainer" class="routes-list">\n                        <div style="text-align:center; padding:20px; color:rgba(255,255,255,0.5); font-size:14px;">\n                            Загрузка списка маршрутов...\n                        </div>\n                    </div>\n                </div>\n            </div>\n            <div id="loadingSpinner">\n                <div class="spinner-box">\n                    <div class="spinner-ring"></div>\n                    <div class="spinner-text">Загрузка маршрута...</div>\n                </div>\n            </div>\n        ',t=document.getElementById("loading");t?t.insertAdjacentHTML("afterend",e):document.body.insertAdjacentHTML("afterbegin",e);const s=document.getElementById("jsonModalClose");s&&s.addEventListener("click",()=>this.hide());const i=document.getElementById("routesSearchInput");i&&(i.addEventListener("input",()=>{this._searchQuery=i.value.trim(),this._saveMenuState(),this._updateSearchClear(),this._buildRoutesList()}),i.addEventListener("keydown",e=>{"Escape"===e.key&&(e.preventDefault(),this._clearSearch())}));const r=document.getElementById("routesSearchClear");r&&r.addEventListener("click",()=>{this._clearSearch(),i&&i.focus()});const n=document.getElementById("routesSearchScope");n&&n.addEventListener("click",()=>{this._searchScope="category"===this._searchScope?"all":"category",this._saveMenuState(),this._buildRoutesList()});const a=document.getElementById("routesCategoryChips");a&&a.addEventListener("click",e=>{const t=e.target.closest(".routes-chip");if(!t)return;const s=t.dataset.category;s&&s!==this._activeCategory&&(this._activeCategory=s,this._activeSub="all",this._searchScope="all",this._saveMenuState(),this._buildRoutesList())});const o=document.getElementById("routesSubcategoryChips");o&&o.addEventListener("click",e=>{const t=e.target.closest(".routes-chip");if(!t)return;if("categories"===t.dataset.action)return this._activeCategory="all",this._activeSub="all",this._searchScope="all",this._saveMenuState(),void this._buildRoutesList();const s=t.dataset.sub;s&&s!==this._activeSub&&(this._activeSub=s,this._saveMenuState(),this._buildRoutesList())}),[a,o].forEach(e=>{e&&e.addEventListener("scroll",()=>this._updateChipFades(e),{passive:!0})})},_clearSearch(){this._searchQuery="";const e=document.getElementById("routesSearchInput");e&&(e.value=""),this._saveMenuState(),this._updateSearchClear(),this._buildRoutesList()},createButton(){const e='\n            <button id="menuBtn" class="circle-btn">\n                <span>Маршруты</span>\n            </button>\n        ',t=document.getElementById("topCenterControls");if(t)t.insertAdjacentHTML("afterbegin",e);else{const t=document.getElementById("loading");t?t.insertAdjacentHTML("afterend",e):document.body.insertAdjacentHTML("afterbegin",e)}document.getElementById("menuBtn").addEventListener("click",()=>{"function"==typeof closeInstruction&&closeInstruction();const e=document.getElementById("jsonModal");e&&e.classList.contains("hidden")?this.show():this.hide()})},checkUrlParam(){const e=this.getUrlParam("m");e&&(this.currentRoute=e,this.isLoaded=!0,this.hide(),this.loadRouteByName(e))},async loadRouteByName(e){this.showSpinner();try{if(!e)throw new Error("Не указан маршрут");let t;this.currentRoute=e,this.hide();const s=this.routesDescriptions&&this.routesDescriptions[e];if(s&&s.data)t={name:s.name,m:e,data:s.data};else{const s=this.API_URL_V2+"?action=get&m="+encodeURIComponent(e),i=await fetch(s);if(!i.ok)throw new Error("HTTP "+i.status);t=await i.json()}await this.loadRoute(t),this._rememberRecent(e),this.hideSpinner()}catch(e){this.hideSpinner(),console.error("[MenuModule] Ошибка загрузки маршрута:",e),"function"==typeof showToast&&showToast("Ошибка загрузки: "+e.message,"error",5e3)}},async loadRoute(e){"function"==typeof clearRoute&&clearRoute();let t=e;if(e&&"object"==typeof e&&"data"in e){t=e.data;const s=this.currentRoute;s&&e.name&&(this.routesDescriptions||(this.routesDescriptions={}),this.routesDescriptions[s]?this.routesDescriptions[s].name=e.name:this.routesDescriptions[s]={name:e.name,m:e.m||s})}"function"==typeof this.callback&&await this.callback(t),this.isLoaded=!0,this.hide()},hide(){this._destroyRoutePreviews();const e=document.getElementById("jsonModal");e&&e.classList.add("hidden"),this._retryTimer&&(clearTimeout(this._retryTimer),this._retryTimer=null)},show(){"function"==typeof closeAllSheets&&closeAllSheets();const e=document.getElementById("jsonModal");e&&e.classList.remove("hidden");const t=document.getElementById("routesSearchInput");t&&(t.value=this._searchQuery),this._updateSearchClear(),this._buildRoutesList()},_updateSearchClear(){const e=document.getElementById("routesSearchClear");e&&(e.hidden=!this._searchQuery)},showSpinner(){const e=document.getElementById("loadingSpinner");e&&e.classList.add("active")},hideSpinner(){const e=document.getElementById("loadingSpinner");e&&e.classList.remove("active")}};
 </script></body>
 </html>
