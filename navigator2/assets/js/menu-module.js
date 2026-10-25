@@ -506,10 +506,11 @@ const MenuModule = {
             }
             const item = document.createElement('button');
             item.type = 'button';
-            item.className = 'routes-breadcrumb-item' + (index === labels.length - 1 ? ' current' : '');
+            const isCurrent = index === labels.length - 1;
+            item.className = 'routes-breadcrumb-item' + (isCurrent ? ' current' : '');
             item.textContent = label;
             item.dataset.breadcrumbIndex = String(index);
-            if (index === labels.length - 1) item.setAttribute('aria-current', 'location');
+            if (isCurrent) item.setAttribute('aria-current', 'location');
             el.appendChild(item);
         });
     },

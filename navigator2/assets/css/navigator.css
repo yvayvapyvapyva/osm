@@ -854,9 +854,10 @@ html, body {
     flex: 0 0 auto;
     max-width: 42vw;
     overflow: hidden;
-    padding: 3px 0;
-    border: 0;
-    background: transparent;
+    padding: 7px 14px;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.06);
     color: #9adfa8;
     font: inherit;
     font-size: 12px;
@@ -864,11 +865,27 @@ html, body {
     text-overflow: ellipsis;
     white-space: nowrap;
     cursor: pointer;
+    min-width: 44px;
+    text-align: center;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+    transition: background 0.15s ease, border-color 0.15s ease, transform 0.1s ease;
+}
+
+.routes-breadcrumb-item:active {
+    background: rgba(255, 255, 255, 0.12);
+    transform: scale(0.96);
 }
 
 .routes-breadcrumb-item.current {
-    color: rgba(255, 255, 255, 0.88);
+    color: #fff;
     font-weight: 700;
+    font-size: 13px;
+    border-color: rgba(255, 255, 255, 0.35);
+    background: rgba(255, 255, 255, 0.15);
+}
+
+.routes-breadcrumb-item.current:active {
+    background: rgba(255, 255, 255, 0.25);
 }
 
 .routes-breadcrumb-separator {
