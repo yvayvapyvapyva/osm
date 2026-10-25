@@ -677,7 +677,10 @@ const MenuModule = {
             if (modal && !modal.classList.contains('hidden')) {
                 const sheet = modal.querySelector('.modal-sheet');
                 const menuBtn = document.getElementById('menuBtn');
-                if (sheet && !sheet.contains(e.target) && e.target !== menuBtn && !menuBtn.contains(e.target)) {
+                const bottomNav = document.getElementById('bottomNav');
+                const inBottomNav = bottomNav && bottomNav.contains(e.target);
+                if (sheet && !sheet.contains(e.target) && !inBottomNav &&
+                    e.target !== menuBtn && !(menuBtn && menuBtn.contains(e.target))) {
                     this.hide();
                 }
             }

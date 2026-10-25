@@ -13,6 +13,11 @@
     --shadow-medium: 0 12px 40px rgba(0, 0, 0, 0.4);
     --radius-sm: 14px;
     --radius-full: 100px;
+
+    /* Нижняя навигация */
+    --nav-h: 64px;
+    --nav-gap: 10px;
+    --nav-space: calc(var(--nav-h) + var(--nav-gap) * 2 + env(safe-area-inset-bottom));
 }
 
 * {
@@ -67,7 +72,7 @@ html, body {
     position: fixed;
     inset: 0;
     background: rgba(0, 0, 0, 0.75);
-    z-index: 9999;
+    z-index: 13000;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -86,7 +91,7 @@ html, body {
 
 #instructionBtn {
     position: fixed;
-    bottom: calc(170px + env(safe-area-inset-bottom));
+    bottom: calc(var(--nav-space) + 8px);
     left: 50%;
     transform: translateX(-50%);
     z-index: 9005;
@@ -120,7 +125,8 @@ html, body {
 #instructionModal { z-index: 20000; }
 
 #instructionModal .modal-sheet {
-    height: 70vh;
+    height: calc(70vh + var(--nav-space));
+    height: calc(70dvh + var(--nav-space));
 }
 
 #instructionModal .icon-row,
@@ -149,7 +155,7 @@ html, body {
     right: 0;
     bottom: 0;
     background: rgba(0, 0, 0, 0.6);
-    z-index: 10001;
+    z-index: 13000;
     display: none;
     align-items: center;
     justify-content: center;
@@ -338,7 +344,7 @@ html, body {
    ============================================ */
 #hud {
     position: absolute;
-    bottom: calc(20px + env(safe-area-inset-bottom));
+    bottom: calc(var(--nav-space) + 8px);
     left: 12px;
     right: 12px;
     z-index: 9000;
@@ -1148,9 +1154,10 @@ html, body {
 }
 
 .sheet-modal .modal-sheet {
-    height: 70vh;
+    height: calc(70vh + var(--nav-space));
+    height: calc(70dvh + var(--nav-space));
     border-radius: 24px 24px 0 0;
-    padding: 0;
+    padding: 0 0 var(--nav-space);
     margin: 0;
     width: 100%;
     max-width: none;
@@ -1326,3 +1333,142 @@ html, body {
     margin: 4px 6px 6px;
     box-sizing: border-box;
 }
+
+/* ============================================
+   Нижняя навигация
+   ============================================ */
+/* Верхние дубли кнопок «Маршруты» и «Настройки» больше не нужны. */
+#menuBtn,
+#settingsBtn {
+    display: none;
+}
+
+/* Инструкция живёт в настройках; на карте она уступает место HUD. */
+body.route-active #instructionBtn {
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+}
+
+/* Свёрнутая атрибуция карты переезжает из-под таб-бара в свободный левый верх. */
+.maplibregl-ctrl-bottom-right {
+    top: calc(12px + env(safe-area-inset-top));
+    bottom: auto;
+    left: 12px;
+    right: auto;
+}
+
+.bottom-nav {
+    position: fixed;
+    left: 50%;
+    bottom: calc(var(--nav-gap) + env(safe-area-inset-bottom));
+    transform: translateX(-50%);
+    z-index: 12000;
+    width: min(460px, calc(100% - 24px));
+    pointer-events: none;
+}
+
+.bottom-nav-inner {
+    position: relative;
+    display: grid;
+    grid-template-columns: repeat(var(--nav-count, 3), 1fr);
+    height: var(--nav-h);
+    padding: 6px;
+    box-sizing: border-box;
+    border-radius: 22px;
+    background: rgba(15, 19, 24, 0.86);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    -webkit-backdrop-filter: blur(24px) saturate(160%);
+    backdrop-filter: blur(24px) saturate(160%);
+    overflow: hidden;
+    pointer-events: auto;
+}
+
+.bottom-nav-indicator {
+    position: absolute;
+    top: 6px;
+    bottom: 6px;
+    left: 6px;
+    width: calc((100% - 12px) / var(--nav-count, 3));
+    border-radius: 16px;
+    background: rgba(52, 199, 89, 0.16);
+    box-shadow: inset 0 0 0 1px rgba(52, 199, 89, 0.22);
+    transform: translateX(calc(var(--tab-index, 0) * 100%));
+    transition: transform 0.32s cubic-bezier(0.22, 1, 0.36, 1);
+    pointer-events: none;
+}
+
+.bottom-nav-item {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    min-width: 0;
+    padding: 0;
+    margin: 0;
+    border: 0;
+    border-radius: 16px;
+    background: transparent;
+    color: rgba(235, 240, 245, 0.58);
+    font-family: inherit;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.1px;
+    line-height: 1;
+    cursor: pointer;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+    transition: color 0.18s ease, transform 0.12s ease;
+}
+
+.bottom-nav-item svg {
+    display: block;
+    width: 22px;
+    height: 22px;
+    flex-shrink: 0;
+}
+
+.bottom-nav-item.active {
+    color: #F4FBF6;
+}
+
+.bottom-nav-item.active svg {
+    color: #34C759;
+}
+
+.bottom-nav-item:active {
+    transform: scale(0.94);
+}
+
+.bottom-nav-item:focus-visible {
+    outline: 2px solid rgba(52, 199, 89, 0.7);
+    outline-offset: -2px;
+}
+
+@supports not ((backdrop-filter: blur(12px)) or (-webkit-backdrop-filter: blur(12px))) {
+    .bottom-nav-inner {
+        background: #121820;
+    }
+}
+
+@media (max-height: 520px) {
+    :root {
+        --nav-h: 56px;
+    }
+
+    .bottom-nav-item svg {
+        width: 20px;
+        height: 20px;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .bottom-nav-indicator {
+        transition: none;
+    }
+}
+

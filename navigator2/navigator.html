@@ -5,7 +5,7 @@
     <title>Автоинструктор</title>
     <link rel="icon" href="ico.png" type="image/png">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <link rel="stylesheet" href="assets/css/navigator.css?v=2">
+    <link rel="stylesheet" href="assets/css/navigator.css?v=3">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.css">
     <style>
 .toggle-switch {
@@ -105,7 +105,7 @@
 <script src="https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/pmtiles@3.2.1/dist/pmtiles.js"></script>
 <script src="assets/js/map-styles.js?v=10"></script>
-<script src="assets/js/menu-module.js?v=7" defer></script>
+<script src="assets/js/menu-module.js?v=8" defer></script>
 <script>
 const MAP_PREFS_KEY = 'osm_map_prefs_v1';
 
@@ -1052,6 +1052,7 @@ function clearRoute() {
     APP.navCurrentIndex = 0;
     APP._routeTotalDistance = 0;
     $('hud').classList.remove('active');
+    document.body.classList.remove('route-active');
     updateRouteNameDisplay();
 }
 
@@ -1466,6 +1467,7 @@ async function processRouteData(data) {
     APP.navCurrentIndex = 0;
 
     $('hud').classList.add('active');
+    document.body.classList.add('route-active');
     const jsonModal = $('jsonModal');
     if (jsonModal) jsonModal.classList.add('hidden');
     $('loading').classList.add('hidden');
@@ -1905,12 +1907,42 @@ if (typeof maplibregl === 'undefined') {
     </div>
 </div>
 
+<nav id="bottomNav" class="bottom-nav" aria-label="Разделы">
+    <div class="bottom-nav-inner">
+        <span class="bottom-nav-indicator" aria-hidden="true"></span>
+        <button type="button" class="bottom-nav-item active" data-tab="map" aria-current="page">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M9 3 3 6v15l6-3 6 3 6-3V3l-6 3-6-3Z"/>
+                <path d="M9 3v15M15 6v15"/>
+            </svg>
+            <span>Карта</span>
+        </button>
+        <button type="button" class="bottom-nav-item" data-tab="routes">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <circle cx="6" cy="19" r="2.5"/>
+                <circle cx="18" cy="5" r="2.5"/>
+                <path d="M8.5 19H15a4 4 0 0 0 0-8H9a4 4 0 0 1 0-8h6"/>
+            </svg>
+            <span>Маршруты</span>
+        </button>
+        <button type="button" class="bottom-nav-item" data-tab="settings">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M4 7h10M18 7h2M4 17h2M10 17h10M4 12h4M12 12h8"/>
+                <circle cx="16" cy="7" r="2"/>
+                <circle cx="8" cy="17" r="2"/>
+                <circle cx="10" cy="12" r="2"/>
+            </svg>
+            <span>Настройки</span>
+        </button>
+    </div>
+</nav>
+
 <script>
 document.addEventListener('click', (e) => {
     const sheetModals = [
-        { id: 'navSettingsModal', close: closeSettings, triggers: ['settingsBtn', 'menuBtn'], handle: 'settingsSheetDragArea' },
-        { id: 'pointsListModal', close: closePointsList, triggers: ['hudCmd', 'hudPrevCmd', 'menuBtn'], handle: 'sheetDragArea' },
-        { id: 'instructionModal', close: closeInstruction, triggers: ['instructionBtn', 'menuBtn'], handle: 'instructionDragArea' },
+        { id: 'navSettingsModal', close: closeSettings, triggers: ['settingsBtn', 'menuBtn', 'bottomNav'], handle: 'settingsSheetDragArea' },
+        { id: 'pointsListModal', close: closePointsList, triggers: ['hudCmd', 'hudPrevCmd', 'menuBtn', 'bottomNav'], handle: 'sheetDragArea' },
+        { id: 'instructionModal', close: closeInstruction, triggers: ['instructionBtn', 'menuBtn', 'bottomNav'], handle: 'instructionDragArea' },
     ];
     sheetModals.forEach(({ id, close, triggers, handle: handleId }) => {
         const modal = document.getElementById(id);
@@ -1957,6 +1989,85 @@ function enableSheetSwipe(sheetId, handleId, closeFn) {
     window.addEventListener('pointerup', onEnd);
     window.addEventListener('pointercancel', onEnd);
 }
+
+/* Нижняя навигация: карта / маршруты / настройки */
+(function () {
+    const nav = document.getElementById('bottomNav');
+    if (!nav) return;
+
+    const tabs = Array.from(nav.querySelectorAll('.bottom-nav-item'));
+    const order = tabs.map(tab => tab.dataset.tab);
+    nav.style.setProperty('--nav-count', tabs.length);
+
+    const isOpen = id => {
+        const el = document.getElementById(id);
+        return !!el && !el.classList.contains('hidden');
+    };
+
+    const setActive = name => {
+        nav.style.setProperty('--tab-index', Math.max(0, order.indexOf(name)));
+        tabs.forEach(tab => {
+            const active = tab.dataset.tab === name;
+            tab.classList.toggle('active', active);
+            if (active) tab.setAttribute('aria-current', 'page');
+            else tab.removeAttribute('aria-current');
+        });
+    };
+
+    const sync = () => {
+        if (isOpen('jsonModal')) setActive('routes');
+        else if (isOpen('navSettingsModal')) setActive('settings');
+        else setActive('map');
+    };
+
+    const closeInstructionSheet = () => {
+        if (isOpen('instructionModal') && typeof closeInstruction === 'function') {
+            closeInstruction();
+        }
+    };
+
+    nav.addEventListener('click', e => {
+        const tab = e.target.closest('.bottom-nav-item');
+        if (!tab || !nav.contains(tab)) return;
+        closeInstructionSheet();
+
+        const name = tab.dataset.tab;
+        if (name === 'routes') {
+            if (typeof MenuModule === 'undefined') return;
+            if (isOpen('jsonModal')) MenuModule.hide();
+            else MenuModule.show();
+        } else if (name === 'settings') {
+            if (typeof openSettings === 'function') openSettings();
+        } else if (typeof closeAllSheets === 'function') {
+            closeAllSheets();
+        }
+        sync();
+        if (navigator.vibrate) {
+            try { navigator.vibrate(8); } catch (e) {}
+        }
+    });
+
+    // Панели открываются не только из таб-бара (например, HUD), поэтому
+    // активную вкладку синхронизируем по классу модальных окон.
+    const observe = id => {
+        const el = document.getElementById(id);
+        if (!el) return false;
+        new MutationObserver(sync).observe(el, { attributes: true, attributeFilter: ['class'] });
+        return true;
+    };
+
+    observe('navSettingsModal');
+    if (!observe('jsonModal')) {
+        const wait = new MutationObserver(() => {
+            if (observe('jsonModal')) {
+                wait.disconnect();
+                sync();
+            }
+        });
+        wait.observe(document.body, { childList: true, subtree: true });
+    }
+    sync();
+})();
 
 enableSheetSwipe('navSettingsSheet', 'settingsSheetDragArea', closeSettings);
 enableSheetSwipe('pointsListSheet', 'sheetDragArea', closePointsList);
