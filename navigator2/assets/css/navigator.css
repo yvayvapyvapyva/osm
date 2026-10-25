@@ -1094,10 +1094,10 @@ html, body {
 .route-row {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 8px;
     width: 100%;
-    min-height: 94px;
-    padding: 7px 10px 7px 7px;
+    min-height: 106px;
+    padding: 5px 8px 5px 5px;
     border: 1px solid rgba(255, 255, 255, 0.09);
     border-radius: 14px;
     background: rgba(255, 255, 255, 0.06);
@@ -1125,9 +1125,9 @@ html, body {
     display: flex;
     align-items: center;
     justify-content: center;
-    flex: 0 0 80px;
-    width: 80px;
-    height: 80px;
+    flex: 0 0 96px;
+    width: 96px;
+    height: 96px;
     border-radius: 10px;
     overflow: hidden;
     background: linear-gradient(145deg, #303840, #20262d);
