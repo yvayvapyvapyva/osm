@@ -677,7 +677,7 @@ const MenuModule = {
         };
 
         previews.forEach(element => {
-            const key = `route-preview-v12\0${element.dataset.routeKey}`;
+            const key = `route-preview-v11\0${element.dataset.routeKey}`;
             element.dataset.previewKey = key;
             const image = this._previewImages.get(key);
             if (image) showPreviewImage(element, key, image);
@@ -723,6 +723,18 @@ const MenuModule = {
                     return;
                 }
 
+                const icons = await Promise.all(points.map(point => new Promise((resolve, reject) => {
+                    const icon = new Image();
+                    icon.onload = () => resolve(icon);
+                    icon.onerror = () => reject(new Error('Could not load route point icon'));
+                    icon.src = window.getNavigatorPointIcon(
+                        point.color,
+                        point.number,
+                        point.current,
+                        point.hasComment
+                    );
+                })));
+
                 const width = Math.max(1, element.clientWidth);
                 const height = Math.max(1, element.clientHeight);
                 const pixelRatio = 2;
@@ -755,33 +767,6 @@ const MenuModule = {
                         maxY = Math.max(maxY, coordinate.y);
                     }
                 }
-                const maxPathPoints = 80;
-                projected.forEach(point => {
-                    if (point.path.length > maxPathPoints) {
-                        const lastIndex = point.path.length - 1;
-                        point.path = Array.from({ length: maxPathPoints }, (_, index) =>
-                            point.path[Math.round(index * lastIndex / (maxPathPoints - 1))]
-                        );
-                    }
-                });
-                const maxMarkers = 8;
-                const markerIndices = projected.length <= maxMarkers
-                    ? projected.map((_point, index) => index)
-                    : Array.from({ length: maxMarkers }, (_, index) =>
-                        Math.round(index * (projected.length - 1) / (maxMarkers - 1))
-                    );
-                const icons = await Promise.all(markerIndices.map(index => new Promise((resolve, reject) => {
-                    const point = projected[index];
-                    const icon = new Image();
-                    icon.onload = () => resolve({ index, icon });
-                    icon.onerror = () => reject(new Error('Could not load route point icon'));
-                    icon.src = window.getNavigatorPointIcon(
-                        point.color,
-                        point.number,
-                        point.current,
-                        point.hasComment
-                    );
-                })));
                 const markerSize = Math.min(40, Math.max(20, Math.min(width, height) * 0.2));
                 const padding = markerSize / 2 + 2;
                 const scale = Math.min(
@@ -813,10 +798,10 @@ const MenuModule = {
                     context.stroke();
                 }
 
-                for (const { index, icon } of icons) {
+                for (let index = projected.length - 1; index >= 0; index--) {
                     const position = toCanvas(projected[index].path[0]);
                     context.drawImage(
-                        icon,
+                        icons[index],
                         position.x - markerSize / 2,
                         position.y - markerSize / 2,
                         markerSize,
