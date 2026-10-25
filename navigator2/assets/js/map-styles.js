@@ -163,7 +163,6 @@ function versaStyleDefinition(style) {
 
     const kindIn = (list) => ['match', KIND, list, true, false];
     const onGround = (list) => ['all', kindIn(list), ['!=', ['get', 'tunnel'], true]];
-    const inTunnel = (list) => ['all', kindIn(list), ['==', ['get', 'tunnel'], true]];
 
     const W_MOTORWAY_C = ['interpolate', ['exponential', 1.2], ['zoom'], 5, 0.4, 6, 0.7, 7, 1.75, 20, 22];
     const W_TRUNK_C = ['interpolate', ['exponential', 1.2], ['zoom'], 5, 0.4, 6, 0.7, 7, 1.75, 20, 22];
@@ -323,7 +322,7 @@ function versaStyleDefinition(style) {
 
     return {
         version: 8,
-        glyphs: style.glyphs || 'https://fonts.openmaptiles.org/{fontstack}/{range}.pbf',
+        glyphs: style.glyphs,
         sources: {
             [S]: {
                 type: 'vector',
@@ -345,7 +344,7 @@ function mapStyleDefinition(type) {
 
     if (style.schema === 'shortbread') return versaStyleDefinition(style);
 
-    const sourceId = styleKey === 'yandex_sat' ? 'osm-yandex-base' : 'osm-raster';
+    const sourceId = 'osm-yandex-base';
     const rasterSource = {
         type: 'raster',
         tiles: style.tiles,

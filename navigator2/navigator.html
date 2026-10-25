@@ -1691,19 +1691,13 @@ if (typeof maplibregl === 'undefined') {
         const isYandexError = sourceId === 'osm-yandex-base'
             || /yandexsat:|core-sat\.maps\.yandex\.net/i.test(url);
         const isVersaError = sourceId === 'versa' || /versatiles\.org/i.test(url);
-        const isOsmError = sourceId === 'osm-raster' || sourceId === 'shortbread'
-            || /(?:tile|vector)\.openstreetmap\.org/i.test(url);
-        const errorType = isYandexError ? 'yandex' : isVersaError ? 'versa' : isOsmError ? 'osm' : null;
+        const errorType = isYandexError ? 'yandex' : isVersaError ? 'versa' : null;
         if (!errorType || shownMapErrors.has(errorType)) return;
         shownMapErrors.add(errorType);
 
-        if (errorType === 'yandex') {
-            showToast('Ошибка загрузки тайлов Яндекса', 'error', 6000);
-        } else if (errorType === 'versa') {
-            showToast('Ошибка загрузки карты VersaTiles', 'error', 6000);
-        } else {
-            showToast('Ошибка загрузки тайлов OpenStreetMap', 'error', 6000);
-        }
+        showToast(errorType === 'yandex'
+            ? 'Ошибка загрузки тайлов Яндекса'
+            : 'Ошибка загрузки карты VersaTiles', 'error', 6000);
     });
 
     const userEl = document.createElement('div');
