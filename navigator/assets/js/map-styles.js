@@ -14,6 +14,12 @@ const MAP_STYLES = {
         vector: true,
         attribution: OSM_ATTRIBUTION
     },
+    ofm_3d: {
+        label: 'OpenFreeMap 3D',
+        vector: true,
+        remoteStyle: 'https://tiles.openfreemap.org/styles/liberty',
+        attribution: OSM_ATTRIBUTION
+    },
     nn_3d: {
         label: 'Нижегородская обл. 3D',
         vector: true,
@@ -144,6 +150,8 @@ function omtStyleDefinition(style) {
 function mapStyleDefinition(type) {
     const styleKey = MAP_STYLES[type] ? type : 'yandex_sat';
     const style = MAP_STYLES[styleKey];
+
+    if (style.remoteStyle) return style.remoteStyle;
 
     if (style.omt) return omtStyleDefinition(style);
 
