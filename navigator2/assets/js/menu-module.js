@@ -11,9 +11,6 @@ const MenuModule = {
     _folderPath: [],
     _searchQuery: '',
     _searchScope: 'all',
-    _recentRouteKeys: [],
-    _recentLimit: 6,
-    _RECENT_KEY: 'osm_recent_routes_v1',
     _MENU_STATE_KEY: 'osm_routes_menu_state_v1',
     _previewObserver: null,
     _previewImages: new Map(),
@@ -59,7 +56,6 @@ const MenuModule = {
     // Инициализация
     async init(onRouteLoaded) {
         this.callback = onRouteLoaded;
-        this._loadRecentRoutes();
         this._loadMenuState();
         this.createModal();
         this.createButton();
@@ -189,16 +185,6 @@ const MenuModule = {
         catalog.sort((a, b) => a.fullPath.localeCompare(b.fullPath, 'ru'));
         this._catalog = catalog;
 
-        if (this._activeCategory !== 'all' && this._activeCategory !== 'recent') {
-            this._activeCategory = 'all';
-        }
-        if (this._activeCategory === 'recent' && !this._getRecentRoutes().length) {
-            this._activeCategory = 'all';
-        }
-        if (this._activeCategory === 'recent') {
-            this._folderPath = [];
-            this._searchScope = 'all';
-        }
         let validPath = [];
         for (const folder of this._folderPath) {
             const children = this._getChildFolders(validPath);
@@ -253,7 +239,6 @@ const MenuModule = {
                 this._folderPath = saved.folderPath;
                 this._activeCategory = 'all';
             } else {
-                if (saved.category === 'recent') this._activeCategory = 'recent';
                 if (typeof saved.category === 'string' && saved.category.startsWith('cat:')) {
                     this._folderPath = [
                         saved.category.slice(4),
@@ -308,33 +293,6 @@ const MenuModule = {
             path.every((folder, index) => item.folders[index] === folder);
     },
 
-    _loadRecentRoutes() {
-        try {
-            const saved = JSON.parse(localStorage.getItem(this._RECENT_KEY) || '[]');
-            if (Array.isArray(saved)) {
-                this._recentRouteKeys = saved
-                    .filter(key => typeof key === 'string' && key)
-                    .slice(0, this._recentLimit);
-            }
-        } catch (e) {
-            this._recentRouteKeys = [];
-        }
-    },
-
-    _rememberRecent(routeM) {
-        if (!routeM) return;
-        this._recentRouteKeys = [routeM, ...this._recentRouteKeys.filter(key => key !== routeM)]
-            .slice(0, this._recentLimit);
-        try {
-            localStorage.setItem(this._RECENT_KEY, JSON.stringify(this._recentRouteKeys));
-        } catch (e) {}
-    },
-
-    _getRecentRoutes() {
-        const byKey = new Map(this._catalog.map(item => [item.key, item]));
-        return this._recentRouteKeys.map(key => byKey.get(key)).filter(Boolean);
-    },
-
     _normalizeSearch(value) {
         return String(value || '')
             .toLocaleLowerCase('ru')
@@ -355,8 +313,6 @@ const MenuModule = {
                     (this._searchScope !== 'category' || !this._folderPath.length ||
                         this._isWithinFolder(item, this._folderPath))
                 );
-        } else if (this._activeCategory === 'recent') {
-            routes = this._getRecentRoutes();
         } else {
             routes = this._catalog.filter(item =>
                 item.folders.length === this._folderPath.length &&
@@ -418,7 +374,7 @@ const MenuModule = {
             return;
         }
 
-        const childFolders = !this._searchQuery && this._activeCategory !== 'recent'
+        const childFolders = !this._searchQuery
             ? this._getChildFolders(this._folderPath)
             : [];
         if (!routes.length && !childFolders.length) {
@@ -481,7 +437,7 @@ const MenuModule = {
         const el = document.getElementById('routesCategoryChips');
         if (!el) return;
 
-        if (!this._catalog.length || this._folderPath.length || this._activeCategory === 'recent') {
+        if (!this._catalog.length || this._folderPath.length) {
             el.innerHTML = '';
             el.hidden = true;
             return;
@@ -490,10 +446,7 @@ const MenuModule = {
         const scrollLeft = el.scrollLeft;
         el.innerHTML = '';
 
-        const recent = this._getRecentRoutes();
-        const chips = recent.length
-            ? [{ key: 'recent', label: 'Недавние', count: recent.length }]
-            : [];
+        const chips = [];
 
         for (const chip of chips) {
             const button = document.createElement('button');
@@ -540,9 +493,7 @@ const MenuModule = {
         const el = document.getElementById('routesBreadcrumb');
         if (!el) return;
         el.innerHTML = '';
-        const labels = this._activeCategory === 'recent'
-            ? ['Все маршруты', 'Недавние']
-            : ['Все маршруты', ...this._folderPath];
+        const labels = ['Все маршруты', ...this._folderPath];
         el.hidden = false;
 
         labels.forEach((label, index) => {
@@ -1024,14 +975,8 @@ const MenuModule = {
                 if (!item) return;
                 const index = Number(item.dataset.breadcrumbIndex);
                 if (!Number.isInteger(index)) return;
-                if (this._activeCategory === 'recent') {
-                    if (index !== 0) return;
-                    this._activeCategory = 'all';
-                    this._folderPath = [];
-                } else {
-                    this._activeCategory = 'all';
-                    this._folderPath = index === 0 ? [] : this._folderPath.slice(0, index);
-                }
+                this._activeCategory = 'all';
+                this._folderPath = index === 0 ? [] : this._folderPath.slice(0, index);
                 this._searchScope = 'all';
                 this._saveMenuState();
                 this._buildRoutesList();
@@ -1135,7 +1080,6 @@ const MenuModule = {
             }
 
             await this.loadRoute(data);
-            this._rememberRecent(routeM);
             this.hideSpinner();
         } catch (e) {
             this.hideSpinner();
