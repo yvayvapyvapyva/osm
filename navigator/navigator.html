@@ -104,7 +104,8 @@
 <script src="assets/js/report.js?v=3"></script>
 <script src="assets/js/tts-client.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
-<script src="assets/js/map-styles.js?v=1"></script>
+<script src="https://cdn.jsdelivr.net/npm/pmtiles@3.2.1/dist/pmtiles.js"></script>
+<script src="assets/js/map-styles.js?v=5"></script>
 <script>
 // Грузим Telegram/VK SDK асинхронно с таймаутом 10с.
 // Если telegram.org / unpkg.com заблокированы или недоступны — не блокируем загрузку приложения.
@@ -175,9 +176,11 @@ function loadMapPrefs() {
     if (saved && saved.style) {
       prefs.style = MAP_STYLES[saved.style]
         ? saved.style
-        : ['scheme', 'base', 'sat', 'topo', 'dark', 'openstreetmap'].includes(saved.style)
-          ? 'osm_vector'
-          : 'osm';
+        : saved.style === 'nn_vector'
+          ? 'nn_3d'
+          : ['scheme', 'base', 'sat', 'topo', 'dark', 'openstreetmap'].includes(saved.style)
+            ? 'osm_vector'
+            : 'osm';
     }
   } catch (e) {}
   return prefs;
@@ -873,6 +876,9 @@ function registerYandexProtocol() {
     if (_yandexProtoRegistered) return;
     if (typeof maplibregl === 'undefined' || !maplibregl.addProtocol) return;
     maplibregl.addProtocol('yandexsat', buildYandexTile);
+    if (typeof pmtiles !== 'undefined' && pmtiles.Protocol) {
+        try { maplibregl.addProtocol('pmtiles', new pmtiles.Protocol().tile); } catch (e) {}
+    }
     _yandexProtoRegistered = true;
 }
 
@@ -911,6 +917,9 @@ function setMapType(type) {
     syncMapStyleButtons();
     APP._routeDataSource = null;
     APP.map.setStyle(mapStyleDefinition(type));
+    if (MAP_STYLES[type].omt && APP.map.getZoom() >= 14) {
+        APP.map.easeTo({ pitch: 55, duration: 600 });
+    }
     showToast(MAP_STYLES[type].label, 'info', 1500);
 }
 
