@@ -18,6 +18,9 @@
     --nav-h: 64px;
     --nav-gap: 10px;
     --nav-space: calc(var(--nav-h) + var(--nav-gap) * 2 + env(safe-area-inset-bottom));
+
+    /* Полноэкранные разделы: контент заканчивается над таб-баром */
+    --screen-bottom: calc(var(--nav-h) + var(--nav-gap) + env(safe-area-inset-bottom) + 8px);
 }
 
 * {
@@ -122,12 +125,8 @@ html, body {
     pointer-events: none;
 }
 
-#instructionModal { z-index: 20000; }
-
-#instructionModal .modal-sheet {
-    height: calc(70vh + var(--nav-space));
-    height: calc(70dvh + var(--nav-space));
-}
+/* Инструкция — полноэкранный раздел; таб-бар остаётся поверх него. */
+#instructionModal { z-index: 11000; }
 
 #instructionModal .icon-row,
 #instructionModal .icon-row-v {
@@ -739,21 +738,6 @@ html, body {
     margin-top: 0;
 }
 
-.modal-sheet {
-    width: 100%;
-    height: 100%;
-    background: #0f0f0f;
-    border: 0.5px solid rgba(255, 255, 255, 0.12);
-    border-radius: 24px;
-    padding: 8px;
-    display: flex;
-    flex-direction: column;
-    gap: 14px;
-    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4), inset 0 0.5px 0 rgba(255, 255, 255, 0.06);
-    overflow: hidden;
-    box-sizing: border-box;
-}
-
 .routes-list {
     margin-top: 4px;
     flex: 1 1 0%;
@@ -768,7 +752,7 @@ html, body {
 .routes-list::after {
     content: '';
     display: block;
-    height: 50px;
+    height: 8px;
     pointer-events: none;
     flex-shrink: 0;
 }
@@ -1002,7 +986,7 @@ html, body {
 .settings-body::after {
     content: '';
     display: block;
-    height: 50px;
+    height: 8px;
     pointer-events: none;
     flex-shrink: 0;
 }
@@ -1036,22 +1020,25 @@ html, body {
 
 .map-style-grid {
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 8px;
 }
 
 .map-style-btn {
-    padding: 10px 6px;
+    min-width: 0;
+    padding: 10px 8px;
     border-radius: 10px;
     background: var(--glass-bg);
     border: 1px solid rgba(255, 255, 255, 0.25);
     color: #fff;
     font-size: 13px;
     font-weight: 600;
+    line-height: 1.25;
     cursor: pointer;
     transition: all 0.15s;
     text-align: center;
-    white-space: nowrap;
+    white-space: normal;
+    overflow-wrap: anywhere;
 }
 
 .map-style-btn:active {
@@ -1144,75 +1131,114 @@ html, body {
 }
 
 /* ============================================
-   Bottom sheet modal (shared)
+   Полноэкранные разделы
    ============================================ */
-.sheet-modal {
+.screen-modal {
     position: fixed;
-    bottom: 0; left: 0; right: 0;
+    inset: 0;
     z-index: 11000;
-    pointer-events: none;
+    background: #0f0f0f;
 }
 
-.sheet-modal .modal-sheet {
-    height: calc(70vh + var(--nav-space));
-    height: calc(70dvh + var(--nav-space));
-    border-radius: 24px 24px 0 0;
-    padding: 0 0 var(--nav-space);
-    margin: 0;
+.screen-modal.hidden {
+    display: none;
+}
+
+.screen-panel {
     width: 100%;
-    max-width: none;
+    height: 100%;
     display: flex;
     flex-direction: column;
     gap: 0;
+    padding-bottom: var(--screen-bottom);
     background: #0f0f0f;
-    border: 0.5px solid rgba(255, 255, 255, 0.12);
-    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4), inset 0 0.5px 0 rgba(255, 255, 255, 0.06);
     box-sizing: border-box;
-    transform: translateY(100%);
-    transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
-    pointer-events: auto;
+    overflow: hidden;
 }
 
-.sheet-modal:not(.hidden) .modal-sheet {
-    transform: translateY(0);
+.screen-modal:not(.hidden) .screen-panel {
+    animation: screen-in 0.22s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-.sheet-modal.hidden .modal-sheet {
-    pointer-events: none;
+@keyframes screen-in {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: none;
+    }
 }
 
-.sheet-drag-area {
+.screen-head {
+    position: relative;
+    z-index: 1;
     flex-shrink: 0;
-    touch-action: none;
-    cursor: grab;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 52px;
+    padding: calc(env(safe-area-inset-top) + 6px) 8px 6px 16px;
+    box-sizing: border-box;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+    background: rgba(15, 15, 15, 0.92);
+    -webkit-backdrop-filter: blur(16px);
+    backdrop-filter: blur(16px);
+}
+
+.screen-title {
+    flex: 1;
+    min-width: 0;
+    margin: 0;
+    font-size: 17px;
+    font-weight: 650;
+    letter-spacing: -0.2px;
+    line-height: 1.2;
+    color: #F4F7FA;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.screen-close {
+    flex-shrink: 0;
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 4px 0;
-    min-height: 44px;
-
-    box-sizing: border-box;
-    border-bottom: 0.5px solid rgba(255,255,255,0.15);
-    background: rgba(255,255,255,0.06);
+    width: 40px;
+    height: 40px;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.06);
+    color: rgba(255, 255, 255, 0.7);
+    cursor: pointer;
+    transition: background 0.15s ease, color 0.15s ease, transform 0.12s ease;
+    -webkit-tap-highlight-color: transparent;
 }
 
-.sheet-handle {
-    width: 100px;
-    height: 26px;
-    flex-shrink: 0;
-    opacity: 0.5;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    pointer-events: none;
-}
-
-.sheet-handle svg {
+.screen-close svg {
     display: block;
-    width: 100%;
-    height: 100%;
-    fill: #fff;
-    pointer-events: none;
+    width: 20px;
+    height: 20px;
+}
+
+.screen-close:active {
+    background: rgba(255, 255, 255, 0.14);
+    color: #fff;
+    transform: scale(0.94);
+}
+
+.screen-close:focus-visible {
+    outline: 2px solid rgba(52, 199, 89, 0.7);
+    outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .screen-modal:not(.hidden) .screen-panel {
+        animation: none;
+    }
 }
 
 #pointsListWrap {
@@ -1224,7 +1250,7 @@ html, body {
 #pointsListWrap::after {
     content: '';
     display: block;
-    height: 50px;
+    height: 8px;
     pointer-events: none;
 }
 

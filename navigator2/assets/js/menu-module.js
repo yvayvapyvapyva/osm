@@ -609,11 +609,14 @@ const MenuModule = {
     // Создание модального окна
     createModal() {
         const html = `
-            <div id="jsonModal" class="sheet-modal">
-                <div class="modal-sheet compact-route-menu" id="jsonModalSheet">
-                    <div class="sheet-drag-area" id="jsonModalDragArea">
-                        <div class="sheet-handle"><svg viewBox="0 0 24 24"><path d="M3 9L12 14.2L21 9" stroke="#fff" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
-                    </div>
+            <div id="jsonModal" class="screen-modal">
+                <div class="screen-panel compact-route-menu" id="jsonModalScreen">
+                    <header class="screen-head">
+                        <h1 class="screen-title">Маршруты</h1>
+                        <button type="button" class="screen-close" id="jsonModalClose" aria-label="Закрыть">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+                        </button>
+                    </header>
                     <div id="routesListContainer" class="routes-list">
                         <div style="text-align:center; padding:20px; color:rgba(255,255,255,0.5); font-size:14px;">
                             Загрузка списка маршрутов...
@@ -636,55 +639,8 @@ const MenuModule = {
             document.body.insertAdjacentHTML('afterbegin', html);
         }
 
-        // Drag-to-dismiss на ручку
-        const self = this;
-        (() => {
-            const sheet = document.getElementById('jsonModalSheet');
-            const handle = document.getElementById('jsonModalDragArea');
-            let startY = 0, currentY = 0, dragging = false;
-            if (!sheet || !handle) return;
-            const onStart = (e) => { e.preventDefault(); startY = e.clientY; currentY = startY; dragging = false; };
-            const onMove = (e) => {
-                if (startY === 0) return;
-                const dy = e.clientY - startY;
-                if (Math.abs(dy) > 5) dragging = true;
-                if (!dragging) return;
-                currentY = e.clientY;
-                sheet.style.transition = 'none';
-                if (dy > 0) sheet.style.transform = `translateY(${dy}px)`;
-            };
-            const onEnd = () => {
-                if (startY === 0) return;
-                if (dragging) {
-                    sheet.style.transition = '';
-                    const dy = currentY - startY;
-                    if (dy > 100) { self.hide(); startY = 0; return; }
-                    sheet.style.transform = '';
-                } else {
-                    self.hide();
-                }
-                startY = 0;
-            };
-            handle.addEventListener('pointerdown', onStart);
-            window.addEventListener('pointermove', onMove);
-            window.addEventListener('pointerup', onEnd);
-            window.addEventListener('pointercancel', onEnd);
-        })();
-
-        // Закрытие меню при клике вне панели.
-        document.addEventListener('click', (e) => {
-            const modal = document.getElementById('jsonModal');
-            if (modal && !modal.classList.contains('hidden')) {
-                const sheet = modal.querySelector('.modal-sheet');
-                const menuBtn = document.getElementById('menuBtn');
-                const bottomNav = document.getElementById('bottomNav');
-                const inBottomNav = bottomNav && bottomNav.contains(e.target);
-                if (sheet && !sheet.contains(e.target) && !inBottomNav &&
-                    e.target !== menuBtn && !(menuBtn && menuBtn.contains(e.target))) {
-                    this.hide();
-                }
-            }
-        });
+        const closeBtn = document.getElementById('jsonModalClose');
+        if (closeBtn) closeBtn.addEventListener('click', () => this.hide());
     },
 
     // Создание кнопки меню
@@ -800,11 +756,7 @@ const MenuModule = {
     hide() {
         this._destroyRoutePreviews();
         const modal = document.getElementById('jsonModal');
-        if (modal) {
-            const sheet = document.getElementById('jsonModalSheet');
-            if (sheet) { sheet.style.transform = ''; sheet.style.transition = ''; }
-            modal.classList.add('hidden');
-        }
+        if (modal) modal.classList.add('hidden');
         if (this._retryTimer) {
             clearTimeout(this._retryTimer);
             this._retryTimer = null;
