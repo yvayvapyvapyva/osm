@@ -36,7 +36,6 @@ function embedPage(file, bundle) {
     let html = fs.readFileSync(path.join(root, file), 'utf8');
     const favicon = fs.readFileSync(path.join(root, 'ico.png')).toString('base64');
     const styles = fs.readFileSync(path.join(root, bundle.stylesheet), 'utf8');
-    const deferredScripts = [];
 
     html = html.replace(
         /<link\b[^>]*href=["']assets\/css\/[^"']+["'][^>]*>/i,
@@ -47,6 +46,10 @@ function embedPage(file, bundle) {
         `<link rel="icon" href="data:image/png;base64,${favicon}" type="image/png">`
     );
 
+    // Встраиваем скрипты на их исходные места: порядок инициализации в бандле
+    // должен совпадать с порядком в исходной странице. Раньше defer-скрипты
+    // переносились в конец body, из-за чего menu-module.js оказывался ниже
+    // кода, который вызывает MenuModule.init().
     for (const scriptFile of bundle.scripts) {
         const source = fs.readFileSync(path.join(root, scriptFile), 'utf8');
         const minified = minifyJavaScript(source, scriptFile);
@@ -54,18 +57,11 @@ function embedPage(file, bundle) {
             `<script\\b([^>]*src=["']${scriptFile.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}[^"']*["'][^>]*)><\\/script\\s*>`,
             'i'
         );
-        html = html.replace(sourcePattern, (_tag, attributes) => {
-            const scriptTag = `<script>${minified}</script>`;
-            if (/\bdefer\b/i.test(attributes)) {
-                deferredScripts.push(scriptTag);
-                return '';
-            }
-            return scriptTag;
-        });
+        html = html.replace(sourcePattern, () => `<script>${minified}</script>`);
     }
 
     const instructionTemplate = `<template id="embeddedInstruction">${bodyContent(bundle.instruction)}</template>`;
-    html = html.replace('</body>', `${instructionTemplate}${deferredScripts.join('')}</body>`);
+    html = html.replace('</body>', `${instructionTemplate}</body>`);
     html = html.replace(/<script\b([^>]*)>([\s\S]*?)<\/script\s*>/gi, (tag, attributes, source) => {
         if (/\bsrc\s*=/i.test(attributes) || !source.trim()) return tag;
         return `<script${attributes}>${minifyJavaScript(source, `${file} inline script`)}</script>`;

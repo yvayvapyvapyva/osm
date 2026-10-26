@@ -681,45 +681,6 @@ html, body {
 /* ============================================
    Модальное окно меню (menu-module)
    ============================================ */
-#menuBtn {
-    position: relative;
-    width: auto;
-    padding: 0 18px;
-    border-radius: 100px;
-    height: 48px;
-    gap: 8px;
-    background: rgba(15, 15, 15, 0.75);
-    border: 0.5px solid rgba(255, 255, 255, 0.12);
-    color: #ffffff;
-    cursor: pointer;
-    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3), inset 0 0.5px 0 rgba(255, 255, 255, 0.1);
-    flex-shrink: 0;
-}
-
-#menuBtn svg {
-    flex-shrink: 0;
-    width: 20px;
-    height: 20px;
-}
-
-#menuBtn span {
-    font-size: 15px;
-    font-weight: 700;
-    white-space: nowrap;
-    letter-spacing: -0.1px;
-    color: #fff;
-}
-
-#menuBtn:active {
-    transform: scale(0.94);
-    background: rgba(30, 30, 30, 0.5);
-    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4);
-}
-
 #jsonModal .routes-list {
     padding: 8px 10px 0;
     margin-top: 0;
@@ -897,119 +858,6 @@ html, body {
 .routes-search-clear svg {
     width: 14px;
     height: 14px;
-}
-
-.routes-chips {
-    display: flex;
-    gap: 7px;
-    padding: 0 20px 0 12px;
-    overflow-x: auto;
-    scrollbar-width: none;
-    -webkit-overflow-scrolling: touch;
-}
-
-.routes-chips.can-scroll-left {
-    -webkit-mask-image: linear-gradient(to right, transparent, #000 16px, #000 100%);
-    mask-image: linear-gradient(to right, transparent, #000 16px, #000 100%);
-}
-
-.routes-chips.can-scroll-right {
-    -webkit-mask-image: linear-gradient(to right, #000 0, #000 calc(100% - 16px), transparent);
-    mask-image: linear-gradient(to right, #000 0, #000 calc(100% - 16px), transparent);
-}
-
-.routes-chips.can-scroll-left.can-scroll-right {
-    -webkit-mask-image: linear-gradient(to right, transparent, #000 16px, #000 calc(100% - 16px), transparent);
-    mask-image: linear-gradient(to right, transparent, #000 16px, #000 calc(100% - 16px), transparent);
-}
-
-.routes-chips::-webkit-scrollbar {
-    display: none;
-}
-
-.routes-chips[hidden] {
-    display: none;
-}
-
-.routes-chip {
-    flex: 0 0 auto;
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    height: 32px;
-    padding: 0 12px;
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 999px;
-    background: rgba(255, 255, 255, 0.07);
-    color: rgba(255, 255, 255, 0.78);
-    font: inherit;
-    font-size: 13px;
-    font-weight: 600;
-    line-height: 1;
-    white-space: nowrap;
-    cursor: pointer;
-    transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease, transform 0.1s ease;
-    -webkit-tap-highlight-color: transparent;
-}
-
-.routes-chip:active {
-    transform: scale(0.96);
-}
-
-.routes-chip.active {
-    background: rgba(48, 209, 88, 0.18);
-    border-color: rgba(48, 209, 88, 0.65);
-    color: #fff;
-}
-
-.routes-chip-count {
-    padding: 2px 6px;
-    border-radius: 999px;
-    background: rgba(0, 0, 0, 0.25);
-    color: rgba(255, 255, 255, 0.55);
-    font-size: 11px;
-    font-weight: 700;
-    line-height: 1;
-}
-
-.routes-chip.active .routes-chip-count {
-    background: rgba(48, 209, 88, 0.28);
-    color: #b9f7c8;
-}
-
-.routes-chips-sub .routes-chip {
-    height: 30px;
-    padding: 0 10px;
-    font-size: 12px;
-}
-
-.routes-chip-back {
-    border-color: rgba(255, 255, 255, 0.06);
-    background: transparent;
-    color: rgba(255, 255, 255, 0.62);
-}
-
-@media (max-width: 380px) {
-    .routes-chips {
-        gap: 6px;
-    }
-
-    .routes-chip {
-        height: 32px;
-        padding: 0 9px;
-        font-size: 12px;
-    }
-
-    .routes-chips-sub .routes-chip {
-        height: 28px;
-        padding: 0 9px;
-        font-size: 11.5px;
-    }
-
-    .routes-chip-count {
-        padding: 2px 5px;
-        font-size: 10px;
-    }
 }
 
 .routes-list {
@@ -1692,12 +1540,6 @@ html, body {
 /* ============================================
    Верхняя навигация: отдельные кнопки (как на gdebenz.ru)
    ============================================ */
-/* Верхние дубли кнопок «Маршруты» и «Настройки» больше не нужны. */
-#menuBtn,
-#settingsBtn {
-    display: none;
-}
-
 /* Атрибуция карты в правом нижнем углу (как на gdebenz.ru) */
 .maplibregl-ctrl-bottom-right {
     bottom: calc(12px + env(safe-area-inset-bottom));

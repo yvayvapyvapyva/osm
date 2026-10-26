@@ -6,8 +6,7 @@ const MenuModule = {
     routesDescriptions: {}, // { "m": { name, description, m, data } }
     _routesLoaded: false,   // список с геометрией уже получен
     _isFetchingRoutes: false,
-    _catalog: [],           // плоский список маршрутов с путём и категориями
-    _activeCategory: 'all',
+    _catalog: [],           // плоский список маршрутов с путём
     _folderPath: [],
     _searchQuery: '',
     _searchScope: 'all',
@@ -58,7 +57,6 @@ const MenuModule = {
         this.callback = onRouteLoaded;
         this._loadMenuState();
         this.createModal();
-        this.createButton();
         this.hide();
 
         // Загружаем список маршрутов динамически
@@ -237,24 +235,12 @@ const MenuModule = {
             if (Array.isArray(saved.folderPath) &&
                 saved.folderPath.every(folder => typeof folder === 'string')) {
                 this._folderPath = saved.folderPath;
-                this._activeCategory = 'all';
-            } else {
-                if (typeof saved.category === 'string' && saved.category.startsWith('cat:')) {
-                    this._folderPath = [
-                        saved.category.slice(4),
-                        ...(typeof saved.subcategory === 'string' && saved.subcategory !== 'all'
-                            ? saved.subcategory.split(' / ')
-                            : [])
-                    ];
-                    this._activeCategory = 'all';
-                }
             }
             if (typeof saved.query === 'string') this._searchQuery = saved.query;
             if (saved.searchScope === 'all' || saved.searchScope === 'category') {
                 this._searchScope = saved.searchScope;
             }
         } catch (e) {
-            this._activeCategory = 'all';
             this._folderPath = [];
             this._searchQuery = '';
             this._searchScope = 'all';
@@ -264,7 +250,6 @@ const MenuModule = {
     _saveMenuState() {
         try {
             localStorage.setItem(this._MENU_STATE_KEY, JSON.stringify({
-                category: this._activeCategory,
                 folderPath: this._folderPath,
                 query: this._searchQuery,
                 searchScope: this._searchScope
@@ -351,8 +336,6 @@ const MenuModule = {
 
         // Список ещё не получен — показываем спиннер, а не «Нет маршрутов».
         if (!this._routesLoaded) {
-            this._renderCategoryChips();
-            this._renderSubcategoryChips();
             this._renderBreadcrumbs();
             if (this._isFetchingRoutes) {
                 this._showListLoading();
@@ -363,8 +346,6 @@ const MenuModule = {
         }
 
         const routes = this._getFilteredRoutes();
-        this._renderCategoryChips();
-        this._renderSubcategoryChips();
         this._renderBreadcrumbs();
 
         container.innerHTML = '';
@@ -433,62 +414,6 @@ const MenuModule = {
         this._observeRoutePreviews(container);
     },
 
-    _renderCategoryChips() {
-        const el = document.getElementById('routesCategoryChips');
-        if (!el) return;
-
-        if (!this._catalog.length || this._folderPath.length) {
-            el.innerHTML = '';
-            el.hidden = true;
-            return;
-        }
-
-        const scrollLeft = el.scrollLeft;
-        el.innerHTML = '';
-
-        const chips = [];
-
-        for (const chip of chips) {
-            const button = document.createElement('button');
-            button.type = 'button';
-            const isActive = this._activeCategory === chip.key;
-            button.className = 'routes-chip' + (isActive ? ' active' : '');
-            button.dataset.category = chip.key;
-            button.setAttribute('role', 'tab');
-            button.setAttribute('aria-selected', String(isActive));
-            button.innerHTML = `
-                <span class="routes-chip-label">${this._escape(chip.label)}</span>
-                <span class="routes-chip-count">${chip.count}</span>
-            `;
-            el.appendChild(button);
-        }
-
-        el.hidden = !!this._searchQuery || !chips.length;
-        el.scrollLeft = scrollLeft;
-        this._ensureActiveChipVisible(el);
-        this._updateChipFades(el);
-    },
-
-    _ensureActiveChipVisible(el) {
-        if (!el || el.hidden) return;
-        const active = el.querySelector('.routes-chip.active');
-        if (!active) return;
-        const elRect = el.getBoundingClientRect();
-        const activeRect = active.getBoundingClientRect();
-        if (activeRect.left < elRect.left) {
-            el.scrollLeft -= elRect.left - activeRect.left + 12;
-        } else if (activeRect.right > elRect.right) {
-            el.scrollLeft += activeRect.right - elRect.right + 12;
-        }
-    },
-
-    _renderSubcategoryChips() {
-        const el = document.getElementById('routesSubcategoryChips');
-        if (!el) return;
-        el.innerHTML = '';
-        el.hidden = true;
-    },
-
     _renderBreadcrumbs() {
         const el = document.getElementById('routesBreadcrumb');
         if (!el) return;
@@ -539,13 +464,6 @@ const MenuModule = {
                 ? `Искать в этой папке и её подпапках: ${this._folderPath.join(' / ')}`
                 : 'Искать во всех маршрутах'
         );
-    },
-
-    _updateChipFades(el) {
-        if (!el || el.hidden) return;
-        const maxScroll = el.scrollWidth - el.clientWidth;
-        el.classList.toggle('can-scroll-left', el.scrollLeft > 1);
-        el.classList.toggle('can-scroll-right', el.scrollLeft < maxScroll - 1);
     },
 
     _createRouteRow(route) {
@@ -893,8 +811,6 @@ const MenuModule = {
                             <button type="button" class="routes-search-scope" id="routesSearchScope" hidden>Везде</button>
                         </div>
                         <nav id="routesBreadcrumb" class="routes-breadcrumb" aria-label="Путь к папке" hidden></nav>
-                        <div id="routesCategoryChips" class="routes-chips" role="tablist" aria-label="Быстрые фильтры" hidden></div>
-                        <div id="routesSubcategoryChips" class="routes-chips routes-chips-sub" role="tablist" aria-label="Подкатегории" hidden></div>
                     </div>
                     <div id="routesListContainer" class="routes-list">
                         <div style="text-align:center; padding:20px; color:rgba(255,255,255,0.5); font-size:14px;">
@@ -954,21 +870,6 @@ const MenuModule = {
             });
         }
 
-        const categoryChips = document.getElementById('routesCategoryChips');
-        if (categoryChips) {
-            categoryChips.addEventListener('click', event => {
-                const chip = event.target.closest('.routes-chip');
-                if (!chip) return;
-                const key = chip.dataset.category;
-                if (!key || key === this._activeCategory) return;
-                this._activeCategory = key;
-                this._folderPath = [];
-                this._searchScope = 'all';
-                this._saveMenuState();
-                this._buildRoutesList();
-            });
-        }
-
         const breadcrumb = document.getElementById('routesBreadcrumb');
         if (breadcrumb) {
             breadcrumb.addEventListener('click', event => {
@@ -976,7 +877,6 @@ const MenuModule = {
                 if (!item) return;
                 const index = Number(item.dataset.breadcrumbIndex);
                 if (!Number.isInteger(index)) return;
-                this._activeCategory = 'all';
                 this._folderPath = index === 0 ? [] : this._folderPath.slice(0, index);
                 this._searchScope = 'all';
                 this._saveMenuState();
@@ -989,18 +889,12 @@ const MenuModule = {
             routesList.addEventListener('click', event => {
                 const folder = event.target.closest('[data-folder]');
                 if (!folder || !routesList.contains(folder)) return;
-                this._activeCategory = 'all';
                 this._folderPath = [...this._folderPath, folder.dataset.folder];
                 this._searchScope = 'all';
                 this._saveMenuState();
                 this._buildRoutesList();
             });
         }
-
-        [categoryChips].forEach(chips => {
-            if (!chips) return;
-            chips.addEventListener('scroll', () => this._updateChipFades(chips), { passive: true });
-        });
     },
 
     _clearSearch() {
@@ -1010,38 +904,6 @@ const MenuModule = {
         this._saveMenuState();
         this._updateSearchClear();
         this._buildRoutesList();
-    },
-
-    // Создание кнопки меню
-    createButton() {
-        const html = `
-            <button id="menuBtn" class="circle-btn">
-                <span>Маршруты</span>
-            </button>
-        `;
-
-        const container = document.getElementById('topCenterControls');
-        if (container) {
-            container.insertAdjacentHTML('afterbegin', html);
-        } else {
-            const loading = document.getElementById('loading');
-            if (loading) {
-                loading.insertAdjacentHTML('afterend', html);
-            } else {
-                document.body.insertAdjacentHTML('afterbegin', html);
-            }
-        }
-
-        // Обработчик клика
-        document.getElementById('menuBtn').addEventListener('click', () => {
-            if (typeof closeInstruction === 'function') closeInstruction();
-            const modal = document.getElementById('jsonModal');
-            if (modal && modal.classList.contains('hidden')) {
-                this.show();
-            } else {
-                this.hide();
-            }
-        });
     },
 
     // Проверка URL параметра
