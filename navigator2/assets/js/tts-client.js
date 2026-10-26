@@ -10,6 +10,7 @@
         comment: { voice: 'ru-RU-SvetlanaNeural', pitch: '+0Hz' }
     };
     const urls = new Map();
+    const blobUrls = new Map();
     const pending = new Map();
     const downloaded = new Set();
 
@@ -54,7 +55,11 @@
         if (!cleanText) return null;
         const type = VOICES[voiceType] ? voiceType : 'command';
         const key = cacheKey(cleanText, type);
-        if (urls.has(key)) return urls.get(key);
+        if (urls.has(key)) {
+            const remoteUrl = urls.get(key);
+            if (blobUrls.has(remoteUrl)) return blobUrls.get(remoteUrl);
+            return remoteUrl;
+        }
         if (pending.has(key)) return pending.get(key);
 
         const task = (async () => {
@@ -123,6 +128,9 @@
                 const audio = await response.arrayBuffer();
                 if (audio.byteLength === 0) throw new Error('Аудиофайл пуст');
                 downloaded.add(url);
+                const blob = new Blob([audio], { type: 'audio/mpeg' });
+                const blobUrl = URL.createObjectURL(blob);
+                blobUrls.set(url, blobUrl);
             }));
         }
     }
