@@ -1,8 +1,14 @@
 const OSM_ATTRIBUTION = '© <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap contributors</a>';
 const MAP_STYLES = {
-    yandex_sat: {
-        label: 'Яндекс.Спутник',
-        tiles: ['yandexsat://sat/{z}/{x}/{y}']
+    nn_3d: {
+        label: 'Нижегородская обл. 3D',
+        vector: true,
+        omt: true,
+        attribution: OSM_ATTRIBUTION,
+        pmtiles: 'https://storage.yandexcloud.net/nn-map-tiles/nn-omt.pmtiles',
+        glyphs: 'https://storage.yandexcloud.net/nn-map-tiles/fonts/{fontstack}/{range}.pbf',
+        font: 'NotoSansRegular',
+        fontBold: 'NotoSansBold'
     },
     versa_3d: {
         label: 'Россия 3D (VersaTiles)',
@@ -16,15 +22,9 @@ const MAP_STYLES = {
         font: 'NotoSansRegular',
         fontBold: 'NotoSansBold'
     },
-    nn_3d: {
-        label: 'Нижегородская обл. 3D',
-        vector: true,
-        omt: true,
-        attribution: OSM_ATTRIBUTION,
-        pmtiles: 'https://storage.yandexcloud.net/nn-map-tiles/nn-omt.pmtiles',
-        glyphs: 'https://storage.yandexcloud.net/nn-map-tiles/fonts/{fontstack}/{range}.pbf',
-        font: 'NotoSansRegular',
-        fontBold: 'NotoSansBold'
+    yandex_sat: {
+        label: 'Яндекс.Спутник',
+        tiles: ['yandexsat://sat/{z}/{x}/{y}']
     }
 };
 
@@ -337,7 +337,7 @@ function versaStyleDefinition(style) {
 }
 
 function mapStyleDefinition(type) {
-    const styleKey = MAP_STYLES[type] ? type : 'yandex_sat';
+    const styleKey = MAP_STYLES[type] ? type : 'nn_3d';
     const style = MAP_STYLES[styleKey];
 
     if (style.omt) return omtStyleDefinition(style);

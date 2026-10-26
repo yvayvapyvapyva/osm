@@ -89,7 +89,7 @@ const MenuModule = {
                 container.innerHTML = `
                     <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:30px;gap:12px;">
                         <div class="spinner-ring" style="width:28px;height:28px;border-width:3px;"></div>
-                        <div style="color:rgba(255,255,255,0.5);font-size:14px;">Не удалось загрузить. Повторяем...</div>
+                        <div style="color:rgba(18,28,46,0.5);font-size:14px;">Не удалось загрузить. Повторяем...</div>
                     </div>
                 `;
             }
@@ -323,7 +323,7 @@ const MenuModule = {
         container.innerHTML = `
             <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:30px;gap:12px;">
                 <div class="spinner-ring" style="width:28px;height:28px;border-width:3px;"></div>
-                <div style="color:rgba(255,255,255,0.5);font-size:14px;">Загрузка маршрутов...</div>
+                <div style="color:rgba(18,28,46,0.5);font-size:14px;">Загрузка маршрутов...</div>
             </div>
         `;
     },
@@ -629,8 +629,8 @@ const MenuModule = {
                 context.scale(pixelRatio, pixelRatio);
 
                 const background = context.createLinearGradient(0, 0, width, height);
-                background.addColorStop(0, '#303840');
-                background.addColorStop(1, '#20262d');
+                background.addColorStop(0, '#F8FAFC');
+                background.addColorStop(1, '#E8EEF6');
                 context.fillStyle = background;
                 context.fillRect(0, 0, width, height);
 
@@ -673,7 +673,7 @@ const MenuModule = {
                     });
                     context.lineCap = 'round';
                     context.lineJoin = 'round';
-                    context.strokeStyle = 'rgba(0, 0, 0, 0.75)';
+                    context.strokeStyle = 'rgba(18, 28, 46, 0.20)';
                     context.lineWidth = markerSize * 0.2;
                     context.stroke();
                     context.strokeStyle = point.color;
@@ -813,7 +813,7 @@ const MenuModule = {
                         <nav id="routesBreadcrumb" class="routes-breadcrumb" aria-label="Путь к папке" hidden></nav>
                     </div>
                     <div id="routesListContainer" class="routes-list">
-                        <div style="text-align:center; padding:20px; color:rgba(255,255,255,0.5); font-size:14px;">
+                        <div style="text-align:center; padding:20px; color:rgba(18,28,46,0.5); font-size:14px;">
                             Загрузка списка маршрутов...
                         </div>
                     </div>

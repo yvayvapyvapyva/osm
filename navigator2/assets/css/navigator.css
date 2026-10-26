@@ -1,16 +1,50 @@
-/* ============================================
-   Общие переменные и базовые стили
-   ============================================ */
 :root {
-    --bg: #000000;
-    --glass-bg: rgba(15, 15, 15, 0.75);
-    --glass-bg-heavy: rgba(12, 12, 12, 0.82);
-    --glass-border: rgba(255, 255, 255, 0.12);
-    --accent-green: #30D158;
-    --accent-green-glow: rgba(48, 209, 88, 0.35);
-    --text-primary: #ffffff;
-    --shadow-soft: 0 8px 32px rgba(0, 0, 0, 0.3);
-    --shadow-medium: 0 12px 40px rgba(0, 0, 0, 0.4);
+    /* Поверхности и фон */
+    --bg: #F4F6FA;
+    --bg-overlay: rgba(244, 246, 250, 0.84);
+    --surface: #FFFFFF;
+    --surface-muted: #F1F4F8;
+    --surface-subtle: #F7F9FC;
+    --map-bg: #EAEEF4;
+    --scrim: rgba(18, 28, 46, 0.28);
+    --toggle-off: #D8DEE8;
+
+    /* Текст */
+    --text: #121A28;
+    --text-muted: rgba(18, 28, 46, 0.62);
+    --text-soft: rgba(18, 28, 46, 0.42);
+    --text-faint: rgba(18, 28, 46, 0.24);
+    --text-disabled: rgba(18, 28, 46, 0.28);
+    --white: #FFFFFF;
+
+    /* Линии */
+    --line: rgba(18, 28, 46, 0.10);
+    --line-soft: rgba(18, 28, 46, 0.08);
+    --line-faint: rgba(18, 28, 46, 0.06);
+    --line-strong: rgba(18, 28, 46, 0.14);
+
+    /* Акценты */
+    --green: #16A34A;
+    --green-dark: #15803D;
+    --green-soft: #DCFCE7;
+    --green-tint: rgba(22, 163, 74, 0.10);
+    --green-tint-strong: rgba(22, 163, 74, 0.16);
+    --green-line: rgba(22, 163, 74, 0.42);
+    --green-line-soft: rgba(22, 163, 74, 0.26);
+    --green-focus: rgba(22, 163, 74, 0.55);
+    --green-glow: rgba(22, 163, 74, 0.18);
+    --danger: #DC2626;
+    --danger-soft: #FDE8E8;
+    --danger-line: rgba(220, 38, 38, 0.28);
+
+    /* Тени и скругления */
+    --shadow-card: 0 2px 10px rgba(18, 28, 46, 0.08);
+    --shadow-float: 0 4px 16px rgba(18, 28, 46, 0.08);
+    --shadow-raised: 0 12px 40px rgba(18, 28, 46, 0.16);
+    --shadow-panel: 0 -24px 48px rgba(18, 28, 46, 0.18);
+    --inset-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.90);
+    --radius-card: 16px;
+    --radius-control: 12px;
     --radius-sm: 14px;
     --radius-full: 100px;
 
@@ -36,8 +70,32 @@ html, body {
     font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', system-ui, sans-serif;
     overflow: hidden;
     background: var(--bg);
-    color: var(--text-primary);
+    color: var(--text);
     -webkit-font-smoothing: antialiased;
+}
+
+/* ============================================
+   Общие поверхности карточек и элементов управления
+   ============================================ */
+.circle-btn,
+#telemetryPanel,
+.hud-cmd,
+.nav-action-btn,
+.top-action-btn,
+.settings-group,
+.pl-item-row,
+.routes-folder-row,
+.route-row {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    box-shadow: var(--shadow-card), var(--inset-highlight);
+}
+
+.circle-btn,
+#telemetryPanel,
+.nav-action-btn,
+.top-action-btn {
+    box-shadow: var(--shadow-float), var(--inset-highlight);
 }
 
 #wakeLockVideo {
@@ -51,7 +109,10 @@ html, body {
 /* ============================================
    Утилиты
    ============================================ */
-.marker-img { display: block; }
+.marker-img {
+    display: block;
+    filter: drop-shadow(0 1px 3px rgba(18, 28, 46, 0.30));
+}
 
 /* Стрелка текущего положения — лежит в плоскости карты и наклоняется вместе с ней */
 .user-location-marker {
@@ -62,7 +123,7 @@ html, body {
     justify-content: center;
     cursor: pointer;
     transform-origin: 50% 50%;
-    filter: drop-shadow(0 3px 5px rgba(0, 0, 0, 0.55)) drop-shadow(0 1px 2px rgba(0, 0, 0, 0.45));
+    filter: drop-shadow(0 3px 5px rgba(18, 28, 46, 0.18)) drop-shadow(0 1px 2px rgba(18, 28, 46, 0.14));
     will-change: transform;
 }
 
@@ -72,10 +133,11 @@ html, body {
     height: 100%;
     overflow: visible;
 }
-.trigger-input { width:100%;padding:10px 14px;border-radius:10px;background:rgba(255,255,255,0.06);color:#fff;font-size:14px;outline:none;box-sizing:border-box;border:none; }
+.trigger-input { width:100%;padding:10px 14px;border-radius:10px;background:var(--surface-muted);color:var(--text);font-size:14px;outline:none;box-sizing:border-box;border:1px solid var(--line); }
+.trigger-input:focus { background:var(--surface);border-color:var(--green-focus); }
 .trigger-pad { padding:4px 0 6px; }
-.trigger-input-num { width:100%;padding:10px 14px;border-radius:10px;border:none;background:rgba(255,255,255,0.06);color:#fff;font-size:16px;font-weight:600;outline:none;box-sizing:border-box; }
-.speed-input-inline { width:60px !important;padding:10px 8px !important;text-align:center;font-size:14px !important;border-radius:8px !important;border:none !important;flex-shrink:0; }
+.trigger-input-num { width:100%;padding:10px 14px;border-radius:10px;border:1px solid var(--line);background:var(--surface-muted);color:var(--text);font-size:16px;font-weight:600;outline:none;box-sizing:border-box; }
+.speed-input-inline { width:60px !important;padding:10px 8px !important;text-align:center;font-size:14px !important;border-radius:8px !important;border:1px solid var(--line) !important;flex-shrink:0; }
 
 /* ============================================
    Стили карты (общие)
@@ -84,6 +146,7 @@ html, body {
     position: absolute;
     inset: 0;
     z-index: 1;
+    background: var(--map-bg);
 }
 
 /* ============================================
@@ -92,13 +155,13 @@ html, body {
 .loading-overlay {
     position: fixed;
     inset: 0;
-    background: rgba(0, 0, 0, 0.75);
+    background: var(--bg-overlay);
     z-index: 13000;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    color: white;
+    color: var(--text);
     font-weight: 600;
     text-align: center;
     padding: 20px;
@@ -115,7 +178,8 @@ html, body {
 
 #instructionModal .icon-row,
 #instructionModal .icon-row-v {
-    background: rgba(255,255,255,0.10);
+    background: var(--surface);
+    border: 1px solid var(--line-soft);
 }
 
 .instruction-body {
@@ -128,7 +192,7 @@ html, body {
 .instruction-loading {
     text-align: center;
     padding: 40px 20px;
-    color: #8b8f99;
+    color: var(--text-soft);
     font-size: 15px;
 }
 
@@ -138,7 +202,7 @@ html, body {
     left: 0;
     right: 0;
     bottom: 0;
-    background: rgba(0, 0, 0, 0.6);
+    background: var(--scrim);
     z-index: 13000;
     display: none;
     align-items: center;
@@ -159,8 +223,8 @@ html, body {
 .spinner-ring {
     width: 48px;
     height: 48px;
-    border: 3px solid rgba(255, 255, 255, 0.15);
-    border-top-color: #30D158;
+    border: 3px solid var(--line);
+    border-top-color: var(--green);
     border-radius: 50%;
     animation: spin 0.8s linear infinite;
 }
@@ -168,7 +232,7 @@ html, body {
 .spinner-text {
     font-size: 14px;
     font-weight: 600;
-    color: #fff;
+    color: var(--text);
     letter-spacing: -0.1px;
 }
 
@@ -182,17 +246,14 @@ html, body {
 .circle-btn {
     position: absolute;
     z-index: 9005;
-    background: var(--glass-bg);
     width: 52px;
     height: 52px;
     border-radius: 50%;
-    border: 0.5px solid var(--glass-border);
-    color: var(--text-primary);
+    color: var(--text);
     cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: center;
-    box-shadow: var(--shadow-soft), inset 0 0.5px 0 rgba(255, 255, 255, 0.1);
     touch-action: manipulation;
 }
 
@@ -203,13 +264,14 @@ html, body {
 }
 
 .circle-btn:active {
-    background: rgba(30, 30, 30, 0.5);
+    background: var(--surface-muted);
 }
 
 .circle-btn.active {
-    background: rgba(48, 209, 88, 0.5);
-    border-color: var(--accent-green);
-    box-shadow: var(--shadow-soft), 0 0 20px var(--accent-green-glow), inset 0 0.5px 0 rgba(255, 255, 255, 0.15);
+    background: var(--green-soft);
+    border-color: var(--green);
+    color: var(--green-dark);
+    box-shadow: var(--shadow-float), var(--inset-highlight);
 }
 
 #locateBtn {
@@ -218,18 +280,19 @@ html, body {
 }
 
 #playBtn.active {
-    background: rgba(255,59,48,0.2);
+    background: var(--danger-soft);
+    border-color: var(--danger-line);
+    color: var(--danger);
 }
 
 #playBtn.active svg {
-    fill: #FF453A;
+    fill: var(--danger);
 }
 
 #routeNameDisplay {
-    color: #ffffff;
+    color: var(--text);
     font-size: 12px;
     font-weight: 700;
-    text-shadow: 0 1px 4px rgba(0, 0, 0, 0.8), 0 0 8px rgba(0, 0, 0, 0.4);
     white-space: normal;
     word-break: break-word;
     pointer-events: none;
@@ -262,11 +325,8 @@ html, body {
     top: calc(140px + env(safe-area-inset-top));
     right: 12px;
     z-index: 9005;
-    background: var(--glass-bg);
     border-radius: 50%;
-    border: 0.5px solid var(--glass-border);
     cursor: pointer;
-    box-shadow: var(--shadow-soft), inset 0 0.5px 0 rgba(255, 255, 255, 0.1);
     transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
     width: 52px;
     height: 52px;
@@ -281,7 +341,7 @@ html, body {
 
 #telemetryPanel:active {
     transform: scale(0.92);
-    background: rgba(30, 30, 30, 0.5);
+    background: var(--surface-muted);
 }
 
 .tel-item {
@@ -292,11 +352,10 @@ html, body {
 
 .tel-label {
     font-size: 8px;
-    color: #ffffff;
+    color: var(--text);
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.5px;
-    text-shadow: 0 1px 4px rgba(0, 0, 0, 0.8), 0 0 8px rgba(0, 0, 0, 0.4);
 }
 
 .tel-value {
@@ -304,8 +363,7 @@ html, body {
     font-weight: 800;
     text-align: center;
     font-variant-numeric: tabular-nums;
-    color: #ffffff;
-    text-shadow: 0 1px 4px rgba(0, 0, 0, 0.8), 0 0 8px rgba(0, 0, 0, 0.4);
+    color: var(--text);
 }
 
 /* ============================================
@@ -334,14 +392,24 @@ html, body {
     gap: 10px;
 }
 
-/* Панель предыдущей команды — та же вёрстка, что и основная, но полупрозрачная */
+/* Панель предыдущей команды — та же вёрстка, что и основная, но приглушённая */
 .hud-prev-header {
     width: 100%;
 }
 
 .hud-cmd.hud-prev {
-    opacity: 0.55;
     width: 100%;
+    background: var(--surface-muted);
+    border-color: var(--line-soft);
+    box-shadow: none;
+}
+
+.hud-cmd.hud-prev #hudPrevCmdNum {
+    opacity: 0.65;
+}
+
+.hud-cmd.hud-prev #hudPrevCmdTextInner {
+    color: var(--text-muted);
 }
 
 #hudPrevCmdNum {
@@ -380,11 +448,10 @@ html, body {
 #prevCommentText {
     font-size: 11px;
     line-height: 1.3;
-    color: rgba(255,255,255,0.8);
+    color: var(--text-muted);
     white-space: pre-wrap;
-    text-shadow: 0 1px 4px rgba(0,0,0,0.8);
     display: none;
-    border: 1px solid rgba(255,69,58,0.5);
+    border: 1px solid var(--danger-line);
     border-radius: 4px;
     padding: 6px 12px;
     margin: 2px 2px 6px;
@@ -396,14 +463,10 @@ html, body {
     font-weight: 700;
     flex: 1;
     letter-spacing: -0.2px;
-    text-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
-    background: var(--glass-bg);
-    border: 1px solid rgba(255, 255, 255, 0.25);
-    color: #fff;
+    color: var(--text);
     border-radius: var(--radius-sm);
     cursor: pointer;
     transition: background 0.15s;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2), inset 0 0.5px 0 rgba(255, 255, 255, 0.15);
     touch-action: manipulation;
     display: flex;
     flex-direction: column;
@@ -461,6 +524,8 @@ html, body {
     width: 100%;
     display: flex;
     align-items: center;
+    justify-content: center;
+    gap: 8px;
     touch-action: manipulation;
 }
 
@@ -473,9 +538,9 @@ html, body {
     font-weight: 700;
     font-variant-numeric: tabular-nums;
     padding: 6px 10px;
-    border: 1px solid rgba(255, 255, 255, 0.25);
+    border: 1px solid var(--line);
     border-radius: 8px;
-    background: rgba(255, 255, 255, 0.08);
+    background: var(--surface-muted);
     font-size: 15px;
 }
 
@@ -488,66 +553,69 @@ html, body {
 }
 
 #hudCmdDist.in-range {
-    border-color: var(--accent-green);
-    background: rgba(48, 209, 88, 0.12);
-    color: var(--accent-green);
-    text-shadow: 0 0 12px var(--accent-green-glow), 0 1px 2px rgba(0, 0, 0, 0.8);
+    border-color: var(--green);
+    background: var(--green-soft);
+    color: var(--green);
 }
 
 /* ============================================
-   Навигационная пилюля (назад, симуляция, вперёд)
+   Навигационные кнопки (назад, симуляция, вперёд)
    ============================================ */
-.nav-pill {
+.nav-action-btn {
+    flex: 0 0 auto;
     display: flex;
-    width: 100%;
-    height: 48px;
-    border-radius: 100px;
-    background: rgba(15, 15, 15, 0.75);
-    border: 1px solid rgba(255, 255, 255, 0.4);
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3), inset 0 0.5px 0 rgba(255, 255, 255, 0.1);
-    overflow: hidden;
-    flex-shrink: 0;
-}
-
-.nav-pill-btn {
-    flex: 1;
-    display: flex;
+    flex-direction: column;
     align-items: center;
     justify-content: center;
-    background: transparent;
-    border: none;
-    color: #ffffff;
-    cursor: pointer;
-    height: 100%;
+    gap: 3px;
+    width: 96px;
+    height: 48px;
     padding: 0;
-    transition: background 0.15s;
+    border-radius: var(--radius-card);
+    color: var(--text);
+    font-family: inherit;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.1px;
+    line-height: 1;
+    cursor: pointer;
+    transition: background 0.15s ease, transform 0.1s ease, border-color 0.15s ease, color 0.15s ease;
     touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
 }
 
-.nav-pill-btn svg {
+.nav-action-btn svg {
+    display: block;
     fill: currentColor;
     width: 22px;
     height: 22px;
-}
-
-.nav-pill-divider {
-    width: 1px;
-    background: rgba(255, 255, 255, 0.4);
     flex-shrink: 0;
 }
 
-.nav-pill-btn:active {
-    background: rgba(255, 255, 255, 0.1);
+.nav-action-btn:active {
+    background: var(--surface-muted);
+    transform: scale(0.97);
 }
 
-.nav-pill-btn:disabled {
-    opacity: 0.4;
+.nav-action-btn:disabled {
+    background: var(--surface-muted);
+    color: var(--text-disabled);
+    box-shadow: none;
     cursor: not-allowed;
+    transform: none;
 }
 
-#playBtn:disabled {
-    opacity: 0.4;
-    cursor: not-allowed;
+@media (max-width: 380px) {
+    .nav-action-btn {
+        width: 88px;
+        font-size: 10px;
+        letter-spacing: 0;
+    }
+
+    .nav-action-btn svg {
+        width: 20px;
+        height: 20px;
+    }
 }
 
 /* ============================================
@@ -567,7 +635,7 @@ html, body {
 #shockBarFill {
     height: 100%;
     width: 0%;
-    background: #30D158;
+    background: var(--green);
 }
 #shockBarValue {
     position: absolute;
@@ -576,10 +644,10 @@ html, body {
     transform: translateY(-50%);
     font-size: 10px;
     font-weight: 800;
-    color: #ffffff;
+    color: var(--text);
     font-variant-numeric: tabular-nums;
     letter-spacing: 0.3px;
-    text-shadow: 0 1px 3px rgba(0,0,0,0.9), 0 0 6px rgba(0,0,0,0.6);
+    text-shadow: 0 1px 3px rgba(255, 255, 255, 0.95), 0 0 6px var(--text-faint);
     line-height: 1;
 }
 
@@ -589,11 +657,10 @@ html, body {
 #commentText {
     font-size: 11px;
     line-height: 1.3;
-    color: rgba(255,255,255,0.8);
+    color: var(--text-muted);
     white-space: pre-wrap;
-    text-shadow: 0 1px 4px rgba(0,0,0,0.8);
     display: none;
-    border: 1px solid rgba(255,69,58,0.5);
+    border: 1px solid var(--danger-line);
     border-radius: 4px;
     padding: 6px 12px;
     margin: 2px 2px 6px;
@@ -608,22 +675,22 @@ html, body {
     top: calc(90px + env(safe-area-inset-top));
     left: 50%;
     transform: translateX(-50%) translateY(-100px);
-    background: var(--glass-bg-heavy);
-    color: var(--text-primary);
+    background: var(--surface);
+    color: var(--text);
     padding: 14px 24px;
     border-radius: var(--radius-full);
     font-size: 15px;
     z-index: 16000;
     transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
     opacity: 0;
-    border: 0.5px solid var(--glass-border);
+    border: 1px solid var(--line);
     font-weight: 600;
     max-width: 85vw;
     white-space: pre-wrap;
     text-align: center;
     line-height: 1.4;
     pointer-events: none;
-    box-shadow: var(--shadow-medium), inset 0 0.5px 0 rgba(255, 255, 255, 0.1);
+    box-shadow: var(--shadow-raised), var(--inset-highlight);
     letter-spacing: -0.1px;
 }
 
@@ -633,17 +700,19 @@ html, body {
 }
 
 #toast.success {
-    background: rgba(48, 209, 88, 0.85);
-    border-color: rgba(48, 209, 88, 0.5);
+    background: var(--green);
+    border-color: var(--green-line);
+    color: var(--white);
 }
 
 #toast.error {
-    background: rgba(255, 69, 58, 0.85);
-    border-color: rgba(255, 69, 58, 0.5);
+    background: var(--danger);
+    border-color: var(--danger-line);
+    color: var(--white);
 }
 
 #toast.info {
-    background: var(--glass-bg-heavy);
+    background: var(--surface);
 }
 
 /* ============================================
@@ -655,8 +724,8 @@ html, body {
     flex-direction: column;
     gap: 6px;
     padding: 8px 0 7px;
-    background: #0f0f0f;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    background: var(--surface);
+    border-bottom: 1px solid var(--line-soft);
 }
 
 .routes-search {
@@ -664,17 +733,17 @@ html, body {
     align-items: center;
     height: 40px;
     margin: 0 12px;
-    border-radius: 12px;
-    background: rgba(255, 255, 255, 0.08);
-    border: 1px solid rgba(255, 255, 255, 0.09);
+    border-radius: var(--radius-control);
+    background: var(--surface-muted);
+    border: 1px solid var(--line);
     box-sizing: border-box;
     transition: border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
 }
 
 .routes-search:focus-within {
-    background: rgba(255, 255, 255, 0.1);
-    border-color: rgba(48, 209, 88, 0.6);
-    box-shadow: 0 0 0 3px rgba(48, 209, 88, 0.12);
+    background: var(--surface);
+    border-color: var(--green-focus);
+    box-shadow: 0 0 0 3px var(--green-tint);
 }
 
 .routes-search-icon {
@@ -682,7 +751,7 @@ html, body {
     width: 18px;
     height: 18px;
     margin-left: 12px;
-    color: rgba(255, 255, 255, 0.42);
+    color: var(--text-soft);
 }
 
 .routes-search-input {
@@ -693,7 +762,7 @@ html, body {
     border: 0;
     outline: 0;
     background: transparent;
-    color: #fff;
+    color: var(--text);
     font: inherit;
     font-size: 16px;
     -webkit-appearance: none;
@@ -701,7 +770,7 @@ html, body {
 }
 
 .routes-search-input::placeholder {
-    color: rgba(255, 255, 255, 0.38);
+    color: var(--text-soft);
 }
 
 .routes-search-input::-webkit-search-cancel-button,
@@ -721,8 +790,8 @@ html, body {
     padding: 0;
     border: 0;
     border-radius: 50%;
-    background: rgba(255, 255, 255, 0.12);
-    color: rgba(255, 255, 255, 0.72);
+    background: var(--surface-muted);
+    color: var(--text-muted);
     cursor: pointer;
 }
 
@@ -735,10 +804,10 @@ html, body {
     height: 28px;
     margin: 0 6px 0 2px;
     padding: 0 10px;
-    border: 1px solid rgba(48, 209, 88, 0.28);
+    border: 1px solid var(--green-line-soft);
     border-radius: 999px;
-    background: rgba(48, 209, 88, 0.12);
-    color: #a4efb4;
+    background: var(--green-tint);
+    color: var(--green-dark);
     font: inherit;
     font-size: 11px;
     font-weight: 700;
@@ -750,9 +819,9 @@ html, body {
 }
 
 .routes-search-scope[aria-pressed="true"] {
-    background: rgba(48, 209, 88, 0.24);
-    border-color: rgba(48, 209, 88, 0.55);
-    color: #d2f8d9;
+    background: var(--green-tint-strong);
+    border-color: var(--green-line);
+    color: var(--green-dark);
 }
 
 .routes-breadcrumb {
@@ -779,10 +848,10 @@ html, body {
     max-width: 42vw;
     overflow: hidden;
     padding: 7px 14px;
-    border: 1px solid rgba(255, 255, 255, 0.15);
+    border: 1px solid var(--green-line-soft);
     border-radius: 10px;
-    background: rgba(255, 255, 255, 0.06);
-    color: #9adfa8;
+    background: var(--green-tint);
+    color: var(--green-dark);
     font: inherit;
     font-size: 12px;
     font-weight: 600;
@@ -791,30 +860,30 @@ html, body {
     cursor: pointer;
     min-width: 44px;
     text-align: center;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+    box-shadow: var(--shadow-card);
     transition: background 0.15s ease, border-color 0.15s ease, transform 0.1s ease;
 }
 
 .routes-breadcrumb-item:active {
-    background: rgba(255, 255, 255, 0.12);
+    background: var(--surface-muted);
     transform: scale(0.96);
 }
 
 .routes-breadcrumb-item.current {
-    color: #fff;
+    color: var(--green-dark);
     font-weight: 700;
     font-size: 13px;
-    border-color: rgba(255, 255, 255, 0.35);
-    background: rgba(255, 255, 255, 0.15);
+    border-color: var(--green-line);
+    background: var(--green-tint-strong);
 }
 
 .routes-breadcrumb-item.current:active {
-    background: rgba(255, 255, 255, 0.25);
+    background: var(--green-tint-strong);
 }
 
 .routes-breadcrumb-separator {
     flex: 0 0 auto;
-    color: rgba(255, 255, 255, 0.32);
+    color: var(--text-faint);
     font-size: 15px;
 }
 
@@ -846,7 +915,7 @@ html, body {
 .routes-results-meta {
     flex: 0 0 auto;
     padding: 2px 4px 3px;
-    color: rgba(255, 255, 255, 0.42);
+    color: var(--text-soft);
     font-size: 11px;
     font-weight: 600;
     letter-spacing: 0.1px;
@@ -865,17 +934,15 @@ html, body {
     width: 100%;
     min-height: 54px;
     padding: 7px 12px;
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    border-radius: 12px;
-    background: rgba(255, 255, 255, 0.045);
-    color: #fff;
+    border-radius: var(--radius-control);
+    color: var(--text);
     text-align: left;
     cursor: pointer;
     -webkit-tap-highlight-color: transparent;
 }
 
 .routes-folder-row:active {
-    background: rgba(255, 255, 255, 0.1);
+    background: var(--surface-muted);
 }
 
 .routes-folder-icon {
@@ -886,8 +953,8 @@ html, body {
     width: 30px;
     height: 30px;
     border-radius: 9px;
-    background: rgba(255, 200, 87, 0.12);
-    color: #ffd166;
+    background: var(--green-tint);
+    color: var(--green);
 }
 
 .routes-folder-icon svg {
@@ -907,14 +974,14 @@ html, body {
 
 .routes-folder-count {
     flex: 0 0 auto;
-    color: rgba(255, 255, 255, 0.48);
+    color: var(--text-soft);
     font-size: 11px;
     font-weight: 600;
 }
 
 .routes-folder-chevron {
     flex: 0 0 auto;
-    color: rgba(255, 255, 255, 0.36);
+    color: var(--text-faint);
     font-size: 22px;
     line-height: 1;
 }
@@ -926,10 +993,8 @@ html, body {
     width: 100%;
     min-height: 106px;
     padding: 5px 8px 5px 5px;
-    border: 1px solid rgba(255, 255, 255, 0.09);
-    border-radius: 14px;
-    background: rgba(255, 255, 255, 0.06);
-    color: #fff;
+    border-radius: var(--radius-sm);
+    color: var(--text);
     text-align: left;
     box-sizing: border-box;
     cursor: pointer;
@@ -939,13 +1004,13 @@ html, body {
 
 .route-row:active {
     transform: scale(0.985);
-    background: rgba(255, 255, 255, 0.1);
+    background: var(--surface-muted);
 }
 
 .route-row.is-active {
-    background: rgba(48, 209, 88, 0.12);
-    border-color: rgba(48, 209, 88, 0.5);
-    box-shadow: inset 3px 0 0 #30d158;
+    background: var(--green-tint);
+    border-color: var(--green-line);
+    box-shadow: inset 3px 0 0 var(--green);
 }
 
 .route-preview {
@@ -958,8 +1023,8 @@ html, body {
     height: 96px;
     border-radius: 10px;
     overflow: hidden;
-    background: linear-gradient(145deg, #303840, #20262d);
-    border: 1px solid rgba(255, 255, 255, 0.14);
+    background: linear-gradient(145deg, #F8FAFC, #E8EEF6);
+    border: 1px solid var(--line);
     box-sizing: border-box;
 }
 
@@ -974,7 +1039,7 @@ html, body {
     content: '';
     position: absolute;
     inset: 0;
-    background: linear-gradient(100deg, transparent 20%, rgba(255, 255, 255, 0.13) 50%, transparent 80%);
+    background: linear-gradient(100deg, transparent 20%, var(--line-soft) 50%, transparent 80%);
     animation: route-preview-shimmer 1.2s ease-in-out infinite;
 }
 
@@ -982,7 +1047,7 @@ html, body {
     content: '';
     width: 20px;
     height: 20px;
-    border: 2px dashed rgba(255, 255, 255, 0.22);
+    border: 2px dashed var(--line-strong);
     border-radius: 50%;
 }
 
@@ -1025,8 +1090,8 @@ html, body {
     flex: 0 0 auto;
     padding: 2px 6px;
     border-radius: 999px;
-    background: rgba(48, 209, 88, 0.18);
-    color: #8ff0a4;
+    background: var(--green-tint-strong);
+    color: var(--green-dark);
     font-size: 10px;
     font-weight: 700;
     line-height: 1.4;
@@ -1044,14 +1109,14 @@ html, body {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    color: rgba(255, 255, 255, 0.44);
+    color: var(--text-soft);
     font-size: 11px;
     font-weight: 500;
 }
 
 .route-row-stats {
     flex: 0 0 auto;
-    color: rgba(255, 255, 255, 0.58);
+    color: var(--text-soft);
     font-size: 10px;
     font-weight: 600;
     white-space: nowrap;
@@ -1064,11 +1129,11 @@ html, body {
     flex: 0 0 20px;
     width: 20px;
     height: 20px;
-    color: rgba(255, 255, 255, 0.32);
+    color: var(--text-faint);
 }
 
 .route-row.is-active .route-row-tail {
-    color: #30d158;
+    color: var(--green);
 }
 
 .route-row-tail svg {
@@ -1084,19 +1149,19 @@ html, body {
     justify-content: center;
     gap: 6px;
     padding: 48px 20px;
-    color: rgba(255, 255, 255, 0.5);
+    color: var(--text-soft);
     text-align: center;
     font-size: 14px;
 }
 
 .routes-empty-title {
-    color: rgba(255, 255, 255, 0.72);
+    color: var(--text-muted);
     font-size: 15px;
     font-weight: 600;
 }
 
 .routes-empty-hint {
-    color: rgba(255, 255, 255, 0.4);
+    color: var(--text-faint);
     font-size: 13px;
 }
 
@@ -1136,8 +1201,7 @@ html, body {
 }
 
 .settings-group {
-    background: rgba(255,255,255,0.10);
-    border-radius: 12px;
+    border-radius: var(--radius-control);
     padding: 8px;
     display: flex;
     flex-direction: column;
@@ -1158,9 +1222,9 @@ html, body {
     min-width: 0;
     padding: 10px 8px;
     border-radius: 10px;
-    background: var(--glass-bg);
-    border: 1px solid rgba(255, 255, 255, 0.25);
-    color: #fff;
+    background: var(--surface-subtle);
+    border: 1px solid var(--line);
+    color: var(--text);
     font-size: 13px;
     font-weight: 600;
     line-height: 1.25;
@@ -1172,13 +1236,13 @@ html, body {
 }
 
 .map-style-btn:active {
-    background: rgba(80, 80, 80, 0.6);
+    background: var(--surface-muted);
 }
 
 .map-style-btn.active {
-    border-color: var(--accent-green);
-    background: rgba(48, 209, 88, 0.15);
-    box-shadow: 0 0 12px rgba(48, 209, 88, 0.2);
+    border-color: var(--green);
+    background: var(--green-tint-strong);
+    box-shadow: 0 0 12px var(--green-glow);
 }
 
 /* ---- Trigger settings ---- */
@@ -1198,14 +1262,14 @@ html, body {
 .trigger-setting-row .label {
     font-size: 14px;
     font-weight: 600;
-    color: #fff;
+    color: var(--text);
     flex: 1;
 }
 
 .trigger-setting-row .value {
     font-size: 14px;
     font-weight: 700;
-    color: rgba(255,255,255,0.5);
+    color: var(--text-muted);
     min-width: 28px;
     text-align: center;
 }
@@ -1215,7 +1279,7 @@ html, body {
     height: 32px;
     margin: 0;
     padding: 0;
-    accent-color: #30D158;
+    accent-color: var(--green);
     -webkit-appearance: none;
     appearance: none;
     background: transparent;
@@ -1225,7 +1289,7 @@ html, body {
 .trigger-setting-row input[type="range"]::-webkit-slider-runnable-track {
     height: 10px;
     border-radius: 5px;
-    background: rgba(255,255,255,0.12);
+    background: var(--surface-muted);
 }
 
 .trigger-setting-row input[type="range"]::-webkit-slider-thumb {
@@ -1234,15 +1298,15 @@ html, body {
     width: 28px;
     height: 28px;
     border-radius: 50%;
-    background: #30D158;
+    background: var(--green);
     margin-top: -9px;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+    box-shadow: var(--shadow-card);
 }
 
 .trigger-setting-row input[type="range"]::-moz-range-track {
     height: 10px;
     border-radius: 5px;
-    background: rgba(255,255,255,0.12);
+    background: var(--surface-muted);
     border: none;
 }
 
@@ -1250,9 +1314,9 @@ html, body {
     width: 28px;
     height: 28px;
     border-radius: 50%;
-    background: #30D158;
+    background: var(--green);
     border: none;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+    box-shadow: var(--shadow-card);
 }
 
 /* ============================================
@@ -1262,8 +1326,7 @@ html, body {
     position: fixed;
     inset: 0;
     z-index: 11000;
-    background: rgba(15, 15, 15, 0.45);
-    backdrop-filter: blur(4px);
+    background: var(--scrim);
 }
 
 .screen-modal.hidden {
@@ -1281,11 +1344,11 @@ html, body {
     flex-direction: column;
     gap: 0;
     padding-top: 0;
-    background: #0f0f0f;
+    background: var(--bg);
     box-sizing: border-box;
     overflow: hidden;
     border-radius: 20px 20px 0 0;
-    box-shadow: 0 -24px 48px rgba(0, 0, 0, 0.55), inset 0 0.5px 0 rgba(255, 255, 255, 0.06);
+    box-shadow: var(--shadow-panel), var(--inset-highlight);
 }
 
 .screen-modal:not(.hidden) .screen-panel {
@@ -1313,10 +1376,8 @@ html, body {
     min-height: 52px;
     padding: 10px 12px 8px 16px;
     box-sizing: border-box;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.07);
-    background: rgba(15, 15, 15, 0.92);
-    -webkit-backdrop-filter: blur(16px);
-    backdrop-filter: blur(16px);
+    border-bottom: 1px solid var(--line-faint);
+    background: var(--surface);
 }
 
 .screen-title {
@@ -1327,7 +1388,7 @@ html, body {
     font-weight: 650;
     letter-spacing: -0.2px;
     line-height: 1.2;
-    color: #F4F7FA;
+    color: var(--text);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -1343,8 +1404,8 @@ html, body {
     padding: 0;
     border: 0;
     border-radius: 50%;
-    background: rgba(255, 255, 255, 0.06);
-    color: rgba(255, 255, 255, 0.7);
+    background: var(--surface-muted);
+    color: var(--text-muted);
     cursor: pointer;
     transition: background 0.15s ease, color 0.15s ease, transform 0.12s ease;
     -webkit-tap-highlight-color: transparent;
@@ -1357,13 +1418,13 @@ html, body {
 }
 
 .screen-close:active {
-    background: rgba(255, 255, 255, 0.14);
-    color: #fff;
+    background: var(--line);
+    color: var(--text);
     transform: scale(0.94);
 }
 
 .screen-close:focus-visible {
-    outline: 2px solid rgba(52, 199, 89, 0.7);
+    outline: 2px solid var(--green);
     outline-offset: 2px;
 }
 
@@ -1402,10 +1463,7 @@ html, body {
     gap: 0;
     padding: 0 4px;
     min-height: 52px;
-    background: var(--glass-bg);
-    border: 1px solid rgba(255, 255, 255, 0.25);
     border-radius: var(--radius-sm);
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2), inset 0 0.5px 0 rgba(255, 255, 255, 0.15);
     box-sizing: border-box;
 }
 
@@ -1419,7 +1477,7 @@ html, body {
 
 .pl-item.pl-active .pl-item-row {
     border-width: 2px;
-    box-shadow: 0 0 12px rgba(0,255,0,0.15), 0 2px 8px rgba(0, 0, 0, 0.2), inset 0 0.5px 0 rgba(255, 255, 255, 0.15);
+    box-shadow: 0 0 12px var(--green-glow), var(--shadow-card), var(--inset-highlight);
 }
 
 .pl-item-icon {
@@ -1465,9 +1523,9 @@ html, body {
     font-weight: 700;
     font-variant-numeric: tabular-nums;
     padding: 6px 10px;
-    border: 1px solid rgba(255, 255, 255, 0.25);
+    border: 1px solid var(--line);
     border-radius: 8px;
-    background: rgba(255, 255, 255, 0.08);
+    background: var(--surface-muted);
     font-size: 15px;
 }
 
@@ -1482,10 +1540,9 @@ html, body {
 .pl-comment {
     font-size: 11px;
     line-height: 1.3;
-    color: rgba(255,255,255,0.8);
+    color: var(--text-muted);
     white-space: pre-wrap;
-    text-shadow: 0 1px 4px rgba(0,0,0,0.8);
-    border: 1px solid rgba(255,69,58,0.5);
+    border: 1px solid var(--danger-line);
     border-radius: 4px;
     padding: 4px 8px;
     margin: 4px 6px 6px;
@@ -1529,10 +1586,8 @@ html, body {
     min-width: 0;
     padding: 0;
     margin: 0;
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    border-radius: 16px;
-    background: rgba(15, 19, 24, 0.86);
-    color: rgba(235, 240, 245, 0.58);
+    border-radius: var(--radius-card);
+    color: var(--text-muted);
     font-family: inherit;
     font-size: 11px;
     font-weight: 600;
@@ -1545,9 +1600,6 @@ html, body {
     flex: 0 0 auto;
     transition: color 0.18s ease, border-color 0.18s ease, background 0.18s ease, transform 0.12s ease;
     height: 48px;
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
-    -webkit-backdrop-filter: blur(20px) saturate(140%);
-    backdrop-filter: blur(20px) saturate(140%);
 }
 
 .top-action-btn svg {
@@ -1558,23 +1610,23 @@ html, body {
 }
 
 .top-action-btn.active {
-    color: #F4FBF6;
-    border-color: rgba(52, 199, 89, 0.45);
-    background: rgba(15, 19, 24, 0.95);
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35), inset 0 0 0 1px rgba(52, 199, 89, 0.25);
+    color: var(--text);
+    border-color: var(--green-line);
+    background: var(--surface);
+    box-shadow: var(--shadow-float), inset 0 0 0 1px var(--green-line-soft);
 }
 
 .top-action-btn.active svg {
-    color: #34C759;
+    color: var(--green);
 }
 
 .top-action-btn:active {
     transform: scale(0.94);
-    background: rgba(30, 30, 30, 0.5);
+    background: var(--surface-muted);
 }
 
 .top-action-btn:focus-visible {
-    outline: 2px solid rgba(52, 199, 89, 0.7);
+    outline: 2px solid var(--green);
     outline-offset: -2px;
 }
 
@@ -1601,4 +1653,47 @@ html, body {
     .top-action-btn {
         transition: none;
     }
+}
+
+/* ============================================
+   Переключатели (перенесены из navigator.html)
+   ============================================ */
+.toggle-switch {
+    position: relative;
+    display: inline-block;
+    width: 52px;
+    height: 32px;
+    flex-shrink: 0;
+}
+
+.toggle-input { display: none; }
+
+.toggle-slider {
+    position: absolute;
+    cursor: pointer;
+    inset: 0;
+    background: var(--toggle-off);
+    border-radius: 32px;
+    transition: 0.25s;
+}
+
+.toggle-slider::before {
+    content: '';
+    position: absolute;
+    width: 26px;
+    height: 26px;
+    left: 3px;
+    bottom: 3px;
+    background: var(--surface);
+    border-radius: 50%;
+    box-shadow: 0 1px 3px rgba(18, 28, 46, 0.22);
+    transition: 0.25s;
+}
+
+.toggle-input:checked + .toggle-slider {
+    background: var(--green);
+}
+
+.toggle-input:checked + .toggle-slider::before {
+    transform: translateX(20px);
 }
