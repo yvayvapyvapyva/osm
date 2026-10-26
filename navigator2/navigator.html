@@ -127,7 +127,7 @@
 <script src="https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/pmtiles@3.2.1/dist/pmtiles.js"></script>
 <script src="assets/js/map-styles.js?v=10"></script>
-<script src="assets/js/menu-module.js?v=11"></script>
+<script src="assets/js/menu-module.js?v=12"></script>
 <script>
 const MAP_PREFS_KEY = 'osm_map_prefs_v1';
 
@@ -156,6 +156,7 @@ function loadThemePreference() {
 
 function applyThemePreference(isDark, persist) {
   const theme = isDark ? 'dark' : 'light';
+  const previousTheme = document.documentElement.getAttribute('data-theme');
   document.documentElement.setAttribute('data-theme', theme);
 
   const meta = document.querySelector('meta[name="theme-color"]');
@@ -169,6 +170,12 @@ function applyThemePreference(isDark, persist) {
 
   if (persist !== false) {
     try { localStorage.setItem(THEME_KEY, theme); } catch (e) {}
+  }
+
+  if (previousTheme && previousTheme !== theme &&
+      typeof MenuModule !== 'undefined' &&
+      typeof MenuModule.refreshRoutePreviews === 'function') {
+    MenuModule.refreshRoutePreviews();
   }
 }
 

@@ -545,6 +545,37 @@ const MenuModule = {
         }
     },
 
+    _previewTheme() {
+        return document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
+    },
+
+    _previewPalette() {
+        const styles = getComputedStyle(document.documentElement);
+        const read = (name, fallback) => styles.getPropertyValue(name).trim() || fallback;
+        return {
+            from: read('--preview-bg-from', '#F8FAFC'),
+            to: read('--preview-bg-to', '#E8EEF6'),
+            shadow: read('--preview-shadow', 'rgba(18, 28, 46, 0.20)')
+        };
+    },
+
+    refreshRoutePreviews() {
+        const container = document.getElementById('routesListContainer');
+        if (!container) return;
+        this._destroyRoutePreviews();
+        this._previewQueue = [];
+        this._previewQueuedKeys.clear();
+        this._previewJobs.clear();
+        this._previewActive = false;
+        this._previewImages.clear();
+        container.querySelectorAll('.route-preview').forEach(element => {
+            delete element.dataset.previewKey;
+            element.replaceChildren();
+            element.classList.remove('is-loading', 'is-empty');
+        });
+        this._observeRoutePreviews(container);
+    },
+
     _observeRoutePreviews(container) {
         const previews = container.querySelectorAll('.route-preview');
         if (!previews.length) return;
@@ -560,13 +591,14 @@ const MenuModule = {
         };
 
         previews.forEach(element => {
-            const key = `route-preview-v11\0${element.dataset.routeKey}`;
+            const key = `route-preview-v12\0${this._previewTheme()}\0${element.dataset.routeKey}`;
             element.dataset.previewKey = key;
             const image = this._previewImages.get(key);
             if (image) showPreviewImage(element, key, image);
         });
 
         const renderPreview = async (element, key, routeData) => {
+            const palette = this._previewPalette();
             try {
                 const points = [];
                 const project = point => {
@@ -629,8 +661,8 @@ const MenuModule = {
                 context.scale(pixelRatio, pixelRatio);
 
                 const background = context.createLinearGradient(0, 0, width, height);
-                background.addColorStop(0, '#F8FAFC');
-                background.addColorStop(1, '#E8EEF6');
+                background.addColorStop(0, palette.from);
+                background.addColorStop(1, palette.to);
                 context.fillStyle = background;
                 context.fillRect(0, 0, width, height);
 
@@ -673,7 +705,7 @@ const MenuModule = {
                     });
                     context.lineCap = 'round';
                     context.lineJoin = 'round';
-                    context.strokeStyle = 'rgba(18, 28, 46, 0.20)';
+                    context.strokeStyle = palette.shadow;
                     context.lineWidth = markerSize * 0.2;
                     context.stroke();
                     context.strokeStyle = point.color;
@@ -714,6 +746,7 @@ const MenuModule = {
                 const job = this._previewQueue.shift();
                 this._previewQueuedKeys.delete(job.key);
                 if (!job.element.isConnected) continue;
+                if (job.element.dataset.previewKey !== job.key) continue;
                 const cachedImage = this._previewImages.get(job.key);
                 if (cachedImage) {
                     job.showCached(cachedImage);
