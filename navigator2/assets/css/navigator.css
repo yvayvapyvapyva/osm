@@ -1,4 +1,6 @@
 :root {
+    color-scheme: light;
+
     /* Поверхности и фон */
     --bg: #F4F6FA;
     --bg-overlay: rgba(244, 246, 250, 0.84);
@@ -12,6 +14,7 @@
     /* Текст */
     --text: #121A28;
     --text-muted: rgba(18, 28, 46, 0.62);
+    --text-body: #46505F;
     --text-soft: rgba(18, 28, 46, 0.42);
     --text-faint: rgba(18, 28, 46, 0.24);
     --text-disabled: rgba(18, 28, 46, 0.28);
@@ -33,9 +36,11 @@
     --green-line-soft: rgba(22, 163, 74, 0.26);
     --green-focus: rgba(22, 163, 74, 0.55);
     --green-glow: rgba(22, 163, 74, 0.18);
+    --success-solid: #16A34A;
     --danger: #DC2626;
     --danger-soft: #FDE8E8;
     --danger-line: rgba(220, 38, 38, 0.28);
+    --danger-solid: #DC2626;
 
     /* Тени и скругления */
     --shadow-card: 0 2px 10px rgba(18, 28, 46, 0.08);
@@ -53,6 +58,52 @@
 
     /* Полноэкранные разделы: контент начинается под таб-баром */
     --screen-top: calc(48px + var(--nav-gap) + env(safe-area-inset-top) + 10px);
+}
+
+/* Тёмная оболочка. Карта остаётся светлой: --map-bg не переопределяется. */
+[data-theme="dark"] {
+    color-scheme: dark;
+
+    --bg: #0F141C;
+    --bg-overlay: rgba(15, 20, 28, 0.86);
+    --surface: #161D27;
+    --surface-muted: #1E2733;
+    --surface-subtle: #1A2230;
+    --scrim: rgba(0, 0, 0, 0.55);
+    --toggle-off: #3A4556;
+
+    --text: #E8EDF5;
+    --text-muted: rgba(232, 237, 245, 0.66);
+    --text-body: rgba(232, 237, 245, 0.74);
+    --text-soft: rgba(232, 237, 245, 0.46);
+    --text-faint: rgba(232, 237, 245, 0.26);
+    --text-disabled: rgba(232, 237, 245, 0.30);
+
+    --line: rgba(232, 237, 245, 0.14);
+    --line-soft: rgba(232, 237, 245, 0.10);
+    --line-faint: rgba(232, 237, 245, 0.07);
+    --line-strong: rgba(232, 237, 245, 0.20);
+
+    --green: #22C55E;
+    --green-dark: #86EFAC;
+    --green-soft: #14351F;
+    --green-tint: rgba(34, 197, 94, 0.14);
+    --green-tint-strong: rgba(34, 197, 94, 0.22);
+    --green-line: rgba(34, 197, 94, 0.55);
+    --green-line-soft: rgba(34, 197, 94, 0.32);
+    --green-focus: rgba(34, 197, 94, 0.70);
+    --green-glow: rgba(34, 197, 94, 0.22);
+    --success-solid: #15803D;
+    --danger: #F87171;
+    --danger-soft: #3A1D20;
+    --danger-line: rgba(248, 113, 113, 0.40);
+    --danger-solid: #B91C1C;
+
+    --shadow-card: 0 2px 10px rgba(0, 0, 0, 0.35);
+    --shadow-float: 0 4px 16px rgba(0, 0, 0, 0.45);
+    --shadow-raised: 0 12px 40px rgba(0, 0, 0, 0.55);
+    --shadow-panel: 0 -24px 48px rgba(0, 0, 0, 0.55);
+    --inset-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.06);
 }
 
 * {
@@ -700,13 +751,13 @@ html, body {
 }
 
 #toast.success {
-    background: var(--green);
+    background: var(--success-solid);
     border-color: var(--green-line);
     color: var(--white);
 }
 
 #toast.error {
-    background: var(--danger);
+    background: var(--danger-solid);
     border-color: var(--danger-line);
     color: var(--white);
 }
@@ -1684,7 +1735,7 @@ html, body {
     height: 26px;
     left: 3px;
     bottom: 3px;
-    background: var(--surface);
+    background: var(--white);
     border-radius: 50%;
     box-shadow: 0 1px 3px rgba(18, 28, 46, 0.22);
     transition: 0.25s;
