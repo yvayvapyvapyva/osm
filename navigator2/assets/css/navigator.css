@@ -1698,12 +1698,12 @@ html, body {
     display: none;
 }
 
-/* Свёрнутая атрибуция карты переезжает из-под таб-бара в свободный левый верх. */
+/* Атрибуция карты в правом нижнем углу (как на gdebenz.ru) */
 .maplibregl-ctrl-bottom-right {
-    top: calc(12px + env(safe-area-inset-top));
-    bottom: auto;
-    left: 12px;
-    right: auto;
+    bottom: calc(12px + env(safe-area-inset-bottom));
+    top: auto;
+    right: 12px;
+    left: auto;
 }
 
 .top-actions {

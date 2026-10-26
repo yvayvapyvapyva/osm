@@ -1705,12 +1705,12 @@ html, body {
     display: none;
 }
 
-/* Свёрнутая атрибуция карты переезжает из-под таб-бара в свободный левый верх. */
+/* Атрибуция карты в правом нижнем углу (как на gdebenz.ru) */
 .maplibregl-ctrl-bottom-right {
-    top: calc(12px + env(safe-area-inset-top));
-    bottom: auto;
-    left: 12px;
-    right: auto;
+    bottom: calc(12px + env(safe-area-inset-bottom));
+    top: auto;
+    right: 12px;
+    left: auto;
 }
 
 .top-actions {
@@ -1852,6 +1852,11 @@ html, body {
     transform: translateX(20px);
 }
 </style>
+    <!-- Yandex.Metrika counter -->
+    <script type="text/javascript">!function(e,r,t,c,n,a,s){e[n]=e[n]||function(){(e[n].a=e[n].a||[]).push(arguments)},e[n].l=1*new Date;for(var i=0;i<document.scripts.length;i++)if(document.scripts[i].src===c)return;a=r.createElement(t),s=r.getElementsByTagName(t)[0],a.async=1,a.src=c,s.parentNode.insertBefore(a,s)}(window,document,"script","https://mc.yandex.ru/metrika/tag.js?id=113791980","ym"),ym(113791980,"init",{ssr:!0,webvisor:!0,clickmap:!0,ecommerce:"dataLayer",referrer:document.referrer,url:location.href,accurateTrackBounce:!0,trackLinks:!0});
+</script>
+    <noscript><div><img src="https://mc.yandex.ru/watch/113791980" style="position:absolute; left:-9999px;" alt="" /></div></noscript>
+    <!-- /Yandex.Metrika counter -->
 </head>
 <body>
 
