@@ -792,7 +792,7 @@ const MenuModule = {
     createModal() {
         const html = `
             <div id="jsonModal" class="screen-modal">
-                <div class="screen-panel compact-route-menu" id="jsonModalScreen">
+                <div class="screen-panel" id="jsonModalScreen">
                     <header class="screen-head">
                         <h1 class="screen-title">Маршруты</h1>
                         <button type="button" class="screen-close" id="jsonModalClose" aria-label="Закрыть">
