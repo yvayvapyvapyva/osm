@@ -1665,7 +1665,7 @@ if (typeof maplibregl === 'undefined') {
     });
 
 
-    // Копирайт держим свёрнутым (кнопка ⓘ), как на gdebenz.ru
+    // Копирайт держим свёрнутым (кнопка ⓘ)
     const collapseAttribution = () => {
         document.querySelectorAll('.maplibregl-ctrl-attrib.maplibregl-compact-show')
             .forEach(el => el.classList.remove('maplibregl-compact-show'));
@@ -1697,7 +1697,7 @@ if (typeof maplibregl === 'undefined') {
             : 'Ошибка загрузки карты VersaTiles', 'error', 6000);
     });
 
-    // Стрелка текущего положения. Геометрия и поведение — как в ГдеБЕНЗ:
+    // Стрелка текущего положения. Геометрия и поведение:
     // маркер с rotationAlignment/pitchAlignment "map", поэтому MapLibre сам
     // наклоняет его вместе с картой и поворачивает вместе с bearing.
     const userEl = document.createElement('div');
@@ -1910,7 +1910,7 @@ if (typeof maplibregl === 'undefined') {
 </div>
 
 <script>
-/* Верхняя навигация: отдельные кнопки (как на gdebenz.ru) */
+/* Верхняя навигация: отдельные кнопки */
 (function () {
     const nav = document.getElementById('topActions');
     if (!nav) return;

@@ -144,7 +144,7 @@ function omtStyleDefinition(style) {
 }
 
 // «Вся Россия 3D» на данных VersaTiles (схема Shortbread, у зданий есть height/min_height).
-// Дорожная сетка повторяет вид Liberty (как на gdebenz.ru), но на свойствах Shortbread (kind/link/bridge/tunnel).
+// Дорожная сетка повторяет вид Liberty, но на свойствах Shortbread (kind/link/bridge/tunnel).
 function versaStyleDefinition(style) {
     const font = style.font || 'NotoSansRegular';
     const fontBold = style.fontBold || 'NotoSansBold';
@@ -359,7 +359,7 @@ function mapStyleDefinition(type) {
     };
 }
 
-// Дорожная сетка из стиля OpenMapTiles Liberty (как на gdebenz.ru), без спрайтовых слоёв.
+// Дорожная сетка из стиля OpenMapTiles Liberty, без спрайтовых слоёв.
 // Сгенерировано из style-liberty.20260802.json: туннели + дороги + мосты + ж/д.
 const LIBERTY_ROADS = [
   {"id":"tunnel_motorway_link_casing","type":"line","source":"omt","source-layer":"transportation","filter":["all",["==",["get","class"],"motorway"],["==",["get","ramp"],1],["==",["get","brunnel"],"tunnel"]],"layout":{"line-join":"round"},"paint":{"line-color":"#e9ac77","line-dasharray":[0.5,0.25],"line-width":["interpolate",["exponential",1.2],["zoom"],12,1,13,3,14,4,20,15]}},
