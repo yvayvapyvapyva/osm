@@ -1139,6 +1139,7 @@ function getNavIconSvg(col, txt, isCurr = false, hasComm = false) {
         <circle cx="${c}" cy="${c}" r="${r}" fill="#FFFFFF"/>
         <circle cx="${c}" cy="${c}" r="${r}" fill="${safeCol}" opacity="0.18"/>
         <circle cx="${c}" cy="${c}" r="${r}" fill="none" stroke="${safeCol}" stroke-width="2"/>
+        <circle cx="${c}" cy="${c}" r="${r + 1.5}" fill="none" stroke="#000000" stroke-width="1"/>
         ${hasComm ? `<circle cx="${s - 8}" cy="8" r="4" fill="#EF4444" stroke="#FFFFFF" stroke-width="1.5"/>` : ''}
         <text x="${c}" y="${c + 0.5}" font-size="9" font-family="Arial" font-weight="900" text-anchor="middle" dominant-baseline="middle" fill="#121A28">${safeTxt}</text>
     </svg>`;
