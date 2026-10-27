@@ -405,6 +405,20 @@ const MenuModule = {
         for (const route of routes) frag.appendChild(this._createRouteRow(route));
         container.appendChild(frag);
         this._observeRoutePreviews(container);
+        this._scrollToCurrentRoute(container);
+    },
+
+    // Прокручивает список к загруженному маршруту, чтобы при открытии меню
+    // было видно, где остановились. Срабатывает, только если строка есть
+    // в текущей папке и не видна целиком.
+    _scrollToCurrentRoute(container) {
+        if (!this.currentRoute) return;
+        const row = container.querySelector('.route-row.is-active');
+        if (!row) return;
+        const box = container.getBoundingClientRect();
+        const rect = row.getBoundingClientRect();
+        if (!box.height || (rect.top >= box.top && rect.bottom <= box.bottom)) return;
+        container.scrollTop += rect.top - box.top - (box.height - rect.height) / 2;
     },
 
     _renderBreadcrumbs() {
