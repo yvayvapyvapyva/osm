@@ -365,11 +365,11 @@ function animateUserMarker(lat, lon, bearing, duration) {
 }
 
 // Стрелка не увеличивается больше базовых 54 px: 100% — это потолок.
-// От зума 14 вниз до 10 она плавно уменьшается до 66%, чтобы на обзорной
-// карте не закрывать половину города. Ниже 10 остаётся минимум.
+// От зума 16 вниз до 12 она плавно уменьшается до 66%, чтобы на обзорной
+// карте не закрывать половину города. Ниже 12 остаётся минимум.
 function updateArrowScale() {
     if (!APP.map) return;
-    const t = Math.min(1, Math.max(0, (APP.map.getZoom() - 10) / 4));
+    const t = Math.min(1, Math.max(0, (APP.map.getZoom() - 12) / 4));
     const scale = 0.66 + 0.34 * t;
     document.documentElement.style.setProperty('--nav-mk-scale', scale.toFixed(3));
 }
