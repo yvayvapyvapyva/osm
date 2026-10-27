@@ -196,16 +196,23 @@ function ttsCacheKey(text, voiceType) {
 }
 
 const APP = {
-    map: null, userMarker: null, lastPos: null, lastAz: 0, rawAz: 0, lastTilt: 0, autoCenter: false, currentSpeed: 0,
+    map: null, userMarker: null, lastPos: null, lastAz: 0, rawAz: 0, hasHeading: false, lastTilt: 0, autoCenter: false, currentSpeed: 0,
+    lastFixTime: 0, _lastGoodFixAt: 0, _weakToastAt: 0, _azBasePos: null, _speedFallback: null,
+    _geoWatchId: null, _geoErrorAt: 0, _geoDenied: false,
     navPoints: [],     navCurrentIndex: 0, _routeTotalDistance: 0,
     navAudio: new Audio(), _commentAudio: new Audio(),
-    navConfig: { TRIGGER_DIST: 25, AZ_TOLERANCE: 45, SPEED_THRESHOLD: 2, SHOCK_THRESHOLD: 1, SHOCK_PHRASE: 'Сильный удар', SPEED_ALERT_THRESHOLD: 58, SPEED_ALERT_PHRASE: 'Превышена максимальная скорость' },
+    navConfig: {
+        TRIGGER_DIST: 25, AZ_TOLERANCE: 45, SPEED_THRESHOLD: 2,
+        ACCURACY_LIMIT: 150, WEAK_FIX_GRACE: 8000, HEADING_MIN_DIST: 6,
+        SHOCK_THRESHOLD: 1, SHOCK_PHRASE: 'Сильный удар',
+        SPEED_ALERT_THRESHOLD: 58, SPEED_ALERT_PHRASE: 'Превышена максимальная скорость'
+    },
     _mapStyle: MAP_PREFS.style,
     _routeFeatures: [], _routeDataSource: null, _routeDataDirty: false,
     _driveActive: false, _driveRaf: null, _driveMarker: null, _driveShowFrom: -1,
     _driveState: null, _driveResume: null,
     _driveSpeed: 90,
-    _userMarkerEl: null, markerRotation: 0,
+    markerRotation: 0,
     _currentDisplayAz: 0,
     _audioCache: new Map(),
     _commentEnabled: true,
@@ -292,7 +299,7 @@ function showToast(text, type = 'info', duration = 2000) {
 }
 
 function updateUserMarkerRotation() {
-    if (!APP.userMarker || APP.lastAz === null || !APP.map) return;
+    if (!APP.userMarker || !APP.hasHeading || !APP.map) return;
     if (APP.currentSpeed < APP.navConfig.SPEED_THRESHOLD) return;
     const targetRotation = APP._currentDisplayAz;
     let delta = ((targetRotation - APP.markerRotation + 180) % 360) - 180;
@@ -524,37 +531,122 @@ function driveAlongPath(fromIdx) {
 
 
 function initGeolocation() {
-    if (navigator.geolocation) {
-        navigator.geolocation.watchPosition(pos => {
-            const coords = [pos.coords.latitude, pos.coords.longitude];
-            const speed = (pos.coords.speed || 0) * 3.6;
-            if (APP.lastPos && speed >= APP.navConfig.SPEED_THRESHOLD) {
-                const rawAz = calcAzimuth(APP.lastPos, coords);
-                APP.rawAz = rawAz;
-                APP.lastAz = rawAz;
-            }
-            APP.lastPos = coords;
-            APP.currentSpeed = speed;
-            checkSpeedAlert(speed);
-
-            if (APP.userMarker && APP._userMarkerEl) {
-                if (APP.autoCenter) {
-                    APP._currentDisplayAz = APP.lastAz;
-                    APP.userMarker.update({ coordinates: [coords[1], coords[0]] });
-                    const camera = { center: [coords[1], coords[0]], pitch: APP.lastTilt };
-                    if (APP.lastAz) camera.bearing = APP.lastAz;
-                    APP.map.jumpTo(camera);
-                } else {
-                    APP._currentDisplayAz = APP.lastAz;
-                    APP.userMarker.update({ coordinates: [coords[1], coords[0]] });
-                }
-                updateUserMarkerRotation();
-            }
-            $('telSpeed').textContent = Math.round(APP.currentSpeed);
-
-            if (APP.navCurrentIndex >= 0) navCheckTriggers();
-        }, () => {}, { enableHighAccuracy: true, maximumAge: 5000, timeout: 10000 });
+    if (!navigator.geolocation) {
+        showToast('Браузер не поддерживает геолокацию', 'error', 5000);
+        return;
     }
+    if (APP._geoWatchId !== null) return;
+    APP._geoWatchId = navigator.geolocation.watchPosition(onGeoPosition, onGeoError, {
+        enableHighAccuracy: true,
+        maximumAge: 1000,
+        timeout: 20000
+    });
+}
+
+function onGeoPosition(pos) {
+    if (!pos || !pos.coords) return;
+    const lat = pos.coords.latitude;
+    const lon = pos.coords.longitude;
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) return;
+
+    const coords = [lat, lon];
+    const now = Date.now();
+    const accuracy = Number.isFinite(pos.coords.accuracy) ? pos.coords.accuracy : null;
+
+    // Грубый фикс (сотни метров) не применяем, пока есть свежий точный:
+    // иначе стрелка прыгает через дома. Если точного давно нет — берём что есть.
+    if (accuracy !== null && accuracy > APP.navConfig.ACCURACY_LIMIT) {
+        if (APP._lastGoodFixAt && now - APP._lastGoodFixAt < APP.navConfig.WEAK_FIX_GRACE) return;
+        if (now - APP._weakToastAt > 60000) {
+            APP._weakToastAt = now;
+            showToast('Слабый сигнал GPS — ведём приблизительно', 'info', 4000);
+        }
+    } else {
+        APP._lastGoodFixAt = now;
+    }
+
+    const dt = APP.lastFixTime ? Math.min((now - APP.lastFixTime) / 1000, 10) : 0;
+    const moved = APP.lastPos ? getGeoDistance(APP.lastPos, coords) : 0;
+    const speed = estimateSpeed(pos.coords.speed, moved, dt);
+    const heading = estimateHeading(coords, speed, pos.coords.heading);
+
+    APP.lastFixTime = now;
+    APP.lastPos = coords;
+    APP.currentSpeed = speed;
+    checkSpeedAlert(speed);
+
+    if (heading !== null) {
+        APP.lastAz = heading;
+        APP.rawAz = heading;
+        APP.hasHeading = true;
+        APP._currentDisplayAz = heading;
+    }
+
+    if (APP.userMarker) {
+        APP.userMarker.update({ coordinates: [lon, lat] });
+        if (APP.autoCenter && APP.map) {
+            const camera = { center: [lon, lat], pitch: APP.lastTilt };
+            if (APP.hasHeading) camera.bearing = APP.lastAz;
+            APP.map.jumpTo(camera);
+        }
+        updateUserMarkerRotation();
+    }
+    $('telSpeed').textContent = Math.round(APP.currentSpeed);
+
+    if (APP.navCurrentIndex >= 0) navCheckTriggers();
+}
+
+// В iOS Safari coords.speed часто null, поэтому считаем скорость по
+// перемещению и сглаживаем: иначе шум GPS дёргает стрелку и спидометр.
+function estimateSpeed(reported, moved, dt) {
+    if (Number.isFinite(reported) && reported >= 0) {
+        APP._speedFallback = null;
+        return reported * 3.6;
+    }
+    if (dt < 0.8) return APP._speedFallback || 0;
+    const measured = Math.min((moved / dt) * 3.6, 250);
+    APP._speedFallback = APP._speedFallback === null
+        ? measured
+        : APP._speedFallback * 0.6 + measured * 0.4;
+    return APP._speedFallback;
+}
+
+function estimateHeading(coords, speedKmh, reported) {
+    if (speedKmh < APP.navConfig.SPEED_THRESHOLD) {
+        // Стоим: курс не обновляем, чтобы стрелка не крутилась на месте.
+        APP._azBasePos = null;
+        return null;
+    }
+
+    if (Number.isFinite(reported) && reported >= 0 && reported <= 360) {
+        APP._azBasePos = null;
+        return reported % 360;
+    }
+
+    // Фолбэк: азимут по перемещению от базовой точки. База сдвигается только
+    // после заметного смещения, поэтому отдельный шумный фикс не даёт скачка.
+    if (!APP._azBasePos) APP._azBasePos = APP.lastPos;
+    if (!APP._azBasePos) return null;
+    if (getGeoDistance(APP._azBasePos, coords) < APP.navConfig.HEADING_MIN_DIST) return null;
+    const azimuth = calcAzimuth(APP._azBasePos, coords);
+    APP._azBasePos = coords;
+    return azimuth;
+}
+
+function onGeoError(error) {
+    const code = error && error.code;
+    const now = Date.now();
+    if (code === 1) {
+        if (APP._geoDenied) return;
+        APP._geoDenied = true;
+        showToast('Геолокация выключена — разрешите доступ', 'error', 6000);
+        return;
+    }
+    // Разовый сбой сразу после нормального фикса не показываем: это шум.
+    if (APP.lastFixTime && now - APP.lastFixTime < 15000) return;
+    if (now - APP._geoErrorAt < 15000) return;
+    APP._geoErrorAt = now;
+    showToast(code === 3 ? 'GPS не отвечает — ждём сигнал' : 'Не удалось определить местоположение', 'info', 4000);
 }
 
 function disableAutoCenter() {
@@ -575,7 +667,7 @@ function tempDisableAutoCenter(duration) {
         $('locateBtn').classList.add('active');
         if (APP.lastPos) {
             const camera = { center: [APP.lastPos[1], APP.lastPos[0]], pitch: APP.lastTilt };
-            if (APP.lastAz) camera.bearing = APP.lastAz;
+            if (APP.hasHeading) camera.bearing = APP.lastAz;
             APP.map.jumpTo(camera);
         }
         updateTiltState();
@@ -596,7 +688,7 @@ function toggleAutoCenter() {
     }
     if (APP.autoCenter && APP.lastPos) {
         const camera = { center: [APP.lastPos[1], APP.lastPos[0]], pitch: APP.lastTilt };
-        if (APP.lastAz) camera.bearing = APP.lastAz;
+        if (APP.hasHeading) camera.bearing = APP.lastAz;
         APP.map.jumpTo(camera);
     }
     updateTiltState();
@@ -1203,7 +1295,7 @@ function updateHud() {
 
     if (APP.lastPos) {
         const d = getGeoDistance(APP.lastPos, [t.lat, t.lon]);
-        let ad = Math.abs(APP.lastAz - t.az) % 360;
+        let ad = APP.hasHeading ? Math.abs(APP.lastAz - t.az) % 360 : 180;
         if (ad > 180) ad = 360 - ad;
         $('hudCmdDist').innerHTML = formatDistance(d);
         $('hudCmdDist').classList.toggle('in-range', d < 50 && ad <= APP.navConfig.AZ_TOLERANCE);
@@ -1457,7 +1549,7 @@ function navCheckTriggers() {
     if (APP.navCurrentIndex < 0 || !APP.lastPos || !APP.navPoints[APP.navCurrentIndex]) return;
     const t = APP.navPoints[APP.navCurrentIndex];
     const d = getGeoDistance(APP.lastPos, [t.lat, t.lon]);
-    let ad = Math.abs(APP.rawAz - t.az) % 360;
+    let ad = APP.hasHeading ? Math.abs(APP.rawAz - t.az) % 360 : 180;
     if (ad > 180) ad = 360 - ad;
     updateHudDist(d, ad);
 
@@ -1751,7 +1843,6 @@ if (typeof maplibregl === 'undefined') {
     const userEl = document.createElement('div');
     userEl.className = 'user-location-marker';
     userEl.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5 20 20.5 12 16.3 4 20.5 12 2.5z" fill="#FF3B30" stroke="#fff" stroke-width="1.4" stroke-linejoin="round"/></svg>';
-    APP._userMarkerEl = userEl;
     APP.userMarker = new MapMarker({
         coordinates: [0, 0],
         rotationAlignment: 'map',
