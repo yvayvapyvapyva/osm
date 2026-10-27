@@ -1075,6 +1075,7 @@ function setMapType(type) {
     APP._routeDataSource = null;
     APP.map.setStyle(mapStyleDefinition(type));
     if ((MAP_STYLES[type].omt || MAP_STYLES[type].pitch3d) && APP.map.getZoom() >= 14) {
+        APP.lastTilt = 55;
         APP.map.easeTo({ pitch: 55, duration: 600 });
     }
     showToast(MAP_STYLES[type].label, 'info', 1500);
@@ -1974,6 +1975,13 @@ if (typeof maplibregl === 'undefined') {
                 APP._followPausedUntil = Date.now() + 5000;
             }
         });
+    });
+
+    // Ручной наклон запоминается как текущий: иначе каждый следующий фикс
+    // возвращал бы угол из режима 2D/3D, и карта дёргалась бы на каждом шаге.
+    // События от easeTo приходят без originalEvent и угол не трогают.
+    APP.map.on('pitch', event => {
+        if (event && event.originalEvent) APP.lastTilt = APP.map.getPitch();
     });
 
     const driveEl = document.createElement('div');
