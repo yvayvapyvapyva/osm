@@ -305,14 +305,7 @@ const MenuModule = {
             );
         }
 
-        return this._pinCurrentRoute(routes);
-    },
-
-    _pinCurrentRoute(routes) {
-        if (!this.currentRoute || routes.length < 2) return routes;
-        const index = routes.findIndex(route => route.key === this.currentRoute);
-        if (index <= 0) return routes;
-        return [routes[index], ...routes.slice(0, index), ...routes.slice(index + 1)];
+        return routes;
     },
 
     // Индикация загрузки списка маршрутов
