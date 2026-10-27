@@ -18,7 +18,7 @@
             if (meta) meta.setAttribute('content', theme === 'dark' ? '#0F141C' : '#F4F6FA');
         })();
     </script>
-    <link rel="stylesheet" href="assets/css/navigator.css?v=20">
+    <link rel="stylesheet" href="assets/css/navigator.css?v=21">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.css">
     <!-- Yandex.Metrika counter -->
     <script type="text/javascript">
@@ -95,7 +95,7 @@
 
 <div id="hud">
     <div class="hud-header hud-prev-header" id="hudPrevHeader" style="display:none">
-        <button class="hud-cmd hud-prev" id="hudPrevCmd"><div class="hud-cmd-row"><span id="hudPrevCmdNum">1</span><span id="hudPrevCmdText"><span id="hudPrevCmdTextInner"></span></span></div><span id="prevCommentText"></span></button>
+        <button class="hud-cmd hud-prev" id="hudPrevCmd"><div class="hud-cmd-row"><span id="hudPrevCmdNum">1</span><span id="hudPrevCmdText"><span id="hudPrevCmdTextInner"></span></span></div></button>
     </div>
     <div class="hud-header">
         <button class="hud-cmd" id="hudCmd"><div class="hud-cmd-row"><span id="hudCmdNum">1</span><span id="hudCmdText"><span id="hudCmdTextInner">Маршрут не выбран</span></span><span id="hudCmdDist">---</span></div><span id="commentText"></span></button>
@@ -386,6 +386,22 @@ function resetFollowPadding() {
     if (!APP.map || !APP._followPaddingBottom) return;
     APP._followPaddingBottom = 0;
     APP.map.easeTo({ padding: { top: 0, bottom: 0, left: 0, right: 0 }, duration: 300 });
+}
+
+// Панель меняет высоту (появился комментарий, сменилась точка) — пересчитываем
+// отступ камеры сразу. Иначе стрелка остаётся под панелью до следующего
+// GPS-фикса, а потом камера прыгает. Замер после кадра: к этому моменту
+// текст уже перенёсся и высота HUD окончательная.
+function syncFollowPadding(duration = 300) {
+    if (!APP.map || !APP.autoCenter) return;
+    requestAnimationFrame(() => {
+        if (!APP.map || !APP.autoCenter) return;
+        if (Date.now() < (APP._followPausedUntil || 0)) return;
+        const padding = followPadding();
+        if (padding.bottom === APP._followPaddingBottom) return;
+        APP._followPaddingBottom = padding.bottom;
+        APP.map.easeTo({ padding, duration });
+    });
 }
 
 function followCamera(lat, lon, duration) {
@@ -834,8 +850,8 @@ function applyCommentConfig() {
     if (!APP._commentEnabled) APP._commentAudio.pause();
     const ct = $('commentText');
     ct.style.display = APP._commentEnabled && ct.textContent.trim() ? 'block' : 'none';
-    const pct = $('prevCommentText');
-    if (pct) pct.style.display = APP._commentEnabled && pct.textContent.trim() ? 'block' : 'none';
+    // Комментарий меняет высоту панели — сразу пересчитываем отступ камеры.
+    syncFollowPadding();
 }
 
 async function requestMotionPermission() {
@@ -1315,6 +1331,7 @@ function clearRoute() {
     APP.navCurrentIndex = 0;
     APP._routeTotalDistance = 0;
     $('hud').classList.remove('active');
+    resetFollowPadding();
     updateRouteNameDisplay();
 }
 
@@ -1452,12 +1469,11 @@ function updateHud() {
                 playPointAudio(prev, () => el.classList.remove('playing'));
             };
             $('hudPrevCmd').onclick = openPointsList;
-            $('prevCommentText').textContent = prev.comm || '';
-            const hasPrevComm = prev.comm && prev.comm.trim() !== '';
-            $('prevCommentText').style.display = hasPrevComm && APP._commentEnabled ? 'block' : 'none';
-            $('prevCommentText').style.opacity = (prev.comm && NavigatorTTS.has(prev.comm, 'comment')) ? '1' : '0.35';
         }
     }
+
+    // Высота панели могла измениться — держим отступ камеры актуальным.
+    syncFollowPadding();
 }
 
 function formatDistance(d) {
