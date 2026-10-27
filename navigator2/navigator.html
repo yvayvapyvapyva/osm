@@ -364,12 +364,13 @@ function animateUserMarker(lat, lon, bearing, duration) {
     APP._arrowRaf = requestAnimationFrame(step);
 }
 
-// Стрелка растёт вместе с зумом: на 20-м зуме иначе она закрывает
-// перекрёсток. Кривая 1.42^(zoom-17) с ограничением 0.66–1.88:
-// на стартовом зуме 17 размер остаётся прежним.
+// Стрелка не увеличивается больше базовых 54 px: 100% — это потолок.
+// От зума 14 вниз до 10 она плавно уменьшается до 66%, чтобы на обзорной
+// карте не закрывать половину города. Ниже 10 остаётся минимум.
 function updateArrowScale() {
     if (!APP.map) return;
-    const scale = Math.min(1.88, Math.max(0.66, Math.pow(1.42, APP.map.getZoom() - 17)));
+    const t = Math.min(1, Math.max(0, (APP.map.getZoom() - 10) / 4));
+    const scale = 0.66 + 0.34 * t;
     document.documentElement.style.setProperty('--nav-mk-scale', scale.toFixed(3));
 }
 
