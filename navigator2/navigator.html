@@ -212,8 +212,8 @@ const APP = {
     _driveActive: false, _driveRaf: null, _driveMarker: null, _driveShowFrom: -1,
     _driveState: null, _driveResume: null,
     _driveSpeed: 90,
-    markerRotation: 0,
-    _currentDisplayAz: 0,
+    markerRotation: 0, _arrowRaf: null, _arrowPos: null,
+    _followPausedUntil: 0, _followPaddingBottom: 0,
     _audioCache: new Map(),
     _commentEnabled: true,
     _lastShockTime: 0,
@@ -298,15 +298,114 @@ function showToast(text, type = 'info', duration = 2000) {
     toastTimer = setTimeout(() => el.classList.remove('show'), duration);
 }
 
-function updateUserMarkerRotation() {
-    if (!APP.userMarker || !APP.hasHeading || !APP.map) return;
-    if (APP.currentSpeed < APP.navConfig.SPEED_THRESHOLD) return;
-    const targetRotation = APP._currentDisplayAz;
-    let delta = ((targetRotation - APP.markerRotation + 180) % 360) - 180;
-    APP.markerRotation += delta;
-    // Маркер лежит в плоскости карты (rotation/pitchAlignment: map),
-    // поэтому MapLibre сам наклоняет его вместе с картой.
-    APP.userMarker.setRotation(APP.markerRotation);
+const ARROW_FRAME_MS = 1000 / 60;
+
+function shortestAngleDelta(from, to) {
+    return ((to - from + 540) % 360) - 180;
+}
+
+function normalizeAngle(deg) {
+    return ((deg % 360) + 360) % 360;
+}
+
+function stopArrowAnimation() {
+    if (APP._arrowRaf) {
+        cancelAnimationFrame(APP._arrowRaf);
+        APP._arrowRaf = null;
+    }
+}
+
+// Плавно ведёт стрелку от последнего отрисованного положения к новому фиксу.
+// Цикл живёт только на время перехода и завершается сам; кадры ограничены
+// 60 fps, чтобы не тратить лишнее на 120-герцовых экранах.
+function animateUserMarker(lat, lon, bearing, duration) {
+    const marker = APP.userMarker;
+    if (!marker) return;
+
+    const from = APP._arrowPos || { lat, lon };
+    const fromBearing = APP.markerRotation;
+    const toBearing = Number.isFinite(bearing) ? normalizeAngle(bearing) : fromBearing;
+    const moved = getGeoDistance([from.lat, from.lon], [lat, lon]);
+    const turned = Math.abs(shortestAngleDelta(fromBearing, toBearing));
+
+    stopArrowAnimation();
+
+    // На месте и без поворота — ставим сразу, иначе стрелка дрожит от шума GPS.
+    if (moved < 2 && turned < 2) {
+        marker.update({ coordinates: [lon, lat] });
+        marker.setRotation(toBearing);
+        APP.markerRotation = toBearing;
+        APP._arrowPos = { lat, lon };
+        return;
+    }
+
+    const started = performance.now();
+    let lastFrame = started - ARROW_FRAME_MS;
+
+    const step = now => {
+        if (now - lastFrame < ARROW_FRAME_MS - 0.5) {
+            APP._arrowRaf = requestAnimationFrame(step);
+            return;
+        }
+        lastFrame = now;
+
+        const t = Math.min(1, (now - started) / duration);
+        const frameLat = from.lat + (lat - from.lat) * t;
+        const frameLon = from.lon + (lon - from.lon) * t;
+        const frameBearing = normalizeAngle(fromBearing + shortestAngleDelta(fromBearing, toBearing) * t);
+
+        marker.update({ coordinates: [frameLon, frameLat] });
+        marker.setRotation(frameBearing);
+        APP.markerRotation = frameBearing;
+        APP._arrowPos = { lat: frameLat, lon: frameLon };
+        APP._arrowRaf = t < 1 ? requestAnimationFrame(step) : null;
+    };
+
+    APP._arrowRaf = requestAnimationFrame(step);
+}
+
+function followPadding() {
+    const hud = $('hud');
+    if (!hud || !hud.classList.contains('active')) {
+        return { top: 0, bottom: 0, left: 0, right: 0 };
+    }
+    return { top: 0, bottom: Math.round(hud.getBoundingClientRect().height + 24), left: 0, right: 0 };
+}
+
+function resetFollowPadding() {
+    if (!APP.map || !APP._followPaddingBottom) return;
+    APP._followPaddingBottom = 0;
+    APP.map.easeTo({ padding: { top: 0, bottom: 0, left: 0, right: 0 }, duration: 300 });
+}
+
+function followCamera(lat, lon, duration) {
+    if (!APP.map) return;
+    if (Date.now() < (APP._followPausedUntil || 0)) return;
+
+    const camera = {
+        center: [lon, lat],
+        zoom: Math.max(APP.map.getZoom(), 16),
+        pitch: APP.lastTilt,
+        duration,
+        easing: t => t
+    };
+    if (APP.hasHeading) camera.bearing = APP.lastAz;
+
+    // Нижний отступ уводит стрелку из-под HUD: карта центрируется
+    // в видимой части, а не под панелью.
+    const padding = followPadding();
+    if (padding.bottom !== APP._followPaddingBottom) {
+        camera.padding = padding;
+        APP._followPaddingBottom = padding.bottom;
+    }
+    APP.map.easeTo(camera);
+}
+
+// Жест пользователя отпускает камеру на 5 с, иначе следующий фикс
+// выдёргивает карту из-под пальца.
+function pauseFollow() {
+    if (!APP.autoCenter) return;
+    APP._followPausedUntil = Date.now() + 5000;
 }
 
 function calcAzimuth(p1, p2) {
@@ -579,18 +678,11 @@ function onGeoPosition(pos) {
         APP.lastAz = heading;
         APP.rawAz = heading;
         APP.hasHeading = true;
-        APP._currentDisplayAz = heading;
     }
 
-    if (APP.userMarker) {
-        APP.userMarker.update({ coordinates: [lon, lat] });
-        if (APP.autoCenter && APP.map) {
-            const camera = { center: [lon, lat], pitch: APP.lastTilt };
-            if (APP.hasHeading) camera.bearing = APP.lastAz;
-            APP.map.jumpTo(camera);
-        }
-        updateUserMarkerRotation();
-    }
+    const duration = Math.max(500, Math.min(1500, (dt ? dt * 1000 : 1000) + 200));
+    animateUserMarker(lat, lon, APP.hasHeading ? APP.lastAz : null, duration);
+    if (APP.autoCenter) followCamera(lat, lon, duration);
     $('telSpeed').textContent = Math.round(APP.currentSpeed);
 
     if (APP.navCurrentIndex >= 0) navCheckTriggers();
@@ -655,7 +747,9 @@ function disableAutoCenter() {
         APP._autoCenterTimer = null;
     }
     APP.autoCenter = false;
+    APP._followPausedUntil = 0;
     $('locateBtn').classList.remove('active');
+    resetFollowPadding();
     updateTiltState();
 }
 
@@ -665,12 +759,8 @@ function tempDisableAutoCenter(duration) {
     APP._autoCenterTimer = setTimeout(() => {
         APP.autoCenter = true;
         $('locateBtn').classList.add('active');
-        if (APP.lastPos) {
-            const camera = { center: [APP.lastPos[1], APP.lastPos[0]], pitch: APP.lastTilt };
-            if (APP.hasHeading) camera.bearing = APP.lastAz;
-            APP.map.jumpTo(camera);
-        }
         updateTiltState();
+        if (APP.lastPos) followCamera(APP.lastPos[0], APP.lastPos[1], 600);
         APP._autoCenterTimer = null;
     }, duration || 5000);
 }
@@ -680,18 +770,26 @@ function toggleAutoCenter() {
         clearTimeout(APP._autoCenterTimer);
         APP._autoCenterTimer = null;
     }
+    // После жеста кнопка возвращает камеру, а не выключает привязку.
+    if (APP.autoCenter && APP._followPausedUntil > Date.now()) {
+        APP._followPausedUntil = 0;
+        if (APP.lastPos) followCamera(APP.lastPos[0], APP.lastPos[1], 500);
+        showToast('Слежение возобновлено', 'info', 1500);
+        return;
+    }
     APP.autoCenter = !APP.autoCenter;
     $('locateBtn').classList.toggle('active', APP.autoCenter);
     if (APP.autoCenter) {
         stopDrive();
         APP._simMode = false;
-    }
-    if (APP.autoCenter && APP.lastPos) {
-        const camera = { center: [APP.lastPos[1], APP.lastPos[0]], pitch: APP.lastTilt };
-        if (APP.hasHeading) camera.bearing = APP.lastAz;
-        APP.map.jumpTo(camera);
+        APP._followPausedUntil = 0;
+    } else {
+        resetFollowPadding();
     }
     updateTiltState();
+    if (APP.autoCenter && APP.lastPos) {
+        followCamera(APP.lastPos[0], APP.lastPos[1], 600);
+    }
     showToast(APP.autoCenter ? 'Привязка включена' : 'Привязка отключена');
 }
 
@@ -1849,6 +1947,22 @@ if (typeof maplibregl === 'undefined') {
         pitchAlignment: 'map'
     }, userEl);
     mapAddChild(APP.userMarker);
+
+    // Ручной жест временно отпускает камеру. Программные move/zoom
+    // (easeTo) не считаются жестом: у них нет originalEvent.
+    ['dragstart', 'zoomstart', 'rotatestart', 'pitchstart'].forEach(type => {
+        APP.map.on(type, event => {
+            if (type !== 'dragstart' && !(event && event.originalEvent)) return;
+            pauseFollow();
+        });
+    });
+    ['dragend', 'zoomend', 'rotateend', 'pitchend'].forEach(type => {
+        APP.map.on(type, () => {
+            if (APP._followPausedUntil > Date.now()) {
+                APP._followPausedUntil = Date.now() + 5000;
+            }
+        });
+    });
 
     const driveEl = document.createElement('div');
     driveEl.innerHTML = '<svg width="18" height="18" viewBox="0 0 18 18"><circle cx="9" cy="9" r="7" fill="#FF3B30" stroke="#fff" stroke-width="2.5"/></svg>';
