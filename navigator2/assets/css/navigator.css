@@ -59,6 +59,9 @@
     /* Верхняя навигация */
     --nav-gap: 10px;
 
+    /* Масштаб стрелки текущего положения: обновляется из JS по зуму */
+    --nav-mk-scale: 1;
+
     /* Полноэкранные разделы: контент начинается под таб-баром */
     --screen-top: calc(48px + var(--nav-gap) + env(safe-area-inset-top) + 10px);
 }
@@ -189,6 +192,8 @@ html, body {
     width: 100%;
     height: 100%;
     overflow: visible;
+    transform: scale(var(--nav-mk-scale, 1));
+    transform-origin: 50% 50%;
 }
 .trigger-input { width:100%;padding:10px 14px;border-radius:10px;background:var(--surface-muted);color:var(--text);font-size:14px;outline:none;box-sizing:border-box;border:1px solid var(--line); }
 .trigger-input:focus { background:var(--surface);border-color:var(--green-focus); }

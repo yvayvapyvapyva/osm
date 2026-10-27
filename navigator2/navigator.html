@@ -18,7 +18,7 @@
             if (meta) meta.setAttribute('content', theme === 'dark' ? '#0F141C' : '#F4F6FA');
         })();
     </script>
-    <link rel="stylesheet" href="assets/css/navigator.css?v=17">
+    <link rel="stylesheet" href="assets/css/navigator.css?v=18">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.css">
     <!-- Yandex.Metrika counter -->
     <script type="text/javascript">
@@ -362,6 +362,15 @@ function animateUserMarker(lat, lon, bearing, duration) {
     };
 
     APP._arrowRaf = requestAnimationFrame(step);
+}
+
+// Стрелка растёт вместе с зумом: на 20-м зуме иначе она закрывает
+// перекрёсток. Кривая 1.42^(zoom-17) с ограничением 0.66–1.88:
+// на стартовом зуме 17 размер остаётся прежним.
+function updateArrowScale() {
+    if (!APP.map) return;
+    const scale = Math.min(1.88, Math.max(0.66, Math.pow(1.42, APP.map.getZoom() - 17)));
+    document.documentElement.style.setProperty('--nav-mk-scale', scale.toFixed(3));
 }
 
 function followPadding() {
@@ -1947,6 +1956,8 @@ if (typeof maplibregl === 'undefined') {
         pitchAlignment: 'map'
     }, userEl);
     mapAddChild(APP.userMarker);
+    APP.map.on('zoom', updateArrowScale);
+    updateArrowScale();
 
     // Ручной жест временно отпускает камеру. Программные move/zoom
     // (easeTo) не считаются жестом: у них нет originalEvent.
