@@ -374,7 +374,7 @@ html, body {
    ============================================ */
 #topCenterControls {
     position: absolute;
-    top: calc(12px + env(safe-area-inset-top));
+    top: calc(64px + env(safe-area-inset-top));
     left: 50%;
     transform: translateX(-50%);
     z-index: 9005;
