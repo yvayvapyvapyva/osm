@@ -22,7 +22,7 @@ const MenuModule = {
     API_URL_V2: 'https://functions.yandexcloud.net/d4e02ghbv31h6kpf8ddh',
 
     // Запасный файл маршрутов в корне проекта (когда Яндекс-функция недоступна)
-    FALLBACK_URL: '/navigator2/routes.json',
+    FALLBACK_URL: '/routes.json',
 
     /**
      * Универсальное получение параметров URL.
