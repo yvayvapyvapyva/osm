@@ -1433,6 +1433,15 @@ function updateHud() {
     $('hudCmdNum').onclick = (e) => {
         e.stopPropagation();
         const el = $('hudCmdNum');
+        if (el.classList.contains('playing')) {
+            el.classList.remove('playing');
+            APP.navAudio.pause();
+            APP._commentAudio.pause();
+            APP.navAudio.onended = null;
+            APP._commentAudio.onended = null;
+            stopDrive();
+            return;
+        }
         document.querySelectorAll('.playing').forEach(e => e.classList.remove('playing'));
         APP._commentAudio.onended = null;
         el.classList.add('playing');
@@ -1483,6 +1492,15 @@ function updateHud() {
             $('hudPrevCmdNum').onclick = (e) => {
                 e.stopPropagation();
                 const el = $('hudPrevCmdNum');
+                if (el.classList.contains('playing')) {
+                    el.classList.remove('playing');
+                    APP.navAudio.pause();
+                    APP._commentAudio.pause();
+                    APP.navAudio.onended = null;
+                    APP._commentAudio.onended = null;
+                    stopDrive();
+                    return;
+                }
                 document.querySelectorAll('.playing').forEach(e => e.classList.remove('playing'));
                 APP._commentAudio.onended = null;
                 el.classList.add('playing');
@@ -2110,6 +2128,15 @@ if (typeof maplibregl === 'undefined') {
             const idx = +icon.dataset.play;
             if (!isNaN(idx) && APP.navPoints[idx]) {
                 const p = APP.navPoints[idx];
+                if (icon.classList.contains('playing')) {
+                    icon.classList.remove('playing');
+                    APP.navAudio.pause();
+                    APP._commentAudio.pause();
+                    APP.navAudio.onended = null;
+                    APP._commentAudio.onended = null;
+                    stopDrive();
+                    return;
+                }
                 document.querySelectorAll('.playing').forEach(e => e.classList.remove('playing'));
                 APP._commentAudio.onended = null;
                 icon.classList.add('playing');
