@@ -1368,11 +1368,14 @@ function renderRoutePoints() {
         const markerSize = isCurrent ? 52 : (isKeyPoint ? 40 : 30);
         const markerOpacity = isKeyPoint ? (isPrevious ? '0.7' : '') : '';
 
+        const markerZIndex = isCurrent ? 100 : (isPrevious ? 50 : 10);
+
         if (shouldShow) {
             el.style.display = '';
             el.style.opacity = markerOpacity;
             el.style.width = markerSize + 'px';
             el.style.height = markerSize + 'px';
+            el.style.zIndex = markerZIndex;
             const markerStyle = markerOpacity ? ` style="opacity:${markerOpacity};"` : '';
             el.innerHTML = `<img src="${getNavIconSvg(p.hex, p.id, isCurrent, hasComm)}" width="${markerSize}" height="${markerSize}" class="marker-img"${markerStyle} />`;
             p.placemark.update({ coordinates: [p.lon, p.lat] });
