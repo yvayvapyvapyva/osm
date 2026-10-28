@@ -1543,7 +1543,7 @@ function openPointsList() {
             ? formatDistance(getGeoDistance(APP.lastPos, [p.pts[0][0], p.pts[0][1]]))
             : '';
         const cls = `pl-item${isCurrent ? ' pl-active' : ''}${isPrev ? ' pl-prev' : ''}`;
-        const activeStyle = isCurrent ? ` style="border-color:#16A34A;border-width:2px"` : '';
+        const activeStyle = isCurrent ? ` style="border-color:#2FA8E0;border-width:2px"` : '';
         return `<div class="${cls}" data-idx="${i}">
             <div class="pl-item-row"${activeStyle}>
                 <div class="pl-item-row-main">
@@ -1604,7 +1604,7 @@ function updatePointsListActive() {
         el.classList.toggle('pl-prev', idx < APP.navCurrentIndex);
 
         const row = el.querySelector('.pl-item-row');
-        if (row) row.style.cssText = isCurrent ? 'border-color:#16A34A;border-width:2px' : '';
+        if (row) row.style.cssText = isCurrent ? 'border-color:#2FA8E0;border-width:2px' : '';
 
         const pt = APP.navPoints[idx];
         let distEl = el.querySelector('.pl-item-dist');

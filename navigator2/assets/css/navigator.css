@@ -34,16 +34,16 @@
     --line-surface: rgba(18, 28, 46, 0.16);
 
     /* Акценты */
-    --green: #16A34A;
-    --green-dark: #15803D;
-    --green-soft: #DCFCE7;
-    --green-tint: rgba(22, 163, 74, 0.10);
-    --green-tint-strong: rgba(22, 163, 74, 0.16);
-    --green-line: rgba(22, 163, 74, 0.42);
-    --green-line-soft: rgba(22, 163, 74, 0.26);
-    --green-focus: rgba(22, 163, 74, 0.55);
-    --green-glow: rgba(22, 163, 74, 0.18);
-    --success-solid: #16A34A;
+    --green: #2FA8E0;
+    --green-dark: #1E90D0;
+    --green-soft: #E7F4FC;
+    --green-tint: rgba(47, 168, 224, 0.10);
+    --green-tint-strong: rgba(47, 168, 224, 0.16);
+    --green-line: rgba(47, 168, 224, 0.42);
+    --green-line-soft: rgba(47, 168, 224, 0.26);
+    --green-focus: rgba(47, 168, 224, 0.55);
+    --green-glow: rgba(47, 168, 224, 0.18);
+    --success-solid: #2FA8E0;
     --danger: #DC2626;
     --danger-soft: #FDE8E8;
     --danger-line: rgba(220, 38, 38, 0.28);
@@ -98,16 +98,16 @@
     --line-strong: rgba(232, 237, 245, 0.20);
     --line-surface: var(--line);
 
-    --green: #22C55E;
-    --green-dark: #86EFAC;
-    --green-soft: #14351F;
-    --green-tint: rgba(34, 197, 94, 0.14);
-    --green-tint-strong: rgba(34, 197, 94, 0.22);
-    --green-line: rgba(34, 197, 94, 0.55);
-    --green-line-soft: rgba(34, 197, 94, 0.32);
-    --green-focus: rgba(34, 197, 94, 0.70);
-    --green-glow: rgba(34, 197, 94, 0.22);
-    --success-solid: #15803D;
+    --green: #2FA8E0;
+    --green-dark: #60A5FA;
+    --green-soft: #0A4A6B;
+    --green-tint: rgba(47, 168, 224, 0.14);
+    --green-tint-strong: rgba(47, 168, 224, 0.22);
+    --green-line: rgba(47, 168, 224, 0.55);
+    --green-line-soft: rgba(47, 168, 224, 0.32);
+    --green-focus: rgba(47, 168, 224, 0.70);
+    --green-glow: rgba(47, 168, 224, 0.22);
+    --success-solid: #2FA8E0;
     --danger: #F87171;
     --danger-soft: #3A1D20;
     --danger-line: rgba(248, 113, 113, 0.40);
@@ -524,7 +524,7 @@ html, body {
     opacity: 0.7;
 }
 #hudPrevCmdNum.playing {
-    border-color: #16A34A;
+    border-color: #2FA8E0;
     background: rgba(22,163,74,0.10);
 }
 
@@ -610,7 +610,7 @@ html, body {
     opacity: 0.7;
 }
 #hudCmdNum.playing {
-    border-color: #16A34A;
+    border-color: #2FA8E0;
     background: rgba(22,163,74,0.10);
 }
 
@@ -1636,7 +1636,7 @@ html, body {
     opacity: 0.7;
 }
 .pl-item-icon.playing {
-    border-color: #16A34A;
+    border-color: #2FA8E0;
     background: rgba(22,163,74,0.10);
 }
 
