@@ -1143,21 +1143,21 @@ function closeSettings() {
 }
 
 function getNavIconSvg(col, txt, isCurr = false, hasComm = false) {
-    const s = 40, c = s / 2;
-    const r = 9;
+    const s = isCurr ? 52 : 40, c = s / 2;
+    const r = isCurr ? 12 : 9;
     // Цвет подставляется в атрибуты SVG, номер точки — в текстовый узел.
     // И то, и другое приходит из данных маршрута, поэтому валидируем/экранируем.
     const safeCol = /^#[0-9a-f]{6}$/i.test(col) ? col : '#007AFF';
     const safeTxt = escapeHtml(String(txt ?? ''));
     const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${s}" height="${s}">
         <rect width="${s}" height="${s}" fill="transparent"/>
-        ${isCurr ? `<circle cx="${c}" cy="${c}" r="${r + 3}" fill="none" stroke="#16A34A" stroke-width="2.5" opacity="0.95"/>` : ''}
+        ${isCurr ? `<circle cx="${c}" cy="${c}" r="${r + 3}" fill="none" stroke="${safeCol}" stroke-width="2.5" opacity="0.95"/>` : ''}
         <circle cx="${c}" cy="${c}" r="${r}" fill="#FFFFFF"/>
         <circle cx="${c}" cy="${c}" r="${r}" fill="${safeCol}" opacity="0.18"/>
         <circle cx="${c}" cy="${c}" r="${r}" fill="none" stroke="${safeCol}" stroke-width="2"/>
         <circle cx="${c}" cy="${c}" r="${r + 1.5}" fill="none" stroke="#000000" stroke-width="1"/>
         ${hasComm ? `<circle cx="${s - 8}" cy="8" r="4" fill="#EF4444" stroke="#FFFFFF" stroke-width="1.5"/>` : ''}
-        <text x="${c}" y="${c + 0.5}" font-size="9" font-family="Arial" font-weight="900" text-anchor="middle" dominant-baseline="middle" fill="#121A28">${safeTxt}</text>
+        <text x="${c}" y="${c + 0.5}" font-size="${isCurr ? 11 : 9}" font-family="Arial" font-weight="900" text-anchor="middle" dominant-baseline="middle" fill="#121A28">${safeTxt}</text>
     </svg>`;
     return 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svg)));
 }
@@ -1229,7 +1229,7 @@ function ensureRouteLayers() {
                 source: ROUTE_SOURCE_ID,
                 filter: ['==', ['get', 'priority'], 30],
                 layout: { 'line-join': 'round', 'line-cap': 'round' },
-                paint: { 'line-color': '#22C55E', 'line-width': 12, 'line-opacity': 0.35 }
+                paint: { 'line-color': ['get', 'color'], 'line-width': 12, 'line-opacity': 0.35 }
             });
         }
         if (!APP.map.getLayer('nav-routes-active-casing')) {
@@ -1342,6 +1342,7 @@ function renderRoutePoints() {
         const isCurrent = (i === APP.navCurrentIndex);
         const isPassed = (i < APP.navCurrentIndex);
         const isPrevious = (i === APP.navCurrentIndex - 1);
+        const isNext = (i === APP.navCurrentIndex + 1);
         const hasComm = p.comm && p.comm.trim() !== '';
 
         const showPoint = APP._driveShowFrom >= 0 ? (i >= Math.max(APP._driveShowFrom - 1, 0)) : (!isPassed || isCurrent || isPrevious);
@@ -1362,10 +1363,17 @@ function renderRoutePoints() {
         const el = p.placemark.element;
         el.dataset.idx = i;
 
-        if (showPoint) {
+        const isKeyPoint = isCurrent || isPrevious || isNext;
+        const markerSize = isCurrent ? 52 : (isKeyPoint ? 40 : 30);
+        const markerOpacity = isKeyPoint ? (isPrevious ? '0.7' : '') : '';
+
+        if (showPoint || !isKeyPoint) {
             el.style.display = '';
-            el.style.opacity = isPrevious ? '0.7' : '';
-            el.innerHTML = `<img src="${getNavIconSvg(p.hex, p.id, isCurrent, hasComm)}" width="40" height="40" class="marker-img" />`;
+            el.style.opacity = markerOpacity;
+            el.style.width = markerSize + 'px';
+            el.style.height = markerSize + 'px';
+            const markerStyle = markerOpacity ? ` style="opacity:${markerOpacity};"` : '';
+            el.innerHTML = `<img src="${getNavIconSvg(p.hex, p.id, isCurrent, hasComm)}" width="${markerSize}" height="${markerSize}" class="marker-img"${markerStyle} />`;
             p.placemark.update({ coordinates: [p.lon, p.lat] });
         } else {
             el.style.display = 'none';
@@ -1390,10 +1398,14 @@ function renderRoutePoints() {
     });
 
     if (APP.map) {
+        // Сначала все, кроме текущей — потом текущая последней, чтобы была поверх.
         for (let ci = APP.navPoints.length - 1; ci >= 0; ci--) {
+            if (ci === APP.navCurrentIndex) continue;
             const pt = APP.navPoints[ci];
             if (pt.placemark) mapAddChild(pt.placemark);
         }
+        const curr = APP.navPoints[APP.navCurrentIndex];
+        if (curr && curr.placemark) mapAddChild(curr.placemark);
         ensureRouteLayers();
         updateRouteLines(features);
     }
