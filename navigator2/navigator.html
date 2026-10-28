@@ -196,7 +196,7 @@ function ttsCacheKey(text, voiceType) {
 }
 
 const APP = {
-    map: null, userMarker: null, lastPos: null, lastAz: 0, rawAz: 0, hasHeading: false, lastTilt: 0, autoCenter: false, currentSpeed: 0,
+    map: null, userMarker: null, lastPos: null, lastAz: 0, rawAz: 0, hasHeading: false, lastTilt: 0, lastZoom: 17, autoCenter: false, currentSpeed: 0,
     lastFixTime: 0, _lastGoodFixAt: 0, _weakToastAt: 0, _azBasePos: null, _speedFallback: null,
     _geoWatchId: null, _geoErrorAt: 0, _geoDenied: false,
     navPoints: [],     navCurrentIndex: 0, _routeTotalDistance: 0,
@@ -410,7 +410,7 @@ function followCamera(lat, lon, duration) {
 
     const camera = {
         center: [lon, lat],
-        zoom: Math.max(APP.map.getZoom(), 16),
+        zoom: Math.max(APP.lastZoom, 16),
         pitch: APP.lastTilt,
         duration,
         easing: t => t
@@ -1999,6 +1999,13 @@ if (typeof maplibregl === 'undefined') {
     // События от easeTo приходят без originalEvent и угол не трогают.
     APP.map.on('pitch', event => {
         if (event && event.originalEvent) APP.lastTilt = APP.map.getPitch();
+    });
+
+    // Ручной зум запоминается, чтобы при возобновлении слежения камера не
+    // сбрасывала его на значение по умолчанию (не ниже 16). События от
+    // программных easeTo приходят без originalEvent и зум не трогают.
+    APP.map.on('zoom', event => {
+        if (event && event.originalEvent) APP.lastZoom = APP.map.getZoom();
     });
 
     const driveEl = document.createElement('div');
