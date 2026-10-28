@@ -1364,10 +1364,11 @@ function renderRoutePoints() {
         el.dataset.idx = i;
 
         const isKeyPoint = isCurrent || isPrevious || isNext;
+        const shouldShow = isKeyPoint || !isPassed;
         const markerSize = isCurrent ? 52 : (isKeyPoint ? 40 : 30);
         const markerOpacity = isKeyPoint ? (isPrevious ? '0.7' : '') : '';
 
-        if (showPoint || !isKeyPoint) {
+        if (shouldShow) {
             el.style.display = '';
             el.style.opacity = markerOpacity;
             el.style.width = markerSize + 'px';
@@ -1398,11 +1399,18 @@ function renderRoutePoints() {
     });
 
     if (APP.map) {
-        // Сначала все, кроме текущей — потом текущая последней, чтобы была поверх.
+        // Сначала все видимые, кроме текущей — потом текущая последней, чтобы была поверх.
         for (let ci = APP.navPoints.length - 1; ci >= 0; ci--) {
             if (ci === APP.navCurrentIndex) continue;
             const pt = APP.navPoints[ci];
-            if (pt.placemark) mapAddChild(pt.placemark);
+            if (!pt.placemark) continue;
+            const isPassed = ci < APP.navCurrentIndex;
+            const isPrev = ci === APP.navCurrentIndex - 1;
+            const isNext = ci === APP.navCurrentIndex + 1;
+            const isKeyPoint = isPrev || isNext;
+            const show = APP._driveShowFrom >= 0 ? (ci >= Math.max(APP._driveShowFrom - 1, 0)) : (isKeyPoint || !isPassed);
+            if (!show) { mapRemoveChild(pt.placemark); continue; }
+            mapAddChild(pt.placemark);
         }
         const curr = APP.navPoints[APP.navCurrentIndex];
         if (curr && curr.placemark) mapAddChild(curr.placemark);
