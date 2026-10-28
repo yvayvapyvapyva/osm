@@ -21,6 +21,9 @@ const MenuModule = {
     // URL Яндекс-функции OSM-версии (отдельная БД dbosm)
     API_URL_V2: 'https://functions.yandexcloud.net/d4e02ghbv31h6kpf8ddh',
 
+    // Запасный файл маршрутов в корне проекта (когда Яндекс-функция недоступна)
+    FALLBACK_URL: '/navigator2/routes.json',
+
     /**
      * Универсальное получение параметров URL.
      * Поддерживается формат: #m=<m>, ?m=<m> и #/path?m=<m>.
@@ -103,9 +106,33 @@ const MenuModule = {
                 this._buildRoutesList();
                 return true;
             } catch (e) {
-                console.warn('Не удалось загрузить список маршрутов:', e);
-                showLoadError();
-                return false;
+                console.warn('Не удалось загрузить список маршрутов из Яндекс-функции:', e);
+                // Запасной вариант: грузим из локального файла routes.json
+                try {
+                    const resp = await fetch(this.FALLBACK_URL);
+                    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+                    const data = await resp.json();
+                    this.routesDescriptions = {};
+                    for (const route of data) {
+                        const key = route.m || route.id || String(route.name || '');
+                        if (!key) continue;
+                        this.routesDescriptions[key] = {
+                            m: route.m || key,
+                            name: route.name || key,
+                            description: typeof route.description === 'string' ? route.description.trim() : '',
+                            data: route.data || route.pts
+                        };
+                    }
+                    this._routesLoaded = true;
+                    this._buildCatalog();
+                    this._buildRoutesList();
+                    showLoadError();
+                    return true;
+                } catch (e2) {
+                    console.warn('Не удалось загрузить запасной файл маршрутов:', e2);
+                    showLoadError();
+                    return false;
+                }
             }
         };
 
