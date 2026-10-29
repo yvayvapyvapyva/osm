@@ -16,13 +16,17 @@ const MenuModule = {
     _previewJobs: new Map(),
     _previewQueue: [],
     _previewQueuedKeys: new Set(),
+    _previewFetching: new Set(),
     _previewActive: false,
 
-    // URL Яндекс-функции OSM-версии (отдельная БД dbosm)
-    API_URL_V2: 'https://functions.yandexcloud.net/d4e02ghbv31h6kpf8ddh',
+    // Новый API на том же origin (API Gateway). Геометрия больше не
+    // приходит вместе со списком: её отдаёт /api/route для одного маршрута.
+    API_CATALOG_URL: '/api/catalog',
+    API_ROUTE_URL: '/api/route',
 
-    // Запасный файл маршрутов в корне проекта (когда Яндекс-функция недоступна)
-    FALLBACK_URL: '/routes.json',
+    // Кэш полных маршрутов: нужен для повторного открытия и превью.
+    _routeDataCache: new Map(),
+    _routeRequests: new Map(),
 
     /**
      * Универсальное получение параметров URL.
@@ -106,33 +110,9 @@ const MenuModule = {
                 this._buildRoutesList();
                 return true;
             } catch (e) {
-                console.warn('Не удалось загрузить список маршрутов из Яндекс-функции:', e);
-                // Запасной вариант: грузим из локального файла routes.json
-                try {
-                    const resp = await fetch(this.FALLBACK_URL);
-                    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-                    const data = await resp.json();
-                    this.routesDescriptions = {};
-                    for (const route of data) {
-                        const key = route.m || route.id || String(route.name || '');
-                        if (!key) continue;
-                        this.routesDescriptions[key] = {
-                            m: route.m || key,
-                            name: route.name || key,
-                            description: typeof route.description === 'string' ? route.description.trim() : '',
-                            data: route.data || route.pts
-                        };
-                    }
-                    this._routesLoaded = true;
-                    this._buildCatalog();
-                    this._buildRoutesList();
-                    showLoadError();
-                    return true;
-                } catch (e2) {
-                    console.warn('Не удалось загрузить запасной файл маршрутов:', e2);
-                    showLoadError();
-                    return false;
-                }
+                console.warn('Не удалось загрузить каталог маршрутов:', e);
+                showLoadError();
+                return false;
             }
         };
 
@@ -146,18 +126,24 @@ const MenuModule = {
     },
 
     /**
-     * Запрос к Яндекс-функции за списком маршрутов
+     * Запрос к новому API за каталогом без геометрии.
      */
     async _fetchFromAPI() {
-        // full=1: геометрия всех видимых маршрутов одним запросом — при выборе
-        // маршрута из каталога сетевые запросы уже не нужны.
-        const response = await fetch(`${this.API_URL_V2}?action=list_routes&full=1`);
+        const response = await fetch(this.API_CATALOG_URL, {
+            credentials: 'same-origin',
+            headers: { Accept: 'application/json' },
+            cache: 'no-store'
+        });
 
         if (!response.ok) {
             throw new Error(`HTTP ${response.status}`);
         }
 
-        const data = await response.json();
+        const payload = await response.json();
+        const data = Array.isArray(payload) ? payload : payload && payload.routes;
+        if (!Array.isArray(data)) {
+            throw new Error('Некорректный ответ каталога');
+        }
 
         const routesFlat = {};
 
@@ -168,12 +154,61 @@ const MenuModule = {
                 m: route.m,
                 name: route.name || route.m,
                 description: typeof route.description === 'string' ? route.description.trim() : '',
-                data: route.data
+                access: route.access || 'public',
+                point_count: Number.isFinite(route.point_count) ? route.point_count : null,
+                distance_meters: Number.isFinite(route.distance_meters) ? route.distance_meters : null
             };
         }
 
         this.routesDescriptions = routesFlat;
         this._buildCatalog();
+    },
+
+    /**
+     * Полная геометрия одного маршрута. Запросы дедуплицируются, результат
+     * кэшируется до перезагрузки страницы.
+     */
+    async _fetchRoute(routeM) {
+        const key = String(routeM);
+        if (this._routeDataCache.has(key)) return this._routeDataCache.get(key);
+        if (this._routeRequests.has(key)) return this._routeRequests.get(key);
+
+        const request = (async () => {
+            const response = await fetch(
+                this.API_ROUTE_URL + '?m=' + encodeURIComponent(key),
+                {
+                    credentials: 'same-origin',
+                    headers: { Accept: 'application/json' },
+                    cache: 'no-store'
+                }
+            );
+
+            let payload = null;
+            try {
+                payload = await response.json();
+            } catch (e) {}
+
+            if (!response.ok) {
+                const error = new Error(
+                    (payload && payload.error) || `HTTP ${response.status}`
+                );
+                error.status = response.status;
+                throw error;
+            }
+            if (!payload || !Array.isArray(payload.data)) {
+                throw new Error('Некорректный ответ маршрута');
+            }
+
+            this._routeDataCache.set(key, payload);
+            return payload;
+        })();
+
+        this._routeRequests.set(key, request);
+        try {
+            return await request;
+        } finally {
+            this._routeRequests.delete(key);
+        }
     },
 
     /**
@@ -200,7 +235,8 @@ const MenuModule = {
                 sub,
                 folders,
                 description: typeof route.description === 'string' ? route.description.trim() : '',
-                ...this._measureRoute(route.data),
+                access: route.access || 'public',
+                ...this._routeStats(route),
                 search: this._normalizeSearch(
                     `${fullPath} ${typeof route.description === 'string' ? route.description : ''}`
                 )
@@ -218,6 +254,22 @@ const MenuModule = {
         }
         this._folderPath = validPath;
         this._saveMenuState();
+    },
+
+    _routeStats(route) {
+        // Новый API присылает готовые метрики. Старый формат с data
+        // поддерживаем на случай локальной отладки.
+        const measured = Array.isArray(route.data)
+            ? this._measureRoute(route.data)
+            : { pointCount: 0, distanceMeters: 0 };
+        return {
+            pointCount: Number.isFinite(route.point_count)
+                ? route.point_count
+                : measured.pointCount,
+            distanceMeters: Number.isFinite(route.distance_meters)
+                ? route.distance_meters
+                : measured.distanceMeters
+        };
     },
 
     _measureRoute(data) {
@@ -599,6 +651,7 @@ const MenuModule = {
         this._destroyRoutePreviews();
         this._previewQueue = [];
         this._previewQueuedKeys.clear();
+        this._previewFetching.clear();
         this._previewJobs.clear();
         this._previewActive = false;
         this._previewImages.clear();
@@ -796,18 +849,8 @@ const MenuModule = {
             }
         };
 
-        const createPreview = element => {
-            if (!element.isConnected) return;
-            const key = element.dataset.previewKey;
-            const cachedImage = this._previewImages.get(key);
-            if (cachedImage) {
-                showPreviewImage(element, key, cachedImage);
-                return;
-            }
+        const queuePreview = (element, key, routeData) => {
             if (this._previewJobs.has(key) || this._previewQueuedKeys.has(key)) return;
-
-            const routeData = this.routesDescriptions[element.dataset.routeKey]?.data;
-            if (!Array.isArray(routeData)) return;
             this._previewQueuedKeys.add(key);
             this._previewQueue.push({
                 key,
@@ -816,6 +859,58 @@ const MenuModule = {
                 showCached: image => showPreviewImage(element, key, image),
             });
             startNextPreview();
+        };
+
+        const createPreview = element => {
+            if (!element.isConnected) return;
+            const key = element.dataset.previewKey;
+            const cachedImage = this._previewImages.get(key);
+            if (cachedImage) {
+                showPreviewImage(element, key, cachedImage);
+                return;
+            }
+            if (
+                this._previewJobs.has(key) ||
+                this._previewQueuedKeys.has(key) ||
+                this._previewFetching.has(key)
+            ) return;
+
+            const routeKey = element.dataset.routeKey;
+            const cachedRoute = this._routeDataCache.get(routeKey);
+            if (cachedRoute && Array.isArray(cachedRoute.data)) {
+                queuePreview(element, key, cachedRoute.data);
+                return;
+            }
+
+            // Старый локальный формат с data внутри каталога.
+            const inlineData = this.routesDescriptions[routeKey]?.data;
+            if (Array.isArray(inlineData)) {
+                queuePreview(element, key, inlineData);
+                return;
+            }
+
+            // Каталог без геометрии: догружаем её только для видимой строки.
+            this._previewFetching.add(key);
+            element.replaceChildren();
+            element.classList.add('is-loading');
+            this._fetchRoute(routeKey)
+                .then(payload => {
+                    this._previewFetching.delete(key);
+                    if (!element.isConnected || element.dataset.previewKey !== key) return;
+                    if (!Array.isArray(payload.data)) {
+                        element.classList.remove('is-loading');
+                        element.classList.add('is-empty');
+                        return;
+                    }
+                    queuePreview(element, key, payload.data);
+                })
+                .catch(error => {
+                    this._previewFetching.delete(key);
+                    if (!element.isConnected || element.dataset.previewKey !== key) return;
+                    element.classList.remove('is-loading');
+                    element.classList.add('is-empty');
+                    console.warn('Не удалось загрузить превью маршрута:', error);
+                });
         };
 
         if (typeof IntersectionObserver === 'undefined') {
@@ -993,21 +1088,9 @@ const MenuModule = {
 
             this.hide();
 
-            let data;
-            const cached = this.routesDescriptions && this.routesDescriptions[routeM];
-
-            if (cached && cached.data) {
-                // Данные уже загружены списком (list_routes&full=1) — без запроса.
-                data = { name: cached.name, m: routeM, data: cached.data };
-            } else {
-                // Fallback: маршрута нет в списке (скрыт/удалён) или бэкенд ещё
-                // не умеет full=1 — грузим по одному.
-                const url = this.API_URL_V2 + '?action=get&m=' + encodeURIComponent(routeM);
-                const res = await fetch(url);
-
-                if (!res.ok) throw new Error('HTTP ' + res.status);
-                data = await res.json();
-            }
+            // Каталог больше не содержит геометрию: грузим только выбранный
+            // маршрут и кэшируем его до перезагрузки страницы.
+            const data = await this._fetchRoute(routeM);
 
             await this.loadRoute(data);
             this.hideSpinner();

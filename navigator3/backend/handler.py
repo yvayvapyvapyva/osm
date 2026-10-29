@@ -23,11 +23,16 @@ API редактора (операции изменения требуют ROUTE
   GET  /api/me                — текущий пользователь или 401
   GET  /api/health            — проверка, что функция на шлюзе доступна
 
+Публичный API навигатора:
+  GET  /api/catalog           — видимые маршруты без геометрии
+  GET  /api/route?m=<m>       — геометрия одного видимого маршрута
+
 База — отдельная serverless-YDB (dbosm).
 """
 
 import hmac
 import json
+import math
 import os
 import secrets
 
@@ -62,6 +67,20 @@ def execute_get_route(session, m_param):
     query = """
         DECLARE $m AS Utf8;
         SELECT json, name, m FROM roads WHERE m = $m;
+    """
+    prepared = session.prepare(query)
+    return session.transaction().execute(
+        prepared, {"$m": str(m_param)}, commit_tx=True
+    )
+
+
+def execute_get_public_route(session, m_param):
+    """Только видимый маршрут: скрытые и удалённые наружу не отдаём."""
+    query = """
+        DECLARE $m AS Utf8;
+        SELECT json, name, m, description
+        FROM roads
+        WHERE m = $m AND visible = true AND name IS NOT NULL;
     """
     prepared = session.prepare(query)
     return session.transaction().execute(
@@ -191,6 +210,60 @@ def _json_value(raw):
         return json.loads(raw) if isinstance(raw, str) else raw
     except ValueError:
         return []
+
+
+def _route_metrics(data):
+    """Считает число сегментов и длину так же, как фронтенд.
+
+    Геометрия остаётся на сервере: в /api/catalog уходят только эти числа.
+    """
+    if not isinstance(data, list):
+        return {"point_count": 0, "distance_meters": 0}
+
+    point_count = 0
+    distance_meters = 0.0
+
+    for segment in data:
+        if not isinstance(segment, dict):
+            continue
+        points = segment.get("pts")
+        if not isinstance(points, list):
+            continue
+
+        previous = None
+        has_point = False
+        for point in points:
+            if (
+                not isinstance(point, (list, tuple))
+                or len(point) < 2
+                or not isinstance(point[0], (int, float))
+                or not isinstance(point[1], (int, float))
+                or abs(point[0]) > 90
+                or abs(point[1]) > 180
+            ):
+                continue
+            has_point = True
+            if previous is not None:
+                lat1 = math.radians(previous[0])
+                lat2 = math.radians(point[0])
+                delta_lat = lat2 - lat1
+                delta_lon = math.radians(point[1] - previous[1])
+                a = (
+                    math.sin(delta_lat / 2) ** 2
+                    + math.cos(lat1) * math.cos(lat2) * math.sin(delta_lon / 2) ** 2
+                )
+                a = min(1.0, max(0.0, a))
+                distance_meters += 6371000 * 2 * math.atan2(
+                    math.sqrt(a), math.sqrt(1 - a)
+                )
+            previous = point
+        if has_point:
+            point_count += 1
+
+    return {
+        "point_count": point_count,
+        "distance_meters": int(round(distance_meters)),
+    }
 
 
 def _header(event, name):
@@ -350,6 +423,64 @@ def _api_me(event):
     )
 
 
+def _api_catalog(event):
+    """Список видимых маршрутов без геометрии.
+
+    Метрики считаются на сервере, чтобы клиент не получал и не парсил все
+    точки ради количества и длины. Сама геометрия отдаётся только
+    /api/route для выбранного маршрута.
+    """
+    try:
+        result = store.get_pool().retry_operation_sync(
+            execute_list_routes, visible_only=True, include_json=True
+        )
+        routes = []
+        for row in result[0].rows:
+            data = _json_value(row.json)
+            route = {
+                "m": _text(row.m),
+                "name": _text(row.name),
+                "description": _text(row.description),
+                "access": "public",
+            }
+            route.update(_route_metrics(data))
+            routes.append(route)
+        return auth.json_response(200, {"routes": routes})
+    except Exception as exc:  # noqa: BLE001
+        print(f"[api] catalog failed: {exc}")
+        return auth.json_response(500, {"error": "storage_failed"})
+
+
+def _api_route(event):
+    """Геометрия одного маршрута. Скрытые маршруты не отдаются."""
+    m_val = _query(event).get("m") or ""
+    if not isinstance(m_val, str) or not m_val.strip():
+        return auth.json_response(400, {"error": "missing_route_name"})
+
+    try:
+        result = store.get_pool().retry_operation_sync(
+            execute_get_public_route, m_param=m_val.strip()
+        )
+    except Exception as exc:  # noqa: BLE001
+        print(f"[api] route failed: {exc}")
+        return auth.json_response(500, {"error": "storage_failed"})
+
+    if not result[0].rows:
+        return auth.json_response(404, {"error": "route_not_found"})
+
+    row = result[0].rows[0]
+    data = _json_value(row.json)
+    payload = {
+        "m": _text(row.m) or m_val,
+        "name": _text(row.name),
+        "description": _text(row.description),
+        "access": "public",
+        "data": data,
+    }
+    payload.update(_route_metrics(data))
+    return auth.json_response(200, payload)
+
+
 def _auth_logout(event):
     if not auth.origin_allowed(event):
         return auth.json_response(403, {"error": "forbidden_origin"})
@@ -375,6 +506,12 @@ def _handle_api(event, path, method):
 
     if normalized == "/api/me" and method == "GET":
         return _api_me(event)
+
+    if normalized == "/api/catalog" and method == "GET":
+        return _api_catalog(event)
+
+    if normalized == "/api/route" and method == "GET":
+        return _api_route(event)
 
     if normalized == "/auth/yandex/start" and method == "GET":
         return _auth_start(event)

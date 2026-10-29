@@ -4,9 +4,10 @@
 версия в `navigator/` и работающая функция `osmn` не меняются: здесь своя
 функция `osmn3`, свой шлюз и свои таблицы в той же YDB `dbosm`.
 
-Первый этап — **только идентификация**. Маршруты по-прежнему публичные,
-оплаты нет. Фронтенд продолжает брать маршруты из старого API `osmn`, а
-`/api/me` и `/auth/*` идут через новый шлюз.
+Сейчас сделаны идентификация и новый каталог. Фронтенд получает список
+маршрутов без геометрии из `/api/catalog`, а точки — из `/api/route` только
+для выбранного маршрута. Маршруты пока публичные, оплаты нет. Старый API
+`osmn` оставлен для редактора и обратной совместимости.
 
 ## Текущий тестовый контур
 
@@ -26,9 +27,8 @@ https://d5dsd5u1tsc8fm9dbsg5.s183zexc.apigw.yandexcloud.net/auth/yandex/callback
 ```
 
 Статус: бакет, шлюз и функция работают, статика отдаётся, таблицы `users` и
-`sessions` созданы. `/api/health` отвечает 200, `/api/me` без cookie — 401,
-`/auth/yandex/start` перенаправляет на Яндекс. Осталось проверить полный вход
-в браузере.
+`sessions` созданы. Вход через Яндекс проверен в браузере. Каталог переведён
+на `/api/catalog` без геометрии; `/api/route` отдаёт точки одного маршрута.
 
 ## Схема
 
@@ -39,6 +39,8 @@ https://<домен-шлюза>/
   /instr.html           → бакет osmn-nav
   /api/me               → функция osmn3
   /api/health           → функция osmn3
+  /api/catalog          → функция osmn3
+  /api/route?m=...      → функция osmn3
   /auth/yandex/start    → функция osmn3
   /auth/yandex/callback → функция osmn3
   /auth/logout          → функция osmn3
@@ -58,7 +60,7 @@ navigator3/
 ├── assets/
 │   ├── css/navigator.css
 │   └── js/
-│       ├── menu-module.js      # маршруты, пока старый API
+│       ├── menu-module.js      # /api/catalog и /api/route
 │       ├── auth-module.js      # вход, /api/me, выход
 │       ├── map-styles.js
 │       └── tts-client.js
@@ -70,7 +72,8 @@ navigator3/
 ├── scripts/
 │   ├── init_auth_db.py         # создание users и sessions
 │   ├── init_db.py              # старый скрипт маршрутов (не обязателен)
-│   ├── test_auth.py            # локальные проверки без сети
+│   ├── test_auth.py            # локальные проверки входа
+│   ├── test_catalog.py         # локальные проверки каталога
 │   └── build-static-deploy.js
 ├── gateway/osmn.yaml           # спецификация API Gateway
 ├── deploy.sh                   # деплой функции osmn3
@@ -147,12 +150,20 @@ CREATE TABLE sessions (
 |---|---|---|
 | GET | `/api/health` | `{"status":"ok"}` |
 | GET | `/api/me` | `{"user":{...},"entitlements":[]}` или 401 |
+| GET | `/api/catalog` | `{"routes":[{"m","name","description","point_count","distance_meters","access"}]}` — без геометрии |
+| GET | `/api/route?m=<m>` | `{"m","name","description","access","point_count","distance_meters","data":[...]}` |
 | GET | `/auth/yandex/start?return=/...` | 302 на Яндекс + state-cookie |
 | GET | `/auth/yandex/callback` | 302 обратно + sid-cookie |
 | POST | `/auth/logout` | 200 + удаление cookie |
 
+`/api/catalog` отдаёт только видимые маршруты и метрики, посчитанные на
+сервере. `/api/route` тоже проверяет `visible = true`: скрытые и удалённые
+маршруты наружу не попадают.
+
 Старые вызовы `?action=list_routes`, `?action=get`, `?action=save` и т. д.
 работают как раньше, с CORS `*` и `X-Route-Admin-Password` для редактора.
+Именно поэтому старый `full=1` пока не отключён — его использует рабочая
+версия `navigator/`.
 
 ## Переменные окружения функции
 
@@ -287,6 +298,8 @@ python3 navigator3/scripts/test_auth.py
 ```bash
 curl -i https://<домен>/api/health
 curl -i https://<домен>/api/me
+curl -i https://<домен>/api/catalog
+curl -i 'https://<домен>/api/route?m=<m>'
 curl -i https://<домен>/auth/yandex/start
 ```
 
@@ -294,6 +307,8 @@ curl -i https://<домен>/auth/yandex/start
 
 - `/api/health` — 200;
 - `/api/me` без cookie — 401;
+- `/api/catalog` — 200, в ответе нет поля `data`;
+- `/api/route?m=<m>` — 200, есть `data`; для скрытого `m` — 404;
 - `/auth/yandex/start` — 302 на `oauth.yandex.ru` и три `Set-Cookie`.
 
 В браузере:
@@ -309,8 +324,8 @@ curl -i https://<домен>/auth/yandex/start
 
 ## Что пока не сделано
 
-- Фронтенд по-прежнему берёт маршруты из старого API `osmn` через
-  `API_URL_V2` в `menu-module.js`.
+- Старый API `osmn` всё ещё умеет `full=1`: его использует рабочая версия
+  `navigator/`. Отключать надо после перевода всех клиентов.
 - Нет платных маршрутов, `entitlements`, ЮKassa.
 - Нет ограничения числа активных сессий и rate limit.
 - Вход доступен в «Настройках»; отдельную кнопку в верхней панели добавим
@@ -319,9 +334,9 @@ curl -i https://<домен>/auth/yandex/start
 
 ## Следующий шаг
 
-После проверки входа:
-
-1. Перевести `menu-module.js` на `/api/catalog` и `/api/route`.
-2. Убрать `full=1` и `routes.json` из публичного доступа.
-3. Добавить в `roads` поля `access`, `price_kopecks`, `sku`.
-4. Добавить `entitlements` и оплату.
+1. Добавить в `roads` поля `access`, `price_kopecks`, `sku`.
+2. Отдавать в `/api/catalog` признак доступа, а в `/api/route` — 402/403 для
+   маршрута без entitlement.
+3. Добавить `entitlements` и оплату через ЮKassa.
+4. После перевода старого навигатора отключить `full=1` и убрать
+   `routes.json` из публичного доступа.
