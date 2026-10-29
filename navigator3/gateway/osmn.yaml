@@ -1,0 +1,78 @@
+# Спецификация API Gateway для navigator3.
+#
+# Текущий тестовый контур:
+#   бакет    osmn-nav
+#   функция  osmn3 / d4e8ds1489g0q91dt7do
+#   шлюз     osmn3 / d5dsd5u1tsc8fm9dbsg5
+#   домен    https://d5dsd5u1tsc8fm9dbsg5.s183zexc.apigw.yandexcloud.net
+#   SA       osmn3-gateway / ajec0sf19r17r3tv6vrg
+#
+# Если функция, SA или бакет пересозданы — замените значения ниже.
+#
+# Создание:
+#   yc serverless api-gateway create --name osmn3 --spec gateway/osmn.yaml
+#
+# Служебный домен появится в выводе команды get:
+#   yc serverless api-gateway get --name osmn3
+
+openapi: 3.0.0
+info:
+  title: OSM Navigator
+  version: 1.0.0
+
+paths:
+  /:
+    get:
+      summary: Главная страница навигатора
+      x-yc-apigateway-integration:
+        type: object_storage
+        bucket: osmn-nav
+        object: navigator.html
+        service_account_id: ajec0sf19r17r3tv6vrg
+
+  /api/{proxy+}:
+    x-yc-apigateway-any-method:
+      summary: API навигатора и аккаунта
+      parameters:
+        - name: proxy
+          in: path
+          required: true
+          schema:
+            type: string
+      x-yc-apigateway-integration:
+        type: cloud_functions
+        function_id: d4e8ds1489g0q91dt7do
+        tag: "$latest"
+        service_account_id: ajec0sf19r17r3tv6vrg
+        payload_format_version: "2.0"
+
+  /auth/{proxy+}:
+    x-yc-apigateway-any-method:
+      summary: Яндекс OAuth и выход
+      parameters:
+        - name: proxy
+          in: path
+          required: true
+          schema:
+            type: string
+      x-yc-apigateway-integration:
+        type: cloud_functions
+        function_id: d4e8ds1489g0q91dt7do
+        tag: "$latest"
+        service_account_id: ajec0sf19r17r3tv6vrg
+        payload_format_version: "2.0"
+
+  /{file+}:
+    get:
+      summary: Статические файлы (css, js, png и т.д.)
+      parameters:
+        - name: file
+          in: path
+          required: true
+          schema:
+            type: string
+      x-yc-apigateway-integration:
+        type: object_storage
+        bucket: osmn-nav
+        object: '{file}'
+        service_account_id: ajec0sf19r17r3tv6vrg
