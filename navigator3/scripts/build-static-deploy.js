@@ -20,6 +20,11 @@ const pageBundles = {
         scripts: ['assets/js/tts-client.js', 'assets/js/map-styles.js', 'assets/js/menu-module.js', 'assets/js/auth-module.js'],
         instruction: 'instr.html',
     },
+    'editor.html': {
+        stylesheet: 'assets/css/editor.css',
+        scripts: ['assets/js/config.js', 'assets/js/report.js', 'assets/js/tts-client.js', 'assets/js/map-styles.js'],
+        instruction: 'instr_editor.html',
+    },
 };
 
 function minifyJavaScript(source, file) {

@@ -4,10 +4,11 @@
 версия в `navigator/` и работающая функция `osmn` не меняются: здесь своя
 функция `osmn3`, свой шлюз и свои таблицы в той же YDB `dbosm`.
 
-Сейчас сделаны идентификация и новый каталог. Фронтенд получает список
-маршрутов без геометрии из `/api/catalog`, а точки — из `/api/route` только
-для выбранного маршрута. Маршруты пока публичные, оплаты нет. Старый API
-`osmn` оставлен для редактора и обратной совместимости.
+Сейчас сделаны идентификация, новый каталог и редактор маршрутов. Навигатор
+получает список маршрутов без геометрии из `/api/catalog`, а точки — из
+`/api/route` только для выбранного маршрута. Редактор открывается на
+`/editor.html` и ходит в свою функцию через `/api/admin`. Маршруты пока
+публичные, оплаты нет. Старый API `osmn` оставлен для обратной совместимости.
 
 ## Текущий тестовый контур
 
@@ -56,12 +57,18 @@ https://<домен-шлюза>/
 ```
 navigator3/
 ├── navigator.html              # клиент (исходник)
-├── instr.html                  # инструкция
+├── editor.html                 # редактор маршрутов (исходник)
+├── instr.html                  # инструкция навигатора
+├── instr_editor.html           # инструкция редактора
 ├── assets/
-│   ├── css/navigator.css
+│   ├── css/
+│   │   ├── navigator.css
+│   │   └── editor.css
 │   └── js/
 │       ├── menu-module.js      # /api/catalog и /api/route
 │       ├── auth-module.js      # вход, /api/me, выход
+│       ├── config.js           # палитра и названия категорий
+│       ├── report.js           # отчёт о маршруте в Telegram
 │       ├── map-styles.js
 │       └── tts-client.js
 ├── backend/
@@ -74,10 +81,13 @@ navigator3/
 │   ├── init_db.py              # старый скрипт маршрутов (не обязателен)
 │   ├── test_auth.py            # локальные проверки входа
 │   ├── test_catalog.py         # локальные проверки каталога
+│   ├── test_admin.py           # локальные проверки редактора
 │   └── build-static-deploy.js
 ├── gateway/osmn.yaml           # спецификация API Gateway
 ├── deploy.sh                   # деплой функции osmn3
-└── deploy-2files/navigator.html # собранный одностраничный бандл
+└── deploy-2files/
+    ├── navigator.html          # собранный одностраничный бандл
+    └── editor.html             # собранный бандл редактора
 ```
 
 ## Как работает вход
@@ -152,6 +162,7 @@ CREATE TABLE sessions (
 | GET | `/api/me` | `{"user":{...},"entitlements":[]}` или 401 |
 | GET | `/api/catalog` | `{"routes":[{"m","name","description","point_count","distance_meters","access"}]}` — без геометрии |
 | GET | `/api/route?m=<m>` | `{"m","name","description","access","point_count","distance_meters","data":[...]}` |
+| POST | `/api/admin?action=...` | операции редактора: `list`, `get`, `get_meta`, `auth`, `save`, `save_meta`, `delete` |
 | GET | `/auth/yandex/start?return=/...` | 302 на Яндекс + state-cookie |
 | GET | `/auth/yandex/callback` | 302 обратно + sid-cookie |
 | POST | `/auth/logout` | 200 + удаление cookie |
@@ -160,10 +171,15 @@ CREATE TABLE sessions (
 сервере. `/api/route` тоже проверяет `visible = true`: скрытые и удалённые
 маршруты наружу не попадают.
 
+`/api/admin` — тот же legacy-обработчик функции, но доступный через шлюз:
+прямой вызов `functions.yandexcloud.net` платформа закрывает ответом 403.
+Все действия через этот путь требуют заголовок `X-Route-Admin-Password`,
+включая чтение: иначе `action=get` отдавал бы скрытые маршруты в обход
+`visible=true`. Пароль хранится только в Lockbox.
+
 Старые вызовы `?action=list_routes`, `?action=get`, `?action=save` и т. д.
-работают как раньше, с CORS `*` и `X-Route-Admin-Password` для редактора.
-Именно поэтому старый `full=1` пока не отключён — его использует рабочая
-версия `navigator/`.
+работают как раньше, с CORS `*`. Именно поэтому старый `full=1` пока не
+отключён — его использует рабочая версия `navigator/`.
 
 ## Переменные окружения функции
 
@@ -281,7 +297,13 @@ yc storage s3api put-object \
   --bucket osmn-nav \
   --key navigator.html \
   --body navigator3/deploy-2files/navigator.html
+yc storage s3api put-object \
+  --bucket osmn-nav \
+  --key editor.html \
+  --body navigator3/deploy-2files/editor.html
 ```
+
+Оба бандла самодостаточны: CSS, скрипты и инструкция уже внутри HTML.
 
 `routes.json` в бакет не загружайте: в нём лежит геометрия всех маршрутов.
 
@@ -291,6 +313,8 @@ yc storage s3api put-object \
 
 ```bash
 python3 navigator3/scripts/test_auth.py
+python3 navigator3/scripts/test_catalog.py
+python3 navigator3/scripts/test_admin.py
 ```
 
 На шлюзе:
@@ -300,6 +324,10 @@ curl -i https://<домен>/api/health
 curl -i https://<домен>/api/me
 curl -i https://<домен>/api/catalog
 curl -i 'https://<домен>/api/route?m=<m>'
+curl -i -X POST 'https://<домен>/api/admin?action=list' \
+  -H 'X-Route-Admin-Password: <пароль>'
+curl -i -X POST 'https://<домен>/api/admin?action=auth' \
+  -H 'X-Route-Admin-Password: <пароль>'
 curl -i https://<домен>/auth/yandex/start
 ```
 
@@ -309,6 +337,8 @@ curl -i https://<домен>/auth/yandex/start
 - `/api/me` без cookie — 401;
 - `/api/catalog` — 200, в ответе нет поля `data`;
 - `/api/route?m=<m>` — 200, есть `data`; для скрытого `m` — 404;
+- `/api/admin?action=list` — 200 со списком всех маршрутов; без пароля — 403;
+- `/api/admin?action=auth` с верным паролем — 200, с неверным — 403;
 - `/auth/yandex/start` — 302 на `oauth.yandex.ru` и три `Set-Cookie`.
 
 В браузере:
@@ -321,6 +351,8 @@ curl -i https://<домен>/auth/yandex/start
 6. «Выйти» — `/api/me` снова 401.
 7. В DevTools проверить, что `osm_sid` имеет `HttpOnly`, `Secure`,
    `SameSite=Lax`, а в `localStorage` токенов нет.
+8. Открыть `https://<домен>/editor.html`, ввести пароль редактора.
+9. Проверить список маршрутов, открыть маршрут, сохранить изменения.
 
 ## Что пока не сделано
 
@@ -330,6 +362,8 @@ curl -i https://<домен>/auth/yandex/start
 - Нет ограничения числа активных сессий и rate limit.
 - Вход доступен в «Настройках»; отдельную кнопку в верхней панели добавим
   после проверки на мобильных.
+- В редакторе пока нет ссылки из навигатора: `/editor.html` открывается по
+  прямому адресу. Ссылка или жест появятся после проверки.
 - `navigator/` и функция `osmn` не изменялись.
 
 ## Следующий шаг

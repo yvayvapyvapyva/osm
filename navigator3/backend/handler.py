@@ -27,6 +27,11 @@ API редактора (операции изменения требуют ROUTE
   GET  /api/catalog           — видимые маршруты без геометрии
   GET  /api/route?m=<m>       — геометрия одного видимого маршрута
 
+Редактор через шлюз:
+  /api/admin?action=...       — те же legacy-операции (list, get, save, ...),
+                                что и прямой вызов функции; нужен пароль
+                                X-Route-Admin-Password для любого действия
+
 База — отдельная serverless-YDB (dbosm).
 """
 
@@ -513,6 +518,16 @@ def _handle_api(event, path, method):
     if normalized == "/api/route" and method == "GET":
         return _api_route(event)
 
+    if normalized == "/api/admin":
+        # Редактор работает на том же origin, что и шлюз. Прямой вызов
+        # функции платформа закрывает (403), поэтому проксируем сюда.
+        # Читать через этот путь тоже можно только с паролем: иначе
+        # action=get отдавал бы скрытые маршруты в обход visible=true.
+        error = _admin_auth_error(event)
+        if error:
+            return error
+        return _handle_legacy(event, method)
+
     if normalized == "/auth/yandex/start" and method == "GET":
         return _auth_start(event)
 
@@ -525,6 +540,28 @@ def _handle_api(event, path, method):
     return auth.json_response(404, {"error": "not_found"})
 
 
+def _admin_auth_error(event):
+    """Возвращает 503/403, если пароль редактора не настроен или неверен."""
+    admin_password = os.environ.get("ROUTE_ADMIN_PASSWORD")
+    if not admin_password:
+        return create_response(503, {"error": "admin_auth_not_configured"})
+
+    headers = event.get("headers") or {}
+    provided_password = next(
+        (
+            value
+            for key, value in headers.items()
+            if str(key).lower() == "x-route-admin-password"
+        ),
+        "",
+    )
+    if not isinstance(provided_password, str) or not hmac.compare_digest(
+        provided_password, admin_password
+    ):
+        return create_response(403, {"error": "invalid_admin_password"})
+    return None
+
+
 def _handle_legacy(event, method):
     params = _query(event)
     body = event.get("body") or ""
@@ -532,22 +569,9 @@ def _handle_legacy(event, method):
     m_val = params.get("m")
 
     if action in {"auth", "save", "save_meta", "delete"}:
-        admin_password = os.environ.get("ROUTE_ADMIN_PASSWORD")
-        headers = event.get("headers") or {}
-        provided_password = next(
-            (
-                value
-                for key, value in headers.items()
-                if str(key).lower() == "x-route-admin-password"
-            ),
-            "",
-        )
-        if not admin_password:
-            return create_response(503, {"error": "admin_auth_not_configured"})
-        if not isinstance(provided_password, str) or not hmac.compare_digest(
-            provided_password, admin_password
-        ):
-            return create_response(403, {"error": "invalid_admin_password"})
+        error = _admin_auth_error(event)
+        if error:
+            return error
         if action == "auth":
             return create_response(200, {"status": "authenticated"}, is_public=True)
 
