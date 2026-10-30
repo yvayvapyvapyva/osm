@@ -736,13 +736,14 @@ input, textarea, select {
    Модалки редактора
    ============================================ */
 #settingsModal,
+#folderSettingsModal,
 #pointsOrderModal {
     position: fixed;
     top: calc(76px + env(safe-area-inset-top));
     bottom: calc(20px + env(safe-area-inset-bottom));
     left: 0;
     right: 0;
-    z-index: 10000;
+    z-index: 12000;
     display: none;
 }
 
@@ -835,6 +836,7 @@ input, textarea, select {
 }
 
 .category-header {
+    position: relative;
     display: flex;
     align-items: center;
     gap: 10px;
@@ -846,6 +848,21 @@ input, textarea, select {
     transition: all 0.2s;
     width: 100%;
     box-sizing: border-box;
+}
+
+.category-header .route-info-btn {
+    position: static;
+    top: auto;
+    right: auto;
+    width: 32px;
+    height: 32px;
+    flex: 0 0 32px;
+    font-size: 14px;
+    font-style: normal;
+}
+
+.category-header [data-folder-add] {
+    margin-left: auto;
 }
 
 .category-header.expanded {
