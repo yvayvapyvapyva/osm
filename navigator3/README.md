@@ -90,6 +90,7 @@ navigator3/
 │   ├── test_auth.py            # локальные проверки входа
 │   ├── test_catalog.py         # локальные проверки каталога и доступа
 │   ├── test_admin.py           # локальные проверки редактора
+│   ├── test_payments.py        # локальные проверки заказов и webhook
 │   └── build-static-deploy.js
 ├── gateway/osmn.yaml           # спецификация API Gateway
 ├── deploy.sh                   # деплой функции osmn3
@@ -328,6 +329,7 @@ yc storage s3 cp navigator3/deploy-2files/editor.html \
 python3 navigator3/scripts/test_auth.py
 python3 navigator3/scripts/test_catalog.py
 python3 navigator3/scripts/test_admin.py
+python3 navigator3/scripts/test_payments.py
 ```
 
 На шлюзе:
