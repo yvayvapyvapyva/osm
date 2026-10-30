@@ -45,6 +45,11 @@ def _now():
     return dt.datetime.now(dt.timezone.utc)
 
 
+def now():
+    """Текущее время UTC для записей в YDB."""
+    return _now()
+
+
 def _as_utc(value):
     if value is None:
         return None

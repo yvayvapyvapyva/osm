@@ -1,63 +1,69 @@
-# navigator3 — навигатор с идентификацией через Яндекс ID
+# navigator3 — навигатор с Яндекс ID и платными папками маршрутов
 
-Рабочая копия `navigator2` для постепенного внедрения аккаунтов. Основная
-версия в `navigator/` и работающая функция `osmn` не меняются: здесь своя
-функция `osmn3`, свой шлюз и свои таблицы в той же YDB `dbosm`.
+`navigator3/` — единственная версия навигатора в репозитории. Старые
+`navigator/`, `navigator2/`, `routes.json` и функция `osmn` удалены: новый
+клиент работает только через API Gateway и функцию `osmn3`.
 
-Сейчас сделаны идентификация, новый каталог и редактор маршрутов. Навигатор
-получает список маршрутов без геометрии из `/api/catalog`, а точки — из
-`/api/route` только для выбранного маршрута. Редактор открывается на
-`/editor.html` и ходит в свою функцию через `/api/admin`. Маршруты пока
-публичные, оплаты нет. Старый API `osmn` оставлен для обратной совместимости.
+Что уже есть:
 
-## Текущий тестовый контур
+- вход через Яндекс ID (OAuth + PKCE, сессия в YDB);
+- каталог без геометрии: `/api/catalog`, точки — только по запросу
+  `/api/route?m=...`;
+- дерево папок как отдельная сущность в БД;
+- платный доступ к папке: покупка открывает саму папку, все вложенные папки и
+  маршруты;
+- оплата через ЮKassa (`/api/orders`, webhook `/api/yookassa/notify`);
+- редактор маршрутов и папок на `/editor.html`.
+
+## Текущий контур
 
 | Что | Значение |
 |---|---|
-| Бакет | `osmn-nav` |
+| Бакет | `osmn-nav` (приватный) |
 | Домен | `https://d5dsd5u1tsc8fm9dbsg5.s183zexc.apigw.yandexcloud.net` |
 | API Gateway | `osmn3` / `d5dsd5u1tsc8fm9dbsg5` |
 | Функция | `osmn3` / `d4e8ds1489g0q91dt7do` |
 | Сервисный аккаунт шлюза | `osmn3-gateway` / `ajec0sf19r17r3tv6vrg` |
-| Таблицы YDB | `users`, `sessions` созданы в `dbosm` |
+| YDB | `dbosm`, таблицы `users`, `sessions`, `roads`, `folders`, `entitlements`, `orders` |
+| Lockbox | `osmn3-oauth` / `e6q97rh5hpfelika4qjl` |
 
-Redirect URI для приложения Яндекс OAuth:
+Redirect URI приложения Яндекс OAuth:
 
 ```
 https://d5dsd5u1tsc8fm9dbsg5.s183zexc.apigw.yandexcloud.net/auth/yandex/callback
 ```
 
-Статус: бакет, шлюз и функция работают, статика отдаётся, таблицы `users` и
-`sessions` созданы. Вход через Яндекс проверен в браузере. Каталог переведён
-на `/api/catalog` без геометрии; `/api/route` отдаёт точки одного маршрута.
-
 ## Схема
 
 ```
 https://<домен-шлюза>/
-  /                     → бакет osmn-nav: navigator.html
-  /assets/*             → бакет osmn-nav
-  /instr.html           → бакет osmn-nav
-  /api/me               → функция osmn3
-  /api/health           → функция osmn3
-  /api/catalog          → функция osmn3
-  /api/route?m=...      → функция osmn3
-  /auth/yandex/start    → функция osmn3
-  /auth/yandex/callback → функция osmn3
-  /auth/logout          → функция osmn3
+  /                       → бакет osmn-nav: navigator.html
+  /editor.html            → бакет osmn-nav: editor.html
+  /api/health             → функция osmn3
+  /api/me                 → функция osmn3
+  /api/catalog            → функция osmn3
+  /api/route?m=...        → функция osmn3
+  /api/orders             → функция osmn3
+  /api/yookassa/notify    → функция osmn3
+  /api/admin?action=...   → функция osmn3
+  /auth/yandex/start      → функция osmn3
+  /auth/yandex/callback   → функция osmn3
+  /auth/logout            → функция osmn3
 ```
 
-Один origin нужен, потому что при прямом вызове
-`functions.yandexcloud.net` Яндекс вырезает из запроса `Cookie` и
-`Authorization`. Через API Gateway cookie доходят до функции, а `sid`
-становится first-party cookie.
+Один origin обязателен: при прямом вызове `functions.yandexcloud.net`
+платформа вырезает `Cookie` и `Authorization`. Через API Gateway cookie
+доходят до функции, а `osm_sid` становится first-party cookie.
+
+Статика лежит в приватном бакете и отдаётся только через шлюз. Оба файла —
+самодостаточные бандлы: CSS, JS и инструкция уже внутри HTML.
 
 ## Состав
 
 ```
 navigator3/
 ├── navigator.html              # клиент (исходник)
-├── editor.html                 # редактор маршрутов (исходник)
+├── editor.html                 # редактор маршрутов и папок (исходник)
 ├── instr.html                  # инструкция навигатора
 ├── instr_editor.html           # инструкция редактора
 ├── assets/
@@ -65,121 +71,186 @@ navigator3/
 │   │   ├── navigator.css
 │   │   └── editor.css
 │   └── js/
-│       ├── menu-module.js      # /api/catalog и /api/route
+│       ├── menu-module.js      # дерево папок, /api/catalog, /api/route, покупка
 │       ├── auth-module.js      # вход, /api/me, выход
 │       ├── config.js           # палитра и названия категорий
 │       ├── report.js           # отчёт о маршруте в Telegram
 │       ├── map-styles.js
 │       └── tts-client.js
 ├── backend/
-│   ├── handler.py              # точка входа, старые action + /api, /auth
+│   ├── handler.py              # точка входа: /api, /auth, /api/admin
 │   ├── auth.py                 # OAuth, PKCE, cookie, ответы
 │   ├── store.py                # users/sessions в YDB
+│   ├── payments.py             # клиент ЮKassa
 │   └── requirements.txt
 ├── scripts/
 │   ├── init_auth_db.py         # создание users и sessions
-│   ├── init_db.py              # старый скрипт маршрутов (не обязателен)
+│   ├── init_folders.py         # folders, entitlements, orders + миграция roads
+│   ├── init_db.py              # первичный перенос маршрутов (архив)
 │   ├── test_auth.py            # локальные проверки входа
-│   ├── test_catalog.py         # локальные проверки каталога
+│   ├── test_catalog.py         # локальные проверки каталога и доступа
 │   ├── test_admin.py           # локальные проверки редактора
 │   └── build-static-deploy.js
 ├── gateway/osmn.yaml           # спецификация API Gateway
 ├── deploy.sh                   # деплой функции osmn3
 └── deploy-2files/
-    ├── navigator.html          # собранный одностраничный бандл
-    └── editor.html             # собранный бандл редактора
+    ├── navigator.html          # собранный бандл
+    └── editor.html             # собранный бандл
 ```
 
-## Как работает вход
+## Модель данных
 
-```
-Браузер                  osmn3                     Яндекс
-  |                        |                         |
-  |-- /auth/yandex/start ->|                         |
-  |<-- 302 + state cookie -|                         |
-  |----------------------->|------------------------>|
-  |                        |    пользователь входит  |
-  |<-----------------------|<------------------------|
-  |-- /auth/yandex/callback?code=...&state=... ---->|
-  |                        |-- POST /token --------->|
-  |                        |<-- access_token --------|
-  |                        |-- GET login/info ------>|
-  |                        |<-- id, login, email ----|
-  |                        | users + sessions в YDB  |
-  |<-- 302 + sid cookie ---|                         |
-  |-- /api/me ------------>|                         |
-  |<-- user / 401 ---------|                         |
-```
-
-Детали:
-
-- `state` и PKCE `code_verifier` лежат в HttpOnly-cookie с путём `/auth` и
-  живут 10 минут.
-- Код Яндекса одноразовый и живёт 10 минут.
-- В `sessions` хранится только SHA-256 от `sid`, не сам `sid`.
-- Cookie сессии: `osm_sid`, `HttpOnly`, `Secure`, `SameSite=Lax`, 30 дней.
-- Токен Яндекса не сохраняется: он нужен один раз для профиля.
-- `return` принимается только как локальный путь (`/...`), иначе `/`.
-
-## Таблицы
-
-Создаются `scripts/init_auth_db.py`:
+### `folders`
 
 ```sql
-CREATE TABLE users (
-    yandex_id     Utf8,
-    user_id       Utf8,
-    login         Utf8,
-    email         Utf8,
-    display_name  Utf8,
-    created_at    Timestamp,
-    last_login_at Timestamp,
-    blocked       Bool,
-    PRIMARY KEY (yandex_id)
-);
-
-CREATE TABLE sessions (
-    sid_hash     Utf8,
-    yandex_id    Utf8,
-    user_id      Utf8,
-    created_at   Timestamp,
-    expires_at   Timestamp,
-    last_seen_at Timestamp,
-    user_agent   Utf8,
-    ip           Utf8,
-    PRIMARY KEY (sid_hash)
+CREATE TABLE folders (
+    folder_id     Utf8,
+    parent_id     Utf8,        -- "" у корневой папки
+    name          Utf8,
+    access        Utf8,        -- public | paid
+    price_kopecks Uint64,
+    sku           Utf8,
+    sort_order    Uint32,
+    PRIMARY KEY (folder_id)
 );
 ```
 
-`yandex_id` — стабильный идентификатор из `login.yandex.ru/info`. Email может
-отсутствовать, поэтому он не ключ.
+Папка — стабильная сущность: у неё есть `folder_id`, который не меняется при
+переименовании. `parent_id` задаёт дерево. Цена хранится в копейках.
+
+### `roads`
+
+К существующим полям добавлены:
+
+```sql
+folder_id     Utf8,
+title         Utf8,        -- короткое имя внутри папки
+access        Utf8,        -- public | folder
+price_kopecks Uint64,      -- резерв, сейчас цена берётся у папки
+sku           Utf8
+```
+
+`roads.name` остаётся полным путём (`МЕЩЕРА/Экзамен/Экз. Мещера-1`) и
+пересчитывается сервером при сохранении метаданных. Новый код использует
+`folder_id` + `title`; полный путь нужен для совместимости с TTS и отчётами.
+
+`access = public` у маршрута означает «открыт всегда», даже внутри платной
+папки. `access = folder` (по умолчанию) наследует доступ папки.
+
+### `entitlements`
+
+```sql
+CREATE TABLE entitlements (
+    user_id     Utf8,
+    entitlement Utf8,        -- "folder:<folder_id>" или "all"
+    created_at  Timestamp,
+    source      Utf8,        -- yookassa | manual
+    order_id    Utf8,
+    PRIMARY KEY (user_id, entitlement)
+);
+```
+
+Право на родительскую папку открывает все вложенные папки и маршруты.
+`all` открывает весь каталог.
+
+### `orders`
+
+```sql
+CREATE TABLE orders (
+    order_id       Utf8,
+    user_id        Utf8,
+    folder_id      Utf8,
+    amount_kopecks Uint64,
+    status         Utf8,      -- pending | paid | canceled | failed
+    created_at     Timestamp,
+    updated_at     Timestamp,
+    payment_id     Utf8,
+    return_path    Utf8,
+    PRIMARY KEY (order_id)
+);
+```
+
+## Как считается доступ
+
+Только на сервере. Клиент не решает, можно ли открыть маршрут.
+
+1. Для папки строится цепочка от корня до неё.
+2. Если в цепочке нет платных папок — доступ публичный.
+3. Если платная папка есть, берётся первая (ближайшая к корню) платная папка:
+   её и нужно купить.
+4. `owned = true`, если у пользователя есть `all` или
+   `folder:<любая папка из цепочки>`.
+
+`/api/catalog` отдаёт для каждой папки и маршрута `access`, `owned`,
+`purchase_folder_id`, `price_kopecks`, `sku`. Геометрия в каталог не входит.
+
+`/api/route`:
+
+- 200 + `data`, если доступ есть;
+- 401 `unauthorized` + `purchase_folder_id`, если пользователь не вошёл;
+- 402 `payment_required` + `purchase_folder_id`, если вошёл, но не купил;
+- 404 для скрытого или несуществующего маршрута.
 
 ## API
 
 | Метод | Путь | Ответ |
 |---|---|---|
 | GET | `/api/health` | `{"status":"ok"}` |
-| GET | `/api/me` | `{"user":{...},"entitlements":[]}` или 401 |
-| GET | `/api/catalog` | `{"routes":[{"m","name","description","point_count","distance_meters","access"}]}` — без геометрии |
-| GET | `/api/route?m=<m>` | `{"m","name","description","access","point_count","distance_meters","data":[...]}` |
-| POST | `/api/admin?action=...` | операции редактора: `list`, `get`, `get_meta`, `auth`, `save`, `save_meta`, `delete` |
+| GET | `/api/me` | `{"user":{...},"entitlements":[...]}` или 401 |
+| GET | `/api/catalog` | `{"folders":[...],"routes":[...],"user":...}` без геометрии |
+| GET | `/api/route?m=<m>` | маршрут с `data`; 401/402 без доступа |
+| POST | `/api/orders` | `{"order_id","payment_id","confirmation_url"}` |
+| POST | `/api/yookassa/notify` | webhook ЮKassa |
+| POST | `/api/admin?action=...` | операции редактора |
 | GET | `/auth/yandex/start?return=/...` | 302 на Яндекс + state-cookie |
 | GET | `/auth/yandex/callback` | 302 обратно + sid-cookie |
 | POST | `/auth/logout` | 200 + удаление cookie |
 
-`/api/catalog` отдаёт только видимые маршруты и метрики, посчитанные на
-сервере. `/api/route` тоже проверяет `visible = true`: скрытые и удалённые
-маршруты наружу не попадают.
+### Редактор
 
-`/api/admin` — тот же legacy-обработчик функции, но доступный через шлюз:
-прямой вызов `functions.yandexcloud.net` платформа закрывает ответом 403.
-Все действия через этот путь требуют заголовок `X-Route-Admin-Password`,
-включая чтение: иначе `action=get` отдавал бы скрытые маршруты в обход
-`visible=true`. Пароль хранится только в Lockbox.
+Все действия `/api/admin` требуют заголовок `X-Route-Admin-Password`, включая
+чтение: иначе `action=list` отдавал бы скрытые маршруты в обход
+`visible = true`. Пароль хранится только в Lockbox.
 
-Старые вызовы `?action=list_routes`, `?action=get`, `?action=save` и т. д.
-работают как раньше, с CORS `*`. Именно поэтому старый `full=1` пока не
-отключён — его использует рабочая версия `navigator/`.
+| `action` | Назначение |
+|---|---|
+| `auth` | проверка пароля |
+| `list` | все маршруты и папки |
+| `get`, `get_meta` | геометрия и метаданные маршрута |
+| `save`, `save_meta`, `delete` | изменение маршрута |
+| `folder_save`, `folder_delete` | создание/изменение и удаление папки |
+| `grant`, `revoke` | выдать/забрать право вручную |
+| `entitlements` | права пользователя |
+| `users` | список пользователей |
+| `orders` | последние 200 заказов |
+
+`save_meta` принимает `{title, folder_id, description, visible, access}`.
+Полный `name` собирается на сервере. `folder_delete` не удаляет папку, если в
+ней есть вложенные папки или маршруты (409).
+
+## Оплата
+
+Поток:
+
+```
+браузер → POST /api/orders {folder_id, return}
+        → заказ pending в orders
+        → POST https://api.yookassa.ru/v3/payments
+        → 200 {confirmation_url}
+браузер → confirmation_url → оплата
+ЮKassa  → POST /api/yookassa/notify
+        → GET /v3/payments/<id> (проверка суммы и статуса)
+        → orders.status = paid
+        → entitlements UPSERT folder:<folder_id>
+браузер → return_path?payment=success → каталог перезагружается
+```
+
+Вебхук не доверяет телу запроса: сумма и статус перепроверяются запросом в
+ЮKassa. Повторный webhook идемпотентен: право выдаётся только при переходе
+заказа в `paid`.
+
+Если `YOOKASSA_SHOP_ID` и `YOOKASSA_SECRET_KEY` не заданы, `/api/orders`
+возвращает 503 `payments_not_configured`, а каталог продолжает работать.
 
 ## Переменные окружения функции
 
@@ -191,121 +262,63 @@ CREATE TABLE sessions (
 | `YANDEX_CLIENT_ID` | да | ClientID приложения OAuth |
 | `SESSION_TTL_DAYS` | нет | срок сессии, по умолчанию 30 |
 | `OAUTH_SCOPE` | нет | по умолчанию `login:info login:email` |
+| `YOOKASSA_SHOP_ID` | для оплаты | shopId ЮKassa |
 
-Секреты в переменные окружения не записываются. Они лежат в Lockbox и
-подключаются к функции как `--secret`:
+Секреты лежат в Lockbox и подключаются к функции как `--secret`:
 
 | Ключ Lockbox | Переменная функции |
 |---|---|
 | `YANDEX_CLIENT_SECRET` | `YANDEX_CLIENT_SECRET` |
 | `ROUTE_ADMIN_PASSWORD` | `ROUTE_ADMIN_PASSWORD` |
+| `YOOKASSA_SECRET_KEY` | `YOOKASSA_SECRET_KEY` (только если задан `YOOKASSA_SHOP_ID`) |
 
-`deploy.sh` требует `LOCKBOX_SECRET_ID` и передаёт оба ключа. Значения не
-попадают в вывод `yc`, в историю команд и в репозиторий:
-
-```bash
-LOCKBOX_SECRET_ID=<id> \
-PUBLIC_BASE_URL=https://<домен> \
-YANDEX_CLIENT_ID=<client-id> \
-./deploy.sh
-```
+`deploy.sh` не передаёт секреты через environment и не печатает их. Пустые
+переменные окружения платформа не принимает, поэтому `YOOKASSA_SHOP_ID`
+добавляется только когда оплата настроена.
 
 ## Порядок запуска
 
-### 1. Бакет и шлюз
+### 1. Таблицы
 
 ```bash
-yc storage bucket create --name osmn-nav
+python3 navigator3/scripts/init_auth_db.py   # users, sessions
+python3 navigator3/scripts/init_folders.py   # folders, entitlements, orders, поля roads
 ```
 
-Создайте сервисный аккаунт шлюза и выдайте роли:
+Оба скрипта идемпотентны. `init_folders.py` один раз раскладывает старые
+`roads.name` вида `МЕЩЕРА/Экзамен/Маршрут` в дерево папок и заполняет
+`folder_id`, `title`, `access`. Уже заполненные значения не перезаписываются.
+
+### 2. Lockbox
 
 ```bash
-yc iam service-account create --name osmn3-gateway
-```
-
-Нужны:
-
-- `storage.viewer` на папку (или на бакет, если доступно);
-- `functions.functionInvoker` на функцию `osmn3`.
-
-Заполните `gateway/osmn.yaml`: `<SERVICE_ACCOUNT_ID>`, `<FUNCTION_ID>`.
-Создайте шлюз:
-
-```bash
-yc serverless api-gateway create --name osmn3 --spec gateway/osmn.yaml
-yc serverless api-gateway get --name osmn3
-```
-
-В поле `domain` будет служебный адрес вида
-`https://d5d....apigw.yandexcloud.net`. Он бесплатный. Если удалить шлюз и
-создать заново, домен изменится.
-
-### 2. Приложение Яндекс OAuth
-
-На `https://oauth.yandex.ru/` создайте приложение:
-
-- тип «Для авторизации пользователей»;
-- платформа «Веб-сервисы»;
-- Redirect URI: `https://<домен-шлюза>/auth/yandex/callback`;
-- права: `login:info`, `login:email`.
-
-Получите `ClientID` и `Client secret`. Секрет положите в Lockbox вместе с
-паролем редактора:
-
-```bash
-printf '%s' '[{"key":"YANDEX_CLIENT_SECRET","text_value":"<secret>"},{"key":"ROUTE_ADMIN_PASSWORD","text_value":"<пароль>"}]' \
-  | yc lockbox secret create --name osmn3-oauth --payload -
+printf '%s' '[
+  {"key":"YANDEX_CLIENT_SECRET","text_value":"<secret>"},
+  {"key":"ROUTE_ADMIN_PASSWORD","text_value":"<пароль>"},
+  {"key":"YOOKASSA_SECRET_KEY","text_value":"<secret-key>"}
+]' | yc lockbox secret create --name osmn3-oauth --payload -
 ```
 
 Сервисному аккаунту функции нужна роль `lockbox.payloadViewer` на секрет.
 
-### 3. Таблицы
-
-```bash
-python3 navigator3/scripts/init_auth_db.py
-```
-
-Скрипт идемпотентен, существующие таблицы не трогает.
-
-### 4. Функция
-
-Можно заполнить `navigator3/.env` (он в `.gitignore`) и запустить:
+### 3. Функция
 
 ```bash
 cp navigator3/.env.example navigator3/.env
-# отредактировать navigator3/.env
+# заполнить PUBLIC_BASE_URL, YANDEX_CLIENT_ID, LOCKBOX_SECRET_ID
+# при необходимости YOOKASSA_SHOP_ID
 ./navigator3/deploy.sh
 ```
 
-Или передать переменные вручную:
-
-```bash
-PUBLIC_BASE_URL=https://<домен-шлюза> \
-YANDEX_CLIENT_ID=<client-id> \
-LOCKBOX_SECRET_ID=<id> \
-./navigator3/deploy.sh
-```
-
-По умолчанию создаётся функция `osmn3`. Старая `osmn` не меняется.
-
-### 5. Статика
+### 4. Статика
 
 ```bash
 node navigator3/scripts/build-static-deploy.js
-yc storage s3api put-object \
-  --bucket osmn-nav \
-  --key navigator.html \
-  --body navigator3/deploy-2files/navigator.html
-yc storage s3api put-object \
-  --bucket osmn-nav \
-  --key editor.html \
-  --body navigator3/deploy-2files/editor.html
+yc storage s3 cp navigator3/deploy-2files/navigator.html \
+  s3://osmn-nav/navigator.html --content-type text/html --cache-control no-cache
+yc storage s3 cp navigator3/deploy-2files/editor.html \
+  s3://osmn-nav/editor.html --content-type text/html --cache-control no-cache
 ```
-
-Оба бандла самодостаточны: CSS, скрипты и инструкция уже внутри HTML.
-
-`routes.json` в бакет не загружайте: в нём лежит геометрия всех маршрутов.
 
 ## Проверка
 
@@ -326,51 +339,30 @@ curl -i https://<домен>/api/catalog
 curl -i 'https://<домен>/api/route?m=<m>'
 curl -i -X POST 'https://<домен>/api/admin?action=list' \
   -H 'X-Route-Admin-Password: <пароль>'
-curl -i -X POST 'https://<домен>/api/admin?action=auth' \
-  -H 'X-Route-Admin-Password: <пароль>'
-curl -i https://<домен>/auth/yandex/start
 ```
 
 Ожидается:
 
-- `/api/health` — 200;
-- `/api/me` без cookie — 401;
-- `/api/catalog` — 200, в ответе нет поля `data`;
-- `/api/route?m=<m>` — 200, есть `data`; для скрытого `m` — 404;
-- `/api/admin?action=list` — 200 со списком всех маршрутов; без пароля — 403;
-- `/api/admin?action=auth` с верным паролем — 200, с неверным — 403;
-- `/auth/yandex/start` — 302 на `oauth.yandex.ru` и три `Set-Cookie`.
+- `/api/catalog` — 200, в ответе есть `folders`, у маршрутов нет `data`;
+- `/api/route?m=<m>` — 200 с `data` для бесплатной папки;
+- для платной папки без входа — 401, после входа без покупки — 402;
+- `/api/admin` без пароля — 403, с верным — 200;
+- `/api/orders` без входа — 401, без настроенной ЮKassa — 503.
 
 В браузере:
 
 1. Открыть `https://<домен>/`.
-2. «Настройки» → «Войти с Яндексом».
-3. Разрешить доступ.
-4. Вернуться в навигатор, снова открыть настройки — видны имя и email.
-5. Перезагрузить страницу — вход сохраняется.
-6. «Выйти» — `/api/me` снова 401.
-7. В DevTools проверить, что `osm_sid` имеет `HttpOnly`, `Secure`,
-   `SameSite=Lax`, а в `localStorage` токенов нет.
-8. Открыть `https://<домен>/editor.html`, ввести пароль редактора.
-9. Проверить список маршрутов, открыть маршрут, сохранить изменения.
+2. Войти через Яндекс в «Настройках».
+3. Открыть платную папку — появится замок и цена.
+4. Нажать покупку, оплатить, вернуться — папка должна открыться.
+5. Открыть `/editor.html`, ввести пароль редактора.
+6. Создать папку, задать цену, перетащить в неё маршрут.
 
-## Что пока не сделано
+## Ограничения
 
-- Старый API `osmn` всё ещё умеет `full=1`: его использует рабочая версия
-  `navigator/`. Отключать надо после перевода всех клиентов.
-- Нет платных маршрутов, `entitlements`, ЮKassa.
-- Нет ограничения числа активных сессий и rate limit.
-- Вход доступен в «Настройках»; отдельную кнопку в верхней панели добавим
-  после проверки на мобильных.
-- В редакторе пока нет ссылки из навигатора: `/editor.html` открывается по
-  прямому адресу. Ссылка или жест появятся после проверки.
-- `navigator/` и функция `osmn` не изменялись.
-
-## Следующий шаг
-
-1. Добавить в `roads` поля `access`, `price_kopecks`, `sku`.
-2. Отдавать в `/api/catalog` признак доступа, а в `/api/route` — 402/403 для
-   маршрута без entitlement.
-3. Добавить `entitlements` и оплату через ЮKassa.
-4. После перевода старого навигатора отключить `full=1` и убрать
-   `routes.json` из публичного доступа.
+- Нет rate limit и ограничения числа активных сессий.
+- Нет возвратов и повторной выдачи прав после отмены платежа.
+- `roads.price_kopecks` и `roads.sku` оставлены как резерв; цена сейчас
+  задаётся у папки.
+- `init_db.py` — архивный скрипт первичного переноса; для текущей схемы
+  используйте `init_folders.py`.

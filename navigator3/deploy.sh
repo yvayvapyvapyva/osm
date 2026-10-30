@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Деплой версии navigator3 с идентификацией через Яндекс OAuth.
 #
-# По умолчанию создаёт отдельную функцию osmn3, чтобы не менять работающую
-# функцию osmn. После проверки можно переключить шлюз на неё или обновить osmn.
+# Создаёт или обновляет функцию osmn3, которую использует шлюз osmn3.
+# Другие функции в проекте не меняются.
 #
 # Обязательные переменные:
 #   PUBLIC_BASE_URL       — https://<домен-шлюза>
@@ -14,9 +14,12 @@
 #   FUNCTION_NAME         — по умолчанию osmn3
 #   FUNCTION_ID           — если функция уже создана
 #   SERVICE_ACCOUNT_ID    — по умолчанию servaccsunt
+#   YOOKASSA_SHOP_ID      — shopId ЮKassa; если задан, подключится секрет
+#                           YOOKASSA_SECRET_KEY из Lockbox
 #
-# Пароль редактора и client secret не передаются через environment: только
-# через Lockbox, чтобы значения не попадали в вывод `yc` и в историю команд.
+# Пароль редактора, client secret и секрет ЮKassa не передаются через
+# environment: только через Lockbox, чтобы значения не попадали в вывод `yc`
+# и в историю команд.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -38,6 +41,7 @@ PUBLIC_BASE_URL="${PUBLIC_BASE_URL:-}"
 YANDEX_CLIENT_ID="${YANDEX_CLIENT_ID:-}"
 LOCKBOX_SECRET_ID="${LOCKBOX_SECRET_ID:-}"
 SESSION_TTL_DAYS="${SESSION_TTL_DAYS:-30}"
+YOOKASSA_SHOP_ID="${YOOKASSA_SHOP_ID:-}"
 
 cd "${SCRIPT_DIR}"
 
@@ -73,10 +77,22 @@ echo "Публичный адрес: ${PUBLIC_BASE_URL}"
 
 ENVIRONMENT="YDB_ENDPOINT=${ENDPOINT},YDB_DATABASE=${DATABASE},PUBLIC_BASE_URL=${PUBLIC_BASE_URL},YANDEX_CLIENT_ID=${YANDEX_CLIENT_ID},SESSION_TTL_DAYS=${SESSION_TTL_DAYS}"
 
+# Пустое значение переменной окружения платформа не принимает: добавляем
+# YOOKASSA_SHOP_ID только когда оплата действительно настроена.
+if [[ -n "${YOOKASSA_SHOP_ID}" ]]; then
+  ENVIRONMENT="${ENVIRONMENT},YOOKASSA_SHOP_ID=${YOOKASSA_SHOP_ID}"
+fi
+
 SECRET_ARGS=(
   --secret "id=${LOCKBOX_SECRET_ID},key=YANDEX_CLIENT_SECRET,environment-variable=YANDEX_CLIENT_SECRET"
   --secret "id=${LOCKBOX_SECRET_ID},key=ROUTE_ADMIN_PASSWORD,environment-variable=ROUTE_ADMIN_PASSWORD"
 )
+
+if [[ -n "${YOOKASSA_SHOP_ID}" ]]; then
+  SECRET_ARGS+=(
+    --secret "id=${LOCKBOX_SECRET_ID},key=YOOKASSA_SECRET_KEY,environment-variable=YOOKASSA_SECRET_KEY"
+  )
+fi
 
 yc serverless function version create \
   --function-id "${FUNCTION_ID}" \

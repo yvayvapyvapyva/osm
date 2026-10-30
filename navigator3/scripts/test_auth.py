@@ -126,13 +126,15 @@ class AuthEndpointTests(unittest.TestCase):
         self.assertEqual(response["statusCode"], 404)
         self.assertEqual(json.loads(response["body"])["error"], "not_found")
 
-    def test_legacy_options_keeps_cors(self):
-        response = handler.handler(
-            event("/", method="OPTIONS"),
-            None,
-        )
-        self.assertEqual(response["statusCode"], 200)
-        self.assertEqual(response["headers"]["Access-Control-Allow-Origin"], "*")
+    def test_options_api_is_empty_and_no_cors(self):
+        response = handler.handler(event("/api/catalog", method="OPTIONS"), None)
+        self.assertEqual(response["statusCode"], 204)
+        self.assertEqual(response["body"], "")
+        self.assertNotIn("Access-Control-Allow-Origin", response["headers"])
+
+    def test_options_outside_api_is_not_found(self):
+        response = handler.handler(event("/", method="OPTIONS"), None)
+        self.assertEqual(response["statusCode"], 404)
 
 
 if __name__ == "__main__":

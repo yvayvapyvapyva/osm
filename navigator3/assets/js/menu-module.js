@@ -7,10 +7,14 @@ const MenuModule = {
     _routesLoaded: false,   // список с геометрией уже получен
     _isFetchingRoutes: false,
     _catalog: [],           // плоский список маршрутов с путём
-    _folderPath: [],
+    _folders: [],           // папки из /api/catalog
+    _folderMap: new Map(),  // folder_id -> папка
+    _folderCounts: new Map(),
+    _folderPath: [],        // folder_id от корня до текущей папки
     _searchQuery: '',
     _searchScope: 'all',
-    _MENU_STATE_KEY: 'osm_routes_menu_state_v1',
+    _MENU_STATE_KEY: 'osm_routes_menu_state_v2',
+    _pendingPurchaseFolderId: null,
     _previewObserver: null,
     _previewImages: new Map(),
     _previewJobs: new Map(),
@@ -65,6 +69,7 @@ const MenuModule = {
         this._loadMenuState();
         this.createModal();
         this.hide();
+        this._handlePaymentReturn();
 
         // Загружаем список маршрутов динамически
         await this._loadRoutesList();
@@ -126,7 +131,11 @@ const MenuModule = {
     },
 
     /**
-     * Запрос к новому API за каталогом без геометрии.
+     * Запрос к API за каталогом без геометрии.
+     *
+     * Сервер отдаёт дерево папок отдельно от маршрутов. Доступ считается
+     * только на сервере: route.access = public|paid, route.owned — можно ли
+     * открывать сейчас, route.purchase_folder_id — какую папку покупать.
      */
     async _fetchFromAPI() {
         const response = await fetch(this.API_CATALOG_URL, {
@@ -145,6 +154,11 @@ const MenuModule = {
             throw new Error('Некорректный ответ каталога');
         }
 
+        this._folders = Array.isArray(payload.folders) ? payload.folders : [];
+        this._folderMap = new Map(
+            this._folders.map(folder => [folder.folder_id, folder])
+        );
+
         const routesFlat = {};
 
         for (const route of data) {
@@ -152,9 +166,15 @@ const MenuModule = {
             if (!key) continue;
             routesFlat[key] = {
                 m: route.m,
-                name: route.name || route.m,
+                name: route.name || route.title || route.m,
+                title: route.title || route.name || route.m,
+                folder_id: route.folder_id || '',
                 description: typeof route.description === 'string' ? route.description.trim() : '',
                 access: route.access || 'public',
+                owned: route.owned !== false,
+                purchase_folder_id: route.purchase_folder_id || '',
+                price_kopecks: Number.isFinite(route.price_kopecks) ? route.price_kopecks : 0,
+                sku: route.sku || '',
                 point_count: Number.isFinite(route.point_count) ? route.point_count : null,
                 distance_meters: Number.isFinite(route.distance_meters) ? route.distance_meters : null
             };
@@ -193,6 +213,9 @@ const MenuModule = {
                     (payload && payload.error) || `HTTP ${response.status}`
                 );
                 error.status = response.status;
+                error.purchaseFolderId = (payload && payload.purchase_folder_id) || '';
+                const folder = this._folderMap.get(error.purchaseFolderId);
+                error.folderName = folder ? folder.name : '';
                 throw error;
             }
             if (!payload || !Array.isArray(payload.data)) {
@@ -212,48 +235,90 @@ const MenuModule = {
     },
 
     /**
-     * Плоский каталог вместо дерева. Путь по-прежнему строится по "/",
-     * но хранится как категория + подкатегория для чипов и поиска.
+     * Плоский каталог маршрутов с деревом папок.
+     *
+     * folderPath хранит folder_id, а не названия: папку можно переименовать,
+     * не ломая сохранённое состояние меню.
      */
     _buildCatalog() {
         const catalog = [];
+        this._folderCounts = new Map();
 
         for (const [key, route] of Object.entries(this.routesDescriptions)) {
-            const fullPath = (route.name || key).trim() || key;
-            const parts = fullPath.split('/').map(s => s.trim()).filter(Boolean);
-            const leafName = parts.length ? parts.pop() : fullPath;
-            const folders = parts;
-            const top = folders[0] || 'Без категории';
-            const sub = folders.length > 1 ? folders.slice(1).join(' / ') : null;
+            const chain = this._folderChain(route.folder_id);
+            const folders = chain.map(folder => folder.folder_id);
+            const folderNames = chain.map(folder => folder.name);
+            const title = (route.title || route.name || key).trim() || key;
+            const fullPath = [...folderNames, title].join(' / ');
+            const top = folderNames[0] || 'Без категории';
+            const sub = folderNames.length > 1 ? folderNames.slice(1).join(' / ') : null;
 
             catalog.push({
                 key,
                 m: route.m || key,
-                name: leafName,
+                name: title,
+                title,
                 fullPath,
                 top,
                 sub,
                 folders,
+                folderNames,
                 description: typeof route.description === 'string' ? route.description.trim() : '',
                 access: route.access || 'public',
+                owned: route.owned !== false,
+                purchaseFolderId: route.purchase_folder_id || '',
+                priceKopecks: Number.isFinite(route.price_kopecks) ? route.price_kopecks : 0,
+                sku: route.sku || '',
                 ...this._routeStats(route),
                 search: this._normalizeSearch(
                     `${fullPath} ${typeof route.description === 'string' ? route.description : ''}`
                 )
             });
+
+            for (const folderId of folders) {
+                this._folderCounts.set(
+                    folderId,
+                    (this._folderCounts.get(folderId) || 0) + 1
+                );
+            }
         }
 
         catalog.sort((a, b) => a.fullPath.localeCompare(b.fullPath, 'ru'));
         this._catalog = catalog;
 
         let validPath = [];
-        for (const folder of this._folderPath) {
-            const children = this._getChildFolders(validPath);
-            if (!children.some(child => child.name === folder)) break;
-            validPath.push(folder);
+        let parentId = '';
+        for (const folderId of this._folderPath) {
+            const folder = this._folderMap.get(folderId);
+            if (!folder || (folder.parent_id || '') !== parentId) break;
+            validPath.push(folderId);
+            parentId = folderId;
         }
         this._folderPath = validPath;
         this._saveMenuState();
+    },
+
+    _folderChain(folderId) {
+        const chain = [];
+        const seen = new Set();
+        let current = folderId || '';
+        while (current && this._folderMap.has(current) && !seen.has(current)) {
+            seen.add(current);
+            const folder = this._folderMap.get(current);
+            chain.push(folder);
+            current = folder.parent_id || '';
+        }
+        return chain.reverse();
+    },
+
+    _formatPrice(kopecks) {
+        const value = Number(kopecks) || 0;
+        if (value <= 0) return 'Платный доступ';
+        const rubles = value / 100;
+        const formatted = rubles.toLocaleString('ru-RU', {
+            maximumFractionDigits: Number.isInteger(rubles) ? 0 : 2
+        });
+        return `${formatted} ₽`;
     },
 
     _routeStats(route) {
@@ -336,25 +401,25 @@ const MenuModule = {
         } catch (e) {}
     },
 
-    _getChildFolders(parentPath) {
-        const folders = new Map();
-        for (const item of this._catalog) {
-            if (item.folders.length <= parentPath.length ||
-                !parentPath.every((folder, index) => item.folders[index] === folder)) continue;
-            const name = item.folders[parentPath.length];
-            folders.set(name, (folders.get(name) || 0) + 1);
-        }
-        return Array.from(folders, ([name, count]) => ({ name, count }))
+    _getChildFolders(parentId) {
+        const parent = parentId || '';
+        return this._folders
+            .filter(folder => (folder.parent_id || '') === parent)
+            .map(folder => ({
+                ...folder,
+                count: this._folderCounts.get(folder.folder_id) || 0
+            }))
             .sort((a, b) => {
-                if (a.name === 'Без категории') return 1;
-                if (b.name === 'Без категории') return -1;
+                const ao = Number.isFinite(a.sort_order) ? a.sort_order : 0;
+                const bo = Number.isFinite(b.sort_order) ? b.sort_order : 0;
+                if (ao !== bo) return ao - bo;
                 return a.name.localeCompare(b.name, 'ru');
             });
     },
 
     _isWithinFolder(item, path) {
         return item.folders.length >= path.length &&
-            path.every((folder, index) => item.folders[index] === folder);
+            path.every((folderId, index) => item.folders[index] === folderId);
     },
 
     _normalizeSearch(value) {
@@ -422,13 +487,13 @@ const MenuModule = {
 
         container.innerHTML = '';
 
-        if (!this._catalog.length) {
+        if (!this._catalog.length && !this._folders.length) {
             container.innerHTML = '<div class="routes-empty"><div class="routes-empty-title">Нет маршрутов</div></div>';
             return;
         }
 
         const childFolders = !this._searchQuery
-            ? this._getChildFolders(this._folderPath)
+            ? this._getChildFolders(this._folderPath[this._folderPath.length - 1] || '')
             : [];
         if (!routes.length && !childFolders.length) {
             const empty = document.createElement('div');
@@ -447,7 +512,7 @@ const MenuModule = {
             : `${routes.length} ${this._pluralize(routes.length, 'маршрут', 'маршрута', 'маршрутов')}`;
         const searchContext = this._searchQuery
             ? this._searchScope === 'category' && this._folderPath.length
-                ? `в папке «${this._folderPath.join(' / ')}»`
+                ? `в папке «${this._folderPath.map(id => this._folderMap.get(id)?.name).filter(Boolean).join(' / ')}»`
                 : 'во всех маршрутах'
             : '';
         summary.textContent = this._searchQuery
@@ -460,21 +525,26 @@ const MenuModule = {
             const folderList = document.createElement('div');
             folderList.className = 'routes-folder-list';
             for (const folder of childFolders) {
+                const locked = folder.access === 'paid' && !folder.owned;
                 const button = document.createElement('button');
                 button.type = 'button';
-                button.className = 'routes-folder-row';
-                button.dataset.folder = folder.name;
+                button.className = 'routes-folder-row' + (locked ? ' is-locked' : '');
+                button.dataset.folderId = folder.folder_id;
+                button.dataset.folderName = folder.name;
+                button.dataset.folderAccess = folder.access || 'public';
+                button.dataset.folderOwned = folder.owned ? '1' : '0';
+                button.dataset.purchaseFolderId = folder.purchase_folder_id || '';
+                const icon = locked
+                    ? `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="10" width="14" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>`
+                    : `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6.5A1.5 1.5 0 0 1 4.5 5h5l2 2h8A1.5 1.5 0 0 1 21 8.5v9a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 17.5z"/></svg>`;
                 button.innerHTML = `
-                    <span class="routes-folder-icon" aria-hidden="true">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M3 6.5A1.5 1.5 0 0 1 4.5 5h5l2 2h8A1.5 1.5 0 0 1 21 8.5v9a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 17.5z"/>
-                        </svg>
-                    </span>
+                    <span class="routes-folder-icon${locked ? ' is-locked' : ''}" aria-hidden="true">${icon}</span>
                     <span class="routes-folder-name">${this._escape(folder.name)}</span>
                     <span class="routes-folder-count" aria-label="${folder.count} ${this._pluralize(folder.count, 'маршрут', 'маршрута', 'маршрутов')}">
                         ${folder.count} ${this._pluralize(folder.count, 'маршрут', 'маршрута', 'маршрутов')}
                     </span>
-                    <span class="routes-folder-chevron" aria-hidden="true">›</span>
+                    ${locked ? `<span class="routes-folder-price">${this._escape(this._formatPrice(folder.price_kopecks))}</span>` : ''}
+                    <span class="routes-folder-chevron" aria-hidden="true">${locked ? '🔒' : '›'}</span>
                 `;
                 folderList.appendChild(button);
             }
@@ -504,7 +574,13 @@ const MenuModule = {
         const el = document.getElementById('routesBreadcrumb');
         if (!el) return;
         el.innerHTML = '';
-        const labels = ['Все маршруты', ...this._folderPath];
+        const labels = [
+            { id: '', name: 'Все маршруты' },
+            ...this._folderPath.map(id => ({
+                id,
+                name: this._folderMap.get(id)?.name || id
+            }))
+        ];
         el.hidden = false;
 
         labels.forEach((label, index) => {
@@ -519,7 +595,7 @@ const MenuModule = {
             item.type = 'button';
             const isCurrent = index === labels.length - 1;
             item.className = 'routes-breadcrumb-item' + (isCurrent ? ' current' : '');
-            item.textContent = label;
+            item.textContent = label.name;
             item.dataset.breadcrumbIndex = String(index);
             if (isCurrent) item.setAttribute('aria-current', 'location');
             el.appendChild(item);
@@ -547,16 +623,17 @@ const MenuModule = {
         button.setAttribute(
             'aria-label',
             this._searchScope === 'category'
-                ? `Искать в этой папке и её подпапках: ${this._folderPath.join(' / ')}`
+                ? `Искать в этой папке и её подпапках: ${this._folderPath.map(id => this._folderMap.get(id)?.name).filter(Boolean).join(' / ')}`
                 : 'Искать во всех маршрутах'
         );
     },
 
     _createRouteRow(route) {
         const isActive = route.key === this.currentRoute;
+        const locked = route.access === 'paid' && !route.owned;
         const btn = document.createElement('button');
         btn.type = 'button';
-        btn.className = 'route-row' + (isActive ? ' is-active' : '');
+        btn.className = 'route-row' + (isActive ? ' is-active' : '') + (locked ? ' is-locked' : '');
         btn.dataset.routeKey = route.key;
         if (isActive) btn.setAttribute('aria-current', 'true');
 
@@ -585,25 +662,29 @@ const MenuModule = {
 
         const meta = document.createElement('span');
         meta.className = 'route-row-meta';
-        meta.textContent = route.folders.length ? route.folders.join(' · ') : 'Без категории';
+        meta.textContent = route.folderNames.length ? route.folderNames.join(' · ') : 'Без папки';
 
         main.appendChild(title);
         const details = document.createElement('span');
         details.className = 'route-row-details';
         details.appendChild(meta);
         const stats = [];
-        if (route.pointCount) {
-            stats.push(`${route.pointCount} ${this._pluralize(route.pointCount, 'точка', 'точки', 'точек')}`);
-        }
-        if (route.distanceMeters >= 10) {
-            const distanceLabel = route.distanceMeters >= 1000
-                ? `${(route.distanceMeters / 1000).toLocaleString('ru-RU', { maximumFractionDigits: 1 })} км`
-                : `${Math.round(route.distanceMeters)} м`;
-            stats.push(`≈ ${distanceLabel}`);
+        if (locked) {
+            stats.push(this._formatPrice(route.priceKopecks));
+        } else {
+            if (route.pointCount) {
+                stats.push(`${route.pointCount} ${this._pluralize(route.pointCount, 'точка', 'точки', 'точек')}`);
+            }
+            if (route.distanceMeters >= 10) {
+                const distanceLabel = route.distanceMeters >= 1000
+                    ? `${(route.distanceMeters / 1000).toLocaleString('ru-RU', { maximumFractionDigits: 1 })} км`
+                    : `${Math.round(route.distanceMeters)} м`;
+                stats.push(`≈ ${distanceLabel}`);
+            }
         }
         if (stats.length) {
             const statsEl = document.createElement('span');
-            statsEl.className = 'route-row-stats';
+            statsEl.className = 'route-row-stats' + (locked ? ' is-price' : '');
             statsEl.textContent = stats.join(' · ');
             details.appendChild(statsEl);
         }
@@ -612,13 +693,19 @@ const MenuModule = {
         const tail = document.createElement('span');
         tail.className = 'route-row-tail';
         tail.setAttribute('aria-hidden', 'true');
-        tail.innerHTML = isActive
-            ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>'
-            : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg>';
+        tail.innerHTML = locked
+            ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="10" width="14" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>'
+            : isActive
+                ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>'
+                : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg>';
 
         btn.append(preview, main, tail);
         btn.addEventListener('click', event => {
             event.stopPropagation();
+            if (locked) {
+                this._openPurchase(route.purchaseFolderId, route.title);
+                return;
+            }
             if (route.m) this.loadRouteByName(route.m);
         });
         return btn;
@@ -981,6 +1068,24 @@ const MenuModule = {
                     </div>
                 </div>
             </div>
+            <div id="purchaseModal" class="screen-modal hidden">
+                <div class="screen-panel purchase-panel">
+                    <header class="screen-head">
+                        <h1 class="screen-title" id="purchaseTitle">Доступ к папке</h1>
+                        <button type="button" class="screen-close" id="purchaseClose" aria-label="Закрыть">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+                        </button>
+                    </header>
+                    <div class="purchase-body">
+                        <div class="purchase-icon" aria-hidden="true">🔒</div>
+                        <div class="purchase-name" id="purchaseName"></div>
+                        <div class="purchase-price" id="purchasePrice"></div>
+                        <p class="purchase-hint" id="purchaseHint">После оплаты откроются эта папка и все вложенные маршруты.</p>
+                        <button type="button" class="purchase-buy" id="purchaseBuy">Купить доступ</button>
+                        <button type="button" class="purchase-login" id="purchaseLogin" hidden>Войти с Яндексом</button>
+                    </div>
+                </div>
+            </div>
             <div id="loadingSpinner">
                 <div class="spinner-box">
                     <div class="spinner-ring"></div>
@@ -998,6 +1103,15 @@ const MenuModule = {
 
         const closeBtn = document.getElementById('jsonModalClose');
         if (closeBtn) closeBtn.addEventListener('click', () => this.hide());
+
+        const purchaseClose = document.getElementById('purchaseClose');
+        if (purchaseClose) purchaseClose.addEventListener('click', () => this._closePurchase());
+
+        const purchaseBuy = document.getElementById('purchaseBuy');
+        if (purchaseBuy) purchaseBuy.addEventListener('click', () => this._buyFolder());
+
+        const purchaseLogin = document.getElementById('purchaseLogin');
+        if (purchaseLogin) purchaseLogin.addEventListener('click', () => this._loginForPurchase());
 
         const searchInput = document.getElementById('routesSearchInput');
         if (searchInput) {
@@ -1049,14 +1163,135 @@ const MenuModule = {
         const routesList = document.getElementById('routesListContainer');
         if (routesList) {
             routesList.addEventListener('click', event => {
-                const folder = event.target.closest('[data-folder]');
+                const folder = event.target.closest('[data-folder-id]');
                 if (!folder || !routesList.contains(folder)) return;
-                this._folderPath = [...this._folderPath, folder.dataset.folder];
+                if (folder.dataset.folderAccess === 'paid' && folder.dataset.folderOwned !== '1') {
+                    this._openPurchase(
+                        folder.dataset.purchaseFolderId || folder.dataset.folderId,
+                        folder.dataset.folderName || ''
+                    );
+                    return;
+                }
+                this._folderPath = [...this._folderPath, folder.dataset.folderId];
                 this._searchScope = 'all';
                 this._saveMenuState();
                 this._buildRoutesList();
             });
         }
+    },
+
+    _openPurchase(folderId, folderName) {
+        if (!folderId) return;
+        this._pendingPurchaseFolderId = folderId;
+        const folder = this._folderMap.get(folderId) || {};
+        const loggedIn = !!(window.AuthModule && AuthModule.user);
+        const title = $('purchaseTitle');
+        const name = $('purchaseName');
+        const price = $('purchasePrice');
+        const hint = $('purchaseHint');
+        const buy = $('purchaseBuy');
+        const login = $('purchaseLogin');
+        if (title) title.textContent = 'Доступ к папке';
+        if (name) name.textContent = folderName || folder.name || 'Платная папка';
+        if (price) price.textContent = this._formatPrice(folder.price_kopecks);
+        if (hint) {
+            hint.textContent = loggedIn
+                ? 'После оплаты откроются эта папка и все вложенные маршруты.'
+                : 'Войдите с Яндексом, чтобы оплатить доступ. После оплаты папка откроется на этом аккаунте.';
+        }
+        if (buy) buy.hidden = !loggedIn;
+        if (login) login.hidden = loggedIn;
+        const modal = $('purchaseModal');
+        if (modal) modal.classList.remove('hidden');
+    },
+
+    _closePurchase() {
+        const modal = $('purchaseModal');
+        if (modal) modal.classList.add('hidden');
+        this._pendingPurchaseFolderId = null;
+    },
+
+    _loginForPurchase() {
+        if (window.AuthModule && typeof AuthModule.login === 'function') {
+            AuthModule.login();
+            return;
+        }
+        const returnTo =
+            window.location.pathname +
+            window.location.search +
+            window.location.hash;
+        window.location.href =
+            '/auth/yandex/start?return=' + encodeURIComponent(returnTo);
+    },
+
+    async _buyFolder() {
+        const folderId = this._pendingPurchaseFolderId;
+        if (!folderId) return;
+        const button = $('purchaseBuy');
+        if (button) {
+            button.disabled = true;
+            button.textContent = 'Создаём заказ…';
+        }
+        try {
+            const returnTo =
+                window.location.pathname +
+                window.location.search +
+                window.location.hash;
+            const response = await fetch('/api/orders', {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Accept: 'application/json'
+                },
+                body: JSON.stringify({ folder_id: folderId, return: returnTo })
+            });
+            const payload = await response.json().catch(() => ({}));
+            if (response.status === 401) {
+                this._loginForPurchase();
+                return;
+            }
+            if (!response.ok || !payload.confirmation_url) {
+                const messages = {
+                    payments_not_configured: 'Оплата временно недоступна',
+                    already_available: 'Доступ уже открыт',
+                    folder_is_free: 'Эта папка бесплатна',
+                    price_not_set: 'Для папки не указана цена'
+                };
+                throw new Error(
+                    messages[payload.error] || payload.error || `HTTP ${response.status}`
+                );
+            }
+            window.location.href = payload.confirmation_url;
+        } catch (e) {
+            if (typeof showToast === 'function') {
+                showToast(e.message, 'error', 5000);
+            }
+        } finally {
+            if (button) {
+                button.disabled = false;
+                button.textContent = 'Купить доступ';
+            }
+        }
+    },
+
+    _handlePaymentReturn() {
+        const params = new URLSearchParams(window.location.search);
+        if (params.get('payment') !== 'success') return;
+        if (typeof showToast === 'function') {
+            showToast('Оплата получена. Обновляем доступ…', 'success', 4000);
+        }
+        // Webhook ЮKassa может прийти на секунду позже возврата в браузер.
+        setTimeout(() => this._loadRoutesList(), 1800);
+        params.delete('payment');
+        const query = params.toString();
+        window.history.replaceState(
+            null,
+            '',
+            window.location.pathname +
+                (query ? '?' + query : '') +
+                window.location.hash
+        );
     },
 
     _clearSearch() {
@@ -1096,6 +1331,10 @@ const MenuModule = {
             this.hideSpinner();
         } catch (e) {
             this.hideSpinner();
+            if (e && (e.status === 401 || e.status === 402)) {
+                this._openPurchase(e.purchaseFolderId, e.folderName);
+                return;
+            }
             console.error('[MenuModule] Ошибка загрузки маршрута:', e);
             if (typeof showToast === 'function') {
                 showToast('Ошибка загрузки: ' + e.message, 'error', 5000);

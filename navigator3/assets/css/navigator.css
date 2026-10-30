@@ -1896,3 +1896,121 @@ html, body {
 .toggle-input:checked + .toggle-slider::before {
     transform: translateX(20px);
 }
+
+/* ============================================
+   Платный доступ к папкам
+   ============================================ */
+.routes-folder-row.is-locked .routes-folder-name {
+    color: var(--text-muted);
+}
+
+.routes-folder-icon.is-locked {
+    background: var(--surface-muted);
+    color: var(--text-soft);
+}
+
+.routes-folder-price {
+    flex: 0 0 auto;
+    padding: 3px 7px;
+    border-radius: 999px;
+    background: var(--green-tint);
+    color: var(--green-dark);
+    font-size: 10px;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+.route-row.is-locked .route-row-name {
+    color: var(--text-muted);
+}
+
+.route-row-stats.is-price {
+    color: var(--green-dark);
+    font-weight: 700;
+}
+
+.purchase-panel {
+    top: auto;
+    bottom: env(safe-area-inset-bottom);
+    max-height: min(78vh, 520px);
+    border-radius: 20px 20px 0 0;
+}
+
+.purchase-body {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    padding: 26px 24px calc(24px + env(safe-area-inset-bottom));
+    overflow-y: auto;
+}
+
+.purchase-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 64px;
+    height: 64px;
+    border-radius: 20px;
+    background: var(--green-tint);
+    font-size: 30px;
+}
+
+.purchase-name {
+    max-width: 100%;
+    color: var(--text);
+    font-size: 20px;
+    font-weight: 700;
+    line-height: 1.25;
+    text-align: center;
+    overflow-wrap: anywhere;
+}
+
+.purchase-price {
+    color: var(--green-dark);
+    font-size: 26px;
+    font-weight: 800;
+    letter-spacing: -0.4px;
+}
+
+.purchase-hint {
+    max-width: 320px;
+    margin: 0;
+    color: var(--text-soft);
+    font-size: 13px;
+    line-height: 1.45;
+    text-align: center;
+}
+
+.purchase-buy,
+.purchase-login {
+    width: 100%;
+    max-width: 320px;
+    min-height: 48px;
+    margin-top: 6px;
+    padding: 0 18px;
+    border: 0;
+    border-radius: var(--radius-control);
+    background: var(--green);
+    color: var(--white);
+    font: inherit;
+    font-size: 16px;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.purchase-buy[hidden],
+.purchase-login[hidden] {
+    display: none;
+}
+
+.purchase-buy:disabled {
+    opacity: 0.6;
+    cursor: default;
+}
+
+.purchase-login {
+    background: var(--surface-muted);
+    color: var(--text);
+    border: 1px solid var(--line);
+}

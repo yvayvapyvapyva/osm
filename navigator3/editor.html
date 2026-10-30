@@ -52,9 +52,27 @@
 <div id="settingsModal" onclick="if(event.target===this) toggleM('settingsModal')"><div class="modal-sheet"><div class="modal-header" style="padding:16px 20px 16px 20px;"><span id="settingsTitle">Маршруты</span><div style="display:flex;gap:6px;margin-left:auto;"><button class="close-circle" onclick="toggleM('settingsModal')">✕</button></div></div><div class="settings-body" id="routesList"></div><div class="modal-actions-sm"><button class="settings-tool-btn settings-tool-btn-green flex-1" onclick="openCreateRouteModal()" style="text-align:center;">Создать маршрут</button><button class="settings-tool-btn flex-1" onclick="window.createFolder()" style="text-align:center;background:rgba(0,122,255,0.25);border-color:rgba(0,122,255,0.4);">Создать папку</button></div></div></div>
 <div id="createRouteModal" onclick="if(event.target===this) toggleM('createRouteModal')"><div class="modal-sheet modal-sheet-compact"><h3 class="modal-title">Новый маршрут</h3><div class="input-wrapper" style="padding:4px;border-radius:14px;"><input type="text" id="newRouteNameInput" placeholder="Название маршрута"></div><div class="modal-actions"><button class="btn-action flex-1" onclick="toggleM('createRouteModal')">Отмена</button><button class="btn-action btn-primary flex-1" onclick="handleCreateNew()">Создать</button></div></div></div>
 <div id="createFolderModal" onclick="if(event.target===this) toggleM('createFolderModal')"><div class="modal-sheet modal-sheet-compact"><h3 class="modal-title">Новая папка</h3><div class="input-wrapper" style="padding:4px;border-radius:14px;"><input type="text" id="newFolderNameInput" placeholder="Название папки"></div><div class="modal-actions"><button class="btn-action flex-1" onclick="toggleM('createFolderModal')">Отмена</button><button class="btn-action btn-primary flex-1" onclick="handleCreateFolder()">Создать</button></div></div></div>
+<div id="folderSettingsModal" onclick="if(event.target===this) toggleM('folderSettingsModal')"><div class="modal-sheet" style="gap:0;padding:0;"><div class="modal-header"><h3 id="folderSettingsTitle">Настройки папки</h3><button class="close-circle" onclick="toggleM('folderSettingsModal')">✕</button></div><div class="modal-body-scroll">
+<div class="field-label">Название папки</div>
+<div class="input-wrapper" style="padding:3px;border-radius:12px;margin-bottom:8px;"><input id="folderNameInput" type="text" placeholder="Название папки" style="width:100%;padding:12px 10px;border:none;font-size:16px;outline:none;background:transparent;color:#f5f7fa;font-family:inherit;box-sizing:border-box;"></div>
+<div class="field-label">Родительская папка</div>
+<div class="input-wrapper" style="padding:3px;border-radius:12px;margin-bottom:8px;"><select id="folderParentSelect" style="width:100%;padding:12px 10px;border:none;font-size:16px;outline:none;background:transparent;color:#f5f7fa;font-family:inherit;box-sizing:border-box;"></select></div>
+<div class="field-label">Доступ</div>
+<div class="input-wrapper" style="padding:3px;border-radius:12px;margin-bottom:8px;"><select id="folderAccessSelect" style="width:100%;padding:12px 10px;border:none;font-size:16px;outline:none;background:transparent;color:#f5f7fa;font-family:inherit;box-sizing:border-box;"><option value="public">Бесплатно</option><option value="paid">Платно</option></select></div>
+<div class="field-label">Цена, ₽</div>
+<div class="input-wrapper" style="padding:3px;border-radius:12px;margin-bottom:8px;"><input id="folderPriceInput" type="number" min="0" step="1" placeholder="0" style="width:100%;padding:12px 10px;border:none;font-size:16px;outline:none;background:transparent;color:#f5f7fa;font-family:inherit;box-sizing:border-box;"></div>
+<div class="field-label">SKU / код</div>
+<div class="input-wrapper" style="padding:3px;border-radius:12px;margin-bottom:8px;"><input id="folderSkuInput" type="text" placeholder="Необязательно" style="width:100%;padding:12px 10px;border:none;font-size:16px;outline:none;background:transparent;color:#f5f7fa;font-family:inherit;box-sizing:border-box;"></div>
+</div>
+<div style="display:flex;flex-direction:column;gap:8px;padding:20px;padding-top:0;">
+<button class="btn-action" onclick="saveFolderSettings();">💾 Сохранить папку</button>
+<button class="btn-action btn-danger" onclick="confirmDeleteFolder();">🗑️ Удалить папку</button>
+</div></div></div>
 <div id="settingsRouteModal" onclick="if(event.target===this) toggleM('settingsRouteModal')"><div class="modal-sheet" style="gap:0;padding:0;"><div class="modal-header"><h3 id="settingsRouteTitle">Настройки маршрута</h3><button class="close-circle" onclick="toggleM('settingsRouteModal')">✕</button></div><div class="modal-body-scroll">
-<div class="field-label">Имя маршрута</div>
-<div class="input-wrapper" style="padding:3px;border-radius:12px;margin-bottom:8px;"><textarea id="routeDisplayName" placeholder="Введите имя маршрута" rows="2" style="width:100%;padding:10px;border:none;font-size:16px;outline:none;background:transparent;color:#f5f7fa;font-family:inherit;resize:none;min-height:56px;box-sizing:border-box;"></textarea></div>
+<div class="field-label">Название маршрута</div>
+<div class="input-wrapper" style="padding:3px;border-radius:12px;margin-bottom:8px;"><textarea id="routeDisplayName" placeholder="Введите название маршрута" rows="2" style="width:100%;padding:10px;border:none;font-size:16px;outline:none;background:transparent;color:#f5f7fa;font-family:inherit;resize:none;min-height:56px;box-sizing:border-box;"></textarea></div>
+<div class="field-label">Папка</div>
+<div class="input-wrapper" style="padding:3px;border-radius:12px;margin-bottom:8px;"><select id="routeFolderSelect" style="width:100%;padding:12px 10px;border:none;font-size:16px;outline:none;background:transparent;color:#f5f7fa;font-family:inherit;box-sizing:border-box;"></select></div>
 <div class="field-label">Описание маршрута</div>
 <div class="input-wrapper" style="padding:3px;border-radius:12px;margin-bottom:8px;"><textarea id="routeDescription" placeholder="Введите описание маршрута" rows="2" style="width:100%;padding:10px;border:none;font-size:16px;outline:none;background:transparent;color:#f5f7fa;font-family:inherit;resize:none;min-height:56px;"></textarea></div>
 
@@ -513,8 +531,10 @@ let map, points = [], cur = null, isAdd = false, isDrawing = false, curRoute = n
 let routeAdminPassword = '';
 let historyStack = [], historyIndex = -1, lastSavedSnapshot = "[]", toastTimer = null;
 let pendingDeletePoint = null;
-let _currentFolderPrefix = null;
-let _emptyFolders = [];
+let _currentFolderId = null;
+let _currentFolderParent = null;
+let _folderSettingsId = null;
+let settingsFolders = [];
 let _expandedFolders = new Set();
 
 // Custom path editor state (API v3 has no built-in polyline editor)
@@ -1017,67 +1037,152 @@ const refreshFileList = async () => {
     try {
         const result = await callAdminApi('list');
         settingsRouteFiles = result.routes || [];
+        settingsFolders = result.folders || [];
         renderSettingsFileList();
         updateVisibility();
     } catch (e) {
-        
         settingsRouteFiles = [];
+        settingsFolders = [];
         renderSettingsFileList();
         updateVisibility();
         showToast('Ошибка загрузки маршрутов', 'error');
     }
 };
+
+const escapeHtml = value => String(value == null ? '' : value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+
 function countNodeRoutes(node) {
-    let c = node.routes.length;
-    for (const f of Object.values(node.folders)) c += countNodeRoutes(f);
-    return c;
+    let count = node.routes.length;
+    for (const child of node.children) count += countNodeRoutes(child);
+    return count;
 }
 
 function buildRouteTree() {
-    const root = { folders: {}, routes: [] };
+    const root = { children: [], routes: [] };
+    const nodes = new Map();
+    for (const folder of settingsFolders) {
+        nodes.set(folder.folder_id, { ...folder, children: [], routes: [] });
+    }
     for (const route of settingsRouteFiles) {
         const key = typeof route === 'string' ? route : (route.m || '');
-        const fullPath = typeof route === 'string' ? route : getRouteName(route);
-        const parts = fullPath.split('/').map(s => s.trim()).filter(Boolean);
-        const leafName = parts.pop() || fullPath;
-        const visible = !(typeof route === 'string') && route.visible;
-        let node = root;
-        for (const part of parts) {
-            if (!node.folders[part]) node.folders[part] = { folders: {}, routes: [] };
-            node = node.folders[part];
-        }
-        node.routes.push({ key, name: leafName, fullPath, visible });
+        const node = (typeof route === 'string' ? null : nodes.get(route.folder_id)) || root;
+        node.routes.push({
+            key,
+            name: getRouteName(route),
+            visible: !(typeof route === 'string') && !!route.visible
+        });
     }
-    if (root.routes.length > 0) {
-        root.folders['Без категории'] = root.folders['Без категории'] || { folders: {}, routes: [] };
-        root.folders['Без категории'].routes.push(...root.routes);
-        root.routes = [];
+    for (const node of nodes.values()) {
+        const parent = nodes.get(node.parent_id) || root;
+        parent.children.push(node);
     }
+    const sortNode = node => {
+        node.children.sort((a, b) => {
+            const ao = Number.isFinite(a.sort_order) ? a.sort_order : 0;
+            const bo = Number.isFinite(b.sort_order) ? b.sort_order : 0;
+            if (ao !== bo) return ao - bo;
+            return String(a.name).localeCompare(String(b.name), 'ru');
+        });
+        node.routes.sort((a, b) => a.name.localeCompare(b.name, 'ru'));
+        node.children.forEach(sortNode);
+    };
+    sortNode(root);
     return root;
 }
 
-function renderTreeLevel(node, pathPrefix, container) {
+function renderRouteItem(route, container) {
+    const isActive = route.key === curRoute;
+    const el = document.createElement('button');
+    el.className = 'route-item' + (isActive ? ' active' : '');
+    if (isActive) el.style.cssText = 'background:rgba(48,209,88,0.2);border-color:rgba(48,209,88,0.4);';
+    el.draggable = true;
+    el.setAttribute('data-key', route.key);
+
+    const nameSpan = document.createElement('span');
+    nameSpan.className = 'route-name';
+    if (route.visible) {
+        const check = document.createElement('span');
+        check.textContent = '✅';
+        check.style.cssText = 'font-size:12px;margin-right:4px;';
+        nameSpan.appendChild(check);
+        nameSpan.appendChild(document.createTextNode(route.name));
+    } else {
+        nameSpan.textContent = route.name;
+    }
+    el.appendChild(nameSpan);
+
+    const gear = document.createElement('span');
+    gear.className = 'route-info-btn';
+    gear.textContent = '⚙️';
+    gear.style.fontStyle = 'normal';
+    gear.style.fontWeight = '400';
+    gear.addEventListener('click', e => {
+        e.stopPropagation();
+        openRouteSettings(route.key);
+    });
+    el.appendChild(gear);
+
+    el.addEventListener('click', () => {
+        if (el.classList.contains('loading')) return;
+        el.classList.add('loading');
+        loadRoute(route.key).then(() => renderSettingsFileList());
+    });
+    el.addEventListener('dragstart', e => {
+        e.dataTransfer.setData('text/plain', route.key);
+        el.classList.add('dragging');
+    });
+    el.addEventListener('dragend', () => {
+        el.classList.remove('dragging');
+        document.querySelectorAll('.drag-over').forEach(d => d.classList.remove('drag-over'));
+    });
+    container.appendChild(el);
+}
+
+function renderTreeLevel(node, container) {
     const frag = document.createDocumentFragment();
-    for (const [name, sub] of Object.entries(node.folders).sort(([a], [b]) => a.localeCompare(b))) {
-        if (name === 'Без категории') continue;
-        const folderPath = pathPrefix ? pathPrefix + '/' + name : name;
-        const total = countNodeRoutes(sub);
-        const isExpanded = _expandedFolders.has(folderPath);
+
+    for (const folder of node.children) {
+        const folderId = folder.folder_id;
+        const total = countNodeRoutes(folder);
+        const isExpanded = _expandedFolders.has(folderId);
+        const accessLabel = folder.access === 'paid'
+            ? (folder.price_kopecks > 0 ? `${Math.round(folder.price_kopecks / 100).toLocaleString('ru-RU')} ₽` : 'платно')
+            : '';
 
         const el = document.createElement('div');
         el.className = 'category-folder';
-        el.setAttribute('data-path', folderPath);
+        el.setAttribute('data-path', folderId);
 
         const header = document.createElement('div');
         header.className = 'category-header' + (isExpanded ? ' expanded' : '');
         header.innerHTML = `
             <span class="category-icon">${isExpanded ? '📂' : '📁'}</span>
-            <span class="category-name">${name}</span>
+            <span class="category-name">${escapeHtml(folder.name)}</span>
+            ${accessLabel ? `<span class="category-access">${escapeHtml(accessLabel)}</span>` : ''}
             <span class="category-count">${total}</span>
+            <span class="route-info-btn" data-folder-add="${escapeHtml(folderId)}" title="Создать маршрут в папке">＋</span>
+            <span class="route-info-btn" data-folder-settings="${escapeHtml(folderId)}" title="Настройки папки">⚙️</span>
         `;
-        header.addEventListener('click', () => {
-            if (_expandedFolders.has(folderPath)) _expandedFolders.delete(folderPath);
-            else _expandedFolders.add(folderPath);
+        header.addEventListener('click', event => {
+            const gear = event.target.closest('[data-folder-settings]');
+            if (gear) {
+                event.stopPropagation();
+                openFolderSettings(gear.dataset.folderSettings);
+                return;
+            }
+            const add = event.target.closest('[data-folder-add]');
+            if (add) {
+                event.stopPropagation();
+                openCreateRouteModal(add.dataset.folderAdd);
+                return;
+            }
+            if (_expandedFolders.has(folderId)) _expandedFolders.delete(folderId);
+            else _expandedFolders.add(folderId);
             renderSettingsFileList();
         });
         el.appendChild(header);
@@ -1087,7 +1192,7 @@ function renderTreeLevel(node, pathPrefix, container) {
         el.addEventListener('drop', e => {
             e.preventDefault(); el.classList.remove('drag-over');
             const routeKey = e.dataTransfer.getData('text/plain');
-            if (routeKey) moveRouteToFolder(routeKey, folderPath);
+            if (routeKey) moveRouteToFolder(routeKey, folderId);
         });
 
         frag.appendChild(el);
@@ -1095,108 +1200,27 @@ function renderTreeLevel(node, pathPrefix, container) {
         if (isExpanded) {
             const childWrap = document.createElement('div');
             childWrap.style.cssText = 'padding-left:16px;display:flex;flex-direction:column;gap:6px;';
-            renderTreeLevel(sub, folderPath, childWrap);
+            renderTreeLevel(folder, childWrap);
             frag.appendChild(childWrap);
         }
     }
 
-    const uncat = node.folders['Без категории'];
-    if (uncat) {
-        const fcPath = pathPrefix ? pathPrefix + '/' + 'Без категории' : 'Без категории';
-        const fcExpanded = _expandedFolders.has(fcPath);
-        const fcTotal = countNodeRoutes(uncat);
-        const fcEl = document.createElement('div');
-        fcEl.className = 'category-folder';
-        fcEl.setAttribute('data-path', fcPath);
-        const fcHdr = document.createElement('div');
-        fcHdr.className = 'category-header' + (fcExpanded ? ' expanded' : '');
-        fcHdr.innerHTML = `
-            <span class="category-icon">${fcExpanded ? '📂' : '📁'}</span>
-            <span class="category-name">Без категории</span>
-            <span class="category-count">${fcTotal}</span>
-        `;
-        fcHdr.addEventListener('click', () => {
-            if (_expandedFolders.has(fcPath)) _expandedFolders.delete(fcPath);
-            else _expandedFolders.add(fcPath);
-            renderSettingsFileList();
-        });
-        fcEl.appendChild(fcHdr);
-        fcEl.addEventListener('dragover', e => { e.preventDefault(); fcEl.classList.add('drag-over'); });
-        fcEl.addEventListener('dragleave', () => fcEl.classList.remove('drag-over'));
-        fcEl.addEventListener('drop', e => {
-            e.preventDefault(); fcEl.classList.remove('drag-over');
-            const routeKey = e.dataTransfer.getData('text/plain');
-            if (routeKey) moveRouteToFolder(routeKey, fcPath);
-        });
-        frag.appendChild(fcEl);
-        if (fcExpanded) {
-            const childWrap = document.createElement('div');
-            childWrap.style.cssText = 'padding-left:16px;display:flex;flex-direction:column;gap:6px;';
-            renderTreeLevel(uncat, fcPath, childWrap);
-            frag.appendChild(childWrap);
-        }
-    }
-
-    for (const route of node.routes) {
-        const isActive = route.key === curRoute;
-        const el = document.createElement('button');
-        el.className = 'route-item' + (isActive ? ' active' : '');
-        if (isActive) el.style.cssText = 'background:rgba(48,209,88,0.2);border-color:rgba(48,209,88,0.4);';
-        el.draggable = true;
-        el.setAttribute('data-key', route.key);
-
-        const nameSpan = document.createElement('span');
-        nameSpan.className = 'route-name';
-        if (route.visible) {
-            const check = document.createElement('span');
-            check.textContent = '✅';
-            check.style.cssText = 'font-size:12px;margin-right:4px;';
-            nameSpan.appendChild(check);
-            nameSpan.appendChild(document.createTextNode(route.name));
-        } else {
-            nameSpan.textContent = route.name;
-        }
-        el.appendChild(nameSpan);
-
-        const gear = document.createElement('span');
-        gear.className = 'route-info-btn';
-        gear.textContent = '⚙️';
-        gear.style.fontStyle = 'normal';
-        gear.style.fontWeight = '400';
-        gear.addEventListener('click', e => {
-            e.stopPropagation();
-            openRouteSettings(route.key);
-        });
-        el.appendChild(gear);
-
-        el.addEventListener('click', () => {
-            if (el.classList.contains('loading')) return;
-            el.classList.add('loading');
-            loadRoute(route.key).then(() => renderSettingsFileList());
-        });
-        el.addEventListener('dragstart', e => {
-            e.dataTransfer.setData('text/plain', route.key);
-            el.classList.add('dragging');
-        });
-        el.addEventListener('dragend', () => {
-            el.classList.remove('dragging');
-            document.querySelectorAll('.drag-over').forEach(d => d.classList.remove('drag-over'));
-        });
-        frag.appendChild(el);
-    }
+    for (const route of node.routes) renderRouteItem(route, frag);
     container.appendChild(frag);
 }
 
-async function moveRouteToFolder(routeKey, folderPath) {
+async function moveRouteToFolder(routeKey, folderId) {
     try {
         const meta = await callAdminApi('get_meta', { m: routeKey });
-        const nm = meta.name || routeKey;
-        const parts = nm.split('/').filter(Boolean);
-        const leafName = parts.pop() || nm;
-        const newName = folderPath + '/' + leafName;
-        await callAdminApi('save_meta', { m: routeKey }, { name: newName, description: meta.description || '', visible: meta.visible !== undefined ? meta.visible : false });
+        await callAdminApi('save_meta', { m: routeKey }, {
+            title: meta.title || meta.name || routeKey,
+            folder_id: folderId || '',
+            description: meta.description || '',
+            visible: meta.visible !== undefined ? meta.visible : false,
+            access: meta.access || 'folder'
+        });
         if (curRoute === routeKey) {
-            currentRouteMeta.name = newName;
+            currentRouteMeta.title = meta.title || currentRouteMeta.title;
         }
         await refreshFileList();
         showToast('Маршрут перемещён', 'success');
@@ -1205,8 +1229,8 @@ async function moveRouteToFolder(routeKey, folderPath) {
     }
 }
 
-const openCreateRouteModal = (folderPrefix) => {
-    _currentFolderPrefix = folderPrefix || null;
+const openCreateRouteModal = (folderId) => {
+    _currentFolderId = folderId || null;
     toggleM('createRouteModal');
     $('newRouteNameInput').value = '';
     setTimeout(() => $('newRouteNameInput').focus(), 100);
@@ -1225,53 +1249,22 @@ const renderSettingsFileList = () => {
     const list = $('routesList');
     if (!list) return;
     list.innerHTML = '';
-    if (settingsRouteFiles.length === 0 && _emptyFolders.length === 0) {
+    if (settingsRouteFiles.length === 0 && settingsFolders.length === 0) {
         list.innerHTML = '<div style="text-align:center;padding:40px 20px;color:#8b8f99;font-size:15px;">Маршрутов пока нет.<br>Создайте первый маршрут.</div>';
         $('settingsTitle').textContent = 'Маршруты: 0';
         return;
     }
     if (curRoute) {
-        const routeName = getRouteName(curRoute);
-        if (!routeName.includes('/')) {
-            _expandedFolders.add('Без категории');
+        const current = settingsRouteFiles.find(route => route && route.m === curRoute);
+        let folderId = current ? current.folder_id : '';
+        const byId = new Map(settingsFolders.map(folder => [folder.folder_id, folder]));
+        while (folderId && byId.has(folderId)) {
+            _expandedFolders.add(folderId);
+            folderId = byId.get(folderId).parent_id || '';
         }
     }
     const tree = buildRouteTree();
-    renderTreeLevel(tree, '', list);
-    const existingPaths = new Set();
-    const collectPaths = (node, prefix) => {
-        for (const [name, child] of Object.entries(node.folders)) {
-            const fp = prefix ? prefix + '/' + name : name;
-            existingPaths.add(fp);
-            collectPaths(child, fp);
-        }
-    };
-    collectPaths(tree, '');
-    for (const folderName of _emptyFolders) {
-        if (existingPaths.has(folderName)) continue;
-        const fp = folderName;
-        const el = document.createElement('div');
-        el.className = 'category-folder';
-        el.setAttribute('data-path', fp);
-        const header = document.createElement('div');
-        header.className = 'category-header';
-        header.style.opacity = '0.6';
-        header.style.cursor = 'default';
-        header.innerHTML = `
-            <span class="category-icon">📁</span>
-            <span class="category-name">${folderName}</span>
-            <span style="font-size:12px;color:rgba(255,255,255,0.3);background:rgba(255,255,255,0.06);padding:2px 8px;border-radius:8px;">пусто</span>
-        `;
-        el.appendChild(header);
-        el.addEventListener('dragover', e => { e.preventDefault(); el.classList.add('drag-over'); });
-        el.addEventListener('dragleave', () => el.classList.remove('drag-over'));
-        el.addEventListener('drop', e => {
-            e.preventDefault(); el.classList.remove('drag-over');
-            const routeKey = e.dataTransfer.getData('text/plain');
-            if (routeKey) moveRouteToFolder(routeKey, fp);
-        });
-        list.appendChild(el);
-    }
+    renderTreeLevel(tree, list);
     $('settingsTitle').textContent = `Маршруты: ${settingsRouteFiles.length}`;
     if (!list.dataset.dragScroll) {
         list.dataset.dragScroll = '1';
@@ -1371,7 +1364,7 @@ const updateVisibility = () => {
     updateGpsBtnVisibility();
     if(curRoute) {
         if ($('fileActions')) $('fileActions').style.display = 'block';
-        const label = currentRouteMeta.name || curRoute;
+        const label = currentRouteMeta.title || curRoute;
         const rnd = $('routeNameDisplay');
         if (rnd) { rnd.textContent = label; rnd.style.display = 'block'; }
     }
@@ -1390,31 +1383,33 @@ const getRouteName = (route) => {
     if (!route) return '';
     if (typeof route === 'string') {
         const found = settingsRouteFiles.find(r => r && r.m === route);
-        return found ? (found.name || found.m || '') : route;
+        return found ? (found.title || found.name || found.m || '') : route;
     }
-    return route.name || route.m || '';
+    return route.title || route.name || route.m || '';
 };
 
 const handleCreateNew = async () => {
-    let name = $('newRouteNameInput').value.trim();
-    if(!name) return;
+    const title = $('newRouteNameInput').value.trim();
+    if (!title) return;
 
-    if (_currentFolderPrefix) {
-        name = _currentFolderPrefix + '/' + name;
-    }
-    
+    const folderId = _currentFolderId || '';
     const id = generateId();
-    
+
     toggleM('createRouteModal');
-    
+
     try {
         await callAdminApi('save', { m: id }, { data: [] });
-        await callAdminApi('save_meta', { m: id }, { name, description: '', visible: false });
-        await refreshFileList(); 
-        await loadRoute(id); 
-        showToast("Маршрут создан", 'success'); 
+        await callAdminApi('save_meta', { m: id }, {
+            title,
+            folder_id: folderId,
+            description: '',
+            visible: false,
+            access: 'folder'
+        });
+        await refreshFileList();
+        await loadRoute(id);
+        showToast("Маршрут создан", 'success');
     } catch (e) {
-        
         showToast("Ошибка создания", 'error');
     }
 };
@@ -1439,12 +1434,20 @@ const loadRoute = async (routeName) => {
         try {
             const meta = await callAdminApi('get_meta', { m: routeName });
             currentRouteMeta = {
-                name: meta.name || routeName,
+                title: meta.title || meta.name || routeName,
                 description: meta.description || '',
-                visible: meta.visible !== undefined ? meta.visible : false
+                visible: meta.visible !== undefined ? meta.visible : false,
+                folder_id: meta.folder_id || '',
+                access: meta.access || 'folder'
             };
         } catch (e) {
-            currentRouteMeta = { name: routeName, description: '', visible: false };
+            currentRouteMeta = {
+                title: routeName,
+                description: '',
+                visible: false,
+                folder_id: '',
+                access: 'folder'
+            };
         }
 
         // Отчёт об открытии маршрута — после получения имени маршрута,
@@ -1455,7 +1458,7 @@ const loadRoute = async (routeName) => {
                 REPORT.send({
                     m_val: routeName,
                     report_type: 'editor',
-                    route_name: currentRouteMeta.name || ''
+                    route_name: currentRouteMeta.title || ''
                 });
             }
         } catch (re) {
@@ -1465,7 +1468,7 @@ const loadRoute = async (routeName) => {
         updateVisibility();
         setActivePoint(points[0] || null);
         toggleM('settingsModal');
-        showToast(`Загружен: ${currentRouteMeta.name}`, 'success');
+        showToast(`Загружен: ${currentRouteMeta.title}`, 'success');
     } catch (e) {
         
         showToast('Ошибка загрузки маршрута', 'error');
@@ -1475,7 +1478,46 @@ const loadRoute = async (routeName) => {
 let _shareRouteName = null;
 
 let settingsRouteName = null;
-let currentRouteMeta = { name: '', description: '', visible: false };
+let currentRouteMeta = { title: '', description: '', visible: false, folder_id: '', access: 'folder' };
+
+const renderFolderOptions = (select, selectedId, excludeId = '') => {
+    if (!select) return;
+    const byId = new Map(settingsFolders.map(folder => [folder.folder_id, folder]));
+    const excluded = new Set();
+    if (excludeId) {
+        excluded.add(excludeId);
+        let changed = true;
+        while (changed) {
+            changed = false;
+            for (const folder of settingsFolders) {
+                if (!excluded.has(folder.folder_id) && excluded.has(folder.parent_id || '')) {
+                    excluded.add(folder.folder_id);
+                    changed = true;
+                }
+            }
+        }
+    }
+    const options = ['<option value="">Без папки</option>'];
+    const walk = (parentId, depth) => {
+        const children = settingsFolders
+            .filter(folder => (folder.parent_id || '') === parentId && !excluded.has(folder.folder_id))
+            .sort((a, b) => {
+                const ao = Number.isFinite(a.sort_order) ? a.sort_order : 0;
+                const bo = Number.isFinite(b.sort_order) ? b.sort_order : 0;
+                if (ao !== bo) return ao - bo;
+                return String(a.name).localeCompare(String(b.name), 'ru');
+            });
+        for (const folder of children) {
+            options.push(
+                `<option value="${escapeHtml(folder.folder_id)}">${'— '.repeat(depth)}${escapeHtml(folder.name)}</option>`
+            );
+            walk(folder.folder_id, depth + 1);
+        }
+    };
+    walk('', 0);
+    select.innerHTML = options.join('');
+    select.value = selectedId && byId.has(selectedId) ? selectedId : '';
+};
 
 const openRouteSettings = async (routeName) => {
     settingsRouteName = routeName;
@@ -1484,53 +1526,63 @@ const openRouteSettings = async (routeName) => {
         const meta = await callAdminApi('get_meta', { m: routeName });
         $('loadingSpinner').classList.remove('active');
         currentRouteMeta = {
-            name: meta.name || routeName,
+            title: meta.title || meta.name || routeName,
             description: meta.description || '',
-            visible: meta.visible !== undefined ? meta.visible : false
+            visible: meta.visible !== undefined ? meta.visible : false,
+            folder_id: meta.folder_id || '',
+            access: meta.access || 'folder'
         };
-        $('settingsRouteTitle').textContent = currentRouteMeta.name;
-        $('routeDisplayName').value = currentRouteMeta.name;
+        $('settingsRouteTitle').textContent = currentRouteMeta.title;
+        $('routeDisplayName').value = currentRouteMeta.title;
         $('routeDescription').value = currentRouteMeta.description;
         $('routeVisible').checked = currentRouteMeta.visible;
+        renderFolderOptions($('routeFolderSelect'), currentRouteMeta.folder_id);
     } catch (e) {
         $('loadingSpinner').classList.remove('active');
-        currentRouteMeta = { name: '', description: '', visible: false };
+        currentRouteMeta = { title: '', description: '', visible: false, folder_id: '', access: 'folder' };
         $('routeDisplayName').value = '';
         $('routeDescription').value = '';
         $('routeVisible').checked = false;
+        renderFolderOptions($('routeFolderSelect'), '');
     }
     toggleM('settingsRouteModal');
 };
 
 const saveRouteMeta = async () => {
     if (!settingsRouteName) { showToast('Выберите маршрут', 'error'); return; }
-    const name = $('routeDisplayName').value.trim();
+    const title = $('routeDisplayName').value.trim();
     const description = $('routeDescription').value.trim();
     const visible = $('routeVisible').checked;
+    const folderId = $('routeFolderSelect') ? $('routeFolderSelect').value : '';
 
-    if (!name) { showToast('Введите имя маршрута', 'error'); return; }
+    if (!title) { showToast('Введите название маршрута', 'error'); return; }
 
     try {
-        await callAdminApi('save_meta', { m: settingsRouteName }, { name, description, visible });
-        
-        currentRouteMeta = { name, description, visible };
-        
+        await callAdminApi('save_meta', { m: settingsRouteName }, {
+            title,
+            folder_id: folderId,
+            description,
+            visible,
+            access: currentRouteMeta.access || 'folder'
+        });
+
+        currentRouteMeta = { ...currentRouteMeta, title, description, visible, folder_id: folderId };
+
         if (curRoute === settingsRouteName) {
             const rnd = $('routeNameDisplay');
-            if (rnd) { rnd.textContent = name; rnd.style.display = 'block'; }
+            if (rnd) { rnd.textContent = title; rnd.style.display = 'block'; }
         }
-        
+
         refreshFileList();
         showToast('Метаданные сохранены', 'success');
     } catch (e) {
-        
         showToast('Ошибка сохранения метаданных', 'error');
     }
 };
 
 const confirmDeleteRoute = () => {
     if (!settingsRouteName) return;
-    const displayName = currentRouteMeta.name || settingsRouteName;
+    const displayName = currentRouteMeta.title || settingsRouteName;
     $('confirmDeleteText').textContent = `Вы уверены, что хотите удалить маршрут "${displayName}"?`;
     toggleM('settingsRouteModal');
     setTimeout(() => toggleM('confirmDeleteModal'), 100);
@@ -1885,7 +1937,7 @@ function startEditPath(p) {
 }
 
 function openPointsOrderModal() {
-    modalMode = 'list'; const list = $('pointsSortList'); list.innerHTML = ''; $('orderModalTitle').textContent = currentRouteMeta.name || curRoute || "Маршрут"; $('saveInListBtn').style.display = 'block'; $('saveBtnText').textContent = "Готово";
+    modalMode = 'list'; const list = $('pointsSortList'); list.innerHTML = ''; $('orderModalTitle').textContent = currentRouteMeta.title || curRoute || "Маршрут"; $('saveInListBtn').style.display = 'block'; $('saveBtnText').textContent = "Готово";
     if (!points.length) list.innerHTML = '<div style="text-align:center;padding:40px;color:#c7c9d1;font-weight:500;">Маршрут пока пуст</div>'; else points.forEach(p => list.appendChild(createPointCard(p)));
     syncActiveListCard();
     $('pointsOrderModal').classList.remove('compact');
@@ -1958,19 +2010,102 @@ async function saveGist() {
     }
 }
 
+const findFolder = folderId =>
+    settingsFolders.find(folder => folder.folder_id === folderId) || null;
+
 window.createFolder = () => {
+    _currentFolderId = '';
     $('newFolderNameInput').value = '';
     toggleM('createFolderModal');
     setTimeout(() => $('newFolderNameInput').focus(), 100);
 };
 
-window.handleCreateFolder = () => {
+window.handleCreateFolder = async () => {
     const name = $('newFolderNameInput').value.trim();
-    if (!name) return;
-    _emptyFolders.push(name);
-    renderSettingsFileList();
-    toggleM('createFolderModal');
-    showToast('Папка создана', 'success');
+    if (!name) {
+        showToast('Введите название папки', 'error');
+        return;
+    }
+    try {
+        await callAdminApi('folder_save', {}, {
+            parent_id: _currentFolderId || '',
+            name,
+            access: 'public',
+            price_kopecks: 0,
+            sku: ''
+        });
+        toggleM('createFolderModal');
+        await refreshFileList();
+        showToast('Папка создана', 'success');
+    } catch (e) {
+        showToast('Ошибка создания папки', 'error');
+    }
+};
+
+const openFolderSettings = folderId => {
+    const folder = findFolder(folderId);
+    if (!folder) return;
+    _folderSettingsId = folderId;
+    $('folderSettingsTitle').textContent = 'Настройки папки';
+    $('folderNameInput').value = folder.name || '';
+    renderFolderOptions($('folderParentSelect'), folder.parent_id || '', folderId);
+    $('folderAccessSelect').value = folder.access === 'paid' ? 'paid' : 'public';
+    $('folderPriceInput').value =
+        folder.price_kopecks > 0 ? folder.price_kopecks / 100 : '';
+    $('folderSkuInput').value = folder.sku || '';
+    toggleM('folderSettingsModal');
+};
+
+window.saveFolderSettings = async () => {
+    if (!_folderSettingsId) return;
+    const name = $('folderNameInput').value.trim();
+    if (!name) {
+        showToast('Введите название папки', 'error');
+        return;
+    }
+    const access = $('folderAccessSelect').value === 'paid' ? 'paid' : 'public';
+    const priceRub = Number($('folderPriceInput').value || 0);
+    if (!Number.isFinite(priceRub) || priceRub < 0) {
+        showToast('Некорректная цена', 'error');
+        return;
+    }
+    if (access === 'paid' && priceRub <= 0) {
+        showToast('Укажите цену для платной папки', 'error');
+        return;
+    }
+    try {
+        await callAdminApi('folder_save', {}, {
+            folder_id: _folderSettingsId,
+            parent_id: $('folderParentSelect').value || '',
+            name,
+            access,
+            price_kopecks: Math.round(priceRub * 100),
+            sku: $('folderSkuInput').value.trim()
+        });
+        toggleM('folderSettingsModal');
+        await refreshFileList();
+        showToast('Папка сохранена', 'success');
+    } catch (e) {
+        showToast('Ошибка сохранения папки', 'error');
+    }
+};
+
+window.confirmDeleteFolder = async () => {
+    const folder = findFolder(_folderSettingsId);
+    if (!folder) return;
+    if (!window.confirm(`Удалить папку «${folder.name}»?`)) return;
+    try {
+        await callAdminApi('folder_delete', {}, { folder_id: folder.folder_id });
+        toggleM('folderSettingsModal');
+        await refreshFileList();
+        showToast('Папка удалена', 'success');
+    } catch (e) {
+        showToast(
+            'Нельзя удалить папку: в ней есть вложенные папки или маршруты',
+            'error',
+            5000
+        );
+    }
 };
 
 // Экспорт функций в глобальную область для onclick обработчиков
@@ -1987,6 +2122,7 @@ window.openInNavigator = openInNavigator;
 window.handleCreateNew = handleCreateNew;
 window.openCreateRouteModal = openCreateRouteModal;
 window.openRouteSettings = openRouteSettings;
+window.openFolderSettings = openFolderSettings;
 window.saveRouteMeta = saveRouteMeta;
 window.shareRouteFromSettings = shareRouteFromSettings;
 window.confirmDeleteRoute = confirmDeleteRoute;
@@ -1995,7 +2131,6 @@ window.executeDeletePoint = executeDeletePoint;
 window.copyShareLink = copyShareLink;
 window.openInstruction = openInstruction;
 window.closeInstruction = closeInstruction;
-window.handleCreateFolder = handleCreateFolder;
 
 </script>
 </body>
