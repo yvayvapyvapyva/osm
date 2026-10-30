@@ -913,16 +913,22 @@ def _api_me(event):
     )
 
 
-def _api_catalog(event):
-    """Папки и видимые маршруты без геометрии."""
+def _api_folder(event):
+    """Содержимое папки со всей геометрией доступных маршрутов."""
+    folder_id = (_query(event).get("folder_id") or "").strip()
     user = _current_user(event)
     try:
         folders, route_rows, by_id = _catalog_data()
         entitlements = _user_entitlements(user)
-        folder_payload = []
+        if folder_id and folder_id not in by_id:
+            return auth.json_response(404, {"error": "folder_not_found"})
+
+        child_folders = []
         for folder in folders:
+            if _text(folder["parent_id"]) != folder_id:
+                continue
             info = _folder_access_info(by_id, folder["folder_id"], entitlements)
-            folder_payload.append(
+            child_folders.append(
                 {
                     "folder_id": folder["folder_id"],
                     "parent_id": folder["parent_id"],
@@ -935,19 +941,32 @@ def _api_catalog(event):
                     "sku": info["sku"],
                 }
             )
-        routes = [
-            _route_public_dict(row, by_id, entitlements) for row in route_rows
-        ]
+        child_folders.sort(key=lambda f: (f["sort_order"], f["name"]))
+
+        routes = []
+        for row in route_rows:
+            row_folder_id = _text(_row_value(row, "folder_id"))
+            if row_folder_id != folder_id:
+                continue
+            info = _route_access_info(row, by_id, entitlements)
+            route = _route_public_dict(row, by_id, entitlements)
+            if info["owned"]:
+                data = _json_value(_row_value(row, "json"))
+                route["data"] = data
+            routes.append(route)
+        routes.sort(key=lambda r: r.get("name", ""))
+
         return auth.json_response(
             200,
             {
-                "folders": folder_payload,
+                "folder_id": folder_id,
+                "folders": child_folders,
                 "routes": routes,
                 "user": _public_user(user) if user else None,
             },
         )
     except Exception as exc:  # noqa: BLE001
-        print(f"[api] catalog failed: {exc}")
+        print(f"[api] folder failed: {exc}")
         return auth.json_response(500, {"error": "storage_failed"})
 
 
@@ -1595,8 +1614,8 @@ def _handle_api(event, path, method):
     if normalized == "/api/catalog" and method == "GET":
         return _api_catalog(event)
 
-    if normalized == "/api/route" and method == "GET":
-        return _api_route(event)
+    if normalized == "/api/folder" and method == "GET":
+        return _api_folder(event)
 
     if normalized == "/api/orders" and method == "POST":
         return _api_orders(event)

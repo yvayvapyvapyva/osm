@@ -4,13 +4,13 @@ const MenuModule = {
     isLoaded: false,
     currentRoute: null,
     routesDescriptions: {}, // { "m": { name, description, m, data } }
-    _routesLoaded: false,   // список с геометрией уже получен
+    _routesLoaded: false,
     _isFetchingRoutes: false,
-    _catalog: [],           // плоский список маршрутов с путём
-    _folders: [],           // папки из /api/catalog
-    _folderMap: new Map(),  // folder_id -> папка
+    _catalog: [],
+    _folders: [],
+    _folderMap: new Map(),
     _folderCounts: new Map(),
-    _folderPath: [],        // folder_id от корня до текущей папки
+    _folderPath: [],
     _searchQuery: '',
     _searchScope: 'all',
     _MENU_STATE_KEY: 'osm_routes_menu_state_v2',
@@ -22,10 +22,9 @@ const MenuModule = {
     _previewQueuedKeys: new Set(),
     _previewFetching: new Set(),
     _previewActive: false,
-
-    // Новый API на том же origin (API Gateway). Геометрия больше не
-    // приходит вместе со списком: её отдаёт /api/route для одного маршрута.
+    _folderCache: new Map(),
     API_CATALOG_URL: '/api/catalog',
+    API_FOLDER_URL: '/api/folder',
     API_ROUTE_URL: '/api/route',
 
     // Кэш полных маршрутов: нужен для повторного открытия и превью.
@@ -89,13 +88,8 @@ const MenuModule = {
             this._retryTimer = null;
         }
         this._isFetchingRoutes = true;
-
         const container = document.getElementById('routesListContainer');
-
-        // Показываем индикацию сразу: полный список с геометрией — ~80 КБ,
-        // на медленной сети это заметно.
         this._showListLoading();
-
         const showLoadError = () => {
             if (container) {
                 container.innerHTML = `
@@ -106,21 +100,25 @@ const MenuModule = {
                 `;
             }
         };
-
         const attempt = async () => {
             try {
-                await this._fetchFromAPI();
+                const folderId = this._folderPath[this._folderPath.length - 1] || '';
+                const payload = await this._fetchFolder(folderId);
+                this._applyFolderData(payload);
+                this._folders = Array.isArray(payload.folders) ? payload.folders : [];
+                this._folderMap.clear();
+                for (const folder of this._folders) {
+                    if (folder && folder.folder_id) this._folderMap.set(folder.folder_id, folder);
+                }
                 this._routesLoaded = true;
-                this._buildCatalog();
                 this._buildRoutesList();
                 return true;
             } catch (e) {
-                console.warn('Не удалось загрузить каталог маршрутов:', e);
+                console.warn('Не удалось загрузить содержимое папки:', e);
                 showLoadError();
                 return false;
             }
         };
-
         const ok = await attempt();
         if (!ok) {
             this._isFetchingRoutes = false;
@@ -184,10 +182,38 @@ const MenuModule = {
         this._buildCatalog();
     },
 
-    /**
-     * Полная геометрия одного маршрута. Запросы дедуплицируются, результат
-     * кэшируется до перезагрузки страницы.
-     */
+    async _fetchFolder(folderId) {
+        const key = folderId || '';
+        if (this._folderCache.has(key)) {
+            return this._folderCache.get(key);
+        }
+        const url = this.API_FOLDER_URL + (key ? '?folder_id=' + encodeURIComponent(key) : '');
+        const response = await fetch(url, { credentials: 'same-origin', headers: { Accept: 'application/json' }, cache: 'no-store' });
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+        }
+        const payload = await response.json();
+        this._folderCache.set(key, payload);
+        return payload;
+    },
+
+    _applyFolderData(payload) {
+        if (!payload || typeof payload !== 'object') return;
+        const routes = Array.isArray(payload.routes) ? payload.routes : [];
+        for (const route of routes) {
+            if (!route || !route.m) continue;
+            if (Array.isArray(route.data)) {
+                this._routeDataCache.set(route.m, route);
+                if (!this.routesDescriptions[route.m]) {
+                    this.routesDescriptions[route.m] = route;
+                } else {
+                    if (route.name) this.routesDescriptions[route.m].name = route.name;
+                    if (route.title) this.routesDescriptions[route.m].title = route.title;
+                    this.routesDescriptions[route.m].data = route.data;
+                }
+            }
+        }
+    },
     async _fetchRoute(routeM) {
         const key = String(routeM);
         if (this._routeDataCache.has(key)) return this._routeDataCache.get(key);
@@ -1175,6 +1201,8 @@ const MenuModule = {
                 this._folderPath = [...this._folderPath, folder.dataset.folderId];
                 this._searchScope = 'all';
                 this._saveMenuState();
+                this._routesLoaded = false;
+                this._catalog = [];
                 this._buildRoutesList();
             });
         }
