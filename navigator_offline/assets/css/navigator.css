@@ -469,17 +469,13 @@ html, body {
     background: var(--surface-muted);
     border-color: var(--line-soft);
     box-shadow: none;
-    /* Пройденная точка — второстепенная: одна строка мелким кеглем,
-       без комментария. Полный текст остаётся в списке точек и в озвучке. */
+    /* Пройденная точка — второстепенная: мелкий кегль, полный текст. */
     font-size: 15px;
+    opacity: 0.75;
 }
 
 .hud-cmd.hud-prev #hudPrevCmdNum {
-    opacity: 0.65;
-}
-
-.hud-cmd.hud-prev #hudPrevCmdTextInner {
-    color: var(--text-muted);
+    opacity: 0.85;
 }
 
 #hudPrevCmdNum {
@@ -487,8 +483,8 @@ html, body {
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
-    width: 52px;
-    height: 52px;
+    width: 44px;
+    height: 44px;
     padding: 4px;
     position: relative;
     cursor: pointer;
@@ -503,8 +499,8 @@ html, body {
     position: absolute;
     right: 1px;
     bottom: 1px;
-    width: 22px;
-    height: 22px;
+    width: 16px;
+    height: 16px;
     background: var(--surface);
     border: 1px solid var(--line);
     border-radius: 8px;
@@ -537,12 +533,12 @@ html, body {
 }
 
 #hudPrevCmdTextInner {
+    opacity: 0.8;
     display: block;
     text-align: left;
     width: 100%;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    white-space: normal;
+    word-break: break-word;
 }
 
 .hud-cmd {
@@ -589,8 +585,8 @@ html, body {
     position: absolute;
     right: 1px;
     bottom: 1px;
-    width: 22px;
-    height: 22px;
+    width: 16px;
+    height: 16px;
     background: var(--surface);
     border: 1px solid var(--line);
     border-radius: 8px;
@@ -1674,8 +1670,8 @@ html, body {
     position: absolute;
     right: 1px;
     bottom: 1px;
-    width: 22px;
-    height: 22px;
+    width: 16px;
+    height: 16px;
     background: var(--surface);
     border: 1px solid var(--line);
     border-radius: 8px;
