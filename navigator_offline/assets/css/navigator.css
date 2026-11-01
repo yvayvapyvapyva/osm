@@ -799,45 +799,75 @@ button, input, select, textarea {
     position: fixed;
     top: calc(90px + env(safe-area-inset-top));
     left: 50%;
-    transform: translateX(-50%) translateY(-100px);
-    background: var(--surface);
-    color: var(--text);
-    padding: 14px 24px;
-    border-radius: var(--radius-full);
-    font-size: 15px;
     z-index: 16000;
-    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-    opacity: 0;
-    border: 1px solid var(--line);
+
+    /* width: max-content обязателен: без него при left: 50% браузер считает
+       доступной только половину экрана, и длинный текст ломается на 3 строки. */
+    box-sizing: border-box;
+    width: max-content;
+    /* 144px = колонка кнопок привязки и спидометра (52px + 12px) с обеих
+       сторон: тост остаётся по центру и не заезжает на них. */
+    max-width: calc(100% - 144px);
+    padding: 11px 18px;
+
+    /* 22px = половина высоты однострочного тоста: одна строка выглядит
+       капсулой, две и больше — аккуратной карточкой. */
+    border-radius: 22px;
+    border: 1px solid var(--line-surface);
+    --toast-surface: color-mix(in srgb, var(--surface) 88%, transparent);
+    background: var(--toast-surface);
+    -webkit-backdrop-filter: blur(14px) saturate(1.6);
+    backdrop-filter: blur(14px) saturate(1.6);
+    color: var(--text);
+
+    font-size: 14px;
     font-weight: 600;
-    max-width: 85vw;
-    white-space: pre-wrap;
-    text-align: center;
-    line-height: 1.4;
-    pointer-events: none;
-    box-shadow: var(--shadow-raised), var(--inset-highlight);
+    line-height: 1.35;
     letter-spacing: -0.1px;
+    text-align: center;
+    white-space: pre-wrap;
+
+    box-shadow: var(--shadow-float), var(--inset-highlight);
+    opacity: 0;
+    transform: translateX(-50%) translateY(-10px) scale(0.96);
+    pointer-events: none;
+    transition: opacity 0.22s ease, transform 0.28s cubic-bezier(0.32, 0.72, 0, 1);
 }
 
 #toast.show {
-    transform: translateX(-50%) translateY(0);
     opacity: 1;
+    transform: translateX(-50%) translateY(0) scale(1);
 }
 
-#toast.success {
-    background: var(--success-solid);
-    border-color: var(--green-line);
-    color: var(--white);
-}
-
-#toast.error {
-    background: var(--danger-solid);
-    border-color: var(--danger-line);
-    color: var(--white);
-}
-
+/* info — нейтральная стеклянная подложка: смысл несёт сам текст. */
 #toast.info {
-    background: var(--surface);
+    background: var(--toast-surface);
+}
+
+/* Белый текст на акцентном синем давал контраст 2.69:1 — ниже нормы WCAG.
+   Поэтому вместо заливки — мягкий зелёный оттенок нейтрального фона. */
+#toast.success {
+    background: color-mix(in srgb, #16A34A 12%, var(--toast-surface));
+}
+
+[data-theme="dark"] #toast.success {
+    background: color-mix(in srgb, #34D399 16%, var(--toast-surface));
+}
+
+/* error — мягкая красная подложка вместо плотной красной заливки. */
+#toast.error {
+    background: color-mix(in srgb, var(--danger-soft) 88%, transparent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    #toast {
+        transition: opacity 0.15s linear;
+        transform: translateX(-50%);
+    }
+
+    #toast.show {
+        transform: translateX(-50%);
+    }
 }
 
 /* ============================================
