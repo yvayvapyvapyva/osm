@@ -2014,8 +2014,10 @@ html, body {
 .circle-btn,
 .nav-action-btn,
 .top-action-btn,
-#telemetryPanel {
+#telemetryPanel,
+.hud-cmd {
     backdrop-filter: blur(8px);
     -webkit-backdrop-filter: blur(8px);
-    background: rgba(255, 255, 255, 0.85);
+    background: color-mix(in srgb, var(--surface) 75%, transparent) !important;
+    opacity: 1;
 }
