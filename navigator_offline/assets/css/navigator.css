@@ -1002,7 +1002,11 @@ button, input, select, textarea {
     flex: 0 0 auto;
     max-width: 42vw;
     overflow: hidden;
-    padding: 7px 14px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 42px;
+    padding: 8px 14px;
     border: 1px solid var(--green-line-soft);
     border-radius: 10px;
     background: var(--green-tint);
@@ -1015,6 +1019,7 @@ button, input, select, textarea {
     cursor: pointer;
     min-width: 44px;
     text-align: center;
+    box-sizing: border-box;
     box-shadow: var(--shadow-card);
     transition: background 0.15s ease, border-color 0.15s ease, transform 0.1s ease;
 }
@@ -1087,12 +1092,13 @@ button, input, select, textarea {
     align-items: center;
     gap: 10px;
     width: 100%;
-    min-height: 54px;
-    padding: 7px 12px;
+    min-height: 64px;
+    padding: 9px 14px;
     border-radius: var(--radius-control);
     color: var(--text);
     text-align: left;
     cursor: pointer;
+    box-sizing: border-box;
     -webkit-tap-highlight-color: transparent;
 }
 
@@ -1104,24 +1110,24 @@ button, input, select, textarea {
     display: flex;
     align-items: center;
     justify-content: center;
-    flex: 0 0 30px;
-    width: 30px;
-    height: 30px;
-    border-radius: 9px;
+    flex: 0 0 34px;
+    width: 34px;
+    height: 34px;
+    border-radius: 10px;
     background: var(--green-tint);
     color: var(--green);
 }
 
 .routes-folder-icon svg {
-    width: 19px;
-    height: 19px;
+    width: 21px;
+    height: 21px;
 }
 
 .routes-folder-name {
     flex: 1 1 auto;
     min-width: 0;
     overflow: hidden;
-    font-size: 14px;
+    font-size: 15px;
     font-weight: 650;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -1130,7 +1136,7 @@ button, input, select, textarea {
 .routes-folder-count {
     flex: 0 0 auto;
     color: var(--text-soft);
-    font-size: 11px;
+    font-size: 12px;
     font-weight: 600;
 }
 
