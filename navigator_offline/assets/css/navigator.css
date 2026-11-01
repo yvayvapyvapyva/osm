@@ -2010,3 +2010,12 @@ html, body {
     color: var(--text);
     border: 1px solid var(--line);
 }
+
+.circle-btn,
+.nav-action-btn,
+.top-action-btn,
+#telemetryPanel {
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    background: rgba(255, 255, 255, 0.85);
+}
