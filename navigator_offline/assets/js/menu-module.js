@@ -108,6 +108,45 @@ const MenuModule = {
                 return true;
             } catch (e) {
                 console.warn('Не удалось загрузить каталог маршрутов:', e);
+                // Попробуем напрямую routes_all.json
+                try {
+                    const response = await fetch('routes_all.json', { cache: 'no-store' });
+                    if (response.ok) {
+                        const payload = await response.json();
+                        const data = Array.isArray(payload) ? payload : payload && payload.routes;
+                        if (Array.isArray(data)) {
+                            this._folders = Array.isArray(payload.folders) ? payload.folders : [];
+                            this._folderMap = new Map((this._folders||[]).map(f=>[f.folder_id,f]));
+                            const routesFlat = {};
+                            for (const route of data) {
+                                const key = route.m;
+                                if (!key) continue;
+                                if (Array.isArray(route.data)) {
+                                    this._routeDataCache.set(String(key), { data: route.data, m: route.m, name: route.name, title: route.title });
+                                }
+                                routesFlat[key] = {
+                                    m: route.m,
+                                    name: route.name || route.title || route.m,
+                                    title: route.title || route.name || route.m,
+                                    folder_id: route.folder_id || '',
+                                    description: typeof route.description === 'string' ? route.description.trim() : '',
+                                    access: 'public',
+                                    owned: true,
+                                    purchase_folder_id: '',
+                                    price_kopecks: 0,
+                                    sku: '',
+                                    point_count: Number.isFinite(route.point_count) ? route.point_count : null,
+                                    distance_meters: Number.isFinite(route.distance_meters) ? route.distance_meters : null
+                                };
+                            }
+                            this.routesDescriptions = routesFlat;
+                            this._buildCatalog();
+                            this._routesLoaded = true;
+                            this._buildRoutesList();
+                            return true;
+                        }
+                    }
+                } catch (e2) {}
                 showLoadError();
                 return false;
             }
@@ -698,7 +737,6 @@ const MenuModule = {
         btn.addEventListener('click', event => {
             event.stopPropagation();
             if (locked) {
-                this._openPurchase(route.purchaseFolderId, route.title);
                 return;
             }
             if (route.m) this.loadRouteByName(route.m);
@@ -1161,10 +1199,6 @@ const MenuModule = {
                 const folder = event.target.closest('[data-folder-id]');
                 if (!folder || !routesList.contains(folder)) return;
                 if (folder.dataset.folderAccess === 'paid' && folder.dataset.folderOwned !== '1') {
-                    this._openPurchase(
-                        folder.dataset.purchaseFolderId || folder.dataset.folderId,
-                        folder.dataset.folderName || ''
-                    );
                     return;
                 }
                 this._folderPath = [...this._folderPath, folder.dataset.folderId];
