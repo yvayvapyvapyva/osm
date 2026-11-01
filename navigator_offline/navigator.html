@@ -8,20 +8,18 @@
     <meta name="theme-color" content="#F4F6FA">
     <script>
         /* Тема применяется до первой отрисовки, чтобы не было вспышки светлого фона.
-           Если пользователь ещё не выбирал тему вручную — берём схему устройства. */
+           Выбор пользователя живёт только в памяти вкладки, поэтому после
+           перезагрузки снова берём схему устройства. */
         (function () {
-            var systemDark = false;
-            try { systemDark = window.matchMedia('(prefers-color-scheme: dark)').matches; } catch (e) {}
-            var theme;
+            var theme = 'light';
             try {
-                var saved = localStorage.getItem('osm_theme_v1');
-                theme = (saved === 'dark' || saved === 'light') ? saved : (systemDark ? 'dark' : 'light');
-            } catch (e) {
-                theme = systemDark ? 'dark' : 'light';
-            }
+                if (window.matchMedia('(prefers-color-scheme: dark)').matches) theme = 'dark';
+            } catch (e) {}
             document.documentElement.setAttribute('data-theme', theme);
             var meta = document.querySelector('meta[name="theme-color"]');
             if (meta) meta.setAttribute('content', theme === 'dark' ? '#0F141C' : '#F4F6FA');
+            /* Ключ из прошлых версий больше не нужен. */
+            try { localStorage.removeItem('osm_theme_v1'); } catch (e) {}
         })();
     </script>
     <link rel="stylesheet" href="assets/css/navigator.css?v=22">
@@ -158,25 +156,17 @@ function loadMapPrefs() {
 
 const MAP_PREFS = loadMapPrefs();
 
-const THEME_KEY = 'osm_theme_v1';
+/* Выбор темы живёт только в памяти: после перезагрузки приложение снова
+   следует схеме устройства. */
+let sessionTheme = null;
+
 const THEME_MEDIA = window.matchMedia('(prefers-color-scheme: dark)');
 
-/* Явный выбор пользователя или null, если он ещё не трогал переключатель. */
-function savedThemePreference() {
-  try {
-    const value = localStorage.getItem(THEME_KEY);
-    return (value === 'dark' || value === 'light') ? value : null;
-  } catch (e) {
-    return null;
-  }
-}
-
 function loadThemePreference() {
-  const saved = savedThemePreference();
-  return saved ? saved === 'dark' : THEME_MEDIA.matches;
+  return sessionTheme ? sessionTheme === 'dark' : THEME_MEDIA.matches;
 }
 
-function applyThemePreference(isDark, persist) {
+function applyThemePreference(isDark, remember) {
   const theme = isDark ? 'dark' : 'light';
   const previousTheme = document.documentElement.getAttribute('data-theme');
   document.documentElement.setAttribute('data-theme', theme);
@@ -190,9 +180,9 @@ function applyThemePreference(isDark, persist) {
   const value = document.getElementById('themeValue');
   if (value) value.textContent = isDark ? 'Вкл' : 'Выкл';
 
-  if (persist !== false) {
-    try { localStorage.setItem(THEME_KEY, theme); } catch (e) {}
-  }
+  /* remember === false — тему выставила система или старт приложения, а не
+     пользователь: выбор не фиксируем и продолжаем следить за системой. */
+  if (remember !== false) sessionTheme = theme;
 
   if (previousTheme && previousTheme !== theme &&
       typeof MenuModule !== 'undefined' &&
@@ -204,7 +194,7 @@ function applyThemePreference(isDark, persist) {
 /* Пока тема не выбрана вручную, приложение следует за системной: если
    пользователь переключит оформление на устройстве, тема обновится сразу. */
 function handleSystemThemeChange(event) {
-  if (savedThemePreference()) return;
+  if (sessionTheme) return;
   applyThemePreference(event.matches, false);
 }
 
