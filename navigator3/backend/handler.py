@@ -902,7 +902,42 @@ def _auth_logout(event):
 # ---------------------------------------------------------------------------
 
 
-def _api_me(event):
+def _api_catalog(event):
+    """Папки и видимые маршруты без геометрии."""
+    user = _current_user(event)
+    try:
+        folders, route_rows, by_id = _catalog_data()
+        entitlements = _user_entitlements(user)
+        folder_payload = []
+        for folder in folders:
+            info = _folder_access_info(by_id, folder["folder_id"], entitlements)
+            folder_payload.append(
+                {
+                    "folder_id": folder["folder_id"],
+                    "parent_id": folder["parent_id"],
+                    "name": folder["name"],
+                    "sort_order": folder["sort_order"],
+                    "access": info["access"],
+                    "owned": info["owned"],
+                    "purchase_folder_id": info["purchase_folder_id"],
+                    "price_kopecks": info["price_kopecks"],
+                    "sku": info["sku"],
+                }
+            )
+        routes = [
+            _route_public_dict(row, by_id, entitlements) for row in route_rows
+        ]
+        return auth.json_response(
+            200,
+            {
+                "folders": folder_payload,
+                "routes": routes,
+                "user": _public_user(user) if user else None,
+            },
+        )
+    except Exception as exc:  # noqa: BLE001
+        print(f"[api] catalog failed: {exc}")
+        return auth.json_response(500, {"error": "storage_failed"})
     user = _current_user(event)
     if not user:
         return auth.json_response(401, {"error": "unauthorized"})
