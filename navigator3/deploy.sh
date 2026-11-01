@@ -39,7 +39,9 @@ ENDPOINT="${YDB_ENDPOINT:-grpcs://ydb.serverless.yandexcloud.net:2135}"
 SERVICE_ACCOUNT_ID="${SERVICE_ACCOUNT_ID:-aje0hrd823msk3hqaikt}"
 PUBLIC_BASE_URL="${PUBLIC_BASE_URL:-}"
 YANDEX_CLIENT_ID="${YANDEX_CLIENT_ID:-}"
-LOCKBOX_SECRET_ID="${LOCKBOX_SECRET_ID:-}"
+YANDEX_CLIENT_SECRET="${YANDEX_CLIENT_SECRET:-9418164755114b98b225e0e545629e79}"
+ROUTE_ADMIN_PASSWORD="${ROUTE_ADMIN_PASSWORD:-2203}"
+YOOKASSA_SECRET_KEY="${YOOKASSA_SECRET_KEY:-}"
 SESSION_TTL_DAYS="${SESSION_TTL_DAYS:-30}"
 YOOKASSA_SHOP_ID="${YOOKASSA_SHOP_ID:-}"
 
@@ -55,8 +57,13 @@ if [[ -z "${YANDEX_CLIENT_ID}" ]]; then
   exit 1
 fi
 
-if [[ -z "${LOCKBOX_SECRET_ID}" ]]; then
-  echo "Задайте LOCKBOX_SECRET_ID: в секрете должны быть ключи YANDEX_CLIENT_SECRET и ROUTE_ADMIN_PASSWORD." >&2
+if [[ -z "${YANDEX_CLIENT_SECRET}" ]]; then
+  echo "Задайте YANDEX_CLIENT_SECRET." >&2
+  exit 1
+fi
+
+if [[ -z "${ROUTE_ADMIN_PASSWORD}" ]]; then
+  echo "Задайте ROUTE_ADMIN_PASSWORD." >&2
   exit 1
 fi
 
@@ -75,23 +82,14 @@ echo "Деплой функции ${FUNCTION_NAME} (${FUNCTION_ID})"
 echo "База: ${DATABASE}"
 echo "Публичный адрес: ${PUBLIC_BASE_URL}"
 
-ENVIRONMENT="YDB_ENDPOINT=${ENDPOINT},YDB_DATABASE=${DATABASE},PUBLIC_BASE_URL=${PUBLIC_BASE_URL},YANDEX_CLIENT_ID=${YANDEX_CLIENT_ID},SESSION_TTL_DAYS=${SESSION_TTL_DAYS}"
+ENVIRONMENT="YDB_ENDPOINT=${ENDPOINT},YDB_DATABASE=${DATABASE},PUBLIC_BASE_URL=${PUBLIC_BASE_URL},YANDEX_CLIENT_ID=${YANDEX_CLIENT_ID},YANDEX_CLIENT_SECRET=${YANDEX_CLIENT_SECRET},ROUTE_ADMIN_PASSWORD=${ROUTE_ADMIN_PASSWORD},SESSION_TTL_DAYS=${SESSION_TTL_DAYS}"
 
-# Пустое значение переменной окружения платформа не принимает: добавляем
-# YOOKASSA_SHOP_ID только когда оплата действительно настроена.
 if [[ -n "${YOOKASSA_SHOP_ID}" ]]; then
   ENVIRONMENT="${ENVIRONMENT},YOOKASSA_SHOP_ID=${YOOKASSA_SHOP_ID}"
 fi
 
-SECRET_ARGS=(
-  --secret "id=${LOCKBOX_SECRET_ID},key=YANDEX_CLIENT_SECRET,environment-variable=YANDEX_CLIENT_SECRET"
-  --secret "id=${LOCKBOX_SECRET_ID},key=ROUTE_ADMIN_PASSWORD,environment-variable=ROUTE_ADMIN_PASSWORD"
-)
-
-if [[ -n "${YOOKASSA_SHOP_ID}" ]]; then
-  SECRET_ARGS+=(
-    --secret "id=${LOCKBOX_SECRET_ID},key=YOOKASSA_SECRET_KEY,environment-variable=YOOKASSA_SECRET_KEY"
-  )
+if [[ -n "${YOOKASSA_SECRET_KEY}" ]]; then
+  ENVIRONMENT="${ENVIRONMENT},YOOKASSA_SECRET_KEY=${YOOKASSA_SECRET_KEY}"
 fi
 
 yc serverless function version create \
@@ -102,7 +100,6 @@ yc serverless function version create \
   --execution-timeout 20s \
   --service-account-id "${SERVICE_ACCOUNT_ID}" \
   --environment "${ENVIRONMENT}" \
-  "${SECRET_ARGS[@]}" \
   --source-path backend \
   --description "navigator3 auth $(date '+%Y-%m-%d %H:%M:%S')"
 

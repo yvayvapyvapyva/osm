@@ -300,7 +300,7 @@ printf '%s' '[
 ]' | yc lockbox secret create --name osmn3-oauth --payload -
 ```
 
-Сервисному аккаунту функции нужна роль `lockbox.payloadViewer` на секрет.
+Секреты прокидываются напрямую в переменные окружения функции (`YANDEX_CLIENT_SECRET`, `ROUTE_ADMIN_PASSWORD`). Lockbox больше не используется.
 
 ### 3. Функция
 
