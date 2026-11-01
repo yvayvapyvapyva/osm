@@ -1162,7 +1162,10 @@ function getNavIconSvgSized(col, txt, isCurr = false, hasComm = false, sizeOverr
     const r = Math.round(s * 9 / 40);
     const safeCol = /^#[0-9a-f]{6}$/i.test(col) ? col : '#007AFF';
     const safeTxt = escapeHtml(String(txt ?? ''));
-    const fontSize = s >= 64 ? 13 : (s >= 52 ? 11 : 8);
+    // Цифра масштабируется вместе с иконкой: 8 px при 40, 13 px при 64.
+    // Коэффициент 13/64 сохраняет прежние размеры на крупных метках.
+    // Нижняя граница 8 px — на метках 30 px цифра иначе не читается на ходу.
+    const fontSize = Math.max(8, Math.round(s * 13 / 64));
     const commR = Math.max(3, Math.round(s * 4 / 40));
     const commCx = s - Math.round(s * 10 / 40);
     const commCy = Math.round(s * 10 / 40);
@@ -1381,7 +1384,7 @@ function renderRoutePoints() {
 
         const isKeyPoint = isCurrent || isPrevious || isNext;
         const shouldShow = isKeyPoint || !isPassed;
-        const markerSize = isCurrent ? 64 : (isNext ? 40 : 30);
+        const markerSize = isCurrent ? 64 : (isNext || isPrevious ? 48 : 30);
         const markerOpacity = isCurrent || isNext ? '' : '0.5';
 
         const markerZIndex = isCurrent ? 100 : (isNext ? 90 : 10);
@@ -1429,7 +1432,11 @@ function renderRoutePoints() {
             const isKeyPoint = isPrev || isNext;
             const show = APP._driveShowFrom >= 0 ? (ci >= Math.max(APP._driveShowFrom - 1, 0)) : (isKeyPoint || !isPassed);
             if (!show) { mapRemoveChild(pt.placemark); continue; }
-            if (pt.placemark.element) pt.placemark.element.style.opacity = '0.5';
+            // Следующая точка важнее остальных: номер должен читаться,
+            // поэтому приглушаем её меньше, чем пройденные и дальние.
+            if (pt.placemark.element) {
+                pt.placemark.element.style.opacity = isNext ? '0.75' : '0.5';
+            }
             mapAddChild(pt.placemark);
         }
         const curr = APP.navPoints[APP.navCurrentIndex];
