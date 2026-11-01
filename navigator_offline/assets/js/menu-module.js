@@ -65,7 +65,13 @@ const MenuModule = {
     // Инициализация
     async init(onRouteLoaded) {
         this.callback = onRouteLoaded;
+        this._folderPath = [];
+        this._searchQuery = '';
+        this._searchScope = 'all';
         this._loadMenuState();
+        this._folderPath = [];
+        this._searchQuery = '';
+        this._searchScope = 'all';
         this.createModal();
         this.hide();
         this._handlePaymentReturn();
