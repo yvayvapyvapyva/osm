@@ -127,7 +127,14 @@
 <script src="assets/js/maplibre-gl.js"></script>
 <script src="assets/js/pmtiles.js"></script>
 <script src="assets/js/map-styles.js?v=10"></script>
-<script src="assets/js/menu-module.js?v=14"></script>
+<script src="assets/js/menu-module.js?v=20"></script>
+<script>
+window.addEventListener('load', () => {
+    try {
+        if (document.querySelector('script[src*="navigator.html"]')) return;
+    } catch(e){}
+});
+</script>
 <script src="assets/js/auth-module.js?v=1"></script>
 <script>
 const MAP_PREFS_KEY = 'osm_map_prefs_v1';
@@ -1152,7 +1159,6 @@ function getNavIconSvg(col, txt, isCurr = false, hasComm = false) {
     const safeTxt = escapeHtml(String(txt ?? ''));
     const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${s}" height="${s}">
         <rect width="${s}" height="${s}" fill="transparent"/>
-        ${isCurr ? `<circle cx="${c}" cy="${c}" r="${r + 3}" fill="none" stroke="${safeCol}" stroke-width="2.5" opacity="0.95"/>` : ''}
         <circle cx="${c}" cy="${c}" r="${r}" fill="#FFFFFF"/>
         <circle cx="${c}" cy="${c}" r="${r}" fill="${safeCol}" opacity="0.18"/>
         <circle cx="${c}" cy="${c}" r="${r}" fill="none" stroke="${safeCol}" stroke-width="2"/>
@@ -1366,10 +1372,10 @@ function renderRoutePoints() {
 
         const isKeyPoint = isCurrent || isPrevious || isNext;
         const shouldShow = isKeyPoint || !isPassed;
-        const markerSize = isCurrent ? 52 : (isKeyPoint ? 40 : 30);
-        const markerOpacity = isKeyPoint ? (isPrevious ? '0.7' : '') : '';
+        const markerSize = isCurrent ? 52 : 40;
+        const markerOpacity = isCurrent ? '' : '0.5';
 
-        const markerZIndex = isCurrent ? 100 : (isPrevious ? 50 : 10);
+        const markerZIndex = isCurrent ? 100 : 10;
 
         if (shouldShow) {
             el.style.display = '';
@@ -1392,11 +1398,11 @@ function renderRoutePoints() {
                     coordinates: p.pts.map(pt => [pt[1], pt[0]])
                 },
                 properties: {
-                    color: isCurrent ? p.hex : (isPrevious ? hexToRgba(p.hex, 0.5) : p.hex),
-                    casingColor: isPrevious ? 'rgba(18,28,46,0.35)' : 'rgba(18,28,46,0.65)',
-                    casingWidth: isCurrent ? 8 : (isPrevious ? 8 : 6),
-                    width: isCurrent ? 6 : (isPrevious ? 6 : 4),
-                    priority: isCurrent ? 30 : (isPrevious ? 20 : 10)
+                    color: isCurrent ? p.hex : hexToRgba(p.hex, 0.5),
+                    casingColor: 'rgba(18,28,46,0.65)',
+                    casingWidth: 8,
+                    width: isCurrent ? 6 : 6,
+                    priority: isCurrent ? 30 : 10
                 }
             });
         }
@@ -1414,10 +1420,14 @@ function renderRoutePoints() {
             const isKeyPoint = isPrev || isNext;
             const show = APP._driveShowFrom >= 0 ? (ci >= Math.max(APP._driveShowFrom - 1, 0)) : (isKeyPoint || !isPassed);
             if (!show) { mapRemoveChild(pt.placemark); continue; }
+            if (pt.placemark.element) pt.placemark.element.style.opacity = '0.5';
             mapAddChild(pt.placemark);
         }
         const curr = APP.navPoints[APP.navCurrentIndex];
-        if (curr && curr.placemark) mapAddChild(curr.placemark);
+        if (curr && curr.placemark) {
+            if (curr.placemark.element) curr.placemark.element.style.opacity = '';
+            mapAddChild(curr.placemark);
+        }
         ensureRouteLayers();
         updateRouteLines(features);
     }
