@@ -357,7 +357,7 @@ html, body {
 }
 
 #routeNameDisplay {
-    color: var(--text);
+    color: #121A28;
     font-size: 12px;
     font-weight: 700;
     white-space: normal;
@@ -367,6 +367,7 @@ html, body {
     text-align: center;
     line-height: 1.3;
     opacity: 0.6;
+    text-shadow: 0 2px 8px rgba(0,0,0,0.7);
 }
 
 /* ============================================
@@ -2021,3 +2022,4 @@ html, body {
     background: color-mix(in srgb, var(--surface) 75%, transparent) !important;
     opacity: 1;
 }
+
