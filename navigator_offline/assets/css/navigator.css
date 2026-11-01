@@ -1806,6 +1806,26 @@ button, input, select, textarea {
     left: auto;
 }
 
+/* Кнопка атрибуции: только белая буква i без фона */
+.maplibregl-ctrl-attrib.maplibregl-compact {
+    background: transparent !important;
+    border-radius: 12px !important;
+    box-shadow: none !important;
+}
+.maplibregl-ctrl-attrib.maplibregl-compact-show {
+    background: hsla(0, 0%, 100%, 0.9) !important;
+    border-radius: 12px !important;
+}
+.maplibregl-ctrl-attrib-button {
+    background: transparent !important;
+    border-radius: 12px !important;
+    box-shadow: none !important;
+    background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' fill='%23ffffff' fill-rule='evenodd' viewBox='0 0 20 20'%3E%3Cpath d='M4 10a6 6 0 1 0 12 0 6 6 0 1 0-12 0m5-3a1 1 0 1 0 2 0 1 1 0 1 0-2 0m0 3a1 1 0 1 1 2 0v3a1 1 0 1 1-2 0'/%3E%3C/svg%3E") !important;
+}
+.maplibregl-ctrl-attrib.maplibregl-compact:after {
+    content: none !important;
+}
+
 .top-actions {
     position: fixed;
     left: 50%;
