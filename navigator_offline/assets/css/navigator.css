@@ -1506,7 +1506,7 @@ html, body {
 .screen-panel {
     position: absolute;
     top: var(--screen-top);
-    bottom: env(safe-area-inset-bottom);
+    bottom: 0;
     left: 0;
     right: 0;
     width: 100%;
@@ -1928,7 +1928,7 @@ html, body {
 
 .purchase-panel {
     top: auto;
-    bottom: env(safe-area-inset-bottom);
+    bottom: 0;
     max-height: min(78vh, 520px);
     border-radius: 20px 20px 0 0;
 }
