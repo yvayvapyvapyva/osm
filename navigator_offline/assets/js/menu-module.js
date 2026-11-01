@@ -11,8 +11,6 @@ const MenuModule = {
     _folderMap: new Map(),
     _folderCounts: new Map(),
     _folderPath: [],
-    _searchQuery: '',
-    _searchScope: 'all',
     _MENU_STATE_KEY: 'osm_routes_menu_state_v2',
     _pendingPurchaseFolderId: null,
     _previewObserver: null,
@@ -66,12 +64,8 @@ const MenuModule = {
     async init(onRouteLoaded) {
         this.callback = onRouteLoaded;
         this._folderPath = [];
-        this._searchQuery = '';
-        this._searchScope = 'all';
         this._loadMenuState();
         this._folderPath = [];
-        this._searchQuery = '';
-        this._searchScope = 'all';
         this.createModal();
         this.hide();
         this._handlePaymentReturn();
@@ -214,6 +208,7 @@ const MenuModule = {
                 purchase_folder_id: route.purchase_folder_id || '',
                 price_kopecks: Number.isFinite(route.price_kopecks) ? route.price_kopecks : 0,
                 sku: route.sku || '',
+                data: Array.isArray(route.data) ? route.data : null,
                 point_count: Number.isFinite(route.point_count) ? route.point_count : null,
                 distance_meters: Number.isFinite(route.distance_meters) ? route.distance_meters : null
             };
@@ -1088,16 +1083,6 @@ const MenuModule = {
                         </button>
                     </header>
                     <div id="routesToolbar" class="routes-toolbar">
-                        <div class="routes-search">
-                            <svg class="routes-search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
-                                <circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>
-                            </svg>
-                            <input id="routesSearchInput" class="routes-search-input" type="search" placeholder="Поиск маршрута" aria-label="Поиск маршрута" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="search">
-                            <button type="button" class="routes-search-clear" id="routesSearchClear" aria-label="Очистить поиск" hidden>
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
-                            </button>
-                            <button type="button" class="routes-search-scope" id="routesSearchScope" hidden>Везде</button>
-                        </div>
                         <nav id="routesBreadcrumb" class="routes-breadcrumb" aria-label="Путь к папке" hidden></nav>
                     </div>
                     <div id="routesListContainer" class="routes-list">
