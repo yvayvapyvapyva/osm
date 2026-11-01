@@ -127,7 +127,7 @@
 <script src="assets/js/maplibre-gl.js"></script>
 <script src="assets/js/pmtiles.js"></script>
 <script src="assets/js/map-styles.js?v=10"></script>
-<script src="assets/js/menu-module.js?v=20"></script>
+<script src="assets/js/menu-module.js?v=24"></script>
 <script>
 window.addEventListener('load', () => {
     try {
@@ -1151,20 +1151,29 @@ function closeSettings() {
 }
 
 function getNavIconSvg(col, txt, isCurr = false, hasComm = false) {
-    const s = isCurr ? 52 : 40, c = s / 2;
-    const r = isCurr ? 12 : 9;
-    // Цвет подставляется в атрибуты SVG, номер точки — в текстовый узел.
-    // И то, и другое приходит из данных маршрута, поэтому валидируем/экранируем.
+    const s = isCurr ? 64 : (txt && false ? 52 : 40); // будет переопределяться вне? лучше передавать размер
+    return getNavIconSvgSized(col, txt, isCurr, hasComm);
+}
+
+function getNavIconSvgSized(col, txt, isCurr = false, hasComm = false, sizeOverride = null) {
+    const isNextMark = false;
+    const s = sizeOverride != null ? sizeOverride : (isCurr ? 64 : 40);
+    const c = s / 2;
+    const r = Math.round(s * 9 / 40);
     const safeCol = /^#[0-9a-f]{6}$/i.test(col) ? col : '#007AFF';
     const safeTxt = escapeHtml(String(txt ?? ''));
+    const fontSize = s >= 64 ? 13 : (s >= 52 ? 11 : 8);
+    const commR = Math.max(3, Math.round(s * 4 / 40));
+    const commCx = s - Math.round(s * 10 / 40);
+    const commCy = Math.round(s * 10 / 40);
     const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${s}" height="${s}">
         <rect width="${s}" height="${s}" fill="transparent"/>
         <circle cx="${c}" cy="${c}" r="${r}" fill="#FFFFFF"/>
         <circle cx="${c}" cy="${c}" r="${r}" fill="${safeCol}" opacity="0.18"/>
         <circle cx="${c}" cy="${c}" r="${r}" fill="none" stroke="${safeCol}" stroke-width="2"/>
         <circle cx="${c}" cy="${c}" r="${r + 1.5}" fill="none" stroke="#000000" stroke-width="1"/>
-        ${hasComm ? `<circle cx="${s - 8}" cy="8" r="4" fill="#EF4444" stroke="#FFFFFF" stroke-width="1.5"/>` : ''}
-        <text x="${c}" y="${c + 0.5}" font-size="${isCurr ? 11 : 9}" font-family="Arial" font-weight="900" text-anchor="middle" dominant-baseline="middle" fill="#121A28">${safeTxt}</text>
+        ${hasComm ? `<circle cx="${commCx}" cy="${commCy}" r="${commR}" fill="#EF4444" stroke="#FFFFFF" stroke-width="1.5"/>` : ''}
+        <text x="${c}" y="${c + 0.5}" font-size="${fontSize}" font-family="Arial" font-weight="900" text-anchor="middle" dominant-baseline="middle" fill="#121A28">${safeTxt}</text>
     </svg>`;
     return 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svg)));
 }
@@ -1372,10 +1381,10 @@ function renderRoutePoints() {
 
         const isKeyPoint = isCurrent || isPrevious || isNext;
         const shouldShow = isKeyPoint || !isPassed;
-        const markerSize = isCurrent ? 52 : 40;
-        const markerOpacity = isCurrent ? '' : '0.5';
+        const markerSize = isCurrent ? 64 : (isNext ? 40 : 30);
+        const markerOpacity = isCurrent || isNext ? '' : '0.5';
 
-        const markerZIndex = isCurrent ? 100 : 10;
+        const markerZIndex = isCurrent ? 100 : (isNext ? 90 : 10);
 
         if (shouldShow) {
             el.style.display = '';
@@ -1384,7 +1393,7 @@ function renderRoutePoints() {
             el.style.height = markerSize + 'px';
             el.style.zIndex = markerZIndex;
             const markerStyle = markerOpacity ? ` style="opacity:${markerOpacity};"` : '';
-            el.innerHTML = `<img src="${getNavIconSvg(p.hex, p.id, isCurrent, hasComm)}" width="${markerSize}" height="${markerSize}" class="marker-img"${markerStyle} />`;
+            el.innerHTML = `<img src="${getNavIconSvgSized(p.hex, p.id, isCurrent, hasComm, markerSize)}" width="${markerSize}" height="${markerSize}" class="marker-img"${markerStyle} />`;
             p.placemark.update({ coordinates: [p.lon, p.lat] });
         } else {
             el.style.display = 'none';
@@ -1400,8 +1409,8 @@ function renderRoutePoints() {
                 properties: {
                     color: isCurrent ? p.hex : hexToRgba(p.hex, 0.5),
                     casingColor: 'rgba(18,28,46,0.65)',
-                    casingWidth: 8,
-                    width: isCurrent ? 6 : 6,
+                    casingWidth: isCurrent ? 14 : 8,
+                    width: isCurrent ? 10 : 6,
                     priority: isCurrent ? 30 : 10
                 }
             });
