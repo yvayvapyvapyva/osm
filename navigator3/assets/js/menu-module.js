@@ -23,6 +23,7 @@ const MenuModule = {
     _previewFetching: new Set(),
     _previewActive: false,
     _folderCache: new Map(),
+    _catalogLoaded: false,
     API_CATALOG_URL: '/api/catalog',
     API_FOLDER_URL: '/api/folder',
     API_ROUTE_URL: '/api/route',
@@ -102,14 +103,15 @@ const MenuModule = {
         };
         const attempt = async () => {
             try {
+                // Дерево папок и метаданные всех маршрутов берём из каталога
+                // один раз. Геометрию потом догружаем попапочной функцией
+                // /api/folder, чтобы не тянуть все маршруты сразу.
+                if (!this._catalogLoaded) {
+                    await this._fetchFromAPI();
+                }
                 const folderId = this._folderPath[this._folderPath.length - 1] || '';
                 const payload = await this._fetchFolder(folderId);
                 this._applyFolderData(payload);
-                this._folders = Array.isArray(payload.folders) ? payload.folders : [];
-                this._folderMap.clear();
-                for (const folder of this._folders) {
-                    if (folder && folder.folder_id) this._folderMap.set(folder.folder_id, folder);
-                }
                 this._routesLoaded = true;
                 this._buildRoutesList();
                 return true;
@@ -179,6 +181,7 @@ const MenuModule = {
         }
 
         this.routesDescriptions = routesFlat;
+        this._catalogLoaded = true;
         this._buildCatalog();
     },
 
@@ -1202,7 +1205,6 @@ const MenuModule = {
                 this._searchScope = 'all';
                 this._saveMenuState();
                 this._routesLoaded = false;
-                this._catalog = [];
                 this._buildRoutesList();
             });
         }
@@ -1303,12 +1305,26 @@ const MenuModule = {
         }
     },
 
+    _resetCatalog() {
+        this._catalogLoaded = false;
+        this._catalog = [];
+        this.routesDescriptions = {};
+        this._folders = [];
+        this._folderMap.clear();
+        this._folderCounts.clear();
+        this._folderCache.clear();
+        this._routeDataCache.clear();
+        this._routeRequests.clear();
+    },
+
     _handlePaymentReturn() {
         const params = new URLSearchParams(window.location.search);
         if (params.get('payment') !== 'success') return;
         if (typeof showToast === 'function') {
             showToast('Оплата получена. Обновляем доступ…', 'success', 4000);
         }
+        // Права могли измениться: сбрасываем кэш каталога и папок.
+        this._resetCatalog();
         // Webhook ЮKassa может прийти на секунду позже возврата в браузер.
         setTimeout(() => this._loadRoutesList(), 1800);
         params.delete('payment');

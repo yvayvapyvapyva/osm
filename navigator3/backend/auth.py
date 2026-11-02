@@ -13,7 +13,7 @@ import os
 import secrets
 from datetime import datetime, timezone
 from urllib.error import HTTPError, URLError
-from urllib.parse import quote, unquote, urlencode
+from urllib.parse import quote, unquote, urlencode, urlsplit
 from urllib.request import Request, urlopen
 
 AUTHORIZE_URL = "https://oauth.yandex.ru/authorize"
@@ -54,6 +54,36 @@ def public_base_url():
     return base
 
 
+def alternate_base_urls():
+    """Дополнительные origin'ы (через запятую), например старый адрес шлюза."""
+    raw = _env("PUBLIC_ALTERNATE_URLS")
+    return [item.strip().rstrip("/") for item in raw.split(",") if item.strip()]
+
+
+def base_url_for_event(event=None):
+    """Возвращает origin текущего запроса, если он разрешён.
+
+    OAuth-cookie живут на конкретном хосте, поэтому redirect_uri должен
+    указывать на тот же хост, с которого пользователь начал вход. Любой
+    другой Host сведётся к PUBLIC_BASE_URL.
+    """
+    base = public_base_url()
+    if not event:
+        return base
+    host = ""
+    headers = event.get("headers") or {}
+    for key, value in headers.items():
+        if str(key).lower() == "host" and isinstance(value, str):
+            host = value.strip().lower()
+            break
+    if not host:
+        return base
+    for candidate in [base] + alternate_base_urls():
+        if urlsplit(candidate).netloc.lower() == host:
+            return candidate
+    return base
+
+
 def client_id():
     value = _env("YANDEX_CLIENT_ID")
     if not value:
@@ -81,8 +111,8 @@ def oauth_scope():
     return _env("OAUTH_SCOPE", DEFAULT_SCOPE)
 
 
-def redirect_uri():
-    return public_base_url() + "/auth/yandex/callback"
+def redirect_uri(event=None):
+    return base_url_for_event(event) + "/auth/yandex/callback"
 
 
 def safe_return(value, default="/"):
@@ -105,11 +135,11 @@ def make_pkce():
     return verifier, challenge
 
 
-def build_authorize_url(state, challenge):
+def build_authorize_url(state, challenge, event=None):
     params = {
         "response_type": "code",
         "client_id": client_id(),
-        "redirect_uri": redirect_uri(),
+        "redirect_uri": redirect_uri(event),
         "scope": oauth_scope(),
         "state": state,
         "code_challenge": challenge,
@@ -343,6 +373,7 @@ def origin_allowed(event):
     base = _env("PUBLIC_BASE_URL").rstrip("/")
     if not base:
         return True
+    allowed = [base] + alternate_base_urls()
     headers = event.get("headers") or {}
     origin = ""
     for key, value in headers.items():
@@ -351,7 +382,7 @@ def origin_allowed(event):
             break
     if not origin:
         return True
-    return hmac.compare_digest(origin, base)
+    return any(hmac.compare_digest(origin, item) for item in allowed)
 
 
 def now_utc():

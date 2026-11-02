@@ -20,18 +20,25 @@
 | Что | Значение |
 |---|---|
 | Бакет | `osmn-nav` (приватный) |
-| Домен | `https://d5dsd5u1tsc8fm9dbsg5.s183zexc.apigw.yandexcloud.net` |
+| Домен | `https://ainstruktor.ru` (Cloudflare → API Gateway) |
+| Домен шлюза | `https://d5dsd5u1tsc8fm9dbsg5.s183zexc.apigw.yandexcloud.net` |
 | API Gateway | `osmn3` / `d5dsd5u1tsc8fm9dbsg5` |
 | Функция | `osmn3` / `d4e8ds1489g0q91dt7do` |
 | Сервисный аккаунт шлюза | `osmn3-gateway` / `ajec0sf19r17r3tv6vrg` |
 | YDB | `dbosm`, таблицы `users`, `sessions`, `roads`, `folders`, `entitlements`, `orders` |
 | Lockbox | `osmn3-oauth` / `e6q97rh5hpfelika4qjl` |
 
-Redirect URI приложения Яндекс OAuth:
+Redirect URI приложения Яндекс OAuth (должны быть зарегистрированы оба):
 
 ```
+https://ainstruktor.ru/auth/yandex/callback
 https://d5dsd5u1tsc8fm9dbsg5.s183zexc.apigw.yandexcloud.net/auth/yandex/callback
 ```
+
+`PUBLIC_BASE_URL` задаёт основной origin (`https://ainstruktor.ru`),
+`PUBLIC_ALTERNATE_URLS` — дополнительные через запятую. Redirect URI и
+return-адреса строятся от того хоста, с которого пользователь начал запрос,
+поэтому вход работает и на старом домене шлюза.
 
 ## Схема
 
@@ -199,6 +206,7 @@ CREATE TABLE orders (
 | GET | `/api/health` | `{"status":"ok"}` |
 | GET | `/api/me` | `{"user":{...},"entitlements":[...]}` или 401 |
 | GET | `/api/catalog` | `{"folders":[...],"routes":[...],"user":...}` без геометрии |
+| GET | `/api/folder?folder_id=<id>` | содержимое папки с геометрией доступных маршрутов |
 | GET | `/api/route?m=<m>` | маршрут с `data`; 401/402 без доступа |
 | POST | `/api/orders` | `{"order_id","payment_id","confirmation_url"}` |
 | POST | `/api/yookassa/notify` | webhook ЮKassa |
@@ -260,6 +268,7 @@ CREATE TABLE orders (
 | `YDB_ENDPOINT` | да | `grpcs://ydb.serverless.yandexcloud.net:2135` |
 | `YDB_DATABASE` | да | `/ru-central1/.../etnjvaftd6eakeq08kqr` |
 | `PUBLIC_BASE_URL` | да | `https://<домен-шлюза>` |
+| `PUBLIC_ALTERNATE_URLS` | нет | дополнительные origin'ы через запятую |
 | `YANDEX_CLIENT_ID` | да | ClientID приложения OAuth |
 | `SESSION_TTL_DAYS` | нет | срок сессии, по умолчанию 30 |
 | `OAUTH_SCOPE` | нет | по умолчанию `login:info login:email` |

@@ -793,7 +793,7 @@ def _auth_start(event):
         return_to = auth.safe_return(_query(event).get("return"))
         state = secrets.token_urlsafe(24)
         verifier, challenge = auth.make_pkce()
-        location = auth.build_authorize_url(state, challenge)
+        location = auth.build_authorize_url(state, challenge, event)
     except auth.AuthConfigError as exc:
         print(f"[auth] config error: {exc}")
         return auth.json_response(503, {"error": "auth_not_configured"})
@@ -938,6 +938,10 @@ def _api_catalog(event):
     except Exception as exc:  # noqa: BLE001
         print(f"[api] catalog failed: {exc}")
         return auth.json_response(500, {"error": "storage_failed"})
+
+
+def _api_me(event):
+    """Текущий пользователь и его права, либо 401 для гостя."""
     user = _current_user(event)
     if not user:
         return auth.json_response(401, {"error": "unauthorized"})
@@ -1052,7 +1056,7 @@ def _api_route(event):
         return auth.json_response(500, {"error": "storage_failed"})
 
 
-def _return_url(return_path):
+def _return_url(return_path, event=None):
     path = auth.safe_return(return_path)
     if "#" in path:
         before, fragment = path.split("#", 1)
@@ -1060,7 +1064,13 @@ def _return_url(return_path):
     else:
         before, fragment = path, ""
     separator = "&" if "?" in before else "?"
-    return auth.public_base_url() + before + separator + "payment=success" + fragment
+    return (
+        auth.base_url_for_event(event)
+        + before
+        + separator
+        + "payment=success"
+        + fragment
+    )
 
 
 def _api_orders(event):
@@ -1112,7 +1122,7 @@ def _api_orders(event):
             payment = payments.create_payment(
                 amount_kopecks=info["price_kopecks"],
                 description=f"Доступ к папке «{by_id[folder_id]['name']}»",
-                return_url=_return_url(return_path),
+                return_url=_return_url(return_path, event),
                 metadata={
                     "order_id": order_id,
                     "user_id": user["user_id"],
@@ -1651,6 +1661,9 @@ def _handle_api(event, path, method):
 
     if normalized == "/api/folder" and method == "GET":
         return _api_folder(event)
+
+    if normalized == "/api/route" and method == "GET":
+        return _api_route(event)
 
     if normalized == "/api/orders" and method == "POST":
         return _api_orders(event)
