@@ -691,13 +691,13 @@ button, input, select, textarea {
     align-items: center;
     justify-content: center;
     gap: 3px;
-    width: 96px;
-    height: 48px;
+    width: 104px;
+    height: 56px;
     padding: 0;
     border-radius: var(--radius-card);
     color: var(--text);
     font-family: inherit;
-    font-size: 11px;
+    font-size: 12px;
     font-weight: 600;
     letter-spacing: 0.1px;
     line-height: 1;
@@ -710,8 +710,8 @@ button, input, select, textarea {
 .nav-action-btn svg {
     display: block;
     fill: currentColor;
-    width: 22px;
-    height: 22px;
+    width: 24px;
+    height: 24px;
     flex-shrink: 0;
 }
 
@@ -731,6 +731,7 @@ button, input, select, textarea {
 @media (max-width: 380px) {
     .nav-action-btn {
         width: 88px;
+        height: 52px;
         font-size: 10px;
         letter-spacing: 0;
     }
@@ -1736,7 +1737,7 @@ button, input, select, textarea {
     padding: 0;
     box-sizing: border-box;
     pointer-events: auto;
-    max-width: min(340px, calc(100% - 24px));
+    max-width: min(360px, calc(100% - 24px));
     width: max-content;
 }
 
@@ -1754,23 +1755,23 @@ button, input, select, textarea {
     border-radius: var(--radius-card);
     color: var(--text);
     font-family: inherit;
-    font-size: 11px;
+    font-size: 12px;
     font-weight: 600;
     letter-spacing: 0.1px;
     line-height: 1;
     cursor: pointer;
     touch-action: manipulation;
     -webkit-tap-highlight-color: transparent;
-    width: 96px;
+    width: 104px;
     flex: 0 0 auto;
     transition: color 0.18s ease, border-color 0.18s ease, background 0.18s ease, transform 0.12s ease;
-    height: 48px;
+    height: 56px;
 }
 
 .top-action-btn svg {
     display: block;
-    width: 22px;
-    height: 22px;
+    width: 24px;
+    height: 24px;
     flex-shrink: 0;
 }
 
@@ -1804,6 +1805,8 @@ button, input, select, textarea {
 
 @media (max-width: 380px) {
     .top-action-btn {
+        width: 88px;
+        height: 52px;
         font-size: 10px;
         letter-spacing: 0;
     }
