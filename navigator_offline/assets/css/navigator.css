@@ -883,102 +883,6 @@ button, input, select, textarea {
     border-bottom: 1px solid var(--line-soft);
 }
 
-.routes-search {
-    display: flex;
-    align-items: center;
-    height: 40px;
-    margin: 0 12px;
-    border-radius: var(--radius-control);
-    background: var(--surface-muted);
-    border: 1px solid var(--line);
-    box-sizing: border-box;
-    transition: border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
-}
-
-.routes-search:focus-within {
-    background: var(--surface);
-    border-color: var(--green-focus);
-    box-shadow: 0 0 0 3px var(--green-tint);
-}
-
-.routes-search-icon {
-    flex: 0 0 auto;
-    width: 18px;
-    height: 18px;
-    margin-left: 12px;
-    color: var(--text-soft);
-}
-
-.routes-search-input {
-    flex: 1 1 auto;
-    min-width: 0;
-    height: 100%;
-    padding: 0 8px;
-    border: 0;
-    outline: 0;
-    background: transparent;
-    color: var(--text);
-    font: inherit;
-    font-size: 16px;
-    -webkit-appearance: none;
-    appearance: none;
-}
-
-.routes-search-input::placeholder {
-    color: var(--text-soft);
-}
-
-.routes-search-input::-webkit-search-cancel-button,
-.routes-search-input::-webkit-search-decoration {
-    -webkit-appearance: none;
-    display: none;
-}
-
-.routes-search-clear {
-    flex: 0 0 auto;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 28px;
-    height: 28px;
-    margin-right: 7px;
-    padding: 0;
-    border: 0;
-    border-radius: 50%;
-    background: var(--surface-muted);
-    color: var(--text-muted);
-    cursor: pointer;
-}
-
-.routes-search-clear[hidden] {
-    display: none;
-}
-
-.routes-search-scope {
-    flex: 0 0 auto;
-    height: 28px;
-    margin: 0 6px 0 2px;
-    padding: 0 10px;
-    border: 1px solid var(--green-line-soft);
-    border-radius: 999px;
-    background: var(--green-tint);
-    color: var(--green-dark);
-    font: inherit;
-    font-size: 11px;
-    font-weight: 700;
-    cursor: pointer;
-}
-
-.routes-search-scope[hidden] {
-    display: none;
-}
-
-.routes-search-scope[aria-pressed="true"] {
-    background: var(--green-tint-strong);
-    border-color: var(--green-line);
-    color: var(--green-dark);
-}
-
 .routes-breadcrumb {
     display: flex;
     align-items: center;
@@ -1045,11 +949,6 @@ button, input, select, textarea {
     flex: 0 0 auto;
     color: var(--text-faint);
     font-size: 15px;
-}
-
-.routes-search-clear svg {
-    width: 14px;
-    height: 14px;
 }
 
 .routes-list {

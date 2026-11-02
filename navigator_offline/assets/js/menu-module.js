@@ -304,10 +304,7 @@ const MenuModule = {
                 purchaseFolderId: route.purchase_folder_id || '',
                 priceKopecks: Number.isFinite(route.price_kopecks) ? route.price_kopecks : 0,
                 sku: route.sku || '',
-                ...this._routeStats(route),
-                search: this._normalizeSearch(
-                    `${fullPath} ${typeof route.description === 'string' ? route.description : ''}`
-                )
+                ...this._routeStats(route)
             });
 
             for (const folderId of folders) {
@@ -415,23 +412,15 @@ const MenuModule = {
                 saved.folderPath.every(folder => typeof folder === 'string')) {
                 this._folderPath = saved.folderPath;
             }
-            if (typeof saved.query === 'string') this._searchQuery = saved.query;
-            if (saved.searchScope === 'all' || saved.searchScope === 'category') {
-                this._searchScope = saved.searchScope;
-            }
         } catch (e) {
             this._folderPath = [];
-            this._searchQuery = '';
-            this._searchScope = 'all';
         }
     },
 
     _saveMenuState() {
         try {
             localStorage.setItem(this._MENU_STATE_KEY, JSON.stringify({
-                folderPath: this._folderPath,
-                query: this._searchQuery,
-                searchScope: this._searchScope
+                folderPath: this._folderPath
             }));
         } catch (e) {}
     },
@@ -457,34 +446,11 @@ const MenuModule = {
             path.every((folderId, index) => item.folders[index] === folderId);
     },
 
-    _normalizeSearch(value) {
-        return String(value || '')
-            .toLocaleLowerCase('ru')
-            .replace(/ё/g, 'е')
-            .replace(/\s+/g, ' ')
-            .trim();
-    },
-
     _getFilteredRoutes() {
-        let routes;
-
-        if (this._searchQuery) {
-            const tokens = this._normalizeSearch(this._searchQuery).split(' ').filter(Boolean);
-            routes = !tokens.length
-                ? this._catalog
-                : this._catalog.filter(item =>
-                    tokens.every(token => item.search.includes(token)) &&
-                    (this._searchScope !== 'category' || !this._folderPath.length ||
-                        this._isWithinFolder(item, this._folderPath))
-                );
-        } else {
-            routes = this._catalog.filter(item =>
-                item.folders.length === this._folderPath.length &&
-                this._isWithinFolder(item, this._folderPath)
-            );
-        }
-
-        return routes;
+        return this._catalog.filter(item =>
+            item.folders.length === this._folderPath.length &&
+            this._isWithinFolder(item, this._folderPath)
+        );
     },
 
     // Индикация загрузки списка маршрутов
@@ -504,7 +470,6 @@ const MenuModule = {
         const container = document.getElementById('routesListContainer');
         if (!container) return;
         this._destroyRoutePreviews();
-        this._updateSearchScopeButton();
 
         // Список ещё не получен — показываем спиннер, а не «Нет маршрутов».
         if (!this._routesLoaded) {
@@ -527,34 +492,21 @@ const MenuModule = {
             return;
         }
 
-        const childFolders = !this._searchQuery
-            ? this._getChildFolders(this._folderPath[this._folderPath.length - 1] || '')
-            : [];
+        const childFolders = this._getChildFolders(this._folderPath[this._folderPath.length - 1] || '');
         if (!routes.length && !childFolders.length) {
             const empty = document.createElement('div');
             empty.className = 'routes-empty';
-            empty.innerHTML = this._searchQuery
-                ? '<div class="routes-empty-title">Ничего не найдено</div><div class="routes-empty-hint">Попробуйте изменить запрос</div>'
-                : '<div class="routes-empty-title">В этом разделе нет маршрутов</div>';
+            empty.innerHTML = '<div class="routes-empty-title">В этом разделе нет маршрутов</div>';
             container.appendChild(empty);
             return;
         }
 
         const summary = document.createElement('div');
         summary.className = 'routes-results-meta';
-        const countLabel = this._searchQuery
-            ? `${routes.length} ${this._pluralize(routes.length, 'маршрут найден', 'маршрута найдено', 'маршрутов найдено')}`
-            : `${routes.length} ${this._pluralize(routes.length, 'маршрут', 'маршрута', 'маршрутов')}`;
-        const searchContext = this._searchQuery
-            ? this._searchScope === 'category' && this._folderPath.length
-                ? `в папке «${this._folderPath.map(id => this._folderMap.get(id)?.name).filter(Boolean).join(' / ')}»`
-                : 'во всех маршрутах'
-            : '';
-        summary.textContent = this._searchQuery
-            ? `${countLabel} ${searchContext}`
-            : childFolders.length
-                ? `${childFolders.length} ${this._pluralize(childFolders.length, 'папка', 'папки', 'папок')} · ${countLabel}`
-                : countLabel;
+        const countLabel = `${routes.length} ${this._pluralize(routes.length, 'маршрут', 'маршрута', 'маршрутов')}`;
+        summary.textContent = childFolders.length
+            ? `${childFolders.length} ${this._pluralize(childFolders.length, 'папка', 'папки', 'папок')} · ${countLabel}`
+            : countLabel;
         container.appendChild(summary);
         if (childFolders.length) {
             const folderList = document.createElement('div');
@@ -647,20 +599,6 @@ const MenuModule = {
             case 4: return few;
             default: return many;
         }
-    },
-
-    _updateSearchScopeButton() {
-        const button = document.getElementById('routesSearchScope');
-        if (!button) return;
-        button.hidden = !this._folderPath.length || !this._searchQuery;
-        button.textContent = this._searchScope === 'category' ? 'В этой папке' : 'Везде';
-        button.setAttribute('aria-pressed', String(this._searchScope === 'category'));
-        button.setAttribute(
-            'aria-label',
-            this._searchScope === 'category'
-                ? `Искать в этой папке и её подпапках: ${this._folderPath.map(id => this._folderMap.get(id)?.name).filter(Boolean).join(' / ')}`
-                : 'Искать во всех маршрутах'
-        );
     },
 
     _createRouteRow(route) {
@@ -1137,39 +1075,6 @@ const MenuModule = {
         const purchaseLogin = document.getElementById('purchaseLogin');
         if (purchaseLogin) purchaseLogin.addEventListener('click', () => this._loginForPurchase());
 
-        const searchInput = document.getElementById('routesSearchInput');
-        if (searchInput) {
-            searchInput.addEventListener('input', () => {
-                this._searchQuery = searchInput.value.trim();
-                this._saveMenuState();
-                this._updateSearchClear();
-                this._buildRoutesList();
-            });
-            searchInput.addEventListener('keydown', event => {
-                if (event.key === 'Escape') {
-                    event.preventDefault();
-                    this._clearSearch();
-                }
-            });
-        }
-
-        const searchClear = document.getElementById('routesSearchClear');
-        if (searchClear) {
-            searchClear.addEventListener('click', () => {
-                this._clearSearch();
-                if (searchInput) searchInput.focus();
-            });
-        }
-
-        const searchScope = document.getElementById('routesSearchScope');
-        if (searchScope) {
-            searchScope.addEventListener('click', () => {
-                this._searchScope = this._searchScope === 'category' ? 'all' : 'category';
-                this._saveMenuState();
-                this._buildRoutesList();
-            });
-        }
-
         const breadcrumb = document.getElementById('routesBreadcrumb');
         if (breadcrumb) {
             breadcrumb.addEventListener('click', event => {
@@ -1178,7 +1083,6 @@ const MenuModule = {
                 const index = Number(item.dataset.breadcrumbIndex);
                 if (!Number.isInteger(index)) return;
                 this._folderPath = index === 0 ? [] : this._folderPath.slice(0, index);
-                this._searchScope = 'all';
                 this._saveMenuState();
                 this._buildRoutesList();
             });
@@ -1193,7 +1097,6 @@ const MenuModule = {
                     return;
                 }
                 this._folderPath = [...this._folderPath, folder.dataset.folderId];
-                this._searchScope = 'all';
                 this._saveMenuState();
                 this._routesLoaded = false;
                 this._catalog = [];
@@ -1316,15 +1219,6 @@ const MenuModule = {
         );
     },
 
-    _clearSearch() {
-        this._searchQuery = '';
-        const input = document.getElementById('routesSearchInput');
-        if (input) input.value = '';
-        this._saveMenuState();
-        this._updateSearchClear();
-        this._buildRoutesList();
-    },
-
     // Проверка URL параметра
     checkUrlParam() {
         const routeParam = this.getUrlParam('m');
@@ -1433,15 +1327,7 @@ const MenuModule = {
         const modal = document.getElementById('jsonModal');
         if (modal) modal.classList.remove('hidden');
 
-        const input = document.getElementById('routesSearchInput');
-        if (input) input.value = this._searchQuery;
-        this._updateSearchClear();
         this._buildRoutesList();
-    },
-
-    _updateSearchClear() {
-        const clear = document.getElementById('routesSearchClear');
-        if (clear) clear.hidden = !this._searchQuery;
     },
 
     showSpinner() {
