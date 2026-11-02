@@ -20,7 +20,7 @@
 | Что | Значение |
 |---|---|
 | Бакет | `osmn-nav` (приватный) |
-| Домен | `https://ainstruktor.ru` (Cloudflare → API Gateway) |
+| Домен | `https://ainstruktor.ru` — DNS only в Cloudflare, трафик напрямую в API Gateway (сертификат Yandex Certificate Manager). `www` — через Cloudflare, 301 на apex |
 | Домен шлюза | `https://d5dsd5u1tsc8fm9dbsg5.s183zexc.apigw.yandexcloud.net` |
 | API Gateway | `osmn3` / `d5dsd5u1tsc8fm9dbsg5` |
 | Функция | `osmn3` / `d4e8ds1489g0q91dt7do` |
