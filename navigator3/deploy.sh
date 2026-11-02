@@ -7,19 +7,19 @@
 # Обязательные переменные:
 #   PUBLIC_BASE_URL       — https://<домен-шлюза>
 #   YANDEX_CLIENT_ID      — ClientID приложения Яндекс OAuth
-#   LOCKBOX_SECRET_ID     — id секрета Lockbox с ключами:
-#                           YANDEX_CLIENT_SECRET и ROUTE_ADMIN_PASSWORD
+#   YANDEX_CLIENT_SECRET  — секрет приложения Яндекс OAuth
+#   ROUTE_ADMIN_PASSWORD  — пароль редактора маршрутов
 #
 # Необязательные:
 #   FUNCTION_NAME         — по умолчанию osmn3
 #   FUNCTION_ID           — если функция уже создана
 #   SERVICE_ACCOUNT_ID    — по умолчанию servaccsunt
-#   YOOKASSA_SHOP_ID      — shopId ЮKassa; если задан, подключится секрет
-#                           YOOKASSA_SECRET_KEY из Lockbox
+#   YOOKASSA_SHOP_ID      — shopId ЮKassa; включает оплату
+#   YOOKASSA_SECRET_KEY   — секретный ключ ЮKassa
 #
-# Пароль редактора, client secret и секрет ЮKassa не передаются через
-# environment: только через Lockbox, чтобы значения не попадали в вывод `yc`
-# и в историю команд.
+# Секреты передаются обычными переменными окружения функции, без Lockbox.
+# Значения видны в `yc serverless function version list`, поэтому доступ к
+# каталогу Yandex Cloud должен быть ограничен кругом доверенных людей.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"

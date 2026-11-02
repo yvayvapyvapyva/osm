@@ -26,7 +26,6 @@
 | Функция | `osmn3` / `d4e8ds1489g0q91dt7do` |
 | Сервисный аккаунт шлюза | `osmn3-gateway` / `ajec0sf19r17r3tv6vrg` |
 | YDB | `dbosm`, таблицы `users`, `sessions`, `roads`, `folders`, `entitlements`, `orders` |
-| Lockbox | `osmn3-oauth` / `e6q97rh5hpfelika4qjl` |
 
 Redirect URI приложения Яндекс OAuth (должны быть зарегистрированы оба):
 
@@ -219,7 +218,8 @@ CREATE TABLE orders (
 
 Все действия `/api/admin` требуют заголовок `X-Route-Admin-Password`, включая
 чтение: иначе `action=list` отдавал бы скрытые маршруты в обход
-`visible = true`. Пароль хранится только в Lockbox.
+`visible = true`. Пароль хранится в переменной окружения функции
+`ROUTE_ADMIN_PASSWORD`.
 
 | `action` | Назначение |
 |---|---|
@@ -272,19 +272,17 @@ CREATE TABLE orders (
 | `YANDEX_CLIENT_ID` | да | ClientID приложения OAuth |
 | `SESSION_TTL_DAYS` | нет | срок сессии, по умолчанию 30 |
 | `OAUTH_SCOPE` | нет | по умолчанию `login:info login:email` |
+| `YANDEX_CLIENT_SECRET` | да | секрет приложения Яндекс OAuth |
+| `ROUTE_ADMIN_PASSWORD` | да | пароль редактора маршрутов |
 | `YOOKASSA_SHOP_ID` | для оплаты | shopId ЮKassa |
+| `YOOKASSA_SECRET_KEY` | для оплаты | секретный ключ ЮKassa |
 
-Секреты лежат в Lockbox и подключаются к функции как `--secret`:
-
-| Ключ Lockbox | Переменная функции |
-|---|---|
-| `YANDEX_CLIENT_SECRET` | `YANDEX_CLIENT_SECRET` |
-| `ROUTE_ADMIN_PASSWORD` | `ROUTE_ADMIN_PASSWORD` |
-| `YOOKASSA_SECRET_KEY` | `YOOKASSA_SECRET_KEY` (только если задан `YOOKASSA_SHOP_ID`) |
-
-`deploy.sh` не передаёт секреты через environment и не печатает их. Пустые
-переменные окружения платформа не принимает, поэтому `YOOKASSA_SHOP_ID`
-добавляется только когда оплата настроена.
+Секреты — обычные переменные окружения функции, Lockbox не используется.
+`deploy.sh` берёт значения из `navigator3/.env` (он в `.gitignore`) и передаёт
+их в `--environment`. Значения видны в `yc serverless function version list`,
+поэтому доступ к каталогу Yandex Cloud должен быть ограничен кругом доверенных
+людей. Пустые переменные платформа не принимает, поэтому `YOOKASSA_SHOP_ID` и
+`YOOKASSA_SECRET_KEY` добавляются только когда оплата настроена.
 
 ## Порядок запуска
 
@@ -299,24 +297,28 @@ python3 navigator3/scripts/init_folders.py   # folders, entitlements, orders, п
 `roads.name` вида `МЕЩЕРА/Экзамен/Маршрут` в дерево папок и заполняет
 `folder_id`, `title`, `access`. Уже заполненные значения не перезаписываются.
 
-### 2. Lockbox
+### 2. Секреты
 
-```bash
-printf '%s' '[
-  {"key":"YANDEX_CLIENT_SECRET","text_value":"<secret>"},
-  {"key":"ROUTE_ADMIN_PASSWORD","text_value":"<пароль>"},
-  {"key":"YOOKASSA_SECRET_KEY","text_value":"<secret-key>"}
-]' | yc lockbox secret create --name osmn3-oauth --payload -
+Все секреты — в `navigator3/.env`, который не попадает в git:
+
+```
+YANDEX_CLIENT_SECRET=<секрет приложения OAuth>
+ROUTE_ADMIN_PASSWORD=<пароль редактора>
+YOOKASSA_SHOP_ID=<shopId>            # только когда подключена оплата
+YOOKASSA_SECRET_KEY=<секретный ключ> # только когда подключена оплата
 ```
 
-Секреты прокидываются напрямую в переменные окружения функции (`YANDEX_CLIENT_SECRET`, `ROUTE_ADMIN_PASSWORD`). Lockbox больше не используется.
+`deploy.sh` передаёт их в переменные окружения функции. Lockbox не
+используется: значение видно в `yc serverless function version list`, так что
+доступ к каталогу Yandex Cloud должен быть ограничен.
 
 ### 3. Функция
 
 ```bash
 cp navigator3/.env.example navigator3/.env
-# заполнить PUBLIC_BASE_URL, YANDEX_CLIENT_ID, LOCKBOX_SECRET_ID
-# при необходимости YOOKASSA_SHOP_ID
+# заполнить PUBLIC_BASE_URL, YANDEX_CLIENT_ID, YANDEX_CLIENT_SECRET,
+# ROUTE_ADMIN_PASSWORD; при необходимости YOOKASSA_SHOP_ID и
+# YOOKASSA_SECRET_KEY
 ./navigator3/deploy.sh
 ```
 
