@@ -7,18 +7,22 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="theme-color" content="#F4F6FA">
     <script>
-        /* Тема применяется до первой отрисовки, чтобы не было вспышки светлого фона. */
+        /* Тема применяется до первой отрисовки, чтобы не было вспышки светлого фона.
+           Выбор пользователя живёт только в памяти вкладки, поэтому после
+           перезагрузки снова берём схему устройства. */
         (function () {
             var theme = 'light';
             try {
-                if (localStorage.getItem('osm_theme_v1') === 'dark') theme = 'dark';
+                if (window.matchMedia('(prefers-color-scheme: dark)').matches) theme = 'dark';
             } catch (e) {}
             document.documentElement.setAttribute('data-theme', theme);
             var meta = document.querySelector('meta[name="theme-color"]');
             if (meta) meta.setAttribute('content', theme === 'dark' ? '#0F141C' : '#F4F6FA');
+            /* Ключ из прошлых версий больше не нужен. */
+            try { localStorage.removeItem('osm_theme_v1'); } catch (e) {}
         })();
     </script>
-    <link rel="stylesheet" href="assets/css/navigator.css?v=22">
+    <link rel="stylesheet" href="assets/css/navigator.css?v=23">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.css">
     <!-- Yandex.Metrika counter -->
     <script type="text/javascript">
@@ -84,8 +88,8 @@
 
 <video id="wakeLockVideo" playsinline muted loop></video>
 <div id="map"></div>
-<button id="locateBtn" class="circle-btn">
-    <svg viewBox="0 0 24 24"><path d="M12 8c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4zm8.94 3c-.46-4.17-3.77-7.48-7.94-7.94V1h-2v2.06C6.83 3.52 3.52 6.83 3.06 11H1v2h2.06c.46 4.17 3.77 7.48 7.94 7.94V23h2v-2.06c4.17-.46 7.48-3.77 7.94-7.94H23v-2h-2.06zM12 19c-3.87 0-7-3.13-7-7s3.13-7 7-7 7 3.13 7 7-3.13 7-7 7z"/></svg>
+<button id="locateBtn" class="circle-btn" aria-label="Привязка к геопозиции">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18.05 5.96 11.68 22.5l-2.42-7.76L1.5 12.32 18.05 5.96Z"/></svg>
 </button>
 
 <div id="telemetryPanel" aria-label="Спидометр. Удерживайте для перехода в редактор" title="Удерживайте для перехода в редактор">
@@ -145,17 +149,17 @@ function loadMapPrefs() {
 
 const MAP_PREFS = loadMapPrefs();
 
-const THEME_KEY = 'osm_theme_v1';
+/* Выбор темы живёт только в памяти: после перезагрузки приложение снова
+   следует схеме устройства. */
+let sessionTheme = null;
+
+const THEME_MEDIA = window.matchMedia('(prefers-color-scheme: dark)');
 
 function loadThemePreference() {
-  try {
-    return localStorage.getItem(THEME_KEY) === 'dark';
-  } catch (e) {
-    return false;
-  }
+  return sessionTheme ? sessionTheme === 'dark' : THEME_MEDIA.matches;
 }
 
-function applyThemePreference(isDark, persist) {
+function applyThemePreference(isDark, remember) {
   const theme = isDark ? 'dark' : 'light';
   const previousTheme = document.documentElement.getAttribute('data-theme');
   document.documentElement.setAttribute('data-theme', theme);
@@ -169,15 +173,29 @@ function applyThemePreference(isDark, persist) {
   const value = document.getElementById('themeValue');
   if (value) value.textContent = isDark ? 'Вкл' : 'Выкл';
 
-  if (persist !== false) {
-    try { localStorage.setItem(THEME_KEY, theme); } catch (e) {}
-  }
+  /* remember === false — тему выставила система или старт приложения, а не
+     пользователь: выбор не фиксируем и продолжаем следить за системой. */
+  if (remember !== false) sessionTheme = theme;
 
   if (previousTheme && previousTheme !== theme &&
       typeof MenuModule !== 'undefined' &&
       typeof MenuModule.refreshRoutePreviews === 'function') {
     MenuModule.refreshRoutePreviews();
   }
+}
+
+/* Пока тема не выбрана вручную, приложение следует за системной: если
+   пользователь переключит оформление на устройстве, тема обновится сразу. */
+function handleSystemThemeChange(event) {
+  if (sessionTheme) return;
+  applyThemePreference(event.matches, false);
+}
+
+if (typeof THEME_MEDIA.addEventListener === 'function') {
+  THEME_MEDIA.addEventListener('change', handleSystemThemeChange);
+} else if (typeof THEME_MEDIA.addListener === 'function') {
+  /* Safari до 14 не поддерживает addEventListener у MediaQueryList. */
+  THEME_MEDIA.addListener(handleSystemThemeChange);
 }
 
 const COLORS = {
@@ -1144,21 +1162,32 @@ function closeSettings() {
 }
 
 function getNavIconSvg(col, txt, isCurr = false, hasComm = false) {
-    const s = isCurr ? 52 : 40, c = s / 2;
-    const r = isCurr ? 12 : 9;
+    return getNavIconSvgSized(col, txt, isCurr, hasComm);
+}
+
+function getNavIconSvgSized(col, txt, isCurr = false, hasComm = false, sizeOverride = null) {
+    const s = sizeOverride != null ? sizeOverride : (isCurr ? 64 : 40);
+    const c = s / 2;
+    const r = Math.round(s * 9 / 40);
     // Цвет подставляется в атрибуты SVG, номер точки — в текстовый узел.
     // И то, и другое приходит из данных маршрута, поэтому валидируем/экранируем.
     const safeCol = /^#[0-9a-f]{6}$/i.test(col) ? col : '#007AFF';
     const safeTxt = escapeHtml(String(txt ?? ''));
+    // Цифра масштабируется вместе с иконкой: 8 px при 40, 13 px при 64.
+    // Коэффициент 13/64 сохраняет прежние размеры на крупных метках.
+    // Нижняя граница 8 px — на метках 30 px цифра иначе не читается на ходу.
+    const fontSize = Math.max(8, Math.round(s * 13 / 64));
+    const commR = Math.max(3, Math.round(s * 4 / 40));
+    const commCx = s - Math.round(s * 10 / 40);
+    const commCy = Math.round(s * 10 / 40);
     const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${s}" height="${s}">
         <rect width="${s}" height="${s}" fill="transparent"/>
-        ${isCurr ? `<circle cx="${c}" cy="${c}" r="${r + 3}" fill="none" stroke="${safeCol}" stroke-width="2.5" opacity="0.95"/>` : ''}
         <circle cx="${c}" cy="${c}" r="${r}" fill="#FFFFFF"/>
         <circle cx="${c}" cy="${c}" r="${r}" fill="${safeCol}" opacity="0.18"/>
         <circle cx="${c}" cy="${c}" r="${r}" fill="none" stroke="${safeCol}" stroke-width="2"/>
         <circle cx="${c}" cy="${c}" r="${r + 1.5}" fill="none" stroke="#000000" stroke-width="1"/>
-        ${hasComm ? `<circle cx="${s - 8}" cy="8" r="4" fill="#EF4444" stroke="#FFFFFF" stroke-width="1.5"/>` : ''}
-        <text x="${c}" y="${c + 0.5}" font-size="${isCurr ? 11 : 9}" font-family="Arial" font-weight="900" text-anchor="middle" dominant-baseline="middle" fill="#121A28">${safeTxt}</text>
+        ${hasComm ? `<circle cx="${commCx}" cy="${commCy}" r="${commR}" fill="#EF4444" stroke="#FFFFFF" stroke-width="1.5"/>` : ''}
+        <text x="${c}" y="${c + 0.5}" font-size="${fontSize}" font-family="Arial" font-weight="900" text-anchor="middle" dominant-baseline="middle" fill="#121A28">${safeTxt}</text>
     </svg>`;
     return 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svg)));
 }
@@ -1366,10 +1395,10 @@ function renderRoutePoints() {
 
         const isKeyPoint = isCurrent || isPrevious || isNext;
         const shouldShow = isKeyPoint || !isPassed;
-        const markerSize = isCurrent ? 52 : (isKeyPoint ? 40 : 30);
-        const markerOpacity = isKeyPoint ? (isPrevious ? '0.7' : '') : '';
+        const markerSize = isCurrent ? 64 : (isNext || isPrevious ? 48 : 30);
+        const markerOpacity = isCurrent || isNext ? '' : '0.5';
 
-        const markerZIndex = isCurrent ? 100 : (isPrevious ? 50 : 10);
+        const markerZIndex = isCurrent ? 100 : (isNext ? 90 : 10);
 
         if (shouldShow) {
             el.style.display = '';
@@ -1378,7 +1407,7 @@ function renderRoutePoints() {
             el.style.height = markerSize + 'px';
             el.style.zIndex = markerZIndex;
             const markerStyle = markerOpacity ? ` style="opacity:${markerOpacity};"` : '';
-            el.innerHTML = `<img src="${getNavIconSvg(p.hex, p.id, isCurrent, hasComm)}" width="${markerSize}" height="${markerSize}" class="marker-img"${markerStyle} />`;
+            el.innerHTML = `<img src="${getNavIconSvgSized(p.hex, p.id, isCurrent, hasComm, markerSize)}" width="${markerSize}" height="${markerSize}" class="marker-img"${markerStyle} />`;
             p.placemark.update({ coordinates: [p.lon, p.lat] });
         } else {
             el.style.display = 'none';
@@ -1392,11 +1421,11 @@ function renderRoutePoints() {
                     coordinates: p.pts.map(pt => [pt[1], pt[0]])
                 },
                 properties: {
-                    color: isCurrent ? p.hex : (isPrevious ? hexToRgba(p.hex, 0.5) : p.hex),
-                    casingColor: isPrevious ? 'rgba(18,28,46,0.35)' : 'rgba(18,28,46,0.65)',
-                    casingWidth: isCurrent ? 8 : (isPrevious ? 8 : 6),
-                    width: isCurrent ? 6 : (isPrevious ? 6 : 4),
-                    priority: isCurrent ? 30 : (isPrevious ? 20 : 10)
+                    color: isCurrent ? p.hex : hexToRgba(p.hex, 0.5),
+                    casingColor: 'rgba(18,28,46,0.65)',
+                    casingWidth: isCurrent ? 14 : 8,
+                    width: isCurrent ? 10 : 6,
+                    priority: isCurrent ? 30 : 10
                 }
             });
         }
@@ -1414,10 +1443,18 @@ function renderRoutePoints() {
             const isKeyPoint = isPrev || isNext;
             const show = APP._driveShowFrom >= 0 ? (ci >= Math.max(APP._driveShowFrom - 1, 0)) : (isKeyPoint || !isPassed);
             if (!show) { mapRemoveChild(pt.placemark); continue; }
+            // Следующая точка важнее остальных: номер должен читаться,
+            // поэтому приглушаем её меньше, чем пройденные и дальние.
+            if (pt.placemark.element) {
+                pt.placemark.element.style.opacity = isNext ? '0.75' : '0.5';
+            }
             mapAddChild(pt.placemark);
         }
         const curr = APP.navPoints[APP.navCurrentIndex];
-        if (curr && curr.placemark) mapAddChild(curr.placemark);
+        if (curr && curr.placemark) {
+            if (curr.placemark.element) curr.placemark.element.style.opacity = '';
+            mapAddChild(curr.placemark);
+        }
         ensureRouteLayers();
         updateRouteLines(features);
     }
