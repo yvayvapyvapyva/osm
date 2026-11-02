@@ -16,6 +16,7 @@
 
 ## Деплой остальных частей (справка)
 - `navigator3/deploy.sh` — функция `osmn3` (ID `d4e8ds1489g0q91dt7do`), API Gateway `https://d5dsd5u1tsc8fm9dbsg5.s183zexc.apigw.yandexcloud.net` (публичный домен `https://ainstruktor.ru` через Cloudflare), статика в бакет `osmn-nav`.
+- В Cloudflare зоны `ainstruktor.ru` **ECH выключен** (`SSL/TLS → Edge Certificates → Encrypted Client Hello = Off`). С включённым ECH сайт не открывается с мобильных сетей РФ: SNI прячется за `cloudflare-ech.com`, и DPI рвёт соединение. Не включать обратно, пока действуют ограничения. Резервный путь, если начнут резать диапазоны Cloudflare: перевести запись в DNS only и направить напрямую на Яндекс-шлюз (он с мобильных работает).
 - `pad/deploy.sh` — функция `pad-osm` (ID `d4esfoiand5dinv3mfth`).
 - `tts/navigator/deploy.sh` — функция TTS (ID `d4e3cj3q3ff36qlrhbg8`).
 
