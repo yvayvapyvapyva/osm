@@ -93,10 +93,17 @@ function embedPage(file, bundle) {
     const stylesRaw = fs.readFileSync(path.join(root, bundle.stylesheet), 'utf8');
     const styles = minifyCss(stylesRaw, bundle.stylesheet);
 
-    html = html.replace(
-        /<link\b[^>]*href=["']assets\/css\/[^"']+["'][^>]*>/i,
-        `<style>${styles}</style>`
+    // Подставляем стили страницы строго по пути: на странице может быть
+    // несколько <link> на CSS (например, maplibre-gl.css), и «первый попавшийся»
+    // больше не годится.
+    const stylesheetPattern = new RegExp(
+        `<link\\b[^>]*href=["']${bundle.stylesheet.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}[^"']*["'][^>]*>`,
+        'i'
     );
+    if (!stylesheetPattern.test(html)) {
+        throw new Error(`В ${file} не найден <link> на ${bundle.stylesheet}`);
+    }
+    html = html.replace(stylesheetPattern, () => `<style>${styles}</style>`);
     html = html.replace(
         /<link\b[^>]*rel=["']icon["'][^>]*>/i,
         `<link rel="icon" href="data:image/png;base64,${favicon}" type="image/png">`
