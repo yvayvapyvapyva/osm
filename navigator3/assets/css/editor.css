@@ -670,13 +670,13 @@ input, textarea, select {
 }
 
 #routesList {
-    padding: 4px 4px 8px;
+    padding: 8px 12px 16px;
     overflow-y: auto;
     display: flex;
     flex-direction: column;
     flex: 1;
     min-height: 0;
-    gap: 6px;
+    gap: 8px;
 }
 
 #newRouteNameInput {
@@ -934,10 +934,11 @@ input, textarea, select {
 
 .route-item {
     display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    padding: 14px;
-    border-radius: 14px;
+    align-items: center;
+    gap: 8px;
+    min-height: 106px;
+    padding: 5px 48px 5px 5px;
+    border-radius: 16px;
     background: rgba(255, 255, 255, 0.08);
     border: 1px solid rgba(255, 255, 255, 0.12);
     cursor: pointer;
@@ -946,12 +947,78 @@ input, textarea, select {
     width: 100%;
     box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
     position: relative;
+    box-sizing: border-box;
 }
 
 .route-item:active {
     transform: scale(0.98);
     background: rgba(48, 209, 88, 0.2);
     border-color: rgba(48, 209, 88, 0.4);
+}
+
+.route-item.is-active {
+    background: rgba(48, 209, 88, 0.18);
+    border-color: rgba(48, 209, 88, 0.42);
+    box-shadow: inset 3px 0 0 #30D158, 0 2px 6px rgba(0, 0, 0, 0.15);
+}
+
+.route-preview {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 96px;
+    width: 96px;
+    height: 96px;
+    overflow: hidden;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 11px;
+    background: linear-gradient(145deg, #26303c, #171d26);
+    box-sizing: border-box;
+}
+
+.route-preview-image {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.route-preview.is-loading::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(100deg, transparent 20%, rgba(255, 255, 255, 0.1) 50%, transparent 80%);
+    animation: route-preview-shimmer 1.2s ease-in-out infinite;
+}
+
+.route-preview.is-empty::after {
+    content: '';
+    width: 20px;
+    height: 20px;
+    border: 2px dashed rgba(255, 255, 255, 0.3);
+    border-radius: 50%;
+}
+
+@keyframes route-preview-shimmer {
+    from { transform: translateX(-100%); }
+    to { transform: translateX(100%); }
+}
+
+.route-item-main {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    gap: 5px;
+    min-width: 0;
+}
+
+.route-item-title {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 5px;
+    min-width: 0;
 }
 
 .route-info-btn {
@@ -985,12 +1052,77 @@ input, textarea, select {
 }
 
 .route-name {
-    font-size: 16px;
-    font-weight: 600;
+    display: -webkit-box;
+    flex: 0 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    font-size: 15px;
+    font-weight: 650;
     color: #fff;
-    line-height: 1.3;
+    line-height: 1.25;
     letter-spacing: -0.1px;
-    padding-right: 36px;
+    overflow-wrap: anywhere;
+}
+
+.route-visibility-badge,
+.route-active-badge {
+    flex: 0 0 auto;
+    padding: 2px 6px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.1);
+    color: rgba(255, 255, 255, 0.62);
+    font-size: 9px;
+    font-weight: 700;
+    line-height: 1.4;
+}
+
+.route-visibility-badge.is-visible {
+    background: rgba(48, 209, 88, 0.18);
+    color: #79e795;
+}
+
+.route-active-badge {
+    background: rgba(48, 209, 88, 0.22);
+    color: #79e795;
+}
+
+.route-item-details {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+
+.route-item-stats {
+    min-height: 13px;
+    color: rgba(255, 255, 255, 0.57);
+    font-size: 10px;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.route-item-tail {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 18px;
+    width: 18px;
+    height: 20px;
+    color: rgba(255, 255, 255, 0.42);
+    font-size: 24px;
+    line-height: 1;
+}
+
+.route-item.is-active .route-item-tail {
+    color: #30D158;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .route-preview.is-loading::after {
+        animation: none;
+    }
 }
 
 /* -- Уникальные стили редактора -- */
