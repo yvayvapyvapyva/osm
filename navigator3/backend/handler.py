@@ -18,6 +18,7 @@
 """
 
 import base64
+import hashlib
 import hmac
 import json
 import math
@@ -33,7 +34,7 @@ import store
 
 def execute_list_folders(session):
     query = """
-        SELECT folder_id, parent_id, name, sort_order
+        SELECT folder_id, parent_id, name, sort_order, owner_user_id
         FROM folders
         ORDER BY sort_order, name;
     """
@@ -58,10 +59,10 @@ def execute_list_editor_folders(session, owner_user_id):
 def execute_list_editor_routes(session, owner_user_id):
     query = """
         DECLARE $owner_user_id AS Utf8;
-        SELECT m, name, description, visible, folder_id, title
+        SELECT m, description, visible, folder_id, title
         FROM roads
         WHERE owner_user_id = $owner_user_id
-        ORDER BY name;
+        ORDER BY title, m;
     """
     prepared = session.prepare(query)
     return session.transaction().execute(
@@ -93,10 +94,19 @@ def execute_get_folder_owner(session, folder_id):
 
 def execute_list_public_routes(session):
     query = """
-        SELECT m, name, description, json, folder_id, title
+        SELECT m, description, json, folder_id, title, owner_user_id
         FROM roads
-        WHERE visible = true AND name IS NOT NULL
-        ORDER BY name;
+        WHERE visible = true
+        ORDER BY title, m;
+    """
+    prepared = session.prepare(query)
+    return session.transaction().execute(prepared, commit_tx=True)
+
+
+def execute_list_owner_names(session):
+    query = """
+        SELECT user_id, login, display_name
+        FROM users;
     """
     prepared = session.prepare(query)
     return session.transaction().execute(prepared, commit_tx=True)
@@ -106,7 +116,7 @@ def execute_get_owned_route(session, m_param, owner_user_id):
     query = """
         DECLARE $m AS Utf8;
         DECLARE $owner_user_id AS Utf8;
-        SELECT json, name, m, description, visible, folder_id, title
+        SELECT json, m, description, visible, folder_id, title
         FROM roads
         WHERE m = $m AND owner_user_id = $owner_user_id;
     """
@@ -122,9 +132,9 @@ def execute_get_public_route(session, m_param):
     """Только видимый маршрут: скрытые и удалённые наружу не отдаём."""
     query = """
         DECLARE $m AS Utf8;
-        SELECT json, name, m, description, folder_id, title
+        SELECT json, m, description, folder_id, title, owner_user_id
         FROM roads
-        WHERE m = $m AND visible = true AND name IS NOT NULL;
+        WHERE m = $m AND visible = true;
     """
     prepared = session.prepare(query)
     return session.transaction().execute(
@@ -191,20 +201,18 @@ def execute_update_route_data(session, m_param, json_data, owner_user_id):
 
 
 def execute_update_route_meta(
-    session, m_param, folder_id, title, name, description, visible, owner_user_id
+    session, m_param, folder_id, title, description, visible, owner_user_id
 ):
     query = """
         DECLARE $m AS Utf8;
         DECLARE $folder_id AS Utf8;
         DECLARE $title AS Utf8;
-        DECLARE $name AS Utf8;
         DECLARE $description AS Utf8;
         DECLARE $visible AS Bool;
         DECLARE $owner_user_id AS Utf8;
         UPDATE roads
         SET folder_id = $folder_id,
             title = $title,
-            name = $name,
             description = $description,
             visible = $visible
         WHERE m = $m AND owner_user_id = $owner_user_id;
@@ -216,29 +224,8 @@ def execute_update_route_meta(
             "$m": str(m_param),
             "$folder_id": str(folder_id),
             "$title": str(title),
-            "$name": str(name),
             "$description": str(description),
             "$visible": bool(visible),
-            "$owner_user_id": str(owner_user_id),
-        },
-        commit_tx=True,
-    )
-
-
-def execute_update_route_name(session, m_param, name, owner_user_id):
-    query = """
-        DECLARE $m AS Utf8;
-        DECLARE $name AS Utf8;
-        DECLARE $owner_user_id AS Utf8;
-        UPDATE roads SET name = $name
-        WHERE m = $m AND owner_user_id = $owner_user_id;
-    """
-    prepared = session.prepare(query)
-    return session.transaction().execute(
-        prepared,
-        {
-            "$m": str(m_param),
-            "$name": str(name),
             "$owner_user_id": str(owner_user_id),
         },
         commit_tx=True,
@@ -251,7 +238,6 @@ def execute_rename_route(
     new_m_param,
     folder_id,
     title,
-    name,
     description,
     visible,
     owner_user_id,
@@ -261,7 +247,6 @@ def execute_rename_route(
         DECLARE $new_m AS Utf8;
         DECLARE $folder_id AS Utf8;
         DECLARE $title AS Utf8;
-        DECLARE $name AS Utf8;
         DECLARE $description AS Utf8;
         DECLARE $visible AS Bool;
         DECLARE $owner_user_id AS Utf8;
@@ -272,9 +257,9 @@ def execute_rename_route(
         );
 
         INSERT INTO roads
-            (m, json, folder_id, title, name, description, visible, owner_user_id)
+            (m, json, folder_id, title, description, visible, owner_user_id)
         VALUES
-            ($new_m, $json, $folder_id, $title, $name, $description, $visible,
+            ($new_m, $json, $folder_id, $title, $description, $visible,
              $owner_user_id);
         DELETE FROM roads
         WHERE m = $old_m AND owner_user_id = $owner_user_id;
@@ -287,7 +272,6 @@ def execute_rename_route(
             "$new_m": str(new_m_param),
             "$folder_id": str(folder_id),
             "$title": str(title),
-            "$name": str(name),
             "$description": str(description),
             "$visible": bool(visible),
             "$owner_user_id": str(owner_user_id),
@@ -471,12 +455,7 @@ def _folder_chain(by_id, folder_id):
 
 def _route_title(row):
     title = _text(_row_value(row, "title")).strip()
-    if title:
-        return title
-    name = _text(_row_value(row, "name")).strip()
-    if "/" in name:
-        name = name.rsplit("/", 1)[-1]
-    return name or _text(_row_value(row, "m"))
+    return title or _text(_row_value(row, "m"))
 
 
 def _full_route_name(by_id, folder_id, title):
@@ -485,9 +464,12 @@ def _full_route_name(by_id, folder_id, title):
     return "/".join(part for part in parts if part)
 
 
-def _route_public_dict(row, by_id):
+def _route_public_dict(row, by_id, folder_id_override=None):
     data = _json_value(_row_value(row, "json"))
-    folder_id = _text(_row_value(row, "folder_id"))
+    raw_folder_id = _text(_row_value(row, "folder_id"))
+    folder_id = (
+        raw_folder_id if folder_id_override is None else folder_id_override
+    )
     title = _route_title(row)
     route = {
         "m": _text(_row_value(row, "m")),
@@ -495,7 +477,7 @@ def _route_public_dict(row, by_id):
         "title": title,
         "name": _full_route_name(by_id, folder_id, title)
         if folder_id in by_id
-        else _text(_row_value(row, "name")) or title,
+        else title,
         "description": _text(_row_value(row, "description")),
     }
     route.update(_route_metrics(data))
@@ -511,7 +493,7 @@ def _route_editor_dict(row, by_id):
         "title": title,
         "name": _full_route_name(by_id, folder_id, title)
         if folder_id in by_id
-        else _text(_row_value(row, "name")) or title,
+        else title,
         "description": _text(_row_value(row, "description")),
         "visible": bool(_row_value(row, "visible"))
         if _row_value(row, "visible") is not None
@@ -594,20 +576,80 @@ def _catalog_data():
     pool = store.get_pool()
     folder_rows = _rows(pool.retry_operation_sync(execute_list_folders))
     route_rows = _rows(pool.retry_operation_sync(execute_list_public_routes))
+    owner_rows = _rows(pool.retry_operation_sync(execute_list_owner_names))
+    owner_names = {
+        _text(_row_value(row, "user_id")): (
+            _text(_row_value(row, "display_name")).strip()
+            or _text(_row_value(row, "login")).strip()
+            or "Владелец"
+        )
+        for row in owner_rows
+        if _text(_row_value(row, "user_id"))
+    }
     all_folders = [_folder_dict(row) for row in folder_rows]
     all_by_id = {folder["folder_id"]: folder for folder in all_folders}
+    folder_owners = {
+        _text(_row_value(row, "folder_id")): _text(
+            _row_value(row, "owner_user_id")
+        )
+        for row in folder_rows
+    }
+    public_owners = {
+        _text(_row_value(row, "owner_user_id")) for row in route_rows
+    }
     public_folder_ids = set()
     for row in route_rows:
+        owner_user_id = _text(_row_value(row, "owner_user_id"))
         folder_id = _text(_row_value(row, "folder_id"))
         public_folder_ids.update(
-            folder["folder_id"] for folder in _folder_chain(all_by_id, folder_id)
+            folder["folder_id"]
+            for folder in _folder_chain(all_by_id, folder_id)
+            if folder_owners.get(folder["folder_id"], "") == owner_user_id
         )
-    folders = [
-        folder for folder in all_folders
-        if folder["folder_id"] in public_folder_ids
-    ]
+
+    folders = []
+    for owner_user_id in sorted(public_owners):
+        folders.append(
+            {
+                "folder_id": _owner_folder_id(owner_user_id),
+                "parent_id": "",
+                "name": owner_names.get(
+                    owner_user_id, "Без владельца" if not owner_user_id else "Владелец"
+                ),
+                "sort_order": 0,
+                "owner_user_id": owner_user_id,
+                "is_owner_root": True,
+            }
+        )
+
+    for folder in all_folders:
+        folder_id = folder["folder_id"]
+        if folder_id not in public_folder_ids:
+            continue
+        owner_user_id = folder_owners.get(folder_id, "")
+        parent_id = folder["parent_id"]
+        if (
+            not parent_id
+            or parent_id not in public_folder_ids
+            or folder_owners.get(parent_id, "") != owner_user_id
+        ):
+            parent_id = _owner_folder_id(owner_user_id)
+        folders.append(
+            {
+                **folder,
+                "parent_id": parent_id,
+                "owner_user_id": owner_user_id,
+            }
+        )
     by_id = {folder["folder_id"]: folder for folder in folders}
     return folders, route_rows, by_id
+
+
+def _owner_folder_id(owner_user_id):
+    if not owner_user_id:
+        return "owner_unassigned"
+    digest = hashlib.sha256(owner_user_id.encode("utf-8")).hexdigest()[:24]
+    return f"owner_{digest}"
 
 
 def _editor_data(owner_user_id):
@@ -751,11 +793,27 @@ def _api_catalog(event):
     user = _current_user(event)
     try:
         folders, route_rows, by_id = _catalog_data()
-        routes = [_route_public_dict(row, by_id) for row in route_rows]
+        routes = []
+        for row in route_rows:
+            owner_user_id = _text(_row_value(row, "owner_user_id"))
+            folder_id = _text(_row_value(row, "folder_id"))
+            if not folder_id or folder_id not in by_id:
+                folder_id = _owner_folder_id(owner_user_id)
+            routes.append(
+                _route_public_dict(row, by_id, folder_id_override=folder_id)
+            )
         return auth.json_response(
             200,
             {
-                "folders": folders,
+                "folders": [
+                    {
+                        "folder_id": folder["folder_id"],
+                        "parent_id": folder["parent_id"],
+                        "name": folder["name"],
+                        "sort_order": folder["sort_order"],
+                    }
+                    for folder in folders
+                ],
                 "routes": routes,
                 "user": _public_user(user) if user else None,
             },
@@ -796,12 +854,26 @@ def _api_folder(event):
             )
         child_folders.sort(key=lambda f: (f["sort_order"], f["name"]))
 
+        owner_root = by_id.get(folder_id, {})
+        owner_root_id = _text(owner_root.get("owner_user_id"))
         routes = []
         for row in route_rows:
             row_folder_id = _text(_row_value(row, "folder_id"))
-            if row_folder_id != folder_id:
+            row_owner_id = _text(_row_value(row, "owner_user_id"))
+            if owner_root.get("is_owner_root"):
+                if (
+                    row_owner_id != owner_root_id
+                    or (row_folder_id and row_folder_id in by_id)
+                ):
+                    continue
+                route_folder_id = folder_id
+            elif not folder_id or row_folder_id != folder_id:
                 continue
-            route = _route_public_dict(row, by_id)
+            else:
+                route_folder_id = row_folder_id
+            route = _route_public_dict(
+                row, by_id, folder_id_override=route_folder_id
+            )
             route["data"] = _json_value(_row_value(row, "json"))
             routes.append(route)
         routes.sort(key=lambda r: r.get("name", ""))
@@ -835,16 +907,14 @@ def _api_route(event):
         if not rows:
             return auth.json_response(404, {"error": "route_not_found"})
 
-        folder_rows = _rows(
-            store.get_pool().retry_operation_sync(execute_list_folders)
-        )
-        by_id = {
-            folder["folder_id"]: folder
-            for folder in (_folder_dict(row) for row in folder_rows)
-        }
+        _, _, by_id = _catalog_data()
         row = rows[0]
         data = _json_value(_row_value(row, "json"))
-        payload = _route_public_dict(row, by_id)
+        owner_user_id = _text(_row_value(row, "owner_user_id"))
+        folder_id = _text(_row_value(row, "folder_id"))
+        if not folder_id or folder_id not in by_id:
+            folder_id = _owner_folder_id(owner_user_id)
+        payload = _route_public_dict(row, by_id, folder_id_override=folder_id)
         payload["data"] = data
         return auth.json_response(200, payload)
     except Exception as exc:  # noqa: BLE001
@@ -883,10 +953,14 @@ def _admin_get(event, user):
     if not rows:
         return auth.json_response(404, {"error": "not_found"})
     row = rows[0]
+    owner_user_id = _text(user.get("user_id"))
+    _, _, by_id = _editor_data(owner_user_id)
+    route = _route_editor_dict(row, by_id)
     return auth.json_response(
         200,
         {
-            "name": _text(_row_value(row, "name")),
+            "name": route["name"],
+            "title": route["title"],
             "m": _text(_row_value(row, "m")) or m_val,
             "data": _json_value(_row_value(row, "json")),
         },
@@ -971,7 +1045,6 @@ def _admin_save_meta(event, user):
     description = _text(body.get("description", current["description"]))
     visible = body.get("visible", current["visible"])
 
-    name = _full_route_name(by_id, folder_id, title)
     new_m = _text(body.get("new_m")).strip()
 
     if new_m and new_m != m_val:
@@ -988,7 +1061,6 @@ def _admin_save_meta(event, user):
             new_m_param=new_m,
             folder_id=folder_id,
             title=title,
-            name=name,
             description=description,
             visible=bool(visible),
             owner_user_id=owner_user_id,
@@ -1000,7 +1072,6 @@ def _admin_save_meta(event, user):
         m_param=m_val,
         folder_id=folder_id,
         title=title,
-        name=name,
         description=description,
         visible=bool(visible),
         owner_user_id=owner_user_id,
@@ -1082,7 +1153,6 @@ def _admin_folder_save(event, user):
             owner_user_id=owner_user_id,
         )
 
-    # Держим legacy-поле roads.name в согласии с деревом папок.
     new_by_id = dict(by_id)
     new_by_id[folder_id] = {
         "folder_id": folder_id,
@@ -1097,16 +1167,6 @@ def _admin_folder_save(event, user):
             for folder in _folder_chain(new_by_id, route_folder_id)
         }:
             continue
-        title = _route_title(row)
-        full_name = _full_route_name(new_by_id, route_folder_id, title)
-        if full_name != _text(_row_value(row, "name")):
-            store.get_pool().retry_operation_sync(
-                execute_update_route_name,
-                m_param=_text(_row_value(row, "m")),
-                name=full_name,
-                owner_user_id=owner_user_id,
-            )
-
     return auth.json_response(
         200,
         {

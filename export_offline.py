@@ -7,7 +7,13 @@ import sys
 sys.path.insert(0, '/Users/mb/Desktop/VSCODE/osm/navigator3/backend')
 
 import store
-from handler import _catalog_data, _rows, _folder_dict, execute_list_public_routes, execute_get_route
+from handler import (
+    _catalog_data,
+    _full_route_name,
+    _owner_folder_id,
+    _rows,
+    execute_get_route,
+)
 
 pool = store.get_pool()
 folders, route_rows, by_id = _catalog_data()
@@ -49,10 +55,13 @@ for row in route_rows:
         return str(v).strip()
     
     m = _txt(_rv(row, "m"))
-    name = _txt(_rv(row, "name"))
-    title = _txt(_rv(row, "title")) or name
+    title = _txt(_rv(row, "title")) or m
     desc = _txt(_rv(row, "description"))
     folder_id = _txt(_rv(row, "folder_id"))
+    owner_user_id = _txt(_rv(row, "owner_user_id"))
+    if not folder_id:
+        folder_id = _owner_folder_id(owner_user_id)
+    name = _full_route_name(by_id, folder_id, title)
     
     routes_meta.append({
         "m": m,
