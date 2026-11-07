@@ -11,7 +11,7 @@
   GET  /auth/yandex/callback
   POST /auth/logout
 
-Редактор (нужен X-Route-Admin-Password для любого действия):
+Редактор (нужна сессия Яндекс ID; данные ограничены владельцем):
   POST /api/admin?action=list|get|get_meta|save|save_meta|delete
   POST /api/admin?action=folder_save|folder_delete
 База — serverless-YDB (dbosm).
@@ -21,7 +21,6 @@ import base64
 import hmac
 import json
 import math
-import os
 import secrets
 
 import auth
@@ -42,14 +41,54 @@ def execute_list_folders(session):
     return session.transaction().execute(prepared, commit_tx=True)
 
 
-def execute_list_editor_routes(session):
+def execute_list_editor_folders(session, owner_user_id):
     query = """
+        DECLARE $owner_user_id AS Utf8;
+        SELECT folder_id, parent_id, name, sort_order
+        FROM folders
+        WHERE owner_user_id = $owner_user_id
+        ORDER BY sort_order, name;
+    """
+    prepared = session.prepare(query)
+    return session.transaction().execute(
+        prepared, {"$owner_user_id": str(owner_user_id)}, commit_tx=True
+    )
+
+
+def execute_list_editor_routes(session, owner_user_id):
+    query = """
+        DECLARE $owner_user_id AS Utf8;
         SELECT m, name, description, visible, folder_id, title
         FROM roads
+        WHERE owner_user_id = $owner_user_id
         ORDER BY name;
     """
     prepared = session.prepare(query)
-    return session.transaction().execute(prepared, commit_tx=True)
+    return session.transaction().execute(
+        prepared, {"$owner_user_id": str(owner_user_id)}, commit_tx=True
+    )
+
+
+def execute_get_route_owner(session, m_param):
+    query = """
+        DECLARE $m AS Utf8;
+        SELECT owner_user_id FROM roads WHERE m = $m;
+    """
+    prepared = session.prepare(query)
+    return session.transaction().execute(
+        prepared, {"$m": str(m_param)}, commit_tx=True
+    )
+
+
+def execute_get_folder_owner(session, folder_id):
+    query = """
+        DECLARE $folder_id AS Utf8;
+        SELECT owner_user_id FROM folders WHERE folder_id = $folder_id;
+    """
+    prepared = session.prepare(query)
+    return session.transaction().execute(
+        prepared, {"$folder_id": str(folder_id)}, commit_tx=True
+    )
 
 
 def execute_list_public_routes(session):
@@ -63,16 +102,19 @@ def execute_list_public_routes(session):
     return session.transaction().execute(prepared, commit_tx=True)
 
 
-def execute_get_route(session, m_param):
+def execute_get_owned_route(session, m_param, owner_user_id):
     query = """
         DECLARE $m AS Utf8;
+        DECLARE $owner_user_id AS Utf8;
         SELECT json, name, m, description, visible, folder_id, title
         FROM roads
-        WHERE m = $m;
+        WHERE m = $m AND owner_user_id = $owner_user_id;
     """
     prepared = session.prepare(query)
     return session.transaction().execute(
-        prepared, {"$m": str(m_param)}, commit_tx=True
+        prepared,
+        {"$m": str(m_param), "$owner_user_id": str(owner_user_id)},
+        commit_tx=True,
     )
 
 
@@ -90,22 +132,27 @@ def execute_get_public_route(session, m_param):
     )
 
 
-def execute_delete_route(session, m_param):
+def execute_delete_route(session, m_param, owner_user_id):
     query = """
         DECLARE $m AS Utf8;
-        DELETE FROM roads WHERE m = $m;
+        DECLARE $owner_user_id AS Utf8;
+        DELETE FROM roads WHERE m = $m AND owner_user_id = $owner_user_id;
     """
     prepared = session.prepare(query)
     return session.transaction().execute(
-        prepared, {"$m": str(m_param)}, commit_tx=True
+        prepared,
+        {"$m": str(m_param), "$owner_user_id": str(owner_user_id)},
+        commit_tx=True,
     )
 
 
-def execute_upsert_route(session, m_param, json_data):
+def execute_create_route(session, m_param, json_data, owner_user_id):
     query = """
         DECLARE $m AS Utf8;
         DECLARE $json AS Json;
-        UPSERT INTO roads (m, json) VALUES ($m, $json);
+        DECLARE $owner_user_id AS Utf8;
+        INSERT INTO roads (m, json, owner_user_id)
+        VALUES ($m, $json, $owner_user_id);
     """
     prepared = session.prepare(query)
     return session.transaction().execute(
@@ -115,13 +162,36 @@ def execute_upsert_route(session, m_param, json_data):
             "$json": json.dumps(json_data, ensure_ascii=False)
             if not isinstance(json_data, str)
             else json_data,
+            "$owner_user_id": str(owner_user_id),
+        },
+        commit_tx=True,
+    )
+
+
+def execute_update_route_data(session, m_param, json_data, owner_user_id):
+    query = """
+        DECLARE $m AS Utf8;
+        DECLARE $json AS Json;
+        DECLARE $owner_user_id AS Utf8;
+        UPDATE roads SET json = $json
+        WHERE m = $m AND owner_user_id = $owner_user_id;
+    """
+    prepared = session.prepare(query)
+    return session.transaction().execute(
+        prepared,
+        {
+            "$m": str(m_param),
+            "$json": json.dumps(json_data, ensure_ascii=False)
+            if not isinstance(json_data, str)
+            else json_data,
+            "$owner_user_id": str(owner_user_id),
         },
         commit_tx=True,
     )
 
 
 def execute_update_route_meta(
-    session, m_param, folder_id, title, name, description, visible
+    session, m_param, folder_id, title, name, description, visible, owner_user_id
 ):
     query = """
         DECLARE $m AS Utf8;
@@ -130,13 +200,14 @@ def execute_update_route_meta(
         DECLARE $name AS Utf8;
         DECLARE $description AS Utf8;
         DECLARE $visible AS Bool;
+        DECLARE $owner_user_id AS Utf8;
         UPDATE roads
         SET folder_id = $folder_id,
             title = $title,
             name = $name,
             description = $description,
             visible = $visible
-        WHERE m = $m;
+        WHERE m = $m AND owner_user_id = $owner_user_id;
     """
     prepared = session.prepare(query)
     return session.transaction().execute(
@@ -148,25 +219,42 @@ def execute_update_route_meta(
             "$name": str(name),
             "$description": str(description),
             "$visible": bool(visible),
+            "$owner_user_id": str(owner_user_id),
         },
         commit_tx=True,
     )
 
 
-def execute_update_route_name(session, m_param, name):
+def execute_update_route_name(session, m_param, name, owner_user_id):
     query = """
         DECLARE $m AS Utf8;
         DECLARE $name AS Utf8;
-        UPDATE roads SET name = $name WHERE m = $m;
+        DECLARE $owner_user_id AS Utf8;
+        UPDATE roads SET name = $name
+        WHERE m = $m AND owner_user_id = $owner_user_id;
     """
     prepared = session.prepare(query)
     return session.transaction().execute(
-        prepared, {"$m": str(m_param), "$name": str(name)}, commit_tx=True
+        prepared,
+        {
+            "$m": str(m_param),
+            "$name": str(name),
+            "$owner_user_id": str(owner_user_id),
+        },
+        commit_tx=True,
     )
 
 
 def execute_rename_route(
-    session, old_m_param, new_m_param, folder_id, title, name, description, visible
+    session,
+    old_m_param,
+    new_m_param,
+    folder_id,
+    title,
+    name,
+    description,
+    visible,
+    owner_user_id,
 ):
     query = """
         DECLARE $old_m AS Utf8;
@@ -176,14 +264,20 @@ def execute_rename_route(
         DECLARE $name AS Utf8;
         DECLARE $description AS Utf8;
         DECLARE $visible AS Bool;
+        DECLARE $owner_user_id AS Utf8;
 
-        $json = (SELECT json FROM roads WHERE m = $old_m);
+        $json = (
+            SELECT json FROM roads
+            WHERE m = $old_m AND owner_user_id = $owner_user_id
+        );
 
-        UPSERT INTO roads
-            (m, json, folder_id, title, name, description, visible)
+        INSERT INTO roads
+            (m, json, folder_id, title, name, description, visible, owner_user_id)
         VALUES
-            ($new_m, $json, $folder_id, $title, $name, $description, $visible);
-        DELETE FROM roads WHERE m = $old_m;
+            ($new_m, $json, $folder_id, $title, $name, $description, $visible,
+             $owner_user_id);
+        DELETE FROM roads
+        WHERE m = $old_m AND owner_user_id = $owner_user_id;
     """
     prepared = session.prepare(query)
     return session.transaction().execute(
@@ -196,21 +290,23 @@ def execute_rename_route(
             "$name": str(name),
             "$description": str(description),
             "$visible": bool(visible),
+            "$owner_user_id": str(owner_user_id),
         },
         commit_tx=True,
     )
 
 
-def execute_upsert_folder(session, folder_id, parent_id, name, sort_order):
+def execute_create_folder(session, folder_id, parent_id, name, sort_order, owner_user_id):
     query = """
         DECLARE $folder_id AS Utf8;
         DECLARE $parent_id AS Utf8;
         DECLARE $name AS Utf8;
         DECLARE $sort_order AS Uint32;
-        UPSERT INTO folders
-            (folder_id, parent_id, name, sort_order)
+        DECLARE $owner_user_id AS Utf8;
+        INSERT INTO folders
+            (folder_id, parent_id, name, sort_order, owner_user_id)
         VALUES
-            ($folder_id, $parent_id, $name, $sort_order);
+            ($folder_id, $parent_id, $name, $sort_order, $owner_user_id);
     """
     prepared = session.prepare(query)
     return session.transaction().execute(
@@ -220,19 +316,52 @@ def execute_upsert_folder(session, folder_id, parent_id, name, sort_order):
             "$parent_id": str(parent_id),
             "$name": str(name),
             "$sort_order": int(sort_order),
+            "$owner_user_id": str(owner_user_id),
         },
         commit_tx=True,
     )
 
 
-def execute_delete_folder(session, folder_id):
+def execute_update_folder(session, folder_id, parent_id, name, sort_order, owner_user_id):
     query = """
         DECLARE $folder_id AS Utf8;
-        DELETE FROM folders WHERE folder_id = $folder_id;
+        DECLARE $parent_id AS Utf8;
+        DECLARE $name AS Utf8;
+        DECLARE $sort_order AS Uint32;
+        DECLARE $owner_user_id AS Utf8;
+        UPDATE folders
+        SET parent_id = $parent_id, name = $name, sort_order = $sort_order
+        WHERE folder_id = $folder_id AND owner_user_id = $owner_user_id;
     """
     prepared = session.prepare(query)
     return session.transaction().execute(
-        prepared, {"$folder_id": str(folder_id)}, commit_tx=True
+        prepared,
+        {
+            "$folder_id": str(folder_id),
+            "$parent_id": str(parent_id),
+            "$name": str(name),
+            "$sort_order": int(sort_order),
+            "$owner_user_id": str(owner_user_id),
+        },
+        commit_tx=True,
+    )
+
+
+def execute_delete_folder(session, folder_id, owner_user_id):
+    query = """
+        DECLARE $folder_id AS Utf8;
+        DECLARE $owner_user_id AS Utf8;
+        DELETE FROM folders
+        WHERE folder_id = $folder_id AND owner_user_id = $owner_user_id;
+    """
+    prepared = session.prepare(query)
+    return session.transaction().execute(
+        prepared,
+        {
+            "$folder_id": str(folder_id),
+            "$owner_user_id": str(owner_user_id),
+        },
+        commit_tx=True,
     )
 
 
@@ -465,15 +594,34 @@ def _catalog_data():
     pool = store.get_pool()
     folder_rows = _rows(pool.retry_operation_sync(execute_list_folders))
     route_rows = _rows(pool.retry_operation_sync(execute_list_public_routes))
-    folders = [_folder_dict(row) for row in folder_rows]
+    all_folders = [_folder_dict(row) for row in folder_rows]
+    all_by_id = {folder["folder_id"]: folder for folder in all_folders}
+    public_folder_ids = set()
+    for row in route_rows:
+        folder_id = _text(_row_value(row, "folder_id"))
+        public_folder_ids.update(
+            folder["folder_id"] for folder in _folder_chain(all_by_id, folder_id)
+        )
+    folders = [
+        folder for folder in all_folders
+        if folder["folder_id"] in public_folder_ids
+    ]
     by_id = {folder["folder_id"]: folder for folder in folders}
     return folders, route_rows, by_id
 
 
-def _editor_data():
+def _editor_data(owner_user_id):
     pool = store.get_pool()
-    folder_rows = _rows(pool.retry_operation_sync(execute_list_folders))
-    route_rows = _rows(pool.retry_operation_sync(execute_list_editor_routes))
+    folder_rows = _rows(
+        pool.retry_operation_sync(
+            execute_list_editor_folders, owner_user_id=owner_user_id
+        )
+    )
+    route_rows = _rows(
+        pool.retry_operation_sync(
+            execute_list_editor_routes, owner_user_id=owner_user_id
+        )
+    )
     folders = [_folder_dict(row) for row in folder_rows]
     by_id = {folder["folder_id"]: folder for folder in folders}
     return folders, route_rows, by_id
@@ -709,22 +857,9 @@ def _api_route(event):
 # ---------------------------------------------------------------------------
 
 
-def _admin_auth_error(event):
-    """Возвращает 503/403, если пароль редактора не настроен или неверен."""
-    admin_password = os.environ.get("ROUTE_ADMIN_PASSWORD")
-    if not admin_password:
-        return auth.json_response(503, {"error": "admin_auth_not_configured"})
-
-    provided_password = _header(event, "x-route-admin-password")
-    if not isinstance(provided_password, str) or not hmac.compare_digest(
-        provided_password, admin_password
-    ):
-        return auth.json_response(403, {"error": "invalid_admin_password"})
-    return None
-
-
-def _admin_list(event):
-    folders, route_rows, by_id = _editor_data()
+def _admin_list(user):
+    owner_user_id = _text(user.get("user_id"))
+    folders, route_rows, by_id = _editor_data(owner_user_id)
     return auth.json_response(
         200,
         {
@@ -734,12 +869,16 @@ def _admin_list(event):
     )
 
 
-def _admin_get(event):
+def _admin_get(event, user):
     m_val = _query(event).get("m")
     if not m_val:
         return auth.json_response(400, {"error": "missing_route_name"})
     rows = _rows(
-        store.get_pool().retry_operation_sync(execute_get_route, m_param=m_val)
+        store.get_pool().retry_operation_sync(
+            execute_get_owned_route,
+            m_param=m_val,
+            owner_user_id=_text(user.get("user_id")),
+        )
     )
     if not rows:
         return auth.json_response(404, {"error": "not_found"})
@@ -754,33 +893,51 @@ def _admin_get(event):
     )
 
 
-def _admin_get_meta(event):
+def _admin_get_meta(event, user):
     m_val = _query(event).get("m")
     if not m_val:
         return auth.json_response(400, {"error": "missing_route_name"})
-    folders, route_rows, by_id = _editor_data()
+    owner_user_id = _text(user.get("user_id"))
+    folders, route_rows, by_id = _editor_data(owner_user_id)
     for row in route_rows:
         if _text(_row_value(row, "m")) == m_val:
             return auth.json_response(200, _route_editor_dict(row, by_id))
     return auth.json_response(404, {"error": "route_not_found"})
 
 
-def _admin_save(event):
+def _admin_save(event, user):
     m_val = _query(event).get("m")
     if not m_val:
         return auth.json_response(400, {"error": "missing_route_name"})
     body = _body_json(event)
     if body is None:
         return auth.json_response(400, {"error": "invalid_json_body"})
-    store.get_pool().retry_operation_sync(
-        execute_upsert_route,
-        m_param=m_val,
-        json_data=body.get("data", []),
+    owner_user_id = _text(user.get("user_id"))
+    owner_rows = _rows(
+        store.get_pool().retry_operation_sync(
+            execute_get_route_owner, m_param=m_val
+        )
     )
+    if owner_rows:
+        if _text(_row_value(owner_rows[0], "owner_user_id")) != owner_user_id:
+            return auth.json_response(404, {"error": "route_not_found"})
+        store.get_pool().retry_operation_sync(
+            execute_update_route_data,
+            m_param=m_val,
+            json_data=body.get("data", []),
+            owner_user_id=owner_user_id,
+        )
+    else:
+        store.get_pool().retry_operation_sync(
+            execute_create_route,
+            m_param=m_val,
+            json_data=body.get("data", []),
+            owner_user_id=owner_user_id,
+        )
     return auth.json_response(200, {"status": "saved"})
 
 
-def _admin_save_meta(event):
+def _admin_save_meta(event, user):
     m_val = _query(event).get("m")
     if not m_val:
         return auth.json_response(400, {"error": "missing_route_name"})
@@ -788,7 +945,8 @@ def _admin_save_meta(event):
     if body is None:
         return auth.json_response(400, {"error": "invalid_json_body"})
 
-    folders, route_rows, by_id = _editor_data()
+    owner_user_id = _text(user.get("user_id"))
+    folders, route_rows, by_id = _editor_data(owner_user_id)
     current = None
     for row in route_rows:
         if _text(_row_value(row, "m")) == m_val:
@@ -817,6 +975,13 @@ def _admin_save_meta(event):
     new_m = _text(body.get("new_m")).strip()
 
     if new_m and new_m != m_val:
+        new_m_owner = _rows(
+            store.get_pool().retry_operation_sync(
+                execute_get_route_owner, m_param=new_m
+            )
+        )
+        if new_m_owner:
+            return auth.json_response(409, {"error": "route_id_exists"})
         store.get_pool().retry_operation_sync(
             execute_rename_route,
             old_m_param=m_val,
@@ -826,6 +991,7 @@ def _admin_save_meta(event):
             name=name,
             description=description,
             visible=bool(visible),
+            owner_user_id=owner_user_id,
         )
         return auth.json_response(200, {"status": "meta_saved", "new_m": new_m})
 
@@ -837,24 +1003,40 @@ def _admin_save_meta(event):
         name=name,
         description=description,
         visible=bool(visible),
+        owner_user_id=owner_user_id,
     )
     return auth.json_response(200, {"status": "meta_saved"})
 
 
-def _admin_delete(event):
+def _admin_delete(event, user):
     m_val = _query(event).get("m")
     if not m_val:
         return auth.json_response(400, {"error": "missing_route_name"})
-    store.get_pool().retry_operation_sync(execute_delete_route, m_param=m_val)
+    owner_user_id = _text(user.get("user_id"))
+    rows = _rows(
+        store.get_pool().retry_operation_sync(
+            execute_get_owned_route,
+            m_param=m_val,
+            owner_user_id=owner_user_id,
+        )
+    )
+    if not rows:
+        return auth.json_response(404, {"error": "route_not_found"})
+    store.get_pool().retry_operation_sync(
+        execute_delete_route,
+        m_param=m_val,
+        owner_user_id=owner_user_id,
+    )
     return auth.json_response(200, {"status": "deleted"})
 
 
-def _admin_folder_save(event):
+def _admin_folder_save(event, user):
     body = _body_json(event)
     if body is None:
         return auth.json_response(400, {"error": "invalid_json_body"})
 
-    folders, route_rows, by_id = _editor_data()
+    owner_user_id = _text(user.get("user_id"))
+    folders, route_rows, by_id = _editor_data(owner_user_id)
     folder_id = _text(body.get("folder_id")).strip() or "f_" + secrets.token_hex(8)
     parent_id = _text(body.get("parent_id")).strip()
     name = _text(body.get("name")).strip()
@@ -874,13 +1056,31 @@ def _admin_folder_save(event):
         seen.add(current)
         current = by_id.get(current, {}).get("parent_id", "")
 
-    store.get_pool().retry_operation_sync(
-        execute_upsert_folder,
-        folder_id=folder_id,
-        parent_id=parent_id,
-        name=name,
-        sort_order=sort_order,
-    )
+    if folder_id in by_id:
+        store.get_pool().retry_operation_sync(
+            execute_update_folder,
+            folder_id=folder_id,
+            parent_id=parent_id,
+            name=name,
+            sort_order=sort_order,
+            owner_user_id=owner_user_id,
+        )
+    else:
+        existing_owner = _rows(
+            store.get_pool().retry_operation_sync(
+                execute_get_folder_owner, folder_id=folder_id
+            )
+        )
+        if existing_owner:
+            return auth.json_response(404, {"error": "folder_not_found"})
+        store.get_pool().retry_operation_sync(
+            execute_create_folder,
+            folder_id=folder_id,
+            parent_id=parent_id,
+            name=name,
+            sort_order=sort_order,
+            owner_user_id=owner_user_id,
+        )
 
     # Держим legacy-поле roads.name в согласии с деревом папок.
     new_by_id = dict(by_id)
@@ -904,6 +1104,7 @@ def _admin_folder_save(event):
                 execute_update_route_name,
                 m_param=_text(_row_value(row, "m")),
                 name=full_name,
+                owner_user_id=owner_user_id,
             )
 
     return auth.json_response(
@@ -915,7 +1116,7 @@ def _admin_folder_save(event):
     )
 
 
-def _admin_folder_delete(event):
+def _admin_folder_delete(event, user):
     body = _body_json(event)
     if body is None:
         return auth.json_response(400, {"error": "invalid_json_body"})
@@ -923,7 +1124,8 @@ def _admin_folder_delete(event):
     if not folder_id:
         return auth.json_response(400, {"error": "missing_folder_id"})
 
-    folders, route_rows, _ = _editor_data()
+    owner_user_id = _text(user.get("user_id"))
+    folders, route_rows, _ = _editor_data(owner_user_id)
     if not any(folder["folder_id"] == folder_id for folder in folders):
         return auth.json_response(404, {"error": "folder_not_found"})
     if any(folder["parent_id"] == folder_id for folder in folders):
@@ -932,33 +1134,33 @@ def _admin_folder_delete(event):
         return auth.json_response(409, {"error": "folder_has_routes"})
 
     store.get_pool().retry_operation_sync(
-        execute_delete_folder, folder_id=folder_id
+        execute_delete_folder,
+        folder_id=folder_id,
+        owner_user_id=owner_user_id,
     )
     return auth.json_response(200, {"status": "folder_deleted"})
 
 
-def _handle_admin(event):
+def _handle_admin(event, user):
     action = _query(event).get("action") or "list"
 
     try:
-        if action == "auth":
-            return auth.json_response(200, {"status": "authenticated"})
         if action == "list":
-            return _admin_list(event)
+            return _admin_list(user)
         if action == "get":
-            return _admin_get(event)
+            return _admin_get(event, user)
         if action == "get_meta":
-            return _admin_get_meta(event)
+            return _admin_get_meta(event, user)
         if action == "save":
-            return _admin_save(event)
+            return _admin_save(event, user)
         if action == "save_meta":
-            return _admin_save_meta(event)
+            return _admin_save_meta(event, user)
         if action == "delete":
-            return _admin_delete(event)
+            return _admin_delete(event, user)
         if action == "folder_save":
-            return _admin_folder_save(event)
+            return _admin_folder_save(event, user)
         if action == "folder_delete":
-            return _admin_folder_delete(event)
+            return _admin_folder_delete(event, user)
         return auth.json_response(400, {"error": "unknown_action"})
     except ValueError as exc:
         return auth.json_response(
@@ -993,14 +1195,14 @@ def _handle_api(event, path, method):
         return _api_route(event)
 
     if normalized == "/api/admin":
-        # Редактор работает на том же origin, что и шлюз. Прямой вызов
-        # функции платформа закрывает (403), поэтому проксируем сюда.
-        # Читать тоже можно только с паролем: иначе action=get отдавал бы
-        # скрытые маршруты в обход visible=true.
-        error = _admin_auth_error(event)
-        if error:
-            return error
-        return _handle_admin(event)
+        if method != "POST":
+            return auth.json_response(405, {"error": "method_not_allowed"})
+        if not auth.origin_allowed(event):
+            return auth.json_response(403, {"error": "forbidden_origin"})
+        user = _current_user(event)
+        if not user:
+            return auth.json_response(401, {"error": "unauthorized"})
+        return _handle_admin(event, user)
 
     if normalized == "/auth/yandex/start" and method == "GET":
         return _auth_start(event)

@@ -13,13 +13,12 @@
 
 <div id="toast">Готово</div>
 <div id="editorAuthGate" style="position:fixed;inset:0;z-index:30000;display:flex;align-items:center;justify-content:center;padding:24px;background:rgba(0,0,0,0.88);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);">
-    <form onsubmit="event.preventDefault(); authenticateEditor();" style="width:min(100%,360px);display:flex;flex-direction:column;gap:14px;padding:24px;border:1px solid rgba(255,255,255,0.16);border-radius:20px;background:rgba(20,20,24,0.96);box-shadow:0 20px 60px rgba(0,0,0,0.5);">
+    <div style="width:min(100%,360px);display:flex;flex-direction:column;gap:14px;padding:24px;border:1px solid rgba(255,255,255,0.16);border-radius:20px;background:rgba(20,20,24,0.96);box-shadow:0 20px 60px rgba(0,0,0,0.5);">
         <h2 style="margin:0;text-align:center;font-size:20px;">Вход в редактор</h2>
-        <p style="margin:0;text-align:center;color:rgba(255,255,255,0.65);font-size:14px;">Введите пароль администратора</p>
-        <input id="editorAuthPassword" type="password" autocomplete="current-password" placeholder="Пароль" aria-label="Пароль администратора" required style="width:100%;box-sizing:border-box;padding:13px;border-radius:12px;border:1px solid rgba(255,255,255,0.2);background:rgba(255,255,255,0.08);color:#fff;font-size:16px;outline:none;">
+        <p id="editorAuthMessage" role="status" style="margin:0;text-align:center;color:rgba(255,255,255,0.65);font-size:14px;">Проверяем вход через Яндекс…</p>
         <div id="editorAuthError" role="alert" style="min-height:18px;text-align:center;color:#ff6961;font-size:13px;"></div>
-        <button id="editorAuthSubmit" class="btn-action btn-primary" type="submit">Войти</button>
-    </form>
+        <a id="editorAuthLogin" class="btn-action btn-primary" href="/auth/yandex/start?return=%2Feditor.html" style="display:none;text-align:center;text-decoration:none;">Войти через Яндекс</a>
+    </div>
 </div>
 <div id="welcomeScreen" style="display:flex;align-items:center;justify-content:center;background:rgba(10,11,15,0.95);"><div style="display:flex;flex-direction:column;align-items:center;gap:16px;"><span style="width:32px;height:32px;border:3px solid rgba(255,255,255,0.3);border-top-color:#fff;border-radius:50%;animation:spin 1s linear infinite;"></span><div style="font-size:16px;font-weight:600;color:#fff;">Загрузка</div></div></div>
 <div id="map"></div>
@@ -522,7 +521,6 @@ function attachEditorMapApi() {
 }
 
 let map, points = [], cur = null, isAdd = false, isDrawing = false, curRoute = null, activeListPoint = null, modalMode = 'list', tempNewPointData = null, userLocPlacemark = null, activePoint = null, settingsRouteFiles = [];
-let routeAdminPassword = '';
 let historyStack = [], historyIndex = -1, lastSavedSnapshot = "[]", toastTimer = null;
 let pendingDeletePoint = null;
 let _currentFolderId = null;
@@ -682,15 +680,6 @@ async function callAdminApi(action, params = {}, bodyData = null, headers = {}) 
 
     Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
     const requestHeaders = Object.assign({ 'Content-Type': 'application/json' }, headers);
-    if (['save', 'save_meta', 'delete'].includes(action) && !routeAdminPassword) {
-        throw new Error('AUTH_REQUIRED');
-    }
-    // /api/admin требует пароль для всех действий, включая list/get:
-    // иначе скрытые маршруты можно было бы читать в обход visible=true.
-    if (routeAdminPassword && !requestHeaders['X-Route-Admin-Password']) {
-        requestHeaders['X-Route-Admin-Password'] = routeAdminPassword;
-    }
-
     const options = {
         method: 'POST',
         headers: requestHeaders
@@ -709,29 +698,34 @@ async function callAdminApi(action, params = {}, bodyData = null, headers = {}) 
     return await response.json();
 }
 
-async function authenticateEditor() {
-    const passwordInput = $('editorAuthPassword');
-    const submitButton = $('editorAuthSubmit');
+async function initializeEditorAuth() {
     const error = $('editorAuthError');
-    const password = passwordInput.value;
-    if (!password) return;
-    submitButton.disabled = true;
-    error.textContent = '';
+    const message = $('editorAuthMessage');
+    const login = $('editorAuthLogin');
     try {
-        await callAdminApi('auth', {}, null, {
-            'X-Route-Admin-Password': password
+        const response = await fetch('/api/me', {
+            credentials: 'same-origin',
+            headers: { Accept: 'application/json' },
+            cache: 'no-store'
         });
-        routeAdminPassword = password;
-        passwordInput.value = '';
+        if (response.status === 401) {
+            const returnTo = window.location.pathname + window.location.search + window.location.hash;
+            window.location.replace('/auth/yandex/start?return=' + encodeURIComponent(returnTo));
+            return;
+        }
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+        }
+        const result = await response.json();
+        if (!result.user || !result.user.user_id) {
+            throw new Error('В ответе API отсутствует пользователь');
+        }
         $('editorAuthGate').style.display = 'none';
         await handleInitialLoad();
     } catch (e) {
-        error.textContent = e.message === 'HTTP 403'
-            ? 'Неверный пароль'
-            : 'Не удалось проверить пароль. ' + e.message;
-        passwordInput.focus();
-    } finally {
-        submitButton.disabled = false;
+        message.textContent = 'Для работы редактора нужен вход через Яндекс.';
+        error.textContent = 'Не удалось проверить сессию. ' + e.message;
+        login.style.display = 'block';
     }
 }
 
@@ -984,7 +978,6 @@ if (typeof maplibregl === 'undefined') {
         new Sortable($('pointsSortList'), { animation: 150, handle: '.sort-handle', ghostClass: 'sortable-ghost', onEnd: reorderPointsFromList, scroll: $('pointsSortList'), scrollSensitivity: 40, scrollSpeed: 15 });
     }
 
-    $('editorAuthPassword').focus();
 })().catch(e => {
     showToast('Ошибка загрузки карты: ' + e.message, 'error', 8000);
     const wsEl = document.getElementById('welcomeScreen');
@@ -2094,6 +2087,8 @@ window.executeDeletePoint = executeDeletePoint;
 window.copyShareLink = copyShareLink;
 window.openInstruction = openInstruction;
 window.closeInstruction = closeInstruction;
+
+initializeEditorAuth();
 
 </script>
 </body>
