@@ -2102,6 +2102,38 @@ if (typeof maplibregl === 'undefined') {
 
     const speedometer = $('telemetryPanel');
     speedometer.addEventListener('contextmenu', (event) => event.preventDefault());
+    let speedometerPressTimer = null;
+    let speedometerPointerId = null;
+    let speedometerPressX = 0;
+    let speedometerPressY = 0;
+    const cancelSpeedometerPress = () => {
+        window.clearTimeout(speedometerPressTimer);
+        speedometerPressTimer = null;
+        speedometerPointerId = null;
+    };
+    speedometer.addEventListener('pointerdown', (event) => {
+        if (!event.isPrimary || event.button !== 0) return;
+        cancelSpeedometerPress();
+        event.preventDefault();
+        event.stopPropagation();
+        speedometerPointerId = event.pointerId;
+        speedometerPressX = event.clientX;
+        speedometerPressY = event.clientY;
+        speedometer.setPointerCapture(event.pointerId);
+        speedometerPressTimer = window.setTimeout(() => {
+            window.location.assign('/editor.html');
+        }, 700);
+    });
+    speedometer.addEventListener('pointermove', (event) => {
+        if (event.pointerId !== speedometerPointerId) return;
+        if (Math.hypot(event.clientX - speedometerPressX, event.clientY - speedometerPressY) > 12) {
+            cancelSpeedometerPress();
+        }
+    });
+    speedometer.addEventListener('pointerup', (event) => {
+        if (event.pointerId === speedometerPointerId) cancelSpeedometerPress();
+    });
+    speedometer.addEventListener('pointercancel', cancelSpeedometerPress);
     $('locateBtn').addEventListener('click', toggleAutoCenter);
 
     $('playBtn').addEventListener('click', () => {
