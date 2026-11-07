@@ -86,9 +86,6 @@ class FakeResult:
 
 
 class FakePool:
-    def __init__(self, entitlements=()):
-        self.entitlements = list(entitlements)
-
     def retry_operation_sync(self, operation, **kwargs):
         name = operation.__name__
         if name == "execute_list_folders":
@@ -98,20 +95,6 @@ class FakePool:
         if name in {"execute_get_public_route", "execute_get_route"}:
             m_param = kwargs.get("m_param")
             return [FakeResult([row for row in ROUTES if row.m == m_param])]
-        if name == "execute_list_entitlements":
-            return [
-                FakeResult(
-                    [
-                        Row(
-                            entitlement=value,
-                            created_at=None,
-                            source="test",
-                            order_id="",
-                        )
-                        for value in self.entitlements
-                    ]
-                )
-            ]
         raise AssertionError(f"unexpected operation: {name}")
 
 
@@ -134,16 +117,14 @@ def event(path, method="GET", query=None):
 
 
 class CatalogTestBase(unittest.TestCase):
-    entitlements = ()
-
     def setUp(self):
-        self.pool = FakePool(self.entitlements)
+        self.pool = FakePool()
         self.patch_pool = unittest.mock.patch.object(
             handler.store, "get_pool", return_value=self.pool
         )
         self.patch_pool.start()
         self.patch_user = unittest.mock.patch.object(
-            handler, "_current_user", return_value=USER if self.entitlements else None
+            handler, "_current_user", return_value=None
         )
         self.patch_user.start()
 
@@ -170,30 +151,24 @@ class AnonymousCatalogTests(CatalogTestBase):
         self.assertEqual(routes["route-1"]["name"], "Категория/Маршрут")
         self.assertEqual(routes["route-2"]["name"], "Категория/Платно/Экзамен/Платный")
         self.assertEqual(routes["route-2"]["title"], "Платный")
-        self.assertEqual(routes["route-2"]["access"], "paid")
-        self.assertFalse(routes["route-2"]["owned"])
-        self.assertEqual(routes["route-2"]["purchase_folder_id"], "f_paid")
-        self.assertEqual(routes["route-2"]["price_kopecks"], 50000)
-        self.assertEqual(routes["route-3"]["access"], "public")
-        self.assertTrue(routes["route-3"]["owned"])
         self.assertEqual(routes["route-1"]["point_count"], 2)
         self.assertGreater(routes["route-1"]["distance_meters"], 0)
         for item in payload["routes"]:
             self.assertNotIn("data", item)
             self.assertNotIn("json", item)
-
-        paid = next(f for f in payload["folders"] if f["folder_id"] == "f_paid")
-        self.assertEqual(paid["access"], "paid")
-        self.assertFalse(paid["owned"])
-        self.assertEqual(paid["purchase_folder_id"], "f_paid")
-        self.assertEqual(paid["price_kopecks"], 50000)
+            self.assertNotIn("access", item)
+            self.assertNotIn("owned", item)
+            self.assertNotIn("price_kopecks", item)
+        for item in payload["folders"]:
+            self.assertNotIn("access", item)
+            self.assertNotIn("price_kopecks", item)
 
     def test_catalog_trailing_slash(self):
         response = handler.handler(event("/api/catalog/"), None)
         self.assertEqual(response["statusCode"], 200)
         self.assertEqual(response["headers"]["Cache-Control"], "no-store")
 
-    def test_route_returns_geometry_for_free_route(self):
+    def test_route_returns_geometry_without_login(self):
         response = handler.handler(
             event("/api/route", query={"m": "route-1"}), None
         )
@@ -201,27 +176,25 @@ class AnonymousCatalogTests(CatalogTestBase):
         payload = json.loads(response["body"])
         self.assertEqual(payload["m"], "route-1")
         self.assertEqual(payload["name"], "Категория/Маршрут")
-        self.assertEqual(payload["access"], "public")
-        self.assertTrue(payload["owned"])
         self.assertEqual(payload["point_count"], 2)
         self.assertIsInstance(payload["data"], list)
         self.assertEqual(payload["data"][0]["pts"][0], [55.0, 37.0])
 
-    def test_public_route_inside_paid_folder_is_open(self):
-        response = handler.handler(
-            event("/api/route", query={"m": "route-3"}), None
-        )
-        self.assertEqual(response["statusCode"], 200)
-
-    def test_paid_route_requires_payment(self):
+    def test_route_inside_legacy_paid_folder_is_open_without_login(self):
         response = handler.handler(
             event("/api/route", query={"m": "route-2"}), None
         )
-        self.assertEqual(response["statusCode"], 401)
-        payload = json.loads(response["body"])
-        self.assertEqual(payload["error"], "unauthorized")
-        self.assertEqual(payload["purchase_folder_id"], "f_paid")
-        self.assertEqual(payload["price_kopecks"], 50000)
+        self.assertEqual(response["statusCode"], 200)
+        self.assertIsInstance(json.loads(response["body"])["data"], list)
+
+    def test_folder_routes_are_open_without_login(self):
+        response = handler.handler(
+            event("/api/folder", query={"folder_id": "f_child"}), None
+        )
+        self.assertEqual(response["statusCode"], 200)
+        routes = json.loads(response["body"])["routes"]
+        self.assertEqual({route["m"] for route in routes}, {"route-2", "route-3"})
+        self.assertTrue(all(isinstance(route["data"], list) for route in routes))
 
     def test_route_without_m(self):
         response = handler.handler(event("/api/route"), None)
@@ -245,37 +218,6 @@ class AnonymousCatalogTests(CatalogTestBase):
         )
         self.assertEqual(metrics["point_count"], 1)
         self.assertEqual(metrics["distance_meters"], 0)
-
-
-class PaidCatalogTests(CatalogTestBase):
-    entitlements = ("folder:f_paid",)
-
-    def test_paid_folder_is_owned_after_purchase(self):
-        payload = self.catalog()
-        routes = {route["m"]: route for route in payload["routes"]}
-        self.assertTrue(routes["route-2"]["owned"])
-        self.assertEqual(routes["route-2"]["purchase_folder_id"], "")
-
-        paid = next(f for f in payload["folders"] if f["folder_id"] == "f_paid")
-        self.assertTrue(paid["owned"])
-        child = next(f for f in payload["folders"] if f["folder_id"] == "f_child")
-        self.assertTrue(child["owned"])
-
-    def test_paid_route_returns_geometry(self):
-        response = handler.handler(
-            event("/api/route", query={"m": "route-2"}), None
-        )
-        self.assertEqual(response["statusCode"], 200)
-        payload = json.loads(response["body"])
-        self.assertTrue(payload["owned"])
-        self.assertIsInstance(payload["data"], list)
-
-    def test_all_entitlement_opens_paid_folder(self):
-        self.pool.entitlements = ["all"]
-        response = handler.handler(
-            event("/api/route", query={"m": "route-2"}), None
-        )
-        self.assertEqual(response["statusCode"], 200)
 
 
 if __name__ == "__main__":

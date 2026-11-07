@@ -57,12 +57,6 @@
 <div class="input-wrapper" style="padding:3px;border-radius:12px;margin-bottom:8px;"><input id="folderNameInput" type="text" placeholder="Название папки" style="width:100%;padding:12px 10px;border:none;font-size:16px;outline:none;background:transparent;color:#f5f7fa;font-family:inherit;box-sizing:border-box;"></div>
 <div class="field-label">Родительская папка</div>
 <div class="input-wrapper" style="padding:3px;border-radius:12px;margin-bottom:8px;"><select id="folderParentSelect" style="width:100%;padding:12px 10px;border:none;font-size:16px;outline:none;background:transparent;color:#f5f7fa;font-family:inherit;box-sizing:border-box;"></select></div>
-<div class="field-label">Доступ</div>
-<div class="input-wrapper" style="padding:3px;border-radius:12px;margin-bottom:8px;"><select id="folderAccessSelect" style="width:100%;padding:12px 10px;border:none;font-size:16px;outline:none;background:transparent;color:#f5f7fa;font-family:inherit;box-sizing:border-box;"><option value="public">Бесплатно</option><option value="paid">Платно</option></select></div>
-<div class="field-label">Цена, ₽</div>
-<div class="input-wrapper" style="padding:3px;border-radius:12px;margin-bottom:8px;"><input id="folderPriceInput" type="number" min="0" step="1" placeholder="0" style="width:100%;padding:12px 10px;border:none;font-size:16px;outline:none;background:transparent;color:#f5f7fa;font-family:inherit;box-sizing:border-box;"></div>
-<div class="field-label">SKU / код</div>
-<div class="input-wrapper" style="padding:3px;border-radius:12px;margin-bottom:8px;"><input id="folderSkuInput" type="text" placeholder="Необязательно" style="width:100%;padding:12px 10px;border:none;font-size:16px;outline:none;background:transparent;color:#f5f7fa;font-family:inherit;box-sizing:border-box;"></div>
 </div>
 <div style="display:flex;flex-direction:column;gap:8px;padding:20px;padding-top:0;">
 <button class="btn-action" onclick="saveFolderSettings();">💾 Сохранить папку</button>
@@ -1150,10 +1144,6 @@ function renderTreeLevel(node, container) {
         const folderId = folder.folder_id;
         const total = countNodeRoutes(folder);
         const isExpanded = _expandedFolders.has(folderId);
-        const accessLabel = folder.access === 'paid'
-            ? (folder.price_kopecks > 0 ? `${Math.round(folder.price_kopecks / 100).toLocaleString('ru-RU')} ₽` : 'платно')
-            : '';
-
         const el = document.createElement('div');
         el.className = 'category-folder';
         el.setAttribute('data-path', folderId);
@@ -1163,7 +1153,6 @@ function renderTreeLevel(node, container) {
         header.innerHTML = `
             <span class="category-icon">${isExpanded ? '📂' : '📁'}</span>
             <span class="category-name">${escapeHtml(folder.name)}</span>
-            ${accessLabel ? `<span class="category-access">${escapeHtml(accessLabel)}</span>` : ''}
             <span class="category-count">${total}</span>
             <span class="route-info-btn" data-folder-add="${escapeHtml(folderId)}" title="Создать маршрут в папке">＋</span>
             <span class="route-info-btn" data-folder-settings="${escapeHtml(folderId)}" title="Настройки папки">⚙️</span>
@@ -1216,8 +1205,7 @@ async function moveRouteToFolder(routeKey, folderId) {
             title: meta.title || meta.name || routeKey,
             folder_id: folderId || '',
             description: meta.description || '',
-            visible: meta.visible !== undefined ? meta.visible : false,
-            access: meta.access || 'folder'
+            visible: meta.visible !== undefined ? meta.visible : false
         });
         if (curRoute === routeKey) {
             currentRouteMeta.title = meta.title || currentRouteMeta.title;
@@ -1403,8 +1391,7 @@ const handleCreateNew = async () => {
             title,
             folder_id: folderId,
             description: '',
-            visible: false,
-            access: 'folder'
+            visible: false
         });
         await refreshFileList();
         await loadRoute(id);
@@ -1437,16 +1424,14 @@ const loadRoute = async (routeName) => {
                 title: meta.title || meta.name || routeName,
                 description: meta.description || '',
                 visible: meta.visible !== undefined ? meta.visible : false,
-                folder_id: meta.folder_id || '',
-                access: meta.access || 'folder'
+                folder_id: meta.folder_id || ''
             };
         } catch (e) {
             currentRouteMeta = {
                 title: routeName,
                 description: '',
                 visible: false,
-                folder_id: '',
-                access: 'folder'
+                folder_id: ''
             };
         }
 
@@ -1478,7 +1463,7 @@ const loadRoute = async (routeName) => {
 let _shareRouteName = null;
 
 let settingsRouteName = null;
-let currentRouteMeta = { title: '', description: '', visible: false, folder_id: '', access: 'folder' };
+let currentRouteMeta = { title: '', description: '', visible: false, folder_id: '' };
 
 const renderFolderOptions = (select, selectedId, excludeId = '') => {
     if (!select) return;
@@ -1529,8 +1514,7 @@ const openRouteSettings = async (routeName) => {
             title: meta.title || meta.name || routeName,
             description: meta.description || '',
             visible: meta.visible !== undefined ? meta.visible : false,
-            folder_id: meta.folder_id || '',
-            access: meta.access || 'folder'
+            folder_id: meta.folder_id || ''
         };
         $('settingsRouteTitle').textContent = currentRouteMeta.title;
         $('routeDisplayName').value = currentRouteMeta.title;
@@ -1539,7 +1523,7 @@ const openRouteSettings = async (routeName) => {
         renderFolderOptions($('routeFolderSelect'), currentRouteMeta.folder_id);
     } catch (e) {
         $('loadingSpinner').classList.remove('active');
-        currentRouteMeta = { title: '', description: '', visible: false, folder_id: '', access: 'folder' };
+        currentRouteMeta = { title: '', description: '', visible: false, folder_id: '' };
         $('routeDisplayName').value = '';
         $('routeDescription').value = '';
         $('routeVisible').checked = false;
@@ -1562,8 +1546,7 @@ const saveRouteMeta = async () => {
             title,
             folder_id: folderId,
             description,
-            visible,
-            access: currentRouteMeta.access || 'folder'
+            visible
         });
 
         currentRouteMeta = { ...currentRouteMeta, title, description, visible, folder_id: folderId };
@@ -2029,10 +2012,7 @@ window.handleCreateFolder = async () => {
     try {
         await callAdminApi('folder_save', {}, {
             parent_id: _currentFolderId || '',
-            name,
-            access: 'public',
-            price_kopecks: 0,
-            sku: ''
+            name
         });
         toggleM('createFolderModal');
         await refreshFileList();
@@ -2049,10 +2029,6 @@ const openFolderSettings = folderId => {
     $('folderSettingsTitle').textContent = 'Настройки папки';
     $('folderNameInput').value = folder.name || '';
     renderFolderOptions($('folderParentSelect'), folder.parent_id || '', folderId);
-    $('folderAccessSelect').value = folder.access === 'paid' ? 'paid' : 'public';
-    $('folderPriceInput').value =
-        folder.price_kopecks > 0 ? folder.price_kopecks / 100 : '';
-    $('folderSkuInput').value = folder.sku || '';
     toggleM('folderSettingsModal');
 };
 
@@ -2063,24 +2039,11 @@ window.saveFolderSettings = async () => {
         showToast('Введите название папки', 'error');
         return;
     }
-    const access = $('folderAccessSelect').value === 'paid' ? 'paid' : 'public';
-    const priceRub = Number($('folderPriceInput').value || 0);
-    if (!Number.isFinite(priceRub) || priceRub < 0) {
-        showToast('Некорректная цена', 'error');
-        return;
-    }
-    if (access === 'paid' && priceRub <= 0) {
-        showToast('Укажите цену для платной папки', 'error');
-        return;
-    }
     try {
         await callAdminApi('folder_save', {}, {
             folder_id: _folderSettingsId,
             parent_id: $('folderParentSelect').value || '',
-            name,
-            access,
-            price_kopecks: Math.round(priceRub * 100),
-            sku: $('folderSkuInput').value.trim()
+            name
         });
         toggleM('folderSettingsModal');
         await refreshFileList();

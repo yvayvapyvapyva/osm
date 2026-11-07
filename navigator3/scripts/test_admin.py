@@ -79,19 +79,6 @@ class FakePool:
                 json="[]",
             ),
         ]
-        self.entitlements = []
-        self.users = [
-            Row(
-                yandex_id="y1",
-                user_id="u1",
-                login="user",
-                email="user@example.com",
-                display_name="User",
-                blocked=False,
-            )
-        ]
-        self.orders = []
-
     def retry_operation_sync(self, operation, **kwargs):
         self.calls.append((operation.__name__, kwargs))
         name = operation.__name__
@@ -112,41 +99,8 @@ class FakePool:
             "execute_delete_route",
             "execute_upsert_folder",
             "execute_delete_folder",
-            "execute_grant_entitlement",
-            "execute_revoke_entitlement",
-            "execute_insert_order",
-            "execute_update_order",
         }:
             return [FakeResult([])]
-        if name == "execute_list_entitlements":
-            return [
-                FakeResult(
-                    [
-                        Row(
-                            entitlement=item,
-                            created_at=None,
-                            source="manual",
-                            order_id="",
-                        )
-                        for item in self.entitlements
-                    ]
-                )
-            ]
-        if name == "execute_find_user":
-            value = kwargs.get("value")
-            found = [
-                user
-                for user in self.users
-                if value in {user.user_id, user.yandex_id, user.login, user.email}
-            ]
-            return [FakeResult(found[:1])]
-        if name == "execute_list_users":
-            return [FakeResult(self.users)]
-        if name == "execute_list_orders":
-            return [FakeResult(self.orders)]
-        if name == "execute_get_order":
-            order_id = kwargs.get("order_id")
-            return [FakeResult([o for o in self.orders if o.order_id == order_id])]
         raise AssertionError(f"unexpected operation: {name}")
 
     def called(self, name):
@@ -210,9 +164,8 @@ class AdminApiTests(unittest.TestCase):
             [folder["folder_id"] for folder in payload["folders"]],
             ["f_root", "f_paid"],
         )
-        paid = payload["folders"][1]
-        self.assertEqual(paid["access"], "paid")
-        self.assertEqual(paid["price_kopecks"], 50000)
+        self.assertNotIn("access", payload["folders"][1])
+        self.assertNotIn("price_kopecks", payload["folders"][1])
 
     def test_list_requires_password(self):
         response = handler.handler(event("/api/admin", query={"action": "list"}), None)
@@ -283,7 +236,6 @@ class AdminApiTests(unittest.TestCase):
                 "folder_id": "f_paid",
                 "description": "Текст",
                 "visible": True,
-                "access": "folder",
             },
         )
         self.assertEqual(response["statusCode"], 200)
@@ -311,9 +263,6 @@ class AdminApiTests(unittest.TestCase):
             body={
                 "parent_id": "f_root",
                 "name": "Новая",
-                "access": "paid",
-                "price_kopecks": 99000,
-                "sku": "sku-1",
             },
         )
         self.assertEqual(response["statusCode"], 200)
@@ -322,8 +271,7 @@ class AdminApiTests(unittest.TestCase):
         self.assertEqual(payload["folder"]["parent_id"], "f_root")
         self.assertEqual(payload["folder"]["name"], "Новая")
         kwargs = self.pool.called("execute_upsert_folder")[0]
-        self.assertEqual(kwargs["access"], "paid")
-        self.assertEqual(kwargs["price_kopecks"], 99000)
+        self.assertEqual(kwargs["name"], "Новая")
 
     def test_folder_save_rejects_cycle(self):
         response = self.admin(
@@ -352,53 +300,15 @@ class AdminApiTests(unittest.TestCase):
         kwargs = self.pool.called("execute_delete_folder")[0]
         self.assertEqual(kwargs["folder_id"], "f_paid")
 
-    def test_grant_entitlement(self):
-        response = self.admin(
-            "grant", body={"user": "user", "folder_id": "f_paid"}
-        )
-        self.assertEqual(response["statusCode"], 200)
-        payload = json.loads(response["body"])
-        self.assertEqual(payload["entitlement"], "folder:f_paid")
-        self.assertEqual(payload["status"], "granted")
-        kwargs = self.pool.called("execute_grant_entitlement")[0]
-        self.assertEqual(kwargs["user_id"], "u1")
-        self.assertEqual(kwargs["source"], "manual")
-
-    def test_revoke_entitlement(self):
-        response = self.admin(
-            "revoke", body={"user": "user", "entitlement": "folder:f_paid"}
-        )
-        self.assertEqual(response["statusCode"], 200)
-        self.assertEqual(json.loads(response["body"])["status"], "revoked")
-        kwargs = self.pool.called("execute_revoke_entitlement")[0]
-        self.assertEqual(kwargs["entitlement"], "folder:f_paid")
-
-    def test_grant_rejects_unknown_user(self):
-        response = self.admin("grant", body={"user": "ghost", "folder_id": "f_paid"})
-        self.assertEqual(response["statusCode"], 404)
-        self.assertEqual(json.loads(response["body"])["error"], "user_not_found")
-
-    def test_entitlements_for_user(self):
-        self.pool.entitlements = ["folder:f_paid"]
-        response = self.admin("entitlements", body={"user": "user"})
-        self.assertEqual(response["statusCode"], 200)
-        payload = json.loads(response["body"])
-        self.assertEqual(
-            [item["entitlement"] for item in payload["entitlements"]],
-            ["folder:f_paid"],
-        )
-
-    def test_users(self):
-        response = self.admin("users")
-        self.assertEqual(response["statusCode"], 200)
-        users = json.loads(response["body"])["users"]
-        self.assertEqual(users[0]["user_id"], "u1")
-        self.assertEqual(users[0]["login"], "user")
-
     def test_unknown_action(self):
-        response = self.admin("drop_table")
-        self.assertEqual(response["statusCode"], 400)
-        self.assertEqual(json.loads(response["body"])["error"], "unknown_action")
+        for action in ("drop_table", "orders", "grant", "entitlements"):
+            with self.subTest(action=action):
+                response = self.admin(action)
+                self.assertEqual(response["statusCode"], 400)
+                self.assertEqual(
+                    json.loads(response["body"])["error"],
+                    "unknown_action",
+                )
 
 
 if __name__ == "__main__":

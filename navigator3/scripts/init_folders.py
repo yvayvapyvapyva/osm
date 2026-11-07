@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
-"""Схема папок, прав и заказов + миграция текущих roads.
+"""Схема дерева папок и миграция текущих roads.
 
 Запуск из корня репозитория (нужен настроенный yc CLI):
 
     python3 navigator3/scripts/init_folders.py
 
 Скрипт идемпотентен:
-  * создаёт таблицы folders, entitlements, orders, если их нет;
-  * добавляет в roads колонки folder_id, title, access, price_kopecks, sku;
+  * создаёт таблицу folders, если её нет;
+  * добавляет в roads колонки folder_id и title;
   * один раз раскладывает текущие roads.name вида "МЕЩЕРА/Экзамен/Маршрут"
     в дерево папок. Уже заполненные folder_id/title не перезаписываются.
 """
@@ -30,35 +30,8 @@ TABLES = {
             folder_id Utf8,
             parent_id Utf8,
             name Utf8,
-            access Utf8,
-            price_kopecks Uint64,
-            sku Utf8,
             sort_order Uint32,
             PRIMARY KEY (folder_id)
-        );
-    """,
-    "entitlements": """
-        CREATE TABLE entitlements (
-            user_id Utf8,
-            entitlement Utf8,
-            created_at Timestamp,
-            source Utf8,
-            order_id Utf8,
-            PRIMARY KEY (user_id, entitlement)
-        );
-    """,
-    "orders": """
-        CREATE TABLE orders (
-            order_id Utf8,
-            user_id Utf8,
-            folder_id Utf8,
-            amount_kopecks Uint64,
-            status Utf8,
-            created_at Timestamp,
-            updated_at Timestamp,
-            payment_id Utf8,
-            return_path Utf8,
-            PRIMARY KEY (order_id)
         );
     """,
 }
@@ -66,9 +39,6 @@ TABLES = {
 ROAD_COLUMNS = {
     "folder_id": "Utf8",
     "title": "Utf8",
-    "access": "Utf8",
-    "price_kopecks": "Uint64",
-    "sku": "Utf8",
 }
 
 
@@ -161,14 +131,11 @@ def create_folder(pool, by_id, by_key, parent_id, name):
             DECLARE $folder_id AS Utf8;
             DECLARE $parent_id AS Utf8;
             DECLARE $name AS Utf8;
-            DECLARE $access AS Utf8;
-            DECLARE $price AS Uint64;
-            DECLARE $sku AS Utf8;
             DECLARE $sort_order AS Uint32;
             UPSERT INTO folders
-                (folder_id, parent_id, name, access, price_kopecks, sku, sort_order)
+                (folder_id, parent_id, name, sort_order)
             VALUES
-                ($folder_id, $parent_id, $name, $access, $price, $sku, $sort_order);
+                ($folder_id, $parent_id, $name, $sort_order);
         """
         return session.transaction().execute(
             session.prepare(query),
@@ -176,9 +143,6 @@ def create_folder(pool, by_id, by_key, parent_id, name):
                 "$folder_id": folder_id,
                 "$parent_id": parent_id,
                 "$name": name,
-                "$access": "public",
-                "$price": 0,
-                "$sku": "",
                 "$sort_order": 0,
             },
             commit_tx=True,
@@ -207,7 +171,7 @@ def migrate_roads(pool, by_id, by_key):
         return session.transaction().execute(
             session.prepare(
                 """
-                SELECT m, name, folder_id, title, access, price_kopecks, sku
+                SELECT m, name, folder_id, title
                 FROM roads;
                 """
             ),
@@ -230,24 +194,14 @@ def migrate_roads(pool, by_id, by_key):
         if not title:
             title = parts[-1] if parts else (name.strip() or row.m or "")
 
-        access = (row.access or "").strip() or "folder"
-        price = int(row.price_kopecks or 0)
-        sku = row.sku or ""
-
         def update(session):
             query = """
                 DECLARE $m AS Utf8;
                 DECLARE $folder_id AS Utf8;
                 DECLARE $title AS Utf8;
-                DECLARE $access AS Utf8;
-                DECLARE $price AS Uint64;
-                DECLARE $sku AS Utf8;
                 UPDATE roads
                 SET folder_id = $folder_id,
-                    title = $title,
-                    access = $access,
-                    price_kopecks = $price,
-                    sku = $sku
+                    title = $title
                 WHERE m = $m;
             """
             return session.transaction().execute(
@@ -256,9 +210,6 @@ def migrate_roads(pool, by_id, by_key):
                     "$m": row.m,
                     "$folder_id": folder_id,
                     "$title": title,
-                    "$access": access,
-                    "$price": price,
-                    "$sku": sku,
                 },
                 commit_tx=True,
             )

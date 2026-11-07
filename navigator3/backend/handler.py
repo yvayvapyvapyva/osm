@@ -2,11 +2,9 @@
 
 Публичное API (через API Gateway, тот же origin):
   GET  /api/health            — проверка функции
-  GET  /api/me                — пользователь и его entitlements
+  GET  /api/me                — текущий пользователь
   GET  /api/catalog           — папки и видимые маршруты без геометрии
   GET  /api/route?m=<m>       — геометрия одного маршрута
-  POST /api/orders            — создать заказ на доступ к папке (ЮKassa)
-  POST /api/yookassa/notify   — webhook ЮKassa
 
 Вход:
   GET  /auth/yandex/start
@@ -16,10 +14,7 @@
 Редактор (нужен X-Route-Admin-Password для любого действия):
   POST /api/admin?action=list|get|get_meta|save|save_meta|delete
   POST /api/admin?action=folder_save|folder_delete
-  POST /api/admin?action=grant|revoke|entitlements|users|orders
-
-База — serverless-YDB (dbosm). Доступ к папке хранится как entitlement
-`folder:<folder_id>`; `all` открывает всё.
+База — serverless-YDB (dbosm).
 """
 
 import base64
@@ -28,17 +23,9 @@ import json
 import math
 import os
 import secrets
-import uuid
 
 import auth
-import payments
 import store
-
-ACCESS_PUBLIC = "public"
-ACCESS_PAID = "paid"
-ROUTE_ACCESS_PUBLIC = "public"
-ROUTE_ACCESS_FOLDER = "folder"
-
 
 # ---------------------------------------------------------------------------
 # YDB-запросы
@@ -47,7 +34,7 @@ ROUTE_ACCESS_FOLDER = "folder"
 
 def execute_list_folders(session):
     query = """
-        SELECT folder_id, parent_id, name, access, price_kopecks, sku, sort_order
+        SELECT folder_id, parent_id, name, sort_order
         FROM folders
         ORDER BY sort_order, name;
     """
@@ -57,8 +44,7 @@ def execute_list_folders(session):
 
 def execute_list_editor_routes(session):
     query = """
-        SELECT m, name, description, visible, folder_id, title, access,
-               price_kopecks, sku
+        SELECT m, name, description, visible, folder_id, title
         FROM roads
         ORDER BY name;
     """
@@ -68,8 +54,7 @@ def execute_list_editor_routes(session):
 
 def execute_list_public_routes(session):
     query = """
-        SELECT m, name, description, json, folder_id, title, access,
-               price_kopecks, sku
+        SELECT m, name, description, json, folder_id, title
         FROM roads
         WHERE visible = true AND name IS NOT NULL
         ORDER BY name;
@@ -81,8 +66,7 @@ def execute_list_public_routes(session):
 def execute_get_route(session, m_param):
     query = """
         DECLARE $m AS Utf8;
-        SELECT json, name, m, description, visible, folder_id, title, access,
-               price_kopecks, sku
+        SELECT json, name, m, description, visible, folder_id, title
         FROM roads
         WHERE m = $m;
     """
@@ -96,8 +80,7 @@ def execute_get_public_route(session, m_param):
     """Только видимый маршрут: скрытые и удалённые наружу не отдаём."""
     query = """
         DECLARE $m AS Utf8;
-        SELECT json, name, m, description, folder_id, title, access,
-               price_kopecks, sku
+        SELECT json, name, m, description, folder_id, title
         FROM roads
         WHERE m = $m AND visible = true AND name IS NOT NULL;
     """
@@ -138,7 +121,7 @@ def execute_upsert_route(session, m_param, json_data):
 
 
 def execute_update_route_meta(
-    session, m_param, folder_id, title, name, description, visible, access
+    session, m_param, folder_id, title, name, description, visible
 ):
     query = """
         DECLARE $m AS Utf8;
@@ -147,14 +130,12 @@ def execute_update_route_meta(
         DECLARE $name AS Utf8;
         DECLARE $description AS Utf8;
         DECLARE $visible AS Bool;
-        DECLARE $access AS Utf8;
         UPDATE roads
         SET folder_id = $folder_id,
             title = $title,
             name = $name,
             description = $description,
-            visible = $visible,
-            access = $access
+            visible = $visible
         WHERE m = $m;
     """
     prepared = session.prepare(query)
@@ -167,7 +148,6 @@ def execute_update_route_meta(
             "$name": str(name),
             "$description": str(description),
             "$visible": bool(visible),
-            "$access": str(access),
         },
         commit_tx=True,
     )
@@ -186,8 +166,7 @@ def execute_update_route_name(session, m_param, name):
 
 
 def execute_rename_route(
-    session, old_m_param, new_m_param, folder_id, title, name, description, visible,
-    access,
+    session, old_m_param, new_m_param, folder_id, title, name, description, visible
 ):
     query = """
         DECLARE $old_m AS Utf8;
@@ -197,18 +176,13 @@ def execute_rename_route(
         DECLARE $name AS Utf8;
         DECLARE $description AS Utf8;
         DECLARE $visible AS Bool;
-        DECLARE $access AS Utf8;
 
         $json = (SELECT json FROM roads WHERE m = $old_m);
-        $price = (SELECT price_kopecks FROM roads WHERE m = $old_m);
-        $sku = (SELECT sku FROM roads WHERE m = $old_m);
 
         UPSERT INTO roads
-            (m, json, folder_id, title, name, description, visible, access,
-             price_kopecks, sku)
+            (m, json, folder_id, title, name, description, visible)
         VALUES
-            ($new_m, $json, $folder_id, $title, $name, $description, $visible,
-             $access, $price, $sku);
+            ($new_m, $json, $folder_id, $title, $name, $description, $visible);
         DELETE FROM roads WHERE m = $old_m;
     """
     prepared = session.prepare(query)
@@ -222,28 +196,21 @@ def execute_rename_route(
             "$name": str(name),
             "$description": str(description),
             "$visible": bool(visible),
-            "$access": str(access),
         },
         commit_tx=True,
     )
 
 
-def execute_upsert_folder(
-    session, folder_id, parent_id, name, access, price_kopecks, sku, sort_order
-):
+def execute_upsert_folder(session, folder_id, parent_id, name, sort_order):
     query = """
         DECLARE $folder_id AS Utf8;
         DECLARE $parent_id AS Utf8;
         DECLARE $name AS Utf8;
-        DECLARE $access AS Utf8;
-        DECLARE $price_kopecks AS Uint64;
-        DECLARE $sku AS Utf8;
         DECLARE $sort_order AS Uint32;
         UPSERT INTO folders
-            (folder_id, parent_id, name, access, price_kopecks, sku, sort_order)
+            (folder_id, parent_id, name, sort_order)
         VALUES
-            ($folder_id, $parent_id, $name, $access, $price_kopecks, $sku,
-             $sort_order);
+            ($folder_id, $parent_id, $name, $sort_order);
     """
     prepared = session.prepare(query)
     return session.transaction().execute(
@@ -252,9 +219,6 @@ def execute_upsert_folder(
             "$folder_id": str(folder_id),
             "$parent_id": str(parent_id),
             "$name": str(name),
-            "$access": str(access),
-            "$price_kopecks": int(price_kopecks),
-            "$sku": str(sku),
             "$sort_order": int(sort_order),
         },
         commit_tx=True,
@@ -270,177 +234,6 @@ def execute_delete_folder(session, folder_id):
     return session.transaction().execute(
         prepared, {"$folder_id": str(folder_id)}, commit_tx=True
     )
-
-
-def execute_list_entitlements(session, user_id):
-    query = """
-        DECLARE $user_id AS Utf8;
-        SELECT entitlement, created_at, source, order_id
-        FROM entitlements
-        WHERE user_id = $user_id
-        ORDER BY entitlement;
-    """
-    prepared = session.prepare(query)
-    return session.transaction().execute(
-        prepared, {"$user_id": str(user_id)}, commit_tx=True
-    )
-
-
-def execute_grant_entitlement(session, user_id, entitlement, source, order_id):
-    query = """
-        DECLARE $user_id AS Utf8;
-        DECLARE $entitlement AS Utf8;
-        DECLARE $created_at AS Timestamp;
-        DECLARE $source AS Utf8;
-        DECLARE $order_id AS Utf8;
-        UPSERT INTO entitlements
-            (user_id, entitlement, created_at, source, order_id)
-        VALUES
-            ($user_id, $entitlement, $created_at, $source, $order_id);
-    """
-    prepared = session.prepare(query)
-    return session.transaction().execute(
-        prepared,
-        {
-            "$user_id": str(user_id),
-            "$entitlement": str(entitlement),
-            "$created_at": store.now(),
-            "$source": str(source),
-            "$order_id": str(order_id or ""),
-        },
-        commit_tx=True,
-    )
-
-
-def execute_revoke_entitlement(session, user_id, entitlement):
-    query = """
-        DECLARE $user_id AS Utf8;
-        DECLARE $entitlement AS Utf8;
-        DELETE FROM entitlements
-        WHERE user_id = $user_id AND entitlement = $entitlement;
-    """
-    prepared = session.prepare(query)
-    return session.transaction().execute(
-        prepared,
-        {"$user_id": str(user_id), "$entitlement": str(entitlement)},
-        commit_tx=True,
-    )
-
-
-def execute_find_user(session, value):
-    query = """
-        DECLARE $value AS Utf8;
-        SELECT yandex_id, user_id, login, email, display_name, blocked
-        FROM users
-        WHERE user_id = $value OR yandex_id = $value OR login = $value
-           OR email = $value
-        LIMIT 1;
-    """
-    prepared = session.prepare(query)
-    return session.transaction().execute(
-        prepared, {"$value": str(value)}, commit_tx=True
-    )
-
-
-def execute_list_users(session):
-    query = """
-        SELECT yandex_id, user_id, login, email, display_name, blocked
-        FROM users
-        ORDER BY login;
-    """
-    prepared = session.prepare(query)
-    return session.transaction().execute(prepared, commit_tx=True)
-
-
-def execute_insert_order(
-    session, order_id, user_id, folder_id, amount_kopecks, status, payment_id,
-    return_path,
-):
-    query = """
-        DECLARE $order_id AS Utf8;
-        DECLARE $user_id AS Utf8;
-        DECLARE $folder_id AS Utf8;
-        DECLARE $amount_kopecks AS Uint64;
-        DECLARE $status AS Utf8;
-        DECLARE $created_at AS Timestamp;
-        DECLARE $updated_at AS Timestamp;
-        DECLARE $payment_id AS Utf8;
-        DECLARE $return_path AS Utf8;
-        INSERT INTO orders
-            (order_id, user_id, folder_id, amount_kopecks, status, created_at,
-             updated_at, payment_id, return_path)
-        VALUES
-            ($order_id, $user_id, $folder_id, $amount_kopecks, $status,
-             $created_at, $updated_at, $payment_id, $return_path);
-    """
-    now = store.now()
-    prepared = session.prepare(query)
-    return session.transaction().execute(
-        prepared,
-        {
-            "$order_id": str(order_id),
-            "$user_id": str(user_id),
-            "$folder_id": str(folder_id),
-            "$amount_kopecks": int(amount_kopecks),
-            "$status": str(status),
-            "$created_at": now,
-            "$updated_at": now,
-            "$payment_id": str(payment_id or ""),
-            "$return_path": str(return_path or "/"),
-        },
-        commit_tx=True,
-    )
-
-
-def execute_update_order(session, order_id, status, payment_id=None):
-    query = """
-        DECLARE $order_id AS Utf8;
-        DECLARE $status AS Utf8;
-        DECLARE $updated_at AS Timestamp;
-        DECLARE $payment_id AS Utf8;
-        UPDATE orders
-        SET status = $status,
-            updated_at = $updated_at,
-            payment_id = IF($payment_id = "", payment_id, $payment_id)
-        WHERE order_id = $order_id;
-    """
-    prepared = session.prepare(query)
-    return session.transaction().execute(
-        prepared,
-        {
-            "$order_id": str(order_id),
-            "$status": str(status),
-            "$updated_at": store.now(),
-            "$payment_id": str(payment_id or ""),
-        },
-        commit_tx=True,
-    )
-
-
-def execute_get_order(session, order_id):
-    query = """
-        DECLARE $order_id AS Utf8;
-        SELECT order_id, user_id, folder_id, amount_kopecks, status, created_at,
-               updated_at, payment_id, return_path
-        FROM orders
-        WHERE order_id = $order_id;
-    """
-    prepared = session.prepare(query)
-    return session.transaction().execute(
-        prepared, {"$order_id": str(order_id)}, commit_tx=True
-    )
-
-
-def execute_list_orders(session):
-    query = """
-        SELECT order_id, user_id, folder_id, amount_kopecks, status, created_at,
-               updated_at, payment_id, return_path
-        FROM orders
-        ORDER BY created_at DESC
-        LIMIT 200;
-    """
-    prepared = session.prepare(query)
-    return session.transaction().execute(prepared, commit_tx=True)
 
 
 # ---------------------------------------------------------------------------
@@ -530,9 +323,6 @@ def _folder_dict(row):
         "folder_id": _text(_row_value(row, "folder_id")),
         "parent_id": _text(_row_value(row, "parent_id")),
         "name": _text(_row_value(row, "name")),
-        "access": _text(_row_value(row, "access")) or ACCESS_PUBLIC,
-        "price_kopecks": _int(_row_value(row, "price_kopecks")),
-        "sku": _text(_row_value(row, "sku")),
         "sort_order": _int(_row_value(row, "sort_order")),
     }
 
@@ -548,47 +338,6 @@ def _folder_chain(by_id, folder_id):
         current = folder["parent_id"]
     chain.reverse()
     return chain
-
-
-def _folder_access_info(by_id, folder_id, entitlements):
-    """Возвращает эффективный доступ к папке с учётом всех родителей."""
-    chain = _folder_chain(by_id, folder_id)
-    owned = "all" in entitlements or any(
-        f"folder:{folder['folder_id']}" in entitlements for folder in chain
-    )
-    paid = [folder for folder in chain if folder["access"] == ACCESS_PAID]
-    if not paid:
-        return {
-            "access": ACCESS_PUBLIC,
-            "owned": True,
-            "purchase_folder_id": "",
-            "price_kopecks": 0,
-            "sku": "",
-        }
-
-    purchase = paid[0]
-    return {
-        "access": ACCESS_PAID,
-        "owned": owned,
-        "purchase_folder_id": "" if owned else purchase["folder_id"],
-        "price_kopecks": purchase["price_kopecks"],
-        "sku": purchase["sku"],
-    }
-
-
-def _route_access_info(row, by_id, entitlements):
-    route_access = _text(_row_value(row, "access")) or ROUTE_ACCESS_FOLDER
-    if route_access == ROUTE_ACCESS_PUBLIC:
-        return {
-            "access": ACCESS_PUBLIC,
-            "owned": True,
-            "purchase_folder_id": "",
-            "price_kopecks": 0,
-            "sku": "",
-        }
-    return _folder_access_info(
-        by_id, _text(_row_value(row, "folder_id")), entitlements
-    )
 
 
 def _route_title(row):
@@ -607,11 +356,10 @@ def _full_route_name(by_id, folder_id, title):
     return "/".join(part for part in parts if part)
 
 
-def _route_public_dict(row, by_id, entitlements):
+def _route_public_dict(row, by_id):
     data = _json_value(_row_value(row, "json"))
     folder_id = _text(_row_value(row, "folder_id"))
     title = _route_title(row)
-    info = _route_access_info(row, by_id, entitlements)
     route = {
         "m": _text(_row_value(row, "m")),
         "folder_id": folder_id,
@@ -620,11 +368,6 @@ def _route_public_dict(row, by_id, entitlements):
         if folder_id in by_id
         else _text(_row_value(row, "name")) or title,
         "description": _text(_row_value(row, "description")),
-        "access": info["access"],
-        "owned": info["owned"],
-        "purchase_folder_id": info["purchase_folder_id"],
-        "price_kopecks": info["price_kopecks"],
-        "sku": info["sku"],
     }
     route.update(_route_metrics(data))
     return route
@@ -644,9 +387,6 @@ def _route_editor_dict(row, by_id):
         "visible": bool(_row_value(row, "visible"))
         if _row_value(row, "visible") is not None
         else False,
-        "access": _text(_row_value(row, "access")) or ROUTE_ACCESS_FOLDER,
-        "price_kopecks": _int(_row_value(row, "price_kopecks")),
-        "sku": _text(_row_value(row, "sku")),
     }
 
 
@@ -737,50 +477,6 @@ def _editor_data():
     folders = [_folder_dict(row) for row in folder_rows]
     by_id = {folder["folder_id"]: folder for folder in folders}
     return folders, route_rows, by_id
-
-
-def _user_entitlements(user):
-    if not user:
-        return set()
-    rows = _rows(
-        store.get_pool().retry_operation_sync(
-            execute_list_entitlements, user_id=user.get("user_id")
-        )
-    )
-    return {_text(_row_value(row, "entitlement")) for row in rows}
-
-
-def _find_user(identifier):
-    rows = _rows(
-        store.get_pool().retry_operation_sync(
-            execute_find_user, value=identifier
-        )
-    )
-    if not rows:
-        return None
-    row = rows[0]
-    return {
-        "yandex_id": _text(_row_value(row, "yandex_id")),
-        "user_id": _text(_row_value(row, "user_id")),
-        "login": _text(_row_value(row, "login")),
-        "email": _text(_row_value(row, "email")),
-        "display_name": _text(_row_value(row, "display_name")),
-        "blocked": bool(_row_value(row, "blocked")),
-    }
-
-
-def _order_dict(row):
-    return {
-        "order_id": _text(_row_value(row, "order_id")),
-        "user_id": _text(_row_value(row, "user_id")),
-        "folder_id": _text(_row_value(row, "folder_id")),
-        "amount_kopecks": _int(_row_value(row, "amount_kopecks")),
-        "status": _text(_row_value(row, "status")),
-        "payment_id": _text(_row_value(row, "payment_id")),
-        "return_path": _text(_row_value(row, "return_path")),
-        "created_at": _row_value(row, "created_at"),
-        "updated_at": _row_value(row, "updated_at"),
-    }
 
 
 # ---------------------------------------------------------------------------
@@ -907,30 +603,11 @@ def _api_catalog(event):
     user = _current_user(event)
     try:
         folders, route_rows, by_id = _catalog_data()
-        entitlements = _user_entitlements(user)
-        folder_payload = []
-        for folder in folders:
-            info = _folder_access_info(by_id, folder["folder_id"], entitlements)
-            folder_payload.append(
-                {
-                    "folder_id": folder["folder_id"],
-                    "parent_id": folder["parent_id"],
-                    "name": folder["name"],
-                    "sort_order": folder["sort_order"],
-                    "access": info["access"],
-                    "owned": info["owned"],
-                    "purchase_folder_id": info["purchase_folder_id"],
-                    "price_kopecks": info["price_kopecks"],
-                    "sku": info["sku"],
-                }
-            )
-        routes = [
-            _route_public_dict(row, by_id, entitlements) for row in route_rows
-        ]
+        routes = [_route_public_dict(row, by_id) for row in route_rows]
         return auth.json_response(
             200,
             {
-                "folders": folder_payload,
+                "folders": folders,
                 "routes": routes,
                 "user": _public_user(user) if user else None,
             },
@@ -941,24 +618,19 @@ def _api_catalog(event):
 
 
 def _api_me(event):
-    """Текущий пользователь и его права, либо 401 для гостя."""
+    """Текущий пользователь либо 401 для гостя."""
     user = _current_user(event)
     if not user:
         return auth.json_response(401, {"error": "unauthorized"})
-    entitlements = sorted(_user_entitlements(user))
-    return auth.json_response(
-        200,
-        {"user": _public_user(user), "entitlements": entitlements},
-    )
+    return auth.json_response(200, {"user": _public_user(user)})
 
 
 def _api_folder(event):
-    """Содержимое папки со всей геометрией доступных маршрутов."""
+    """Содержимое папки со всей геометрией её маршрутов."""
     folder_id = (_query(event).get("folder_id") or "").strip()
     user = _current_user(event)
     try:
         folders, route_rows, by_id = _catalog_data()
-        entitlements = _user_entitlements(user)
         if folder_id and folder_id not in by_id:
             return auth.json_response(404, {"error": "folder_not_found"})
 
@@ -966,18 +638,12 @@ def _api_folder(event):
         for folder in folders:
             if _text(folder["parent_id"]) != folder_id:
                 continue
-            info = _folder_access_info(by_id, folder["folder_id"], entitlements)
             child_folders.append(
                 {
                     "folder_id": folder["folder_id"],
                     "parent_id": folder["parent_id"],
                     "name": folder["name"],
                     "sort_order": folder["sort_order"],
-                    "access": info["access"],
-                    "owned": info["owned"],
-                    "purchase_folder_id": info["purchase_folder_id"],
-                    "price_kopecks": info["price_kopecks"],
-                    "sku": info["sku"],
                 }
             )
         child_folders.sort(key=lambda f: (f["sort_order"], f["name"]))
@@ -987,11 +653,8 @@ def _api_folder(event):
             row_folder_id = _text(_row_value(row, "folder_id"))
             if row_folder_id != folder_id:
                 continue
-            info = _route_access_info(row, by_id, entitlements)
-            route = _route_public_dict(row, by_id, entitlements)
-            if info["owned"]:
-                data = _json_value(_row_value(row, "json"))
-                route["data"] = data
+            route = _route_public_dict(row, by_id)
+            route["data"] = _json_value(_row_value(row, "json"))
             routes.append(route)
         routes.sort(key=lambda r: r.get("name", ""))
 
@@ -1010,12 +673,11 @@ def _api_folder(event):
 
 
 def _api_route(event):
-    """Геометрия одного маршрута с проверкой доступа на сервере."""
+    """Геометрия одного видимого маршрута."""
     m_val = _query(event).get("m") or ""
     if not isinstance(m_val, str) or not m_val.strip():
         return auth.json_response(400, {"error": "missing_route_name"})
 
-    user = _current_user(event)
     try:
         rows = _rows(
             store.get_pool().retry_operation_sync(
@@ -1032,201 +694,13 @@ def _api_route(event):
             folder["folder_id"]: folder
             for folder in (_folder_dict(row) for row in folder_rows)
         }
-        entitlements = _user_entitlements(user)
         row = rows[0]
-        info = _route_access_info(row, by_id, entitlements)
-        if not info["owned"]:
-            payload = {
-                "error": "payment_required",
-                "purchase_folder_id": info["purchase_folder_id"],
-                "price_kopecks": info["price_kopecks"],
-                "sku": info["sku"],
-            }
-            if not user:
-                payload["error"] = "unauthorized"
-                return auth.json_response(401, payload)
-            return auth.json_response(402, payload)
-
         data = _json_value(_row_value(row, "json"))
-        payload = _route_public_dict(row, by_id, entitlements)
+        payload = _route_public_dict(row, by_id)
         payload["data"] = data
         return auth.json_response(200, payload)
     except Exception as exc:  # noqa: BLE001
         print(f"[api] route failed: {exc}")
-        return auth.json_response(500, {"error": "storage_failed"})
-
-
-def _return_url(return_path, event=None):
-    path = auth.safe_return(return_path)
-    if "#" in path:
-        before, fragment = path.split("#", 1)
-        fragment = "#" + fragment
-    else:
-        before, fragment = path, ""
-    separator = "&" if "?" in before else "?"
-    return (
-        auth.base_url_for_event(event)
-        + before
-        + separator
-        + "payment=success"
-        + fragment
-    )
-
-
-def _api_orders(event):
-    if not auth.origin_allowed(event):
-        return auth.json_response(403, {"error": "forbidden_origin"})
-
-    user = _current_user(event)
-    if not user:
-        return auth.json_response(401, {"error": "unauthorized"})
-
-    body = _body_json(event)
-    if body is None:
-        return auth.json_response(400, {"error": "invalid_json_body"})
-
-    folder_id = _text(body.get("folder_id")).strip()
-    if not folder_id:
-        return auth.json_response(400, {"error": "missing_folder_id"})
-
-    if not payments.configured():
-        return auth.json_response(503, {"error": "payments_not_configured"})
-
-    try:
-        folders, _, by_id = _editor_data()
-        if folder_id not in by_id:
-            return auth.json_response(404, {"error": "folder_not_found"})
-        entitlements = _user_entitlements(user)
-        info = _folder_access_info(by_id, folder_id, entitlements)
-        if info["access"] != ACCESS_PAID:
-            return auth.json_response(400, {"error": "folder_is_free"})
-        if info["owned"]:
-            return auth.json_response(400, {"error": "already_available"})
-        if info["price_kopecks"] <= 0:
-            return auth.json_response(400, {"error": "price_not_set"})
-
-        order_id = uuid.uuid4().hex
-        return_path = auth.safe_return(body.get("return"), "/")
-        store.get_pool().retry_operation_sync(
-            execute_insert_order,
-            order_id=order_id,
-            user_id=user["user_id"],
-            folder_id=folder_id,
-            amount_kopecks=info["price_kopecks"],
-            status="pending",
-            payment_id="",
-            return_path=return_path,
-        )
-
-        try:
-            payment = payments.create_payment(
-                amount_kopecks=info["price_kopecks"],
-                description=f"Доступ к папке «{by_id[folder_id]['name']}»",
-                return_url=_return_url(return_path, event),
-                metadata={
-                    "order_id": order_id,
-                    "user_id": user["user_id"],
-                    "folder_id": folder_id,
-                },
-                idempotence_key=order_id,
-            )
-        except Exception as exc:  # noqa: BLE001
-            print(f"[payments] create failed: {exc}")
-            store.get_pool().retry_operation_sync(
-                execute_update_order,
-                order_id=order_id,
-                status="failed",
-            )
-            return auth.json_response(502, {"error": "payment_failed"})
-
-        store.get_pool().retry_operation_sync(
-            execute_update_order,
-            order_id=order_id,
-            status="pending",
-            payment_id=payment["payment_id"],
-        )
-        return auth.json_response(
-            200,
-            {
-                "order_id": order_id,
-                "payment_id": payment["payment_id"],
-                "confirmation_url": payment["confirmation_url"],
-            },
-        )
-    except Exception as exc:  # noqa: BLE001
-        print(f"[api] order failed: {exc}")
-        return auth.json_response(500, {"error": "storage_failed"})
-
-
-def _api_yookassa_notify(event):
-    body = _body_json(event)
-    if body is None:
-        return auth.json_response(400, {"error": "invalid_json_body"})
-
-    payment_id = _text((body.get("object") or {}).get("id")).strip()
-    event_type = _text(body.get("event")).strip()
-    if not payment_id or not event_type:
-        return auth.json_response(200, {"status": "ignored"})
-    if event_type not in {"payment.succeeded", "payment.canceled"}:
-        return auth.json_response(200, {"status": "ignored"})
-
-    try:
-        payment = payments.fetch_payment(payment_id)
-    except Exception as exc:  # noqa: BLE001
-        print(f"[payments] verify failed: {exc}")
-        return auth.json_response(502, {"error": "payment_verification_failed"})
-
-    metadata = payment.get("metadata") or {}
-    order_id = _text(metadata.get("order_id")).strip()
-    if not order_id:
-        return auth.json_response(200, {"status": "ignored"})
-
-    try:
-        orders = _rows(
-            store.get_pool().retry_operation_sync(
-                execute_get_order, order_id=order_id
-            )
-        )
-        if not orders:
-            return auth.json_response(200, {"status": "ignored"})
-        order = _order_dict(orders[0])
-
-        if event_type == "payment.canceled":
-            store.get_pool().retry_operation_sync(
-                execute_update_order,
-                order_id=order_id,
-                status="canceled",
-                payment_id=payment_id,
-            )
-            return auth.json_response(200, {"status": "canceled"})
-
-        if not payment.get("paid") or payment.get("status") != "succeeded":
-            return auth.json_response(200, {"status": "not_paid"})
-
-        amount = payment.get("amount") or {}
-        amount_value = _text(amount.get("value"))
-        amount_kopecks = _int(round(float(amount_value) * 100)) if amount_value else 0
-        if amount.get("currency") != "RUB" or amount_kopecks != order["amount_kopecks"]:
-            print(f"[payments] amount mismatch for order {order_id}")
-            return auth.json_response(400, {"error": "amount_mismatch"})
-
-        if order["status"] != "paid":
-            store.get_pool().retry_operation_sync(
-                execute_update_order,
-                order_id=order_id,
-                status="paid",
-                payment_id=payment_id,
-            )
-            store.get_pool().retry_operation_sync(
-                execute_grant_entitlement,
-                user_id=order["user_id"],
-                entitlement=f"folder:{order['folder_id']}",
-                source="yookassa",
-                order_id=order_id,
-            )
-        return auth.json_response(200, {"status": "paid"})
-    except Exception as exc:  # noqa: BLE001
-        print(f"[api] yookassa notify failed: {exc}")
         return auth.json_response(500, {"error": "storage_failed"})
 
 
@@ -1338,9 +812,6 @@ def _admin_save_meta(event):
 
     description = _text(body.get("description", current["description"]))
     visible = body.get("visible", current["visible"])
-    access = _text(body.get("access", current["access"])) or ROUTE_ACCESS_FOLDER
-    if access not in {ROUTE_ACCESS_PUBLIC, ROUTE_ACCESS_FOLDER}:
-        return auth.json_response(400, {"error": "invalid_access"})
 
     name = _full_route_name(by_id, folder_id, title)
     new_m = _text(body.get("new_m")).strip()
@@ -1355,7 +826,6 @@ def _admin_save_meta(event):
             name=name,
             description=description,
             visible=bool(visible),
-            access=access,
         )
         return auth.json_response(200, {"status": "meta_saved", "new_m": new_m})
 
@@ -1367,7 +837,6 @@ def _admin_save_meta(event):
         name=name,
         description=description,
         visible=bool(visible),
-        access=access,
     )
     return auth.json_response(200, {"status": "meta_saved"})
 
@@ -1389,20 +858,12 @@ def _admin_folder_save(event):
     folder_id = _text(body.get("folder_id")).strip() or "f_" + secrets.token_hex(8)
     parent_id = _text(body.get("parent_id")).strip()
     name = _text(body.get("name")).strip()
-    access = _text(body.get("access")).strip() or ACCESS_PUBLIC
-    price_kopecks = _int(body.get("price_kopecks"))
-    sku = _text(body.get("sku")).strip()
     sort_order = _int(body.get("sort_order"))
 
     if not name:
         return auth.json_response(400, {"error": "missing_folder_name"})
     if parent_id and parent_id not in by_id:
         return auth.json_response(400, {"error": "unknown_parent"})
-    if access not in {ACCESS_PUBLIC, ACCESS_PAID}:
-        return auth.json_response(400, {"error": "invalid_access"})
-    if price_kopecks < 0:
-        return auth.json_response(400, {"error": "invalid_price"})
-
     current = parent_id
     seen = set()
     while current:
@@ -1418,9 +879,6 @@ def _admin_folder_save(event):
         folder_id=folder_id,
         parent_id=parent_id,
         name=name,
-        access=access,
-        price_kopecks=price_kopecks,
-        sku=sku,
         sort_order=sort_order,
     )
 
@@ -1430,9 +888,6 @@ def _admin_folder_save(event):
         "folder_id": folder_id,
         "parent_id": parent_id,
         "name": name,
-        "access": access,
-        "price_kopecks": price_kopecks,
-        "sku": sku,
         "sort_order": sort_order,
     }
     for row in route_rows:
@@ -1482,124 +937,6 @@ def _admin_folder_delete(event):
     return auth.json_response(200, {"status": "folder_deleted"})
 
 
-def _resolve_entitlement(body, by_id):
-    entitlement = _text(body.get("entitlement")).strip()
-    if entitlement:
-        if entitlement == "all" or entitlement.startswith("folder:"):
-            return entitlement
-        return None
-    folder_id = _text(body.get("folder_id")).strip()
-    if not folder_id or folder_id not in by_id:
-        return None
-    return f"folder:{folder_id}"
-
-
-def _admin_grant(event, revoke=False):
-    body = _body_json(event)
-    if body is None:
-        return auth.json_response(400, {"error": "invalid_json_body"})
-
-    identifier = (
-        _text(body.get("user")).strip()
-        or _text(body.get("user_id")).strip()
-        or _text(body.get("login")).strip()
-        or _text(body.get("email")).strip()
-    )
-    if not identifier:
-        return auth.json_response(400, {"error": "missing_user"})
-
-    _, _, by_id = _editor_data()
-    entitlement = _resolve_entitlement(body, by_id)
-    if not entitlement:
-        return auth.json_response(400, {"error": "invalid_entitlement"})
-
-    user = _find_user(identifier)
-    if not user:
-        return auth.json_response(404, {"error": "user_not_found"})
-
-    if revoke:
-        store.get_pool().retry_operation_sync(
-            execute_revoke_entitlement,
-            user_id=user["user_id"],
-            entitlement=entitlement,
-        )
-        status = "revoked"
-    else:
-        store.get_pool().retry_operation_sync(
-            execute_grant_entitlement,
-            user_id=user["user_id"],
-            entitlement=entitlement,
-            source="manual",
-            order_id="",
-        )
-        status = "granted"
-
-    return auth.json_response(
-        200,
-        {"status": status, "entitlement": entitlement, "user": _public_user(user)},
-    )
-
-
-def _admin_entitlements(event):
-    body = _body_json(event) or {}
-    identifier = (
-        _text(body.get("user")).strip()
-        or _text(body.get("user_id")).strip()
-        or _query(event).get("user")
-        or _query(event).get("user_id")
-        or ""
-    )
-    if not identifier:
-        return auth.json_response(400, {"error": "missing_user"})
-    user = _find_user(identifier)
-    if not user:
-        return auth.json_response(404, {"error": "user_not_found"})
-    rows = _rows(
-        store.get_pool().retry_operation_sync(
-            execute_list_entitlements, user_id=user["user_id"]
-        )
-    )
-    return auth.json_response(
-        200,
-        {
-            "user": _public_user(user),
-            "entitlements": [
-                {
-                    "entitlement": _text(_row_value(row, "entitlement")),
-                    "source": _text(_row_value(row, "source")),
-                    "order_id": _text(_row_value(row, "order_id")),
-                }
-                for row in rows
-            ],
-        },
-    )
-
-
-def _admin_users(event):
-    rows = _rows(store.get_pool().retry_operation_sync(execute_list_users))
-    return auth.json_response(
-        200,
-        {
-            "users": [
-                {
-                    "yandex_id": _text(_row_value(row, "yandex_id")),
-                    "user_id": _text(_row_value(row, "user_id")),
-                    "login": _text(_row_value(row, "login")),
-                    "email": _text(_row_value(row, "email")),
-                    "display_name": _text(_row_value(row, "display_name")),
-                    "blocked": bool(_row_value(row, "blocked")),
-                }
-                for row in rows
-            ]
-        },
-    )
-
-
-def _admin_orders(event):
-    rows = _rows(store.get_pool().retry_operation_sync(execute_list_orders))
-    return auth.json_response(200, {"orders": [_order_dict(row) for row in rows]})
-
-
 def _handle_admin(event):
     action = _query(event).get("action") or "list"
 
@@ -1622,16 +959,6 @@ def _handle_admin(event):
             return _admin_folder_save(event)
         if action == "folder_delete":
             return _admin_folder_delete(event)
-        if action == "grant":
-            return _admin_grant(event)
-        if action == "revoke":
-            return _admin_grant(event, revoke=True)
-        if action == "entitlements":
-            return _admin_entitlements(event)
-        if action == "users":
-            return _admin_users(event)
-        if action == "orders":
-            return _admin_orders(event)
         return auth.json_response(400, {"error": "unknown_action"})
     except ValueError as exc:
         return auth.json_response(
@@ -1664,12 +991,6 @@ def _handle_api(event, path, method):
 
     if normalized == "/api/route" and method == "GET":
         return _api_route(event)
-
-    if normalized == "/api/orders" and method == "POST":
-        return _api_orders(event)
-
-    if normalized == "/api/yookassa/notify" and method == "POST":
-        return _api_yookassa_notify(event)
 
     if normalized == "/api/admin":
         # Редактор работает на том же origin, что и шлюз. Прямой вызов

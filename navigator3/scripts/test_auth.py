@@ -126,6 +126,19 @@ class AuthEndpointTests(unittest.TestCase):
         self.assertEqual(response["statusCode"], 404)
         self.assertEqual(json.loads(response["body"])["error"], "not_found")
 
+    def test_payment_endpoints_are_removed(self):
+        for path, method in (
+            ("/api/orders", "POST"),
+            ("/api/yookassa/notify", "POST"),
+        ):
+            with self.subTest(path=path):
+                response = handler.handler(event(path, method=method), None)
+                self.assertEqual(response["statusCode"], 404)
+                self.assertEqual(
+                    json.loads(response["body"])["error"],
+                    "not_found",
+                )
+
     def test_options_api_is_empty_and_no_cors(self):
         response = handler.handler(event("/api/catalog", method="OPTIONS"), None)
         self.assertEqual(response["statusCode"], 204)

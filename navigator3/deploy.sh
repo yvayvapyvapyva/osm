@@ -14,8 +14,6 @@
 #   FUNCTION_NAME         — по умолчанию osmn3
 #   FUNCTION_ID           — если функция уже создана
 #   SERVICE_ACCOUNT_ID    — по умолчанию servaccsunt
-#   YOOKASSA_SHOP_ID      — shopId ЮKassa; включает оплату
-#   YOOKASSA_SECRET_KEY   — секретный ключ ЮKassa
 #
 # Секреты передаются обычными переменными окружения функции, без Lockbox.
 # Значения видны в `yc serverless function version list`, поэтому доступ к
@@ -42,9 +40,7 @@ PUBLIC_ALTERNATE_URLS="${PUBLIC_ALTERNATE_URLS:-}"
 YANDEX_CLIENT_ID="${YANDEX_CLIENT_ID:-}"
 YANDEX_CLIENT_SECRET="${YANDEX_CLIENT_SECRET:-9418164755114b98b225e0e545629e79}"
 ROUTE_ADMIN_PASSWORD="${ROUTE_ADMIN_PASSWORD:-2203}"
-YOOKASSA_SECRET_KEY="${YOOKASSA_SECRET_KEY:-}"
 SESSION_TTL_DAYS="${SESSION_TTL_DAYS:-30}"
-YOOKASSA_SHOP_ID="${YOOKASSA_SHOP_ID:-}"
 
 cd "${SCRIPT_DIR}"
 
@@ -89,14 +85,6 @@ if [[ -n "${PUBLIC_ALTERNATE_URLS}" ]]; then
   ENVIRONMENT="${ENVIRONMENT},PUBLIC_ALTERNATE_URLS=${PUBLIC_ALTERNATE_URLS}"
 fi
 
-if [[ -n "${YOOKASSA_SHOP_ID}" ]]; then
-  ENVIRONMENT="${ENVIRONMENT},YOOKASSA_SHOP_ID=${YOOKASSA_SHOP_ID}"
-fi
-
-if [[ -n "${YOOKASSA_SECRET_KEY}" ]]; then
-  ENVIRONMENT="${ENVIRONMENT},YOOKASSA_SECRET_KEY=${YOOKASSA_SECRET_KEY}"
-fi
-
 yc serverless function version create \
   --function-id "${FUNCTION_ID}" \
   --runtime python314 \
@@ -106,6 +94,7 @@ yc serverless function version create \
   --service-account-id "${SERVICE_ACCOUNT_ID}" \
   --environment "${ENVIRONMENT}" \
   --source-path backend \
-  --description "navigator3 auth $(date '+%Y-%m-%d %H:%M:%S')"
+  --description "navigator3 auth $(date '+%Y-%m-%d %H:%M:%S')" \
+  >/dev/null
 
 echo "Готово. Проверьте: https://functions.yandexcloud.net/${FUNCTION_ID}"

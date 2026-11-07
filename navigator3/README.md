@@ -1,4 +1,4 @@
-# navigator3 — навигатор с Яндекс ID и платными папками маршрутов
+# navigator3 — навигатор с Яндекс ID и папками маршрутов
 
 `navigator3/` — единственная версия навигатора в репозитории. Старые
 `navigator/`, `navigator2/`, `routes.json` и функция `osmn` удалены: новый
@@ -10,9 +10,7 @@
 - каталог без геометрии: `/api/catalog`, точки — только по запросу
   `/api/route?m=...`;
 - дерево папок как отдельная сущность в БД;
-- платный доступ к папке: покупка открывает саму папку, все вложенные папки и
-  маршруты;
-- оплата через ЮKassa (`/api/orders`, webhook `/api/yookassa/notify`);
+- все видимые маршруты открыты без входа;
 - редактор маршрутов и папок на `/editor.html`.
 
 ## Текущий контур
@@ -25,7 +23,7 @@
 | API Gateway | `osmn3` / `d5dsd5u1tsc8fm9dbsg5` |
 | Функция | `osmn3` / `d4e8ds1489g0q91dt7do` |
 | Сервисный аккаунт шлюза | `osmn3-gateway` / `ajec0sf19r17r3tv6vrg` |
-| YDB | `dbosm`, таблицы `users`, `sessions`, `roads`, `folders`, `entitlements`, `orders` |
+| YDB | `dbosm`, таблицы `users`, `sessions`, `roads`, `folders` |
 
 Redirect URI приложения Яндекс OAuth (должны быть зарегистрированы оба):
 
@@ -49,8 +47,6 @@ https://<домен-шлюза>/
   /api/me                 → функция osmn3
   /api/catalog            → функция osmn3
   /api/route?m=...        → функция osmn3
-  /api/orders             → функция osmn3
-  /api/yookassa/notify    → функция osmn3
   /api/admin?action=...   → функция osmn3
   /auth/yandex/start      → функция osmn3
   /auth/yandex/callback   → функция osmn3
@@ -77,7 +73,7 @@ navigator3/
 │   │   ├── navigator.css
 │   │   └── editor.css
 │   └── js/
-│       ├── menu-module.js      # дерево папок, /api/catalog, /api/route, покупка
+│       ├── menu-module.js      # дерево папок, /api/catalog, /api/route
 │       ├── auth-module.js      # вход, /api/me, выход
 │       ├── config.js           # палитра и названия категорий
 │       ├── report.js           # отчёт о маршруте в Telegram
@@ -87,16 +83,14 @@ navigator3/
 │   ├── handler.py              # точка входа: /api, /auth, /api/admin
 │   ├── auth.py                 # OAuth, PKCE, cookie, ответы
 │   ├── store.py                # users/sessions в YDB
-│   ├── payments.py             # клиент ЮKassa
 │   └── requirements.txt
 ├── scripts/
 │   ├── init_auth_db.py         # создание users и sessions
-│   ├── init_folders.py         # folders, entitlements, orders + миграция roads
+│   ├── init_folders.py         # folders + миграция roads
 │   ├── init_db.py              # первичный перенос маршрутов (архив)
 │   ├── test_auth.py            # локальные проверки входа
 │   ├── test_catalog.py         # локальные проверки каталога и доступа
 │   ├── test_admin.py           # локальные проверки редактора
-│   ├── test_payments.py        # локальные проверки заказов и webhook
 │   └── build-static-deploy.js
 ├── gateway/osmn.yaml           # спецификация API Gateway
 ├── deploy.sh                   # деплой функции osmn3
@@ -114,16 +108,13 @@ CREATE TABLE folders (
     folder_id     Utf8,
     parent_id     Utf8,        -- "" у корневой папки
     name          Utf8,
-    access        Utf8,        -- public | paid
-    price_kopecks Uint64,
-    sku           Utf8,
     sort_order    Uint32,
     PRIMARY KEY (folder_id)
 );
 ```
 
 Папка — стабильная сущность: у неё есть `folder_id`, который не меняется при
-переименовании. `parent_id` задаёт дерево. Цена хранится в копейках.
+переименовании. `parent_id` задаёт дерево.
 
 ### `roads`
 
@@ -131,71 +122,19 @@ CREATE TABLE folders (
 
 ```sql
 folder_id     Utf8,
-title         Utf8,        -- короткое имя внутри папки
-access        Utf8,        -- public | folder
-price_kopecks Uint64,      -- резерв, сейчас цена берётся у папки
-sku           Utf8
+title         Utf8         -- короткое имя внутри папки
 ```
 
 `roads.name` остаётся полным путём (`МЕЩЕРА/Экзамен/Экз. Мещера-1`) и
 пересчитывается сервером при сохранении метаданных. Новый код использует
 `folder_id` + `title`; полный путь нужен для совместимости с TTS и отчётами.
 
-`access = public` у маршрута означает «открыт всегда», даже внутри платной
-папки. `access = folder` (по умолчанию) наследует доступ папки.
-
-### `entitlements`
-
-```sql
-CREATE TABLE entitlements (
-    user_id     Utf8,
-    entitlement Utf8,        -- "folder:<folder_id>" или "all"
-    created_at  Timestamp,
-    source      Utf8,        -- yookassa | manual
-    order_id    Utf8,
-    PRIMARY KEY (user_id, entitlement)
-);
-```
-
-Право на родительскую папку открывает все вложенные папки и маршруты.
-`all` открывает весь каталог.
-
-### `orders`
-
-```sql
-CREATE TABLE orders (
-    order_id       Utf8,
-    user_id        Utf8,
-    folder_id      Utf8,
-    amount_kopecks Uint64,
-    status         Utf8,      -- pending | paid | canceled | failed
-    created_at     Timestamp,
-    updated_at     Timestamp,
-    payment_id     Utf8,
-    return_path    Utf8,
-    PRIMARY KEY (order_id)
-);
-```
-
-## Как считается доступ
-
-Только на сервере. Клиент не решает, можно ли открыть маршрут.
-
-1. Для папки строится цепочка от корня до неё.
-2. Если в цепочке нет платных папок — доступ публичный.
-3. Если платная папка есть, берётся первая (ближайшая к корню) платная папка:
-   её и нужно купить.
-4. `owned = true`, если у пользователя есть `all` или
-   `folder:<любая папка из цепочки>`.
-
-`/api/catalog` отдаёт для каждой папки и маршрута `access`, `owned`,
-`purchase_folder_id`, `price_kopecks`, `sku`. Геометрия в каталог не входит.
+Маршруты доступны всем без входа. Каталог содержит только видимые маршруты
+без геометрии; геометрия загружается отдельно.
 
 `/api/route`:
 
-- 200 + `data`, если доступ есть;
-- 401 `unauthorized` + `purchase_folder_id`, если пользователь не вошёл;
-- 402 `payment_required` + `purchase_folder_id`, если вошёл, но не купил;
+- 200 + `data` для видимого маршрута;
 - 404 для скрытого или несуществующего маршрута.
 
 ## API
@@ -203,12 +142,10 @@ CREATE TABLE orders (
 | Метод | Путь | Ответ |
 |---|---|---|
 | GET | `/api/health` | `{"status":"ok"}` |
-| GET | `/api/me` | `{"user":{...},"entitlements":[...]}` или 401 |
+| GET | `/api/me` | `{"user":{...}}` или 401 |
 | GET | `/api/catalog` | `{"folders":[...],"routes":[...],"user":...}` без геометрии |
-| GET | `/api/folder?folder_id=<id>` | содержимое папки с геометрией доступных маршрутов |
-| GET | `/api/route?m=<m>` | маршрут с `data`; 401/402 без доступа |
-| POST | `/api/orders` | `{"order_id","payment_id","confirmation_url"}` |
-| POST | `/api/yookassa/notify` | webhook ЮKassa |
+| GET | `/api/folder?folder_id=<id>` | содержимое папки с геометрией её маршрутов |
+| GET | `/api/route?m=<m>` | маршрут с `data` |
 | POST | `/api/admin?action=...` | операции редактора |
 | GET | `/auth/yandex/start?return=/...` | 302 на Яндекс + state-cookie |
 | GET | `/auth/yandex/callback` | 302 обратно + sid-cookie |
@@ -228,38 +165,10 @@ CREATE TABLE orders (
 | `get`, `get_meta` | геометрия и метаданные маршрута |
 | `save`, `save_meta`, `delete` | изменение маршрута |
 | `folder_save`, `folder_delete` | создание/изменение и удаление папки |
-| `grant`, `revoke` | выдать/забрать право вручную |
-| `entitlements` | права пользователя |
-| `users` | список пользователей |
-| `orders` | последние 200 заказов |
 
-`save_meta` принимает `{title, folder_id, description, visible, access}`.
+`save_meta` принимает `{title, folder_id, description, visible}`.
 Полный `name` собирается на сервере. `folder_delete` не удаляет папку, если в
 ней есть вложенные папки или маршруты (409).
-
-## Оплата
-
-Поток:
-
-```
-браузер → POST /api/orders {folder_id, return}
-        → заказ pending в orders
-        → POST https://api.yookassa.ru/v3/payments
-        → 200 {confirmation_url}
-браузер → confirmation_url → оплата
-ЮKassa  → POST /api/yookassa/notify
-        → GET /v3/payments/<id> (проверка суммы и статуса)
-        → orders.status = paid
-        → entitlements UPSERT folder:<folder_id>
-браузер → return_path?payment=success → каталог перезагружается
-```
-
-Вебхук не доверяет телу запроса: сумма и статус перепроверяются запросом в
-ЮKassa. Повторный webhook идемпотентен: право выдаётся только при переходе
-заказа в `paid`.
-
-Если `YOOKASSA_SHOP_ID` и `YOOKASSA_SECRET_KEY` не заданы, `/api/orders`
-возвращает 503 `payments_not_configured`, а каталог продолжает работать.
 
 ## Переменные окружения функции
 
@@ -274,15 +183,12 @@ CREATE TABLE orders (
 | `OAUTH_SCOPE` | нет | по умолчанию `login:info login:email` |
 | `YANDEX_CLIENT_SECRET` | да | секрет приложения Яндекс OAuth |
 | `ROUTE_ADMIN_PASSWORD` | да | пароль редактора маршрутов |
-| `YOOKASSA_SHOP_ID` | для оплаты | shopId ЮKassa |
-| `YOOKASSA_SECRET_KEY` | для оплаты | секретный ключ ЮKassa |
 
 Секреты — обычные переменные окружения функции, Lockbox не используется.
 `deploy.sh` берёт значения из `navigator3/.env` (он в `.gitignore`) и передаёт
 их в `--environment`. Значения видны в `yc serverless function version list`,
 поэтому доступ к каталогу Yandex Cloud должен быть ограничен кругом доверенных
-людей. Пустые переменные платформа не принимает, поэтому `YOOKASSA_SHOP_ID` и
-`YOOKASSA_SECRET_KEY` добавляются только когда оплата настроена.
+людей.
 
 ## Порядок запуска
 
@@ -290,12 +196,12 @@ CREATE TABLE orders (
 
 ```bash
 python3 navigator3/scripts/init_auth_db.py   # users, sessions
-python3 navigator3/scripts/init_folders.py   # folders, entitlements, orders, поля roads
+python3 navigator3/scripts/init_folders.py   # folders и поля roads для дерева
 ```
 
 Оба скрипта идемпотентны. `init_folders.py` один раз раскладывает старые
 `roads.name` вида `МЕЩЕРА/Экзамен/Маршрут` в дерево папок и заполняет
-`folder_id`, `title`, `access`. Уже заполненные значения не перезаписываются.
+`folder_id`, `title`. Уже заполненные значения не перезаписываются.
 
 ### 2. Секреты
 
@@ -304,8 +210,6 @@ python3 navigator3/scripts/init_folders.py   # folders, entitlements, orders, п
 ```
 YANDEX_CLIENT_SECRET=<секрет приложения OAuth>
 ROUTE_ADMIN_PASSWORD=<пароль редактора>
-YOOKASSA_SHOP_ID=<shopId>            # только когда подключена оплата
-YOOKASSA_SECRET_KEY=<секретный ключ> # только когда подключена оплата
 ```
 
 `deploy.sh` передаёт их в переменные окружения функции. Lockbox не
@@ -317,8 +221,7 @@ YOOKASSA_SECRET_KEY=<секретный ключ> # только когда по
 ```bash
 cp navigator3/.env.example navigator3/.env
 # заполнить PUBLIC_BASE_URL, YANDEX_CLIENT_ID, YANDEX_CLIENT_SECRET,
-# ROUTE_ADMIN_PASSWORD; при необходимости YOOKASSA_SHOP_ID и
-# YOOKASSA_SECRET_KEY
+# ROUTE_ADMIN_PASSWORD
 ./navigator3/deploy.sh
 ```
 
@@ -340,7 +243,6 @@ yc storage s3 cp navigator3/deploy-2files/editor.html \
 python3 navigator3/scripts/test_auth.py
 python3 navigator3/scripts/test_catalog.py
 python3 navigator3/scripts/test_admin.py
-python3 navigator3/scripts/test_payments.py
 ```
 
 На шлюзе:
@@ -357,25 +259,21 @@ curl -i -X POST 'https://<домен>/api/admin?action=list' \
 Ожидается:
 
 - `/api/catalog` — 200, в ответе есть `folders`, у маршрутов нет `data`;
-- `/api/route?m=<m>` — 200 с `data` для бесплатной папки;
-- для платной папки без входа — 401, после входа без покупки — 402;
+- `/api/route?m=<m>` — 200 с `data` для видимого маршрута;
 - `/api/admin` без пароля — 403, с верным — 200;
-- `/api/orders` без входа — 401, без настроенной ЮKassa — 503.
 
 В браузере:
 
 1. Открыть `https://<домен>/`.
 2. Войти через Яндекс в «Настройках».
-3. Открыть платную папку — появится замок и цена.
-4. Нажать покупку, оплатить, вернуться — папка должна открыться.
-5. Открыть `/editor.html`, ввести пароль редактора.
-6. Создать папку, задать цену, перетащить в неё маршрут.
+3. Открыть любую папку и маршрут — доступ не требует входа.
+4. Открыть `/editor.html`, ввести пароль редактора.
+5. Создать папку и перетащить в неё маршрут.
 
 ## Ограничения
 
 - Нет rate limit и ограничения числа активных сессий.
-- Нет возвратов и повторной выдачи прав после отмены платежа.
-- `roads.price_kopecks` и `roads.sku` оставлены как резерв; цена сейчас
-  задаётся у папки.
+- Старые поля оплаты в YDB могут оставаться после миграции, но приложение их
+  больше не использует.
 - `init_db.py` — архивный скрипт первичного переноса; для текущей схемы
   используйте `init_folders.py`.
