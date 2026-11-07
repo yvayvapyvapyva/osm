@@ -22,7 +22,7 @@ const pageBundles = {
     },
     'editor.html': {
         stylesheet: 'assets/css/editor.css',
-        scripts: ['assets/js/config.js', 'assets/js/report.js', 'assets/js/tts-client.js', 'assets/js/map-styles.js'],
+        scripts: ['assets/js/config.js', 'assets/js/tts-client.js', 'assets/js/map-styles.js'],
         instruction: 'instr_editor.html',
     },
 };

@@ -92,7 +92,7 @@
 </div></div></div>
 <div id="confirmDeleteModal" onclick="if(event.target===this) toggleM('confirmDeleteModal')"><div class="modal-sheet modal-sheet-compact"><h3 class="modal-title">Удалить маршрут?</h3><p id="confirmDeleteText" class="modal-desc-text" style="font-size:16px;"></p><div class="modal-actions"><button class="btn-action flex-1" onclick="toggleM('confirmDeleteModal')">Отмена</button><button id="confirmDeleteRouteBtn" class="btn-action btn-danger flex-1" onclick="executeDeleteRoute()">Удалить</button></div></div></div>
 <div id="confirmDeletePointModal" onclick="if(event.target===this) toggleM('confirmDeletePointModal')"><div class="modal-sheet modal-sheet-compact"><h3 class="modal-title">Удалить точку?</h3><p class="modal-desc-text" style="font-size:16px;">Вы уверены, что хотите удалить эту точку?</p><div class="modal-actions"><button class="btn-action flex-1" onclick="toggleM('confirmDeletePointModal')">Отмена</button><button class="btn-action btn-danger flex-1" onclick="executeDeletePoint()">Удалить</button></div></div></div>
-<div id="shareModal" onclick="if(event.target===this) toggleM('shareModal')"><div class="modal-sheet modal-sheet-compact"><h3 class="modal-title">Поделиться маршрутом</h3><p class="modal-desc-text">При открытии ссылки откроется навигатор с этим маршрутом.</p><div style="display:flex;flex-direction:column;gap:12px"><button class="btn-action flex-1" onclick="copyShareLink('vk')">VK</button><button class="btn-action flex-1" onclick="copyShareLink('tg')">Telegram</button><button class="btn-action flex-1" onclick="copyShareLink('web')">Браузер</button><button class="btn-action flex-1" onclick="toggleM('shareModal')">Отмена</button></div></div></div>
+<div id="shareModal" onclick="if(event.target===this) toggleM('shareModal')"><div class="modal-sheet modal-sheet-compact"><h3 class="modal-title">Поделиться маршрутом</h3><p class="modal-desc-text">При открытии ссылки откроется навигатор с этим маршрутом.</p><div style="display:flex;flex-direction:column;gap:12px"><button class="btn-action flex-1" onclick="copyShareLink()">Скопировать ссылку</button><button class="btn-action flex-1" onclick="toggleM('shareModal')">Отмена</button></div></div></div>
 <button id="instructionBtn" onclick="openInstruction()">📖 Инструкция</button>
 <div id="instructionModal" class="instruction-overlay" onclick="if(event.target===this) closeInstruction()">
     <div class="instruction-sheet">
@@ -108,71 +108,10 @@
 
 <div id="loadingSpinner"><div class="spinner-box"><div class="spinner-ring"></div><div class="spinner-text">Загрузка...</div></div></div>
 
-<script>
-// Грузим Telegram/VK SDK асинхронно с таймаутом 10с.
-// Если telegram.org / unpkg.com заблокированы или недоступны — не блокируем загрузку приложения.
-(function (g) {
-  var finished = false, pending = 0, cbs = [];
-  function finish() {
-    if (finished) return;
-    finished = true;
-    var list = cbs.splice(0);
-    for (var i = 0; i < list.length; i++) { try { list[i](); } catch (e) {} }
-  }
-  function tryLoad(url, flag) {
-    pending++;
-    var settled = false;
-    var controller = null;
-    var timeout = null;
-    function settle(failed) {
-      if (settled) return; settled = true;
-      if (failed) { try { g[flag] = true; } catch (e) {} }
-      if (timeout) { clearTimeout(timeout); timeout = null; }
-      if (controller) { try { controller.abort(); } catch (e) {} controller = null; }
-      if (--pending === 0) finish();
-    }
-    timeout = setTimeout(function () { settle(true); }, 10000);
-    if (typeof fetch === 'function' && typeof AbortController !== 'undefined') {
-      // Реально отменяем запрос через 10с, чтобы браузер не крутил спиннер
-      controller = new AbortController();
-      fetch(url, { signal: controller.signal })
-        .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.text(); })
-        .then(function (code) {
-          if (settled) return;
-          try {
-            var s = document.createElement('script');
-            s.text = code;
-            (document.head || document.documentElement).appendChild(s);
-          } catch (e) {}
-          settle(false);
-        })
-        .catch(function () { settle(true); });
-    } else {
-      var s = document.createElement('script');
-      s.async = true;
-      var done = false;
-      function done_(failed) { if (done) return; done = true; settle(failed); }
-      s.onload = function () { done_(false); };
-      s.onerror = function () { done_(true); };
-      s.src = url;
-      try { (document.head || document.documentElement).appendChild(s); }
-      catch (e) { done_(true); }
-    }
-  }
-  g.bootPlatforms = function (cb) {
-    if (finished) { try { cb(); } catch (e) {} }
-    else cbs.push(cb);
-  };
-  g.platformReady = new Promise(function (r) { g.bootPlatforms(r); });
-  tryLoad('https://telegram.org/js/telegram-web-app.js', '__tgWebAppFailed');
-  tryLoad('https://unpkg.com/@vkontakte/vk-bridge/dist/browser.min.js', '__vkBridgeFailed');
-})(window);
-</script>
     <script src="assets/js/maplibre-gl.js?v=4.7.1"></script>
     <script src="assets/js/pmtiles.js?v=3.2.1"></script>
 <script src="assets/js/sortable.min.js?v=1.15.0" defer onerror="window.__sortableFailed = true;"></script>
 <script src="assets/js/config.js?v=2"></script>
-<script src="assets/js/report.js?v=3"></script>
 <script src="assets/js/tts-client.js"></script>
 <script src="assets/js/map-styles.js?v=10"></script>
 <script>
@@ -191,52 +130,10 @@ const { byId, round6 } = window.AppShared;
 const $ = byId;
 const f6 = round6;
 
-// ---- Определение платформы (Telegram/VK SDK, максимум ~10с) ----
-// Нужно только для UI и отчётов; аккаунты не используются.
-(function() {
-    const runPlatform = () => {
-        if (window._platformRan) return;
-        window._platformRan = true;
-        if (typeof Telegram !== 'undefined' && Telegram.WebApp) {
-            try {
-                Telegram.WebApp.ready();
-                Telegram.WebApp.expand();
-                if (Telegram.WebApp.version && parseFloat(Telegram.WebApp.version) >= 7.0) {
-                    try { Telegram.WebApp.requestFullscreen?.(); } catch (e) {}
-                    try { Telegram.WebApp.disableVerticalSwipes?.(); } catch (e) {}
-                }
-                const user = Telegram.WebApp.initDataUnsafe?.user;
-                if (user) {
-                    window.platformType = 'tg';
-                    window.tgUser = user;
-                }
-            } catch (e) {}
-        }
-        if (typeof vkBridge !== 'undefined') {
-            try {
-                vkBridge.send('VKWebAppInit');
-                vkBridge.send('VKWebAppGetUserInfo').then(data => {
-                    if (data?.id) {
-                        window.platformType = 'vk';
-                        window.vkUser = data;
-                        if (window._onVkReady) window._onVkReady();
-                    }
-                });
-            } catch (e) {}
-        }
-        if (navigator.userAgent.includes('Android') && window.platformType === 'tg') {
-            document.documentElement.classList.add('android-app');
-        }
-    };
-    if (window.bootPlatforms) window.bootPlatforms(runPlatform); else runPlatform();
-})();
-// -------------------------
-
 // Редактор ходит в свою функцию osmn3 через тот же шлюз, что и навигатор:
 // прямой вызов functions.yandexcloud.net закрыт платформой (403), а /api/admin
 // на шлюзе передаёт запрос в legacy-обработчик функции.
 const ADMIN_API_URL = '/api/admin';
-const TG_BOT_LINK = 'https://t.me/E_ia_bot/navigator?startapp=m=';
 
 /* ---------- Яндекс.Спутник: проекция EPSG:3395 -> Web Mercator ---------- */
 const YANDEX_MERC_E = 0.0818191908426;
@@ -864,22 +761,6 @@ if (typeof maplibregl === 'undefined') {
     // Скрываем welcomeScreen сразу, не дожидаясь загрузки карты
     const wsEl0 = document.getElementById('welcomeScreen');
     if (wsEl0) wsEl0.style.display = 'none';
-
-    // Даём SDK платформ короткую фору (1.5с)
-    if (window.platformReady) {
-        const grace = new Promise(r => setTimeout(r, 1500));
-        try { await Promise.race([window.platformReady, grace]); } catch (e) {}
-    }
-
-    // Ждём данные VK для отчёта (необязательно)
-    if (!window.platformType && typeof vkBridge !== 'undefined') {
-        try {
-            await new Promise((resolve, reject) => {
-                window._onVkReady = resolve;
-                setTimeout(() => reject(), 1500);
-            });
-        } catch (e) {}
-    }
 
     const center = await initMapWithGeolocation();
     registerYandexProtocol();
@@ -1733,21 +1614,6 @@ const loadRoute = async (routeName) => {
             };
         }
 
-        // Отчёт об открытии маршрута — после получения имени маршрута,
-        // без зависимости от SDK Telegram. Логика — в report.js, он сам
-        // собирает данные пользователя.
-        try {
-            if (typeof REPORT !== 'undefined') {
-                REPORT.send({
-                    m_val: routeName,
-                    report_type: 'editor',
-                    route_name: currentRouteMeta.title || ''
-                });
-            }
-        } catch (re) {
-            console.warn('[report] ошибка отправки отчёта редактора:', re);
-        }
-
         updateVisibility();
         setActivePoint(points[0] || null);
         toggleM('settingsModal');
@@ -1909,16 +1775,11 @@ function copyToClipboard(text, msg) {
         showToast(message, 'success');
     });
 }
-function copyShareLink(platform) {
+function copyShareLink() {
     const name = _shareRouteName || settingsRouteName || curRoute;
     if (!name) return;
     const encoded = encodeURIComponent(name);
-    const webBase = location.origin + location.pathname.replace(/[^/]*$/, 'navigator.html');
-    const link = platform === 'vk'
-        ? `https://vk.com/app54507759#m=${encoded}`
-        : platform === 'web'
-        ? `${webBase}#m=${encoded}`
-        : `${TG_BOT_LINK}${encoded}`;
+    const link = `https://ainstruktor.ru/navigator.html#m=${encoded}`;
     toggleM('shareModal');
     copyToClipboard(link, "Ссылка скопирована в буфер обмена");
 }
