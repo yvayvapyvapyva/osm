@@ -85,12 +85,6 @@ navigator3/
 │   ├── store.py                # users/sessions в YDB
 │   └── requirements.txt
 ├── scripts/
-│   ├── init_auth_db.py         # создание users и sessions
-│   ├── init_folders.py         # folders + миграция roads
-│   ├── init_db.py              # первичный перенос маршрутов (архив)
-│   ├── test_auth.py            # локальные проверки входа
-│   ├── test_catalog.py         # локальные проверки каталога и доступа
-│   ├── test_admin.py           # локальные проверки редактора
 │   └── build-static-deploy.js
 ├── gateway/osmn.yaml           # спецификация API Gateway
 ├── deploy.sh                   # деплой функции osmn3
@@ -192,18 +186,7 @@ title         Utf8         -- короткое имя внутри папки
 
 ## Порядок запуска
 
-### 1. Таблицы
-
-```bash
-python3 navigator3/scripts/init_auth_db.py   # users, sessions
-python3 navigator3/scripts/init_folders.py   # folders и поля roads для дерева
-```
-
-Оба скрипта идемпотентны. `init_folders.py` один раз раскладывает старые
-`roads.name` вида `МЕЩЕРА/Экзамен/Маршрут` в дерево папок и заполняет
-`folder_id`, `title`. Уже заполненные значения не перезаписываются.
-
-### 2. Секреты
+### 1. Секреты
 
 Все секреты — в `navigator3/.env`, который не попадает в git:
 
@@ -216,7 +199,7 @@ ROUTE_ADMIN_PASSWORD=<пароль редактора>
 используется: значение видно в `yc serverless function version list`, так что
 доступ к каталогу Yandex Cloud должен быть ограничен.
 
-### 3. Функция
+### 2. Функция
 
 ```bash
 cp navigator3/.env.example navigator3/.env
@@ -225,7 +208,7 @@ cp navigator3/.env.example navigator3/.env
 ./navigator3/deploy.sh
 ```
 
-### 4. Статика
+### 3. Статика
 
 ```bash
 node navigator3/scripts/build-static-deploy.js
@@ -236,14 +219,6 @@ yc storage s3 cp navigator3/deploy-2files/editor.html \
 ```
 
 ## Проверка
-
-Локально, без YDB и сети:
-
-```bash
-python3 navigator3/scripts/test_auth.py
-python3 navigator3/scripts/test_catalog.py
-python3 navigator3/scripts/test_admin.py
-```
 
 На шлюзе:
 
@@ -273,7 +248,3 @@ curl -i -X POST 'https://<домен>/api/admin?action=list' \
 ## Ограничения
 
 - Нет rate limit и ограничения числа активных сессий.
-- Старые поля оплаты в YDB могут оставаться после миграции, но приложение их
-  больше не использует.
-- `init_db.py` — архивный скрипт первичного переноса; для текущей схемы
-  используйте `init_folders.py`.
