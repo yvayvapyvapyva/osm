@@ -766,7 +766,7 @@ input, textarea, select {
 #createFolderModal {
     position: fixed;
     inset: 0;
-    z-index: 11000;
+    z-index: 13000;
     display: none;
     align-items: center;
     justify-content: center;
@@ -1432,4 +1432,3 @@ input, textarea, select {
     margin: 0 0 6px;
     min-height: 40px;
 }
-
