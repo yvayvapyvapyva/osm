@@ -2,6 +2,7 @@
 """Generate missing TTS audio for unique commands and comments in dbosm."""
 
 import argparse
+import hashlib
 import json
 import subprocess
 import time
@@ -16,8 +17,73 @@ YDB_DATABASE = (
     "/ru-central1/b1gtnlal9r2s3rvqadjn/etnjvaftd6eakeq08kqr"
 )
 TTS_ENDPOINT = "https://functions.yandexcloud.net/d4e3cj3q3ff36qlrhbg8"
+BUCKET = "eia-tts"
+BUCKET_URL = f"https://storage.yandexcloud.net/{BUCKET}"
+VOICE_SETTINGS = {
+    "command": ("ru-RU-DmitryNeural", "-10Hz"),
+    "comment": ("ru-RU-SvetlanaNeural", "+0Hz"),
+}
+VOLUME = "+30%"
 MAX_TEXT_LENGTH = 1000
 MAX_BATCH_SIZE = 100
+MANIFEST_KEY = "v1/manifest.json"
+
+
+def _object_key(text, voice_type):
+    voice, pitch = VOICE_SETTINGS[voice_type]
+    raw = f"{text}\0{voice}\0{pitch}\0{VOLUME}".encode("utf-8")
+    return "v1/" + hashlib.sha256(raw).hexdigest() + ".mp3"
+
+
+def _object_url(key):
+    return f"{BUCKET_URL}/{key}"
+
+
+def _manifest_url():
+    return _object_url(MANIFEST_KEY)
+
+
+def _object_exists(url, token):
+    try:
+        with urlopen(
+            Request(url, method="HEAD", headers={"Authorization": "Bearer " + token}),
+            timeout=10,
+        ):
+            return True
+    except HTTPError as error:
+        if error.code == 404:
+            return False
+        raise
+
+
+def _load_manifest(token):
+    try:
+        with urlopen(
+            Request(_manifest_url(), method="GET", headers={"Authorization": "Bearer " + token}),
+            timeout=10,
+        ) as response:
+            return json.loads(response.read().decode("utf-8"))
+    except HTTPError as error:
+        if error.code == 404:
+            return {}
+        raise
+
+
+def _save_manifest(token, manifest):
+    data = json.dumps(manifest, ensure_ascii=False).encode("utf-8")
+    request = Request(
+        _manifest_url(),
+        data=data,
+        method="PUT",
+        headers={
+            "Authorization": "Bearer " + token,
+            "Content-Type": "application/json",
+            "Cache-Control": "public, max-age=31536000, immutable",
+        },
+    )
+    with urlopen(request, timeout=20) as response:
+        if response.status not in (200, 201):
+            raise RuntimeError(f"Manifest upload failed: HTTP {response.status}")
 
 
 def read_route_phrases():
@@ -111,6 +177,11 @@ def main():
         action="store_true",
         help="Count route phrases without generating or uploading audio",
     )
+    parser.add_argument(
+        "--rebuild-manifest",
+        action="store_true",
+        help="Register already-existing audio files in the bucket manifest without re-synthesizing",
+    )
     args = parser.parse_args()
     if not 1 <= args.batch_size <= MAX_BATCH_SIZE:
         parser.error(f"--batch-size must be between 1 and {MAX_BATCH_SIZE}")
@@ -137,6 +208,31 @@ def main():
         f"{len(phrases['comment'])} unique comments, {len(items)} audio files total."
     )
     if args.dry_run:
+        return
+
+    if args.rebuild_manifest:
+        token = subprocess.check_output(
+            ["yc", "iam", "create-token"],
+            text=True,
+        ).strip()
+        manifest = _load_manifest(token)
+        registered = 0
+        for voice_type, text in items:
+            key = _object_key(text, voice_type)
+            url = _object_url(key)
+            if _object_exists(url, token):
+                if key not in manifest:
+                    manifest[key] = {
+                        "text": text,
+                        "voice_type": voice_type,
+                        "key": key,
+                        "url": url,
+                    }
+                    registered += 1
+        _save_manifest(token, manifest)
+        print(
+            f"Manifest rebuilt: {registered} new entries, {len(manifest)} total."
+        )
         return
 
     generated = 0
