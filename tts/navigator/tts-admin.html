@@ -182,6 +182,12 @@
         try {
             const data = await api('list');
             const items = data.items || [];
+            items.sort((a, b) => {
+                const va = a.voice_type === 'comment' ? 1 : 0;
+                const vb = b.voice_type === 'comment' ? 1 : 0;
+                if (va !== vb) return va - vb;
+                return a.text.localeCompare(b.text);
+            });
             count.textContent = items.length + ' команд';
             list.innerHTML = '';
             if (items.length === 0) {
