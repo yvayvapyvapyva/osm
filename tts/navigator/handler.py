@@ -5,6 +5,7 @@ import asyncio
 import hashlib
 import json
 import os
+import time
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
@@ -51,9 +52,16 @@ def _object_url(key):
     return f"{BUCKET_URL}/{key}"
 
 
-def _object_exists(url):
+def _manifest_url():
+    return f"{BUCKET_URL}/{MANIFEST_KEY}?t={int(time.time())}"
+
+
+def _object_exists(url, token=None):
+    headers = {}
+    if token:
+        headers["Authorization"] = "Bearer " + token
     try:
-        with urlopen(Request(url, method="HEAD"), timeout=10):
+        with urlopen(Request(url, method="HEAD", headers=headers), timeout=10):
             return True
     except HTTPError as error:
         if error.code == 404:
@@ -73,42 +81,36 @@ def _iam_token():
     return token
 
 
-def _upload_object(url, audio, content_type="audio/mpeg"):
-    request = Request(
-        url,
-        data=audio,
-        method="PUT",
-        headers={
-            "Authorization": "Bearer " + _iam_token(),
-            "Content-Type": content_type,
-            "Cache-Control": "public, max-age=31536000, immutable",
-        },
-    )
+def _upload_object(url, data, content_type="application/json", token=None, cache="public, max-age=31536000, immutable"):
+    headers = {
+        "Authorization": "Bearer " + (token or _iam_token()),
+        "Content-Type": content_type,
+        "Cache-Control": cache,
+    }
+    request = Request(url, data=data, method="PUT", headers=headers)
     with urlopen(request, timeout=20) as response:
         if response.status not in (200, 201):
             raise RuntimeError(f"Object Storage upload failed: HTTP {response.status}")
 
 
-def _delete_object(url):
-    request = Request(
-        url,
-        method="DELETE",
-        headers={
-            "Authorization": "Bearer " + _iam_token(),
-        },
-    )
+def _delete_object(url, token=None):
+    headers = {}
+    if token:
+        headers["Authorization"] = "Bearer " + token
+    request = Request(url, method="DELETE", headers=headers)
     with urlopen(request, timeout=20) as response:
         if response.status not in (200, 204, 202):
             raise RuntimeError(f"Object Storage delete failed: HTTP {response.status}")
 
 
-def _manifest_url():
-    return _object_url(MANIFEST_KEY)
-
-
-def _load_manifest():
+def _load_manifest(token=None):
     try:
-        with urlopen(Request(_manifest_url(), method="GET"), timeout=10) as response:
+        headers = {"Cache-Control": "no-cache"}
+        if token:
+            headers["Authorization"] = "Bearer " + token
+        with urlopen(
+            Request(_manifest_url(), method="GET", headers=headers), timeout=10
+        ) as response:
             return json.loads(response.read().decode("utf-8"))
     except HTTPError as error:
         if error.code == 404:
@@ -116,9 +118,15 @@ def _load_manifest():
         raise
 
 
-def _save_manifest(manifest):
+def _save_manifest(manifest, token=None):
     data = json.dumps(manifest, ensure_ascii=False).encode("utf-8")
-    _upload_object(_manifest_url(), data, content_type="application/json")
+    _upload_object(
+        _manifest_url(),
+        data,
+        content_type="application/json",
+        token=token,
+        cache="no-cache",
+    )
 
 
 def _check_admin_secret(event):
@@ -163,33 +171,33 @@ async def _ensure_audios(items):
 
 
 async def _ensure_audio(text, voice_type, semaphore):
+    token = await asyncio.to_thread(_iam_token)
     key = _object_key(text, voice_type)
     url = _object_url(key)
-    if await asyncio.to_thread(_object_exists, url):
-        return url
+    exists = await asyncio.to_thread(_object_exists, url, token)
     async with semaphore:
-        if await asyncio.to_thread(_object_exists, url):
-            return url
-        audio = await _synthesize(text, voice_type)
-        await asyncio.to_thread(_upload_object, url, audio)
-        try:
-            manifest = await asyncio.to_thread(_load_manifest)
-            manifest[key] = {
-                "text": text,
-                "voice_type": voice_type,
-                "key": key,
-                "url": url,
-            }
-            await asyncio.to_thread(_save_manifest, manifest)
-        except Exception as error:
-            print(f"Warning: failed to update manifest: {error}")
+        exists = await asyncio.to_thread(_object_exists, url, token)
+        if not exists:
+            audio = await _synthesize(text, voice_type)
+            await asyncio.to_thread(_upload_object, url, audio, token=token)
+    try:
+        manifest = await asyncio.to_thread(_load_manifest, token)
+        manifest[key] = {
+            "text": text,
+            "voice_type": voice_type,
+            "key": key,
+            "url": url,
+        }
+        await asyncio.to_thread(_save_manifest, manifest, token)
+    except Exception as error:
+        print(f"Warning: failed to update manifest: {error}")
     return url
 
 
-def _handle_admin(body):
+def _handle_admin(body, token=None):
     action = body.get("action")
     if action == "list":
-        manifest = _load_manifest()
+        manifest = _load_manifest(token)
         items = []
         for key, meta in manifest.items():
             items.append(
@@ -206,12 +214,12 @@ def _handle_admin(body):
         key = body.get("key")
         if not key:
             return _error(400, "key is required")
-        _delete_object(_object_url(key))
+        _delete_object(_object_url(key), token)
         try:
-            manifest = _load_manifest()
+            manifest = _load_manifest(token)
             if key in manifest:
                 del manifest[key]
-                _save_manifest(manifest)
+                _save_manifest(manifest, token)
         except Exception as error:
             print(f"Warning: failed to update manifest after delete: {error}")
         return {"ok": True, "deleted": key}
@@ -237,7 +245,8 @@ def handler(event, context):
         if action in ("list", "delete"):
             if not _check_admin_secret(event):
                 return _cors(401, {"error": "Unauthorized"})
-            result = _handle_admin(body)
+            token = _iam_token()
+            result = _handle_admin(body, token)
             if isinstance(result, dict) and "statusCode" in result:
                 return _cors(result["statusCode"], {"error": result["body"]})
             return _cors(200, result)
