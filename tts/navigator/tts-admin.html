@@ -105,7 +105,11 @@
         .tts-text { flex: 1; min-width: 0; font-size: 15px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .tts-voice { flex: 0 0 auto; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 999px; background: var(--green-tint); color: var(--green-dark); white-space: nowrap; }
         .tts-voice.comment { background: rgba(175, 82, 222, 0.10); color: #AF52DE; }
-        .tts-delete { flex: 0 0 auto; padding: 6px; border-radius: 10px; background: var(--danger-soft); color: var(--danger); border: 1px solid var(--danger-line); cursor: pointer; display: flex; align-items: center; justify-content: center; }
+        .tts-actions { flex: 0 0 auto; display: flex; gap: 6px; align-items: center; }
+        .tts-play { flex: 0 0 auto; padding: 6px; border-radius: 10px; background: var(--green-tint); color: var(--green-dark); border: 1px solid var(--green-line); cursor: pointer; display: flex; align-items: center; justify-content: center; }
+        .tts-play:active { background: var(--green-line); }
+        .tts-play.is-playing { background: var(--danger-soft); color: var(--danger); border-color: var(--danger-line); }
+        .tts-delete { flex: 0 0 auto; padding: 6px 10px; border-radius: 10px; background: var(--danger-soft); color: var(--danger); border: 1px solid var(--danger-line); cursor: pointer; display: flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 600; }
         .tts-delete:active { background: var(--danger-line); }
         .empty { text-align: center; padding: 40px 20px; color: var(--text-soft); font-size: 14px; }
         .toast { position: fixed; top: 90px; left: 50%; z-index: 16000; box-sizing: border-box; width: max-content; max-width: calc(100% - 144px); padding: 11px 18px; border-radius: 22px; border: 1px solid var(--line-surface); background: var(--toast-surface); color: var(--text); font-size: 14px; font-weight: 600; line-height: 1.35; text-align: center; white-space: pre-wrap; box-shadow: var(--shadow-float); opacity: 0; transform: translateX(-50%) translateY(-10px) scale(0.96); pointer-events: none; transition: opacity 0.22s ease, transform 0.28s cubic-bezier(0.32, 0.72, 0, 1); }
@@ -191,13 +195,22 @@
                 el.innerHTML = `
                     <div class="tts-text">${escapeHtml(item.text)}</div>
                     <div class="tts-voice ${item.voice_type}">${item.voice_type === 'comment' ? 'комментарий' : 'команда'}</div>
-                    <button type="button" class="tts-delete" title="Удалить" data-key="${escapeHtml(item.key)}">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
-                    </button>
+                    <div class="tts-actions">
+                        <button type="button" class="tts-play" title="Воспроизвести" data-url="${escapeHtml(item.url)}">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                        </button>
+                        <button type="button" class="tts-delete" title="Удалить" data-key="${escapeHtml(item.key)}">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                            <span>Удалить</span>
+                        </button>
+                    </div>
                     <div class="tts-key">${escapeHtml(item.key)}</div>
                 `;
-                const btn = el.querySelector('.tts-delete');
-                btn.addEventListener('click', () => deleteItem(item.key, item.text));
+                const playBtn = el.querySelector('.tts-play');
+                const deleteBtn = el.querySelector('.tts-delete');
+                let currentAudio = null;
+                playBtn.addEventListener('click', () => playItem(playBtn, item.url));
+                deleteBtn.addEventListener('click', () => deleteItem(item.key, item.text));
                 list.appendChild(el);
             }
         } catch (e) {
@@ -216,6 +229,43 @@
         } catch (e) {
             console.error(e);
             showToast('Ошибка удаления: ' + escapeHtml(e.message), 'error');
+        }
+    }
+
+    let _currentPlay = { btn: null, audio: null };
+    function stopCurrentPlay() {
+        if (_currentPlay.audio) {
+            _currentPlay.audio.pause();
+            _currentPlay.audio = null;
+        }
+        if (_currentPlay.btn) {
+            _currentPlay.btn.classList.remove('is-playing');
+            _currentPlay.btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>';
+            _currentPlay.btn = null;
+        }
+    }
+    async function playItem(btn, url) {
+        if (_currentPlay.btn === btn) {
+            stopCurrentPlay();
+            return;
+        }
+        stopCurrentPlay();
+        btn.classList.add('is-playing');
+        btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="6" y1="3" x2="6" y2="21"/><line x1="18" y1="3" x2="18" y2="21"/></svg>';
+        _currentPlay.btn = btn;
+        try {
+            const audio = new Audio(url);
+            _currentPlay.audio = audio;
+            audio.onended = () => stopCurrentPlay();
+            audio.onerror = () => {
+                showToast('Не удалось воспроизвести аудио', 'error');
+                stopCurrentPlay();
+            };
+            await audio.play();
+        } catch (e) {
+            console.error(e);
+            showToast('Ошибка воспроизведения', 'error');
+            stopCurrentPlay();
         }
     }
 
