@@ -103,8 +103,7 @@
         .tts-item.is-command { border-left: 3px solid var(--green); }
         .tts-item.is-comment { border-left: 3px solid #AF52DE; }
         .tts-text { flex: 1; min-width: 0; font-size: 15px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        .tts-voice { flex: 0 0 auto; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 999px; background: var(--green-tint); color: var(--green-dark); white-space: nowrap; }
-        .tts-voice.comment { background: rgba(175, 82, 222, 0.10); color: #AF52DE; }
+        .tts-voice { flex: 0 0 auto; font-size: 10px; font-weight: 600; padding: 2px 8px; border-radius: 999px; background: var(--green-tint); color: var(--green-dark); white-space: nowrap; }
         .tts-actions { flex: 0 0 auto; display: flex; gap: 6px; align-items: center; }
         .tts-play { flex: 0 0 auto; padding: 6px 10px; border-radius: 10px; background: var(--green-tint); color: var(--green-dark); border: 1px solid var(--green-line); cursor: pointer; display: flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 600; }
         .tts-play:active { background: var(--green-line); }
@@ -190,11 +189,15 @@
                 return;
             }
             for (const item of items) {
+                const isComment = item.voice_type === 'comment';
+                const voiceInfo = isComment
+                    ? 'ru-RU-SvetlanaNeural · pitch +0 Hz · громкость +30%'
+                    : 'ru-RU-DmitryNeural · pitch -10 Hz · громкость +30%';
                 const el = document.createElement('div');
-                el.className = 'tts-item ' + (item.voice_type === 'comment' ? 'is-comment' : 'is-command');
+                el.className = 'tts-item ' + (isComment ? 'is-comment' : 'is-command');
                 el.innerHTML = `
                     <div class="tts-text">${escapeHtml(item.text)}</div>
-                    <div class="tts-voice ${item.voice_type}">${item.voice_type === 'comment' ? 'комментарий' : 'команда'}</div>
+                    <div class="tts-voice">${voiceInfo}</div>
                     <div class="tts-actions">
                         <button type="button" class="tts-play" title="Воспроизвести" data-url="${escapeHtml(item.url)}">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>
