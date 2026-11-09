@@ -24,6 +24,8 @@ MAX_CONCURRENT_SYNTHESIS = 4
 METADATA_TOKEN_URL = (
     "http://169.254.169.254/computeMetadata/v1/instance/service-accounts/default/token"
 )
+MANIFEST_KEY = "v1/manifest.json"
+ADMIN_SECRET = os.environ.get("TTS_ADMIN_SECRET", "")
 
 
 def _cors(status, body):
@@ -33,7 +35,7 @@ def _cors(status, body):
             "Content-Type": "application/json",
             "Access-Control-Allow-Origin": "*",
             "Access-Control-Allow-Methods": "POST, OPTIONS",
-            "Access-Control-Allow-Headers": "Content-Type",
+            "Access-Control-Allow-Headers": "Content-Type, X-TTS-Admin-Password",
         },
         "body": json.dumps(body, ensure_ascii=False),
     }
@@ -71,20 +73,64 @@ def _iam_token():
     return token
 
 
-def _upload_object(url, audio):
+def _upload_object(url, audio, content_type="audio/mpeg"):
     request = Request(
         url,
         data=audio,
         method="PUT",
         headers={
             "Authorization": "Bearer " + _iam_token(),
-            "Content-Type": "audio/mpeg",
+            "Content-Type": content_type,
             "Cache-Control": "public, max-age=31536000, immutable",
         },
     )
     with urlopen(request, timeout=20) as response:
         if response.status not in (200, 201):
             raise RuntimeError(f"Object Storage upload failed: HTTP {response.status}")
+
+
+def _delete_object(url):
+    request = Request(
+        url,
+        method="DELETE",
+        headers={
+            "Authorization": "Bearer " + _iam_token(),
+        },
+    )
+    with urlopen(request, timeout=20) as response:
+        if response.status not in (200, 204, 202):
+            raise RuntimeError(f"Object Storage delete failed: HTTP {response.status}")
+
+
+def _manifest_url():
+    return _object_url(MANIFEST_KEY)
+
+
+def _load_manifest():
+    try:
+        with urlopen(Request(_manifest_url(), method="GET"), timeout=10) as response:
+            return json.loads(response.read().decode("utf-8"))
+    except HTTPError as error:
+        if error.code == 404:
+            return {}
+        raise
+
+
+def _save_manifest(manifest):
+    data = json.dumps(manifest, ensure_ascii=False).encode("utf-8")
+    _upload_object(_manifest_url(), data, content_type="application/json")
+
+
+def _check_admin_secret(event):
+    if not ADMIN_SECRET:
+        return True
+    headers = event.get("headers") or {}
+    provided = (
+        headers.get("X-TTS-Admin-Password")
+        or headers.get("x-tts-admin-password")
+        or ""
+    )
+    return provided == ADMIN_SECRET
 
 
 async def _synthesize(text, voice_type):
@@ -130,7 +176,54 @@ async def _ensure_audio(text, voice_type, semaphore):
             return url
         audio = await _synthesize(text, voice_type)
         await asyncio.to_thread(_upload_object, url, audio)
+        try:
+            manifest = await asyncio.to_thread(_load_manifest)
+            manifest[key] = {
+                "text": text,
+                "voice_type": voice_type,
+                "key": key,
+                "url": url,
+            }
+            await asyncio.to_thread(_save_manifest, manifest)
+        except Exception as error:
+            print(f"Warning: failed to update manifest: {error}")
     return url
+
+
+def _handle_admin(body):
+    action = body.get("action")
+    if action == "list":
+        manifest = _load_manifest()
+        items = []
+        for key, meta in manifest.items():
+            items.append(
+                {
+                    "key": key,
+                    "text": meta.get("text", ""),
+                    "voice_type": meta.get("voice_type", "command"),
+                    "url": meta.get("url", _object_url(key)),
+                }
+            )
+        items.sort(key=lambda x: x.get("text", ""))
+        return {"items": items, "total": len(items)}
+    if action == "delete":
+        key = body.get("key")
+        if not key:
+            return _error(400, "key is required")
+        _delete_object(_object_url(key))
+        try:
+            manifest = _load_manifest()
+            if key in manifest:
+                del manifest[key]
+                _save_manifest(manifest)
+        except Exception as error:
+            print(f"Warning: failed to update manifest after delete: {error}")
+        return {"ok": True, "deleted": key}
+    return _error(400, "Unknown action")
+
+
+def _error(status, message):
+    return {"statusCode": status, "body": message}
 
 
 def handler(event, context):
@@ -143,6 +236,16 @@ def handler(event, context):
         body = json.loads(event.get("body") or "{}")
         if not isinstance(body, dict):
             return _cors(400, {"error": "Request body must be a JSON object"})
+
+        action = body.get("action")
+        if action in ("list", "delete"):
+            if not _check_admin_secret(event):
+                return _cors(401, {"error": "Unauthorized"})
+            result = _handle_admin(body)
+            if isinstance(result, dict) and "statusCode" in result:
+                return _cors(result["statusCode"], {"error": result["body"]})
+            return _cors(200, result)
+
         batches = body.get("batches")
         if not isinstance(batches, list) or not batches:
             return _cors(400, {"error": "batches must be a non-empty array"})

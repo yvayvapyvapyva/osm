@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Админка озвучки — Автоинструктор</title>
+    <meta name="theme-color" content="#F4F6FA">
+    <style>
+        :root {
+            color-scheme: light;
+            --bg: #F4F6FA;
+            --surface: #FFFFFF;
+            --surface-muted: #F1F4F8;
+            --surface-subtle: #F7F9FC;
+            --scrim: rgba(18, 28, 46, 0.28);
+            --toggle-off: #D8DEE8;
+            --text: #121A28;
+            --text-muted: rgba(18, 28, 46, 0.62);
+            --text-body: #46505F;
+            --text-soft: rgba(18, 28, 46, 0.42);
+            --text-faint: rgba(18, 28, 46, 0.24);
+            --white: #FFFFFF;
+            --line: rgba(18, 28, 46, 0.10);
+            --line-soft: rgba(18, 28, 46, 0.08);
+            --line-surface: rgba(18, 28, 46, 0.16);
+            --green: #2FA8E0;
+            --green-dark: #1E90D0;
+            --green-soft: #E7F4FC;
+            --green-tint: rgba(47, 168, 224, 0.10);
+            --green-line: rgba(47, 168, 224, 0.42);
+            --danger: #DC2626;
+            --danger-soft: #FDE8E8;
+            --danger-line: rgba(220, 38, 38, 0.28);
+            --shadow-card: 0 4px 16px rgba(18, 28, 46, 0.16);
+            --shadow-panel: 0 -24px 48px rgba(18, 28, 46, 0.18);
+            --radius-card: 16px;
+            --radius-control: 12px;
+            --radius-sm: 14px;
+        }
+        [data-theme="dark"] {
+            --bg: #0F141C;
+            --surface: #161D27;
+            --surface-muted: #1E2733;
+            --surface-subtle: #1A2230;
+            --scrim: rgba(0, 0, 0, 0.55);
+            --toggle-off: #3A4556;
+            --text: #E8EDF5;
+            --text-muted: rgba(232, 237, 245, 0.66);
+            --text-body: rgba(232, 237, 245, 0.74);
+            --text-soft: rgba(232, 237, 245, 0.46);
+            --text-faint: rgba(232, 237, 245, 0.26);
+            --line: rgba(232, 237, 245, 0.14);
+            --line-soft: rgba(232, 237, 245, 0.10);
+            --line-surface: var(--line);
+            --green: #2FA8E0;
+            --green-dark: #60A5FA;
+            --green-soft: #0A4A6B;
+            --green-tint: rgba(47, 168, 224, 0.14);
+            --green-line: rgba(47, 168, 224, 0.55);
+            --danger: #F87171;
+            --danger-soft: #3A1D20;
+            --danger-line: rgba(248, 113, 113, 0.40);
+            --shadow-card: 0 2px 10px rgba(0, 0, 0, 0.35);
+            --shadow-panel: 0 -24px 48px rgba(0, 0, 0, 0.55);
+        }
+        * { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; }
+        html, body { margin: 0; padding: 0; height: 100%; width: 100%; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', system-ui, sans-serif; overflow: hidden; background: var(--bg); color: var(--text); -webkit-font-smoothing: antialiased; }
+        button, input { font-family: inherit; }
+        .screen-modal { position: fixed; inset: 0; z-index: 11000; background: var(--scrim); display: flex; align-items: center; justify-content: center; }
+        .screen-modal.hidden { display: none; }
+        .screen-panel { position: relative; width: 100%; height: 100%; display: flex; flex-direction: column; background: var(--bg); box-sizing: border-box; overflow: hidden; border-radius: 20px 20px 0 0; box-shadow: var(--shadow-panel); }
+        .screen-head { position: relative; z-index: 1; flex-shrink: 0; display: flex; align-items: center; gap: 8px; min-height: 52px; padding: 10px 12px 8px 16px; box-sizing: border-box; border-bottom: 1px solid var(--line-faint); background: var(--surface); }
+        .screen-title { flex: 1; min-width: 0; margin: 0; font-size: 17px; font-weight: 650; letter-spacing: -0.2px; line-height: 1.2; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .screen-close { flex-shrink: 0; display: flex; align-items: center; justify-content: center; width: 48px; height: 48px; padding: 0; border: 0; border-radius: 50%; background: var(--surface-muted); color: var(--text-muted); cursor: pointer; transition: background 0.15s ease, color 0.15s ease, transform 0.12s ease; -webkit-tap-highlight-color: transparent; }
+        .screen-close svg { display: block; width: 20px; height: 20px; }
+        .screen-close:active { background: var(--line); color: var(--text); transform: scale(0.94); }
+        .settings-body { display: flex; flex-direction: column; gap: 8px; overflow-y: auto; flex: 1; min-height: 0; padding: 8px 12px 16px; box-sizing: border-box; }
+        .settings-body::after { content: ''; display: block; height: 8px; pointer-events: none; flex-shrink: 0; }
+        .settings-label { font-size: 16px; font-weight: 600; text-align: center; margin-top: 12px; }
+        .settings-group { border-radius: var(--radius-control); padding: 8px; display: flex; flex-direction: column; gap: 10px; background: var(--surface); border: 1px solid var(--line-surface); box-shadow: var(--shadow-card); }
+        .settings-group + .settings-group { margin-top: 12px; }
+        .toggle-switch { position: relative; display: inline-block; width: 52px; height: 32px; flex-shrink: 0; }
+        .toggle-input { display: none; }
+        .toggle-slider { position: absolute; cursor: pointer; inset: 0; background: var(--toggle-off); border-radius: 32px; transition: 0.25s; }
+        .toggle-slider::before { content: ''; position: absolute; width: 26px; height: 26px; left: 3px; bottom: 3px; background: var(--white); border-radius: 50%; box-shadow: 0 1px 3px rgba(18, 28, 46, 0.22); transition: 0.25s; }
+        .toggle-input:checked + .toggle-slider { background: var(--green); }
+        .toggle-input:checked + .toggle-slider::before { transform: translateX(20px); }
+        .trigger-setting-row { display: flex; flex-direction: column; }
+        .trigger-setting-header { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 0 0 6px 0; }
+        .trigger-setting-row .label { font-size: 14px; font-weight: 600; color: var(--text); flex: 1; }
+        .trigger-setting-row .value { font-size: 14px; font-weight: 700; color: var(--text-muted); min-width: 28px; text-align: center; }
+        .trigger-input { width: 100%; padding: 10px 14px; border-radius: 10px; background: var(--surface-muted); color: var(--text); font-size: 14px; outline: none; box-sizing: border-box; border: 1px solid var(--line); }
+        .trigger-input:focus { background: var(--surface); border-color: var(--green-focus); }
+        .trigger-input-num { width: 100%; padding: 10px 14px; border-radius: 10px; border: 1px solid var(--line); background: var(--surface-muted); color: var(--text); font-size: 16px; font-weight: 600; outline: none; box-sizing: border-box; }
+        .trigger-pad { padding: 4px 0 6px; }
+        .tts-admin-toolbar { display: flex; gap: 8px; margin-bottom: 10px; }
+        .tts-admin-btn { flex: 1; padding: 10px 14px; border-radius: var(--radius-control); border: 1px solid var(--line-surface); background: var(--surface); color: var(--text); font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; touch-action: manipulation; }
+        .tts-admin-btn:active { background: var(--surface-muted); }
+        .tts-admin-count { font-size: 13px; font-weight: 600; color: var(--text-soft); }
+        .tts-list { display: flex; flex-direction: column; gap: 6px; }
+        .tts-item { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-radius: var(--radius-control); background: var(--surface); border: 1px solid var(--line-surface); box-shadow: var(--shadow-card); }
+        .tts-item:active { background: var(--surface-muted); }
+        .tts-item.is-command { border-left: 3px solid var(--green); }
+        .tts-item.is-comment { border-left: 3px solid #AF52DE; }
+        .tts-text { flex: 1; min-width: 0; font-size: 15px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .tts-voice { flex: 0 0 auto; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 999px; background: var(--green-tint); color: var(--green-dark); white-space: nowrap; }
+        .tts-voice.comment { background: rgba(175, 82, 222, 0.10); color: #AF52DE; }
+        .tts-delete { flex: 0 0 auto; padding: 6px; border-radius: 10px; background: var(--danger-soft); color: var(--danger); border: 1px solid var(--danger-line); cursor: pointer; display: flex; align-items: center; justify-content: center; }
+        .tts-delete:active { background: var(--danger-line); }
+        .empty { text-align: center; padding: 40px 20px; color: var(--text-soft); font-size: 14px; }
+        .toast { position: fixed; top: 90px; left: 50%; z-index: 16000; box-sizing: border-box; width: max-content; max-width: calc(100% - 144px); padding: 11px 18px; border-radius: 22px; border: 1px solid var(--line-surface); background: var(--toast-surface); color: var(--text); font-size: 14px; font-weight: 600; line-height: 1.35; text-align: center; white-space: pre-wrap; box-shadow: var(--shadow-float); opacity: 0; transform: translateX(-50%) translateY(-10px) scale(0.96); pointer-events: none; transition: opacity 0.22s ease, transform 0.28s cubic-bezier(0.32, 0.72, 0, 1); }
+        .toast.show { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
+        .toast.success { background: color-mix(in srgb, #16A34A 12%, var(--toast-surface)); }
+        .toast.error { background: color-mix(in srgb, var(--danger-soft) 88%, transparent); }
+        .tts-key { flex: 0 0 auto; font-size: 10px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--text-faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 120px; margin-left: 8px; }
+    </style>
+</head>
+<body>
+
+<div id="ttsAdmin" class="screen-panel">
+    <header class="screen-head">
+        <h1 class="screen-title">Админка озвучки</h1>
+    </header>
+    <div class="settings-body">
+        <div class="settings-group">
+            <div class="settings-label">Пароль админа</div>
+            <input type="password" id="adminPassword" class="trigger-input" placeholder="Введите пароль">
+        </div>
+        <div class="settings-group">
+            <div class="settings-label">Команды в бакете</div>
+            <div class="tts-admin-toolbar">
+                <button type="button" class="tts-admin-btn" id="btnRefresh">Обновить</button>
+                <span class="tts-admin-count" id="ttsCount">— команд</span>
+            </div>
+            <div id="ttsList" class="tts-list">
+                <div class="empty">Введите пароль и нажмите «Обновить»</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+(function () {
+    const API_URL = 'https://functions.yandexcloud.net/d4e3cj3q3ff36qlrhbg8';
+    const $ = id => document.getElementById(id);
+
+    const toast = $('toast');
+    function showToast(text, type = 'info', duration = 2000) {
+        toast.textContent = text;
+        toast.className = `toast ${type === 'error' ? 'error' : 'success'} show`;
+        setTimeout(() => toast.classList.remove('show'), duration);
+    }
+
+    let adminPassword = '';
+
+    async function api(action, body = {}) {
+        const headers = { 'Content-Type': 'application/json' };
+        if (adminPassword) headers['X-TTS-Admin-Password'] = adminPassword;
+        const response = await fetch(API_URL, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({ action, ...body })
+        });
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.error || 'HTTP ' + response.status);
+        return result;
+    }
+
+    async function loadList() {
+        if (!adminPassword) {
+            showToast('Введите пароль админа', 'error');
+            return;
+        }
+        const list = $('ttsList');
+        const count = $('ttsCount');
+        list.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text-soft);">Загрузка…</div>';
+        try {
+            const data = await api('list');
+            const items = data.items || [];
+            count.textContent = items.length + ' команд';
+            list.innerHTML = '';
+            if (items.length === 0) {
+                list.innerHTML = '<div class="empty">В бакете нет озвученных команд</div>';
+                return;
+            }
+            for (const item of items) {
+                const el = document.createElement('div');
+                el.className = 'tts-item ' + (item.voice_type === 'comment' ? 'is-comment' : 'is-command');
+                el.innerHTML = `
+                    <div class="tts-text">${escapeHtml(item.text)}</div>
+                    <div class="tts-voice ${item.voice_type}">${item.voice_type === 'comment' ? 'комментарий' : 'команда'}</div>
+                    <button type="button" class="tts-delete" title="Удалить" data-key="${escapeHtml(item.key)}">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                    </button>
+                    <div class="tts-key">${escapeHtml(item.key)}</div>
+                `;
+                const btn = el.querySelector('.tts-delete');
+                btn.addEventListener('click', () => deleteItem(item.key, item.text));
+                list.appendChild(el);
+            }
+        } catch (e) {
+            console.error(e);
+            list.innerHTML = '<div class="empty">Ошибка загрузки: ' + escapeHtml(e.message) + '</div>';
+            showToast('Ошибка загрузки списка', 'error');
+        }
+    }
+
+    async function deleteItem(key, text) {
+        if (!confirm('Удалить озвучку «' + text + '»?')) return;
+        try {
+            await api('delete', { key });
+            showToast('Удалено', 'success');
+            loadList();
+        } catch (e) {
+            console.error(e);
+            showToast('Ошибка удаления: ' + escapeHtml(e.message), 'error');
+        }
+    }
+
+    function escapeHtml(str) {
+        const d = document.createElement('div');
+        d.textContent = str;
+        return d.innerHTML;
+    }
+
+    $('adminPassword').addEventListener('input', (e) => {
+        adminPassword = e.target.value;
+    });
+    $('adminPassword').addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') loadList();
+    });
+    $('btnRefresh').addEventListener('click', loadList);
+})();
+</script>
+
+</body>
+</html>
