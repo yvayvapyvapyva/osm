@@ -124,12 +124,8 @@ def _save_manifest(manifest):
 def _check_admin_secret(event):
     if not ADMIN_SECRET:
         return True
-    headers = event.get("headers") or {}
-    provided = (
-        headers.get("X-TTS-Admin-Password")
-        or headers.get("x-tts-admin-password")
-        or ""
-    )
+    headers = {k.lower(): v for k, v in (event.get("headers") or {}).items()}
+    provided = headers.get("x-tts-admin-password", "")
     return provided == ADMIN_SECRET
 
 
