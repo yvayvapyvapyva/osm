@@ -234,7 +234,7 @@ const APP = {
         TRIGGER_DIST: 25, AZ_TOLERANCE: 45, SPEED_THRESHOLD: 2,
         ACCURACY_LIMIT: 150, WEAK_FIX_GRACE: 8000, HEADING_MIN_DIST: 6,
         SHOCK_THRESHOLD: 0, SHOCK_PHRASE: 'Сильный удар',
-        SPEED_ALERT_THRESHOLD: 58, SPEED_ALERT_PHRASE: 'Превышена максимальная скорость',
+        SPEED_ALERT_THRESHOLD: 58, SPEED_ALERT_PHRASE: 'Превышение скорости',
         BRAKE_THRESHOLD: 0, BRAKE_PHRASE: 'Резкое торможение', BRAKE_DURATION: 500
     },
     _mapStyle: MAP_PREFS.style,
@@ -885,7 +885,7 @@ function applySpeedConfig() {
     const on = $('triggerSpeedAlertToggle').checked;
     const val = on ? parseInt($('triggerSpeedAlert').value) || 58 : 0;
     APP.navConfig.SPEED_ALERT_THRESHOLD = val;
-    APP.navConfig.SPEED_ALERT_PHRASE = 'Превышена максимальная скорость';
+    APP.navConfig.SPEED_ALERT_PHRASE = 'Превышение скорости';
 }
 function updateBrakeDisplay() {
     if (!$('triggerBrakeToggle').checked) {
@@ -1088,7 +1088,7 @@ function checkSpeedAlert(speed) {
         const now = Date.now();
         if (now - APP._lastSpeedAlertTime < SPEED_ALERT_DEBOUNCE) return;
         APP._lastSpeedAlertTime = now;
-        playCommand(APP.navConfig.SPEED_ALERT_PHRASE || 'Превышена максимальная скорость').catch(() => {});
+        playCommand(APP.navConfig.SPEED_ALERT_PHRASE || 'Превышение скорости').catch(() => {});
     }
 }
 
@@ -1975,7 +1975,7 @@ async function precacheRouteAudio(data) {
     const cmdTexts = [...new Set(data.map((d, i) => d.cmd || d.comm || `Т${i + 1}`).filter(t => t && t.trim()))];
     const commTexts = [...new Set(data.map(d => d.comm).filter(t => t && t.trim()))];
     const shockPhrase = APP.navConfig.SHOCK_PHRASE || 'Сильный удар';
-    const speedPhrase = APP.navConfig.SPEED_ALERT_PHRASE || 'Превышена максимальная скорость';
+    const speedPhrase = APP.navConfig.SPEED_ALERT_PHRASE || 'Превышение скорости';
     cmdTexts.push(shockPhrase, speedPhrase);
     try {
         await NavigatorTTS.preload([
@@ -2487,7 +2487,7 @@ if (typeof maplibregl === 'undefined') {
                                 <span class="toggle-slider"></span>
                             </label>
                             <div class="trigger-pad">
-                                <button type="button" class="trigger-phrase-btn" onclick="playCommand('Превышена максимальная скорость')" aria-label="Озвучить: Превышена максимальная скорость">Превышена максимальная скорость</button>
+                                <button type="button" class="trigger-phrase-btn" onclick="playCommand('Превышение скорости')" aria-label="Озвучить: Превышение скорости">Превышение скорости</button>
                             </div>
                         </div>
                         <input type="text" inputmode="numeric" pattern="[0-9]*" id="triggerSpeedAlert" value="58" class="trigger-input-num speed-input-inline" oninput="this.value=this.value.replace(/[^0-9]/g,'');applySpeedConfig()">
