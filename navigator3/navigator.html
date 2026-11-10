@@ -863,18 +863,16 @@ function updateShockDisplay() {
 function applyShockConfig() {
     const on = $('triggerShockToggle').checked;
     const val = on ? parseFloat($('triggerShock').value) : 0;
-    const phrase = $('triggerShockPhrase').value.trim() || 'Сильный удар';
     APP.navConfig.SHOCK_THRESHOLD = val;
-    APP.navConfig.SHOCK_PHRASE = phrase;
+    APP.navConfig.SHOCK_PHRASE = 'Сильный удар';
     updateShockBarVisibility();
     if (val > 0) ensureMotionTracking();
 }
 function applySpeedConfig() {
     const on = $('triggerSpeedAlertToggle').checked;
     const val = on ? parseInt($('triggerSpeedAlert').value) || 58 : 0;
-    const phrase = $('triggerSpeedAlertPhrase').value.trim() || 'Превышена максимальная скорость';
     APP.navConfig.SPEED_ALERT_THRESHOLD = val;
-    APP.navConfig.SPEED_ALERT_PHRASE = phrase;
+    APP.navConfig.SPEED_ALERT_PHRASE = 'Превышена максимальная скорость';
 }
 function updateBrakeDisplay() {
     if (!$('triggerBrakeToggle').checked) {
@@ -893,10 +891,9 @@ function applyBrakeConfig() {
     APP._brakeEnabled = on;
     const val = on ? parseFloat($('triggerBrake').value) : 0;
     const timeVal = on ? parseInt($('triggerBrakeTime').value) : 0;
-    const phrase = $('triggerBrakePhrase').value.trim() || 'Резкое торможение';
     APP.navConfig.BRAKE_THRESHOLD = val;
     APP.navConfig.BRAKE_DURATION = timeVal;
-    APP.navConfig.BRAKE_PHRASE = phrase;
+    APP.navConfig.BRAKE_PHRASE = 'Резкое торможение';
     $('triggerBrakeVal').textContent = on ? val + ' м/с²' : 'Выкл';
     if (on) ensureMotionTracking();
     updateShockBarVisibility();
@@ -1239,18 +1236,15 @@ function openDrivingControl() {
     const shockOn = APP.navConfig.SHOCK_THRESHOLD > 0;
     $('triggerShockToggle').checked = shockOn;
     $('triggerShock').value = shockOn ? APP.navConfig.SHOCK_THRESHOLD : 1;
-    $('triggerShockPhrase').value = APP.navConfig.SHOCK_PHRASE;
     $('triggerShockVal').textContent = APP.navConfig.SHOCK_THRESHOLD + 'g';
     const speedOn = APP.navConfig.SPEED_ALERT_THRESHOLD > 0;
     $('triggerSpeedAlertToggle').checked = speedOn;
     $('triggerSpeedAlert').value = speedOn ? APP.navConfig.SPEED_ALERT_THRESHOLD : 58;
-    $('triggerSpeedAlertPhrase').value = APP.navConfig.SPEED_ALERT_PHRASE;
     const brakeOn = APP.navConfig.BRAKE_THRESHOLD > 0 && APP._brakeEnabled;
     $('triggerBrakeToggle').checked = brakeOn;
     $('triggerBrake').value = brakeOn ? APP.navConfig.BRAKE_THRESHOLD : 4;
     $('triggerBrakeTime').value = brakeOn ? APP.navConfig.BRAKE_DURATION : 500;
     $('triggerBrakeTimeVal').textContent = (brakeOn ? APP.navConfig.BRAKE_DURATION : 500) + ' мс';
-    $('triggerBrakePhrase').value = APP.navConfig.BRAKE_PHRASE;
     $('triggerBrakeVal').textContent = brakeOn ? APP.navConfig.BRAKE_THRESHOLD + ' м/с²' : 'Выкл';
     $('drivingControlModal').classList.remove('hidden');
 }
@@ -2449,7 +2443,7 @@ if (typeof maplibregl === 'undefined') {
                     <div>
                         <input type="range" id="triggerShock" min="0.5" max="3" value="1" step="0.25" oninput="updateShockDisplay();applyShockConfig()">
                         <div class="trigger-pad">
-                            <input type="text" id="triggerShockPhrase" value="Сильный удар" class="trigger-input" oninput="applyShockConfig()">
+                            <span class="trigger-phrase">Сильный удар</span>
                         </div>
                     </div>
                 </div>
@@ -2465,7 +2459,7 @@ if (typeof maplibregl === 'undefined') {
                     </div>
                     <div>
                         <div class="trigger-pad">
-                            <input type="text" id="triggerSpeedAlertPhrase" value="Превышена максимальная скорость" class="trigger-input" oninput="applySpeedConfig()">
+                            <span class="trigger-phrase">Превышена максимальная скорость</span>
                         </div>
                     </div>
                 </div>
@@ -2490,7 +2484,7 @@ if (typeof maplibregl === 'undefined') {
                             <span class="value" id="triggerBrakeTimeVal">500 мс</span>
                         </div>
                         <div class="trigger-pad">
-                            <input type="text" id="triggerBrakePhrase" value="Резкое торможение" class="trigger-input" oninput="applyBrakeConfig()">
+                            <span class="trigger-phrase">Резкое торможение</span>
                         </div>
                     </div>
                 </div>
