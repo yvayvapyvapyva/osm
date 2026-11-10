@@ -544,6 +544,7 @@ function driveAlongPath(fromIdx) {
 
     const resume = APP._driveResume && APP._driveResume.idx === fromIdx ? APP._driveResume : null;
     stopDrive();
+    APP._driveActive = true;
 
     const path = p.pts;
     if (!p._dists) {
