@@ -238,7 +238,9 @@ const APP = {
     _mapStyle: MAP_PREFS.style,
     _routeFeatures: [], _routeDataSource: null, _routeDataDirty: false,
     _driveActive: false, _driveRaf: null, _driveMarker: null, _driveShowFrom: -1,
-    _lastSpeed: null, _lastSpeedTime: 0, _lastBrakeTime: 0, _brakeEnabled: false,
+    _lastSpeedAlertTime: 0,
+    _lastBrakeTime: 0, _brakeEnabled: false,
+    _gravityX: 0, _gravityY: 0, _gravityZ: 0,
     _driveState: null, _driveResume: null,
     _driveSpeed: 90,
     markerRotation: 0, _arrowRaf: null, _arrowPos: null,
@@ -729,24 +731,6 @@ function onGeoPosition(pos) {
     APP.currentSpeed = speed;
     checkSpeedAlert(speed);
 
-    // Резкое торможение: скорость падает быстрее порога (м/с²), независимо от
-    // ориентации телефона — считаем по замещению GPS-скорости.
-    if (APP._brakeEnabled && APP.navConfig.BRAKE_THRESHOLD > 0 && APP._lastSpeed !== null && dt > 0) {
-        const decelKmhPerS = APP._lastSpeed - speed;
-        if (decelKmhPerS > 0) {
-            const decelMs2 = decelKmhPerS / 3.6 / dt;
-            if (decelMs2 > APP.navConfig.BRAKE_THRESHOLD && !isAudioPlaying()) {
-                const brakeNow = Date.now();
-                if (!APP._lastBrakeTime || brakeNow - APP._lastBrakeTime > 5000) {
-                    APP._lastBrakeTime = brakeNow;
-                    playCommand(APP.navConfig.BRAKE_PHRASE || 'Резкое торможение').catch(() => {});
-                }
-            }
-        }
-    }
-    APP._lastSpeed = speed;
-    APP._lastSpeedTime = now;
-
     if (heading !== null) {
         APP.lastAz = heading;
         APP.rawAz = heading;
@@ -907,6 +891,7 @@ function applyBrakeConfig() {
     APP.navConfig.BRAKE_THRESHOLD = val;
     APP.navConfig.BRAKE_PHRASE = phrase;
     $('triggerBrakeVal').textContent = on ? val + ' м/с²' : 'Выкл';
+    if (on) ensureMotionTracking();
 }
 
 function applyCommentConfig() {
@@ -959,21 +944,55 @@ function isAudioPlaying() {
            (!APP._commentAudio.paused && APP._commentAudio.currentTime > 0);
 }
 
+const GRAVITY_ALPHA = 0.85;
+const BRAKE_DEBOUNCE = 3000;
+
 function onMotion(event) {
     const gThreshold = APP.navConfig.SHOCK_THRESHOLD;
-    if (gThreshold <= 0) return;
     const acc = event.accelerationIncludingGravity;
     if (!acc) return;
     const { x, y, z } = acc;
-    const total = Math.sqrt(x*x + y*y + z*z);
-    const impactG = Math.abs(total - 9.8) / 9.8;
-    updateShockBar(impactG);
-    if (isAudioPlaying()) return;
-    if (impactG > gThreshold) {
-        const now = Date.now();
-        if (now - APP._lastShockTime < SHOCK_DEBOUNCE) return;
-        APP._lastShockTime = now;
-        playCommand(APP.navConfig.SHOCK_PHRASE || 'Сильный удар').catch(() => {});
+
+    /* Гравитационный фильтр (low-pass): отделяем статическую гравитацию
+       от динамического ускорения автомобиля. Чем выше alpha, тем медленнее
+       фильтр адаптируется к изменению ориентации телефона. */
+    APP._gravityX = GRAVITY_ALPHA * APP._gravityX + (1 - GRAVITY_ALPHA) * x;
+    APP._gravityY = GRAVITY_ALPHA * APP._gravityY + (1 - GRAVITY_ALPHA) * y;
+    APP._gravityZ = GRAVITY_ALPHA * APP._gravityZ + (1 - GRAVITY_ALPHA) * z;
+
+    /* Линейное ускорение (без гравитации) — то, что создаёт движение машины. */
+    const linX = x - APP._gravityX;
+    const linY = y - APP._gravityY;
+    const linZ = z - APP._gravityZ;
+
+    /* Продольное ускорение вдоль оси движения автомобиля.
+       Телефон в портретном режиме на панели, экран к водителю: ось Z —
+       вперёд/назад. Отрицательное линейное ускорение по Z = торможение. */
+    const forwardAccel = linZ;
+
+    /* Шок-бар (удар) — существующая логика. */
+    if (gThreshold > 0) {
+        const total = Math.sqrt(x * x + y * y + z * z);
+        const impactG = Math.abs(total - 9.8) / 9.8;
+        updateShockBar(impactG);
+        if (!isAudioPlaying() && impactG > gThreshold) {
+            const now = Date.now();
+            if (now - APP._lastShockTime < SHOCK_DEBOUNCE) return;
+            APP._lastShockTime = now;
+            playCommand(APP.navConfig.SHOCK_PHRASE || 'Сильный удар').catch(() => {});
+        }
+    }
+
+    /* Резкое торможение через акселерометр (независимо от GPS). */
+    if (APP._brakeEnabled && APP.navConfig.BRAKE_THRESHOLD > 0 && !isAudioPlaying()) {
+        const brakeMs2 = -forwardAccel; // положительное значение = торможение
+        if (brakeMs2 > APP.navConfig.BRAKE_THRESHOLD) {
+            const now = Date.now();
+            if (!APP._lastBrakeTime || now - APP._lastBrakeTime > BRAKE_DEBOUNCE) {
+                APP._lastBrakeTime = now;
+                playCommand(APP.navConfig.BRAKE_PHRASE || 'Резкое торможение').catch(() => {});
+            }
+        }
     }
 }
 
