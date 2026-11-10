@@ -1290,12 +1290,12 @@ function getNavIconSvg(col, txt, isCurr = false, hasComm = false) {
 }
 
 function getNavIconSvgSized(col, txt, isCurr = false, hasComm = false, sizeOverride = null) {
-    const s = sizeOverride != null ? sizeOverride : (isCurr ? 64 : 40);
+    const s = sizeOverride != null ? sizeOverride : 40;
     const c = s / 2;
     const r = Math.round(s * 9 / 40);
     const safeCol = /^#[0-9a-f]{6}$/i.test(col) ? col : '#007AFF';
     const safeTxt = escapeHtml(String(txt ?? ''));
-    const fontSize = Math.max(8, Math.round(s * 13 / 64));
+    const fontSize = Math.max(8, Math.round(s * 9 / 40));
     const commR = Math.max(3, Math.round(s * 4 / 40));
     const commCx = s - Math.round(s * 10 / 40);
     const commCy = Math.round(s * 10 / 40);
