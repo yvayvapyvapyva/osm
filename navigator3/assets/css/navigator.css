@@ -211,6 +211,7 @@ button, input, select, textarea {
 .trigger-phrase-btn { display:inline-flex;align-items:center;justify-content:center;min-height:42px;padding:8px 14px;border:1px solid var(--green-line-soft);border-radius:10px;background:var(--green-tint);color:var(--green-dark);font:inherit;font-size:12px;font-weight:600;white-space:nowrap;cursor:pointer;touch-action:manipulation;-webkit-tap-highlight-color:transparent;box-sizing:border-box;box-shadow:var(--shadow-card);transition:background 0.15s ease,border-color 0.15s ease,transform 0.1s ease; }
 .trigger-phrase-btn:active { background:var(--surface-muted);transform:scale(0.96); }
 .trigger-phrase-btn:focus-visible { outline:2px solid var(--green);outline-offset:-2px; }
+.trigger-desc { font-size:11px;color:var(--text-muted);margin:4px 8px 8px;line-height:1.3; }
 .speed-input-inline { width:60px !important;padding:10px 8px !important;text-align:center;font-size:14px !important;border-radius:8px !important;border:1px solid var(--line) !important;flex-shrink:0; }
 
 /* ============================================
