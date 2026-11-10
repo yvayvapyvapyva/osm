@@ -239,7 +239,7 @@ const APP = {
     _routeFeatures: [], _routeDataSource: null, _routeDataDirty: false,
     _driveActive: false, _driveRaf: null, _driveMarker: null, _driveShowFrom: -1,
     _lastSpeedAlertTime: 0,
-    _lastBrakeTime: 0, _brakeEnabled: false, _brakeStartTime: null,
+    _lastBrakeTime: 0, _brakeEnabled: true, _brakeStartTime: null,
     _gravityX: 0, _gravityY: 0, _gravityZ: 0,
     _driveState: null, _driveResume: null,
     _driveSpeed: 90,
@@ -249,7 +249,7 @@ const APP = {
     _commentEnabled: true,
     _lastShockTime: 0,
     _lastSpeedAlertTime: 0,
-    _motionTracked: false,
+    _motionTracked: true,
     _shockDisplayG: 0,
     _shockPeakTime: 0,
     _simFirstRun: true,
@@ -260,6 +260,7 @@ const APP = {
 };
 
 loadNavConfig();
+ensureMotionTracking();
 
 const $ = id => document.getElementById(id);
 
