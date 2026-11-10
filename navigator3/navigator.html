@@ -1234,6 +1234,7 @@ function openDrivingControl() {
     $('triggerShockToggle').checked = shockOn;
     $('triggerShock').value = shockOn ? APP.navConfig.SHOCK_THRESHOLD : 1;
     $('triggerShockPhrase').value = APP.navConfig.SHOCK_PHRASE;
+    $('triggerShockVal').textContent = shockOn ? APP.navConfig.SHOCK_THRESHOLD + 'g' : 'Выкл';
     const speedOn = APP.navConfig.SPEED_ALERT_THRESHOLD > 0;
     $('triggerSpeedAlertToggle').checked = speedOn;
     $('triggerSpeedAlert').value = speedOn ? APP.navConfig.SPEED_ALERT_THRESHOLD : 58;
