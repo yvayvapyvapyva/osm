@@ -1781,17 +1781,17 @@ button, input, select, textarea {
     color: var(--text-soft);
 }
 
-/* Активная вкладка — сияющая рамка-пилюля вокруг кнопки */
+/* Активная вкладка — светящаяся рамка-пилюля, как на gdebenz.ru */
 .bottom-nav-btn.active {
     color: var(--green);
     background: transparent;
-    border-radius: 16px;
-    box-shadow: 0 0 0 2px var(--green-line-soft);
+    border-radius: 20px;
+    box-shadow: 0 0 0 2px var(--green-line-soft), 0 0 16px var(--green-glow);
 }
 
 .bottom-nav-btn.active svg {
     color: var(--green);
-    filter: drop-shadow(0 0 6px var(--green-glow));
+    filter: drop-shadow(0 0 8px var(--green-glow));
 }
 
 .bottom-nav-btn.active span {
