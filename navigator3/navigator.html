@@ -233,7 +233,7 @@ const APP = {
         ACCURACY_LIMIT: 150, WEAK_FIX_GRACE: 8000, HEADING_MIN_DIST: 6,
         SHOCK_THRESHOLD: 1, SHOCK_PHRASE: 'Сильный удар',
         SPEED_ALERT_THRESHOLD: 58, SPEED_ALERT_PHRASE: 'Превышена максимальная скорость',
-        BRAKE_THRESHOLD: 4, BRAKE_PHRASE: 'Резкое торможение'
+        BRAKE_THRESHOLD: 4, BRAKE_PHRASE: 'Резкое торможение', BRAKE_DURATION: 500
     },
     _mapStyle: MAP_PREFS.style,
     _routeFeatures: [], _routeDataSource: null, _routeDataDirty: false,
@@ -883,12 +883,18 @@ function updateBrakeDisplay() {
     const val = parseFloat($('triggerBrake').value);
     $('triggerBrakeVal').textContent = val + ' м/с²';
 }
+function updateBrakeTimeDisplay() {
+    const val = parseInt($('triggerBrakeTime').value);
+    $('triggerBrakeTimeVal').textContent = val + ' мс';
+}
 function applyBrakeConfig() {
     const on = $('triggerBrakeToggle').checked;
     APP._brakeEnabled = on;
     const val = on ? parseFloat($('triggerBrake').value) : 0;
+    const timeVal = on ? parseInt($('triggerBrakeTime').value) : 0;
     const phrase = $('triggerBrakePhrase').value.trim() || 'Резкое торможение';
     APP.navConfig.BRAKE_THRESHOLD = val;
+    APP.navConfig.BRAKE_DURATION = timeVal;
     APP.navConfig.BRAKE_PHRASE = phrase;
     $('triggerBrakeVal').textContent = on ? val + ' м/с²' : 'Выкл';
     if (on) ensureMotionTracking();
@@ -945,7 +951,6 @@ function isAudioPlaying() {
 }
 
 const GRAVITY_ALPHA = 0.85;
-const BRAKE_DURATION = 500;
 const BRAKE_DEBOUNCE = 3000;
 
 function onMotion(event) {
@@ -993,7 +998,7 @@ function onMotion(event) {
         if (brakeMs2 > APP.navConfig.BRAKE_THRESHOLD) {
             if (!APP._brakeStartTime) {
                 APP._brakeStartTime = now;
-            } else if (now - APP._brakeStartTime >= BRAKE_DURATION) {
+            } else if (now - APP._brakeStartTime >= APP.navConfig.BRAKE_DURATION) {
                 if (!APP._lastBrakeTime || now - APP._lastBrakeTime > BRAKE_DEBOUNCE) {
                     APP._lastBrakeTime = now;
                     APP._brakeStartTime = null;
@@ -1243,6 +1248,8 @@ function openDrivingControl() {
     const brakeOn = APP.navConfig.BRAKE_THRESHOLD > 0 && APP._brakeEnabled;
     $('triggerBrakeToggle').checked = brakeOn;
     $('triggerBrake').value = brakeOn ? APP.navConfig.BRAKE_THRESHOLD : 4;
+    $('triggerBrakeTime').value = brakeOn ? APP.navConfig.BRAKE_DURATION : 500;
+    $('triggerBrakeTimeVal').textContent = (brakeOn ? APP.navConfig.BRAKE_DURATION : 500) + ' мс';
     $('triggerBrakePhrase').value = APP.navConfig.BRAKE_PHRASE;
     $('triggerBrakeVal').textContent = brakeOn ? APP.navConfig.BRAKE_THRESHOLD + ' м/с²' : 'Выкл';
     $('drivingControlModal').classList.remove('hidden');
@@ -2474,7 +2481,15 @@ if (typeof maplibregl === 'undefined') {
                         <span class="value" id="triggerBrakeVal">Выкл</span>
                     </div>
                     <div>
-                        <input type="range" id="triggerBrake" min="1" max="8" value="4" step="0.5" oninput="updateBrakeDisplay();applyBrakeConfig()">
+                        <div class="trigger-pad">
+                            <label style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:4px;">Интенсивность (м/с²)</label>
+                            <input type="range" id="triggerBrake" min="1" max="8" value="4" step="0.5" oninput="updateBrakeDisplay();applyBrakeConfig()">
+                        </div>
+                        <div class="trigger-pad">
+                            <label style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:4px;">Время торможения (мс)</label>
+                            <input type="range" id="triggerBrakeTime" min="100" max="2000" value="500" step="100" oninput="updateBrakeTimeDisplay();applyBrakeConfig()">
+                            <span class="value" id="triggerBrakeTimeVal">500 мс</span>
+                        </div>
                         <div class="trigger-pad">
                             <input type="text" id="triggerBrakePhrase" value="Резкое торможение" class="trigger-input" oninput="applyBrakeConfig()">
                         </div>
