@@ -232,11 +232,13 @@ const APP = {
         TRIGGER_DIST: 25, AZ_TOLERANCE: 45, SPEED_THRESHOLD: 2,
         ACCURACY_LIMIT: 150, WEAK_FIX_GRACE: 8000, HEADING_MIN_DIST: 6,
         SHOCK_THRESHOLD: 1, SHOCK_PHRASE: 'Сильный удар',
-        SPEED_ALERT_THRESHOLD: 58, SPEED_ALERT_PHRASE: 'Превышена максимальная скорость'
+        SPEED_ALERT_THRESHOLD: 58, SPEED_ALERT_PHRASE: 'Превышена максимальная скорость',
+        BRAKE_THRESHOLD: 4, BRAKE_PHRASE: 'Резкое торможение'
     },
     _mapStyle: MAP_PREFS.style,
     _routeFeatures: [], _routeDataSource: null, _routeDataDirty: false,
     _driveActive: false, _driveRaf: null, _driveMarker: null, _driveShowFrom: -1,
+    _lastSpeed: null, _lastSpeedTime: 0, _lastBrakeTime: 0, _brakeEnabled: false,
     _driveState: null, _driveResume: null,
     _driveSpeed: 90,
     markerRotation: 0, _arrowRaf: null, _arrowPos: null,
@@ -727,6 +729,24 @@ function onGeoPosition(pos) {
     APP.currentSpeed = speed;
     checkSpeedAlert(speed);
 
+    // Резкое торможение: скорость падает быстрее порога (м/с²), независимо от
+    // ориентации телефона — считаем по замещению GPS-скорости.
+    if (APP._brakeEnabled && APP.navConfig.BRAKE_THRESHOLD > 0 && APP._lastSpeed !== null && dt > 0) {
+        const decelKmhPerS = APP._lastSpeed - speed;
+        if (decelKmhPerS > 0) {
+            const decelMs2 = decelKmhPerS / 3.6 / dt;
+            if (decelMs2 > APP.navConfig.BRAKE_THRESHOLD && !isAudioPlaying()) {
+                const brakeNow = Date.now();
+                if (!APP._lastBrakeTime || brakeNow - APP._lastBrakeTime > 5000) {
+                    APP._lastBrakeTime = brakeNow;
+                    playCommand(APP.navConfig.BRAKE_PHRASE || 'Резкое торможение').catch(() => {});
+                }
+            }
+        }
+    }
+    APP._lastSpeed = speed;
+    APP._lastSpeedTime = now;
+
     if (heading !== null) {
         APP.lastAz = heading;
         APP.rawAz = heading;
@@ -870,6 +890,23 @@ function applySpeedConfig() {
     const phrase = $('triggerSpeedAlertPhrase').value.trim() || 'Превышена максимальная скорость';
     APP.navConfig.SPEED_ALERT_THRESHOLD = val;
     APP.navConfig.SPEED_ALERT_PHRASE = phrase;
+}
+function updateBrakeDisplay() {
+    if (!$('triggerBrakeToggle').checked) {
+        $('triggerBrakeVal').textContent = 'Выкл';
+        return;
+    }
+    const val = parseFloat($('triggerBrake').value);
+    $('triggerBrakeVal').textContent = val + ' м/с²';
+}
+function applyBrakeConfig() {
+    const on = $('triggerBrakeToggle').checked;
+    APP._brakeEnabled = on;
+    const val = on ? parseFloat($('triggerBrake').value) : 0;
+    const phrase = $('triggerBrakePhrase').value.trim() || 'Резкое торможение';
+    APP.navConfig.BRAKE_THRESHOLD = val;
+    APP.navConfig.BRAKE_PHRASE = phrase;
+    $('triggerBrakeVal').textContent = on ? val + ' м/с²' : 'Выкл';
 }
 
 function applyCommentConfig() {
@@ -1174,7 +1211,11 @@ function openDrivingControl() {
     $('triggerSpeedAlertToggle').checked = speedOn;
     $('triggerSpeedAlert').value = speedOn ? APP.navConfig.SPEED_ALERT_THRESHOLD : 58;
     $('triggerSpeedAlertPhrase').value = APP.navConfig.SPEED_ALERT_PHRASE;
-    $('triggerShockVal').textContent = shockOn ? APP.navConfig.SHOCK_THRESHOLD + 'g' : 'Выкл';
+    const brakeOn = APP.navConfig.BRAKE_THRESHOLD > 0 && APP._brakeEnabled;
+    $('triggerBrakeToggle').checked = brakeOn;
+    $('triggerBrake').value = brakeOn ? APP.navConfig.BRAKE_THRESHOLD : 4;
+    $('triggerBrakePhrase').value = APP.navConfig.BRAKE_PHRASE;
+    $('triggerBrakeVal').textContent = brakeOn ? APP.navConfig.BRAKE_THRESHOLD + ' м/с²' : 'Выкл';
     $('drivingControlModal').classList.remove('hidden');
 }
 
@@ -2390,6 +2431,23 @@ if (typeof maplibregl === 'undefined') {
                     <div>
                         <div class="trigger-pad">
                             <input type="text" id="triggerSpeedAlertPhrase" value="Превышена максимальная скорость" class="trigger-input" oninput="applySpeedConfig()">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="trigger-setting-row">
+                    <div class="trigger-setting-header">
+                        <label class="toggle-switch">
+                            <input type="checkbox" class="toggle-input" id="triggerBrakeToggle" onchange="applyBrakeConfig()">
+                            <span class="toggle-slider"></span>
+                        </label>
+                        <span class="label">Резкое торможение</span>
+                        <span class="value" id="triggerBrakeVal">Выкл</span>
+                    </div>
+                    <div>
+                        <input type="range" id="triggerBrake" min="1" max="8" value="4" step="0.5" oninput="updateBrakeDisplay();applyBrakeConfig()">
+                        <div class="trigger-pad">
+                            <input type="text" id="triggerBrakePhrase" value="Резкое торможение" class="trigger-input" oninput="applyBrakeConfig()">
                         </div>
                     </div>
                 </div>
