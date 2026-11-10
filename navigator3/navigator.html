@@ -896,6 +896,7 @@ function applyBrakeConfig() {
     APP.navConfig.BRAKE_PHRASE = phrase;
     $('triggerBrakeVal').textContent = on ? val + ' м/с²' : 'Выкл';
     if (on) ensureMotionTracking();
+    updateShockBarVisibility();
 }
 
 function applyCommentConfig() {
@@ -932,7 +933,9 @@ function ensureMotionTracking() {
 
 function updateShockBarVisibility() {
     const bar = $('shockBar');
-    if (bar) bar.style.display = APP.navConfig.SHOCK_THRESHOLD > 0 ? 'block' : 'none';
+    const show = APP.navConfig.SHOCK_THRESHOLD > 0 ||
+        (APP._brakeEnabled && APP.navConfig.BRAKE_THRESHOLD > 0);
+    if (bar) bar.style.display = show ? 'block' : 'none';
 }
 
 const SHOCK_DEBOUNCE = 3000;
