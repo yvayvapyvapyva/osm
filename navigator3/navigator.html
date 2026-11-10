@@ -853,10 +853,6 @@ function toggleAutoCenter() {
 }
 
 function updateShockDisplay() {
-    if (!$('triggerShockToggle').checked) {
-        $('triggerShockVal').textContent = 'Выкл';
-        return;
-    }
     const val = parseFloat($('triggerShock').value);
     $('triggerShockVal').textContent = val + 'g';
 }
