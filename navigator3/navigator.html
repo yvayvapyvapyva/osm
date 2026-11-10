@@ -2460,12 +2460,14 @@ if (typeof maplibregl === 'undefined') {
                 <div class="settings-group">
                     <div class="trigger-setting-row">
                     <div class="trigger-setting-header">
-                        <label class="toggle-switch">
-                            <input type="checkbox" class="toggle-input" id="triggerShockToggle" onchange="updateShockDisplay();applyShockConfig()">
-                            <span class="toggle-slider"></span>
-                        </label>
-                        <div class="trigger-pad">
-                            <button type="button" class="trigger-phrase-btn" onclick="playCommand('Сильный удар')" aria-label="Озвучить: Сильный удар">Сильный удар</button>
+                        <div class="trigger-switch-group">
+                            <label class="toggle-switch">
+                                <input type="checkbox" class="toggle-input" id="triggerShockToggle" onchange="updateShockDisplay();applyShockConfig()">
+                                <span class="toggle-slider"></span>
+                            </label>
+                            <div class="trigger-pad">
+                                <button type="button" class="trigger-phrase-btn" onclick="playCommand('Сильный удар')" aria-label="Озвучить: Сильный удар">Сильный удар</button>
+                            </div>
                         </div>
                         <span class="value" id="triggerShockVal">Выкл</span>
                     </div>
@@ -2479,12 +2481,14 @@ if (typeof maplibregl === 'undefined') {
             <div class="settings-group">
                 <div class="trigger-setting-row">
                     <div class="trigger-setting-header">
-                        <label class="toggle-switch">
-                            <input type="checkbox" class="toggle-input" id="triggerSpeedAlertToggle" onchange="applySpeedConfig()">
-                            <span class="toggle-slider"></span>
-                        </label>
-                        <div class="trigger-pad">
-                            <button type="button" class="trigger-phrase-btn" onclick="playCommand('Превышена максимальная скорость')" aria-label="Озвучить: Превышена максимальная скорость">Превышена максимальная скорость</button>
+                        <div class="trigger-switch-group">
+                            <label class="toggle-switch">
+                                <input type="checkbox" class="toggle-input" id="triggerSpeedAlertToggle" onchange="applySpeedConfig()">
+                                <span class="toggle-slider"></span>
+                            </label>
+                            <div class="trigger-pad">
+                                <button type="button" class="trigger-phrase-btn" onclick="playCommand('Превышена максимальная скорость')" aria-label="Озвучить: Превышена максимальная скорость">Превышена максимальная скорость</button>
+                            </div>
                         </div>
                         <input type="text" inputmode="numeric" pattern="[0-9]*" id="triggerSpeedAlert" value="58" class="trigger-input-num speed-input-inline" oninput="this.value=this.value.replace(/[^0-9]/g,'');applySpeedConfig()">
                     </div>
@@ -2495,12 +2499,14 @@ if (typeof maplibregl === 'undefined') {
             <div class="settings-group">
                 <div class="trigger-setting-row">
                     <div class="trigger-setting-header">
-                        <label class="toggle-switch">
-                            <input type="checkbox" class="toggle-input" id="triggerBrakeToggle" onchange="applyBrakeConfig()">
-                            <span class="toggle-slider"></span>
-                        </label>
-                        <div class="trigger-pad">
-                            <button type="button" class="trigger-phrase-btn" onclick="playCommand('Резкое торможение')" aria-label="Озвучить: Резкое торможение">Резкое торможение</button>
+                        <div class="trigger-switch-group">
+                            <label class="toggle-switch">
+                                <input type="checkbox" class="toggle-input" id="triggerBrakeToggle" onchange="applyBrakeConfig()">
+                                <span class="toggle-slider"></span>
+                            </label>
+                            <div class="trigger-pad">
+                                <button type="button" class="trigger-phrase-btn" onclick="playCommand('Резкое торможение')" aria-label="Озвучить: Резкое торможение">Резкое торможение</button>
+                            </div>
                         </div>
                         <span class="value" id="triggerBrakeVal">Выкл</span>
                     </div>

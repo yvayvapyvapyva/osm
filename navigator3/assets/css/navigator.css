@@ -1390,6 +1390,12 @@ button, input, select, textarea {
     padding-bottom: 0;
 }
 
+.trigger-switch-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
 .trigger-setting-row .label {
     font-size: 13px;
     font-weight: 600;
