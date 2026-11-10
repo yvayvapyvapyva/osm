@@ -2326,13 +2326,13 @@ if (typeof maplibregl === 'undefined') {
                 setPlayBtnState(false);
                 return;
             }
-            // APP.navCurrentIndex уже установлен в nextIdx в frame при достижении конца пути
-            // Оставляем его как есть — панель показывает следующую точку как цель
+            // Путь точки начинается с неё самой (pts[0] === координаты точки),
+            // поэтому едем по пути озвученной точки: currentIdx, а не previous.
             APP._driveShowFrom = APP.navCurrentIndex;
             renderRoutePoints();
             updateHud();
             updatePointsListActive();
-            driveAlongPath(currentIdx - 1);
+            driveAlongPath(currentIdx);
         };
         const doPlay = () => playPointAudio(p, startSimAfterAudio);
         APP._simForceZoom ? setTimeout(doPlay, 2000) : doPlay();
