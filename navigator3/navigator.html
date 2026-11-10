@@ -239,7 +239,7 @@ const APP = {
     _routeFeatures: [], _routeDataSource: null, _routeDataDirty: false,
     _driveActive: false, _driveRaf: null, _driveMarker: null, _driveShowFrom: -1,
     _lastSpeedAlertTime: 0,
-    _lastBrakeTime: 0, _brakeEnabled: false,
+    _lastBrakeTime: 0, _brakeEnabled: false, _brakeStartTime: null,
     _gravityX: 0, _gravityY: 0, _gravityZ: 0,
     _driveState: null, _driveResume: null,
     _driveSpeed: 90,
@@ -945,6 +945,7 @@ function isAudioPlaying() {
 }
 
 const GRAVITY_ALPHA = 0.85;
+const BRAKE_DURATION = 500;
 const BRAKE_DEBOUNCE = 3000;
 
 function onMotion(event) {
@@ -983,15 +984,24 @@ function onMotion(event) {
         }
     }
 
-    /* Резкое торможение через акселерометр (независимо от GPS). */
+    /* Резкое торможение через акселерометр (независимо от GPS).
+       Работает как удар, но с удержанием во времени: ускорение должно
+       превышать порог в течение BRAKE_DURATION мс, иначе сброс. */
     if (APP._brakeEnabled && APP.navConfig.BRAKE_THRESHOLD > 0 && !isAudioPlaying()) {
-        const brakeMs2 = -forwardAccel; // положительное значение = торможение
+        const brakeMs2 = -forwardAccel;
+        const now = Date.now();
         if (brakeMs2 > APP.navConfig.BRAKE_THRESHOLD) {
-            const now = Date.now();
-            if (!APP._lastBrakeTime || now - APP._lastBrakeTime > BRAKE_DEBOUNCE) {
-                APP._lastBrakeTime = now;
-                playCommand(APP.navConfig.BRAKE_PHRASE || 'Резкое торможение').catch(() => {});
+            if (!APP._brakeStartTime) {
+                APP._brakeStartTime = now;
+            } else if (now - APP._brakeStartTime >= BRAKE_DURATION) {
+                if (!APP._lastBrakeTime || now - APP._lastBrakeTime > BRAKE_DEBOUNCE) {
+                    APP._lastBrakeTime = now;
+                    APP._brakeStartTime = null;
+                    playCommand(APP.navConfig.BRAKE_PHRASE || 'Резкое торможение').catch(() => {});
+                }
             }
+        } else {
+            APP._brakeStartTime = null;
         }
     }
 }
