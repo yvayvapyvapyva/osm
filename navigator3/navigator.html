@@ -2443,7 +2443,7 @@ if (typeof maplibregl === 'undefined') {
                     <div>
                         <input type="range" id="triggerShock" min="0.5" max="3" value="1" step="0.25" oninput="updateShockDisplay();applyShockConfig()">
                         <div class="trigger-pad">
-                            <span class="trigger-phrase">Сильный удар</span>
+                            <button type="button" class="trigger-phrase-btn" onclick="playCommand('Сильный удар')" aria-label="Озвучить: Сильный удар">Сильный удар</button>
                         </div>
                     </div>
                 </div>
@@ -2459,7 +2459,7 @@ if (typeof maplibregl === 'undefined') {
                     </div>
                     <div>
                         <div class="trigger-pad">
-                            <span class="trigger-phrase">Превышена максимальная скорость</span>
+                            <button type="button" class="trigger-phrase-btn" onclick="playCommand('Превышена максимальная скорость')" aria-label="Озвучить: Превышена максимальная скорость">Превышена максимальная скорость</button>
                         </div>
                     </div>
                 </div>
@@ -2484,7 +2484,7 @@ if (typeof maplibregl === 'undefined') {
                             <span class="value" id="triggerBrakeTimeVal">500 мс</span>
                         </div>
                         <div class="trigger-pad">
-                            <span class="trigger-phrase">Резкое торможение</span>
+                            <button type="button" class="trigger-phrase-btn" onclick="playCommand('Резкое торможение')" aria-label="Озвучить: Резкое торможение">Резкое торможение</button>
                         </div>
                     </div>
                 </div>

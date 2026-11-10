@@ -208,7 +208,9 @@ button, input, select, textarea {
 .trigger-input:focus { background:var(--surface);border-color:var(--green-focus); }
 .trigger-pad { padding:4px 0 6px; }
 .trigger-input-num { width:100%;padding:10px 14px;border-radius:10px;border:1px solid var(--line);background:var(--surface-muted);color:var(--text);font-size:16px;font-weight:600;outline:none;box-sizing:border-box; }
-.trigger-phrase { width:100%;padding:10px 14px;border-radius:10px;background:var(--surface-muted);color:var(--text-muted);font-size:14px;font-weight:500;box-sizing:border-box; }
+.trigger-phrase-btn { width:100%;padding:10px 14px;border-radius:10px;background:var(--surface-muted);color:var(--text-muted);font-size:14px;font-weight:500;border:1px solid var(--line);cursor:pointer;touch-action:manipulation;-webkit-tap-highlight-color:transparent;transition:background 0.15s ease,color 0.15s ease,border-color 0.15s ease;box-sizing:border-box;text-align:left; }
+.trigger-phrase-btn:active { background:var(--surface);border-color:var(--line-surface);color:var(--text);transform:scale(0.98); }
+.trigger-phrase-btn:focus-visible { outline:2px solid var(--green);outline-offset:-2px; }
 .speed-input-inline { width:60px !important;padding:10px 8px !important;text-align:center;font-size:14px !important;border-radius:8px !important;border:1px solid var(--line) !important;flex-shrink:0; }
 
 /* ============================================
