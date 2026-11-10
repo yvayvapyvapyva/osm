@@ -1515,7 +1515,7 @@ function renderRoutePoints() {
 
         const isKeyPoint = isCurrent || isPrevious || isNext;
         const shouldShow = isKeyPoint || !isPassed;
-        const markerSize = isCurrent ? 64 : (isNext || isPrevious ? 48 : 30);
+        const markerSize = 40;
         const markerOpacity = isCurrent || isNext ? '' : (isPrevious ? '0.9' : '0.5');
 
         const markerZIndex = isCurrent ? 100 : (isNext ? 90 : 10);
