@@ -1293,25 +1293,21 @@ function getNavIconSvgSized(col, txt, isCurr = false, hasComm = false, sizeOverr
     const s = sizeOverride != null ? sizeOverride : (isCurr ? 64 : 40);
     const c = s / 2;
     const r = Math.round(s * 9 / 40);
-    // Цвет подставляется в атрибуты SVG, номер точки — в текстовый узел.
-    // И то, и другое приходит из данных маршрута, поэтому валидируем/экранируем.
     const safeCol = /^#[0-9a-f]{6}$/i.test(col) ? col : '#007AFF';
     const safeTxt = escapeHtml(String(txt ?? ''));
-    // Цифра масштабируется вместе с иконкой: 8 px при 40, 13 px при 64.
-    // Коэффициент 13/64 сохраняет прежние размеры на крупных метках.
-    // Нижняя граница 8 px — на метках 30 px цифра иначе не читается на ходу.
     const fontSize = Math.max(8, Math.round(s * 13 / 64));
     const commR = Math.max(3, Math.round(s * 4 / 40));
     const commCx = s - Math.round(s * 10 / 40);
     const commCy = Math.round(s * 10 / 40);
     const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${s}" height="${s}">
         <rect width="${s}" height="${s}" fill="transparent"/>
-        <circle cx="${c}" cy="${c}" r="${r}" fill="#FFFFFF"/>
-        <circle cx="${c}" cy="${c}" r="${r}" fill="${safeCol}" opacity="0.18"/>
-        <circle cx="${c}" cy="${c}" r="${r}" fill="none" stroke="${safeCol}" stroke-width="2"/>
-        <circle cx="${c}" cy="${c}" r="${r + 1.5}" fill="none" stroke="#000000" stroke-width="1"/>
+        ${isCurr ? `<circle cx="${c}" cy="${c}" r="${r + 3}" fill="none" stroke="#00FF00" stroke-width="2.5" opacity="0.9"/>` : ''}
+        <circle cx="${c}" cy="${c}" r="${r}" fill="rgba(0,0,0,0.7)"/>
+        <circle cx="${c}" cy="${c}" r="${r}" fill="${safeCol}" opacity="0.3"/>
+        <circle cx="${c}" cy="${c}" r="${r}" fill="none" stroke="${safeCol}" stroke-width="1.5"/>
+        <circle cx="${c}" cy="${c}" r="${r}" fill="none" stroke="rgba(255,255,255,0.3)" stroke-width="0.5"/>
+        <text x="${c}" y="${c + 0.5}" font-size="${fontSize}" font-family="Arial" font-weight="900" text-anchor="middle" dominant-baseline="middle" fill="#ffffff" stroke="#000000" stroke-width="2" paint-order="stroke fill">${safeTxt}</text>
         ${hasComm ? `<circle cx="${commCx}" cy="${commCy}" r="${commR}" fill="#EF4444" stroke="#FFFFFF" stroke-width="1.5"/>` : ''}
-        <text x="${c}" y="${c + 0.5}" font-size="${fontSize}" font-family="Arial" font-weight="900" text-anchor="middle" dominant-baseline="middle" fill="#121A28">${safeTxt}</text>
     </svg>`;
     return 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svg)));
 }
