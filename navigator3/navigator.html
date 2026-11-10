@@ -1357,7 +1357,7 @@ function ensureRouteLayers() {
                 source: ROUTE_SOURCE_ID,
                 filter: ['==', ['get', 'priority'], 30],
                 layout: { 'line-join': 'round', 'line-cap': 'round' },
-                paint: { 'line-color': ['get', 'color'], 'line-width': 12, 'line-opacity': 0.35 }
+                paint: { 'line-color': ['get', 'color'], 'line-width': 12, 'line-opacity': 0.9 }
             });
         }
         if (!APP.map.getLayer('nav-routes-active-casing')) {
