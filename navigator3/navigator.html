@@ -1314,7 +1314,7 @@ function getNavIconSvgSized(col, txt, isCurr = false, hasComm = false, sizeOverr
 
 function getPointBadgeSvg(hex, txt, size = 44) {
     const safeCol = /^#[0-9a-f]{6}$/i.test(hex) ? hex : '#007AFF';
-    return `<svg width="${size}" height="${size}" viewBox="0 0 20 20"><circle cx="10" cy="10" r="9" fill="${safeCol}" opacity="0.3"/><circle cx="10" cy="10" r="9" fill="none" stroke="${safeCol}" stroke-width="1.5"/><text x="10" y="10.5" font-size="8" font-family="Arial" font-weight="900" text-anchor="middle" dominant-baseline="middle" fill="#fff">${escapeHtml(String(txt ?? ''))}</text></svg>`;
+    return `<svg width="${size}" height="${size}" viewBox="0 0 20 20"><circle cx="10" cy="10" r="9" fill="#121A28"/><circle cx="10" cy="10" r="9" fill="${safeCol}" opacity="0.3"/><circle cx="10" cy="10" r="9" fill="none" stroke="${safeCol}" stroke-width="1.5"/><text x="10" y="10.5" font-size="8" font-family="Arial" font-weight="900" text-anchor="middle" dominant-baseline="middle" fill="#ffffff">${escapeHtml(String(txt ?? ''))}</text></svg>`;
 }
 
 window.getNavigatorPointIcon = getNavIconSvg;
