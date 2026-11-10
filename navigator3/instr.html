@@ -8,7 +8,7 @@
         /* Базовые стили только для открытия instr.html отдельной страницей.
            В приложении внедряется только содержимое body. */
         html, body { margin: 0; padding: 0; background: var(--bg, #F4F6FA); }
-        body { padding: 20px 20px 40px; }
+        body { padding: 20px 20px 40px; box-sizing: border-box; }
     </style>
 </head>
 <body>
@@ -82,48 +82,315 @@
         border-radius: 12px;
         margin: 10px 0;
     }
-    .instruction-content .icon-row-v .icon { display: flex; align-items: center; justify-content: center; }
+    .instruction-content .icon-row-v .icon { display: flex; align-items: center; justify-content: center; width: 100%; }
     .instruction-content .icon-row-v .desc { width: 100%; text-align: left; }
     .instruction-content .icon-row-v .label { font-weight: 600; font-size: 15px; }
-    .instruction-content .btn-replica {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        width: 52px;
-        height: 52px;
-        border-radius: 50%;
+
+    /* ---------- Реплики интерфейса ---------- */
+    .instruction-content .rep-pill {
+        display: flex; align-items: center; gap: 2px;
+        width: 100%; max-width: 340px;
+        margin: 0 auto;
+        padding: 6px 8px;
+        border-radius: 26px;
         background: var(--surface, #FFFFFF);
-        border: 1px solid var(--line, rgba(18,28,46,0.10));
-        box-shadow: var(--shadow-card, 0 2px 10px rgba(18,28,46,0.08));
-        flex-shrink: 0;
+        border: 1px solid var(--line-surface, rgba(18,28,46,0.16));
+        box-shadow: var(--shadow-float, 0 8px 24px rgba(18,28,46,0.18));
+    }
+    .instruction-content .rep-tab {
+        flex: 1 1 0; min-width: 0;
+        display: flex; flex-direction: column; align-items: center; justify-content: center;
+        gap: 3px;
+        padding: 6px 2px;
+        border: 1px solid transparent;
+        border-radius: 20px;
         color: var(--text, #121A28);
+        font-size: 10px; font-weight: 600; line-height: 1.05;
+        text-align: center;
     }
-    .instruction-content .btn-replica svg {
-        fill: currentColor;
-        width: 22px;
-        height: 22px;
+    .instruction-content .rep-tab span { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+    .instruction-content .rep-tab svg {
+        width: 22px; height: 22px; flex-shrink: 0;
+        fill: none; stroke: currentColor; stroke-width: 1.8;
+        stroke-linecap: round; stroke-linejoin: round;
     }
-    .instruction-content .btn-replica-pill {
-        border-radius: 100px;
-        width: auto;
-        padding: 0 18px;
-        font-size: 15px;
-        font-weight: 700;
-        height: 48px;
-        gap: 8px;
+    .instruction-content .rep-tab.active {
+        color: var(--green, #2FA8E0);
+        background: var(--green-tint, rgba(47,168,224,0.10));
+        border-color: var(--green-line-soft, rgba(47,168,224,0.26));
+    }
+    .instruction-content .rep-tab.active span { font-weight: 700; }
+    .instruction-content .rep-tab-solo { flex: 0 0 auto; width: 68px; }
+
+    .instruction-content .rep-group {
+        display: flex; flex-direction: column; gap: 8px;
+        padding: 12px 14px;
+        border-radius: 14px;
+        background: var(--surface, #FFFFFF);
+        border: 1px solid var(--line-surface, rgba(18,28,46,0.16));
+        box-shadow: var(--shadow-card, 0 4px 16px rgba(18,28,46,0.12));
+        margin: 8px 0;
+    }
+    .instruction-content .rep-group-title {
+        font-size: 11px; font-weight: 700; letter-spacing: 0.5px;
+        text-transform: uppercase;
+        color: var(--text-muted, rgba(18,28,46,0.62));
+    }
+    .instruction-content .rep-setting { display: flex; align-items: center; gap: 10px; }
+    .instruction-content .rep-setting-label { flex: 1; min-width: 0; font-size: 13px; font-weight: 600; }
+    .instruction-content .rep-setting-value { font-size: 12px; font-weight: 700; color: var(--text-muted, rgba(18,28,46,0.62)); white-space: nowrap; }
+    .instruction-content .rep-btn-main {
+        display: inline-flex; align-items: center; justify-content: center;
+        min-height: 32px; padding: 6px 12px;
+        border-radius: 10px;
+        background: var(--green-tint, rgba(47,168,224,0.10));
+        border: 1px solid var(--green-line-soft, rgba(47,168,224,0.26));
+        color: var(--green-dark, #1E90D0);
+        font-size: 12px; font-weight: 700;
         white-space: nowrap;
     }
-    .instruction-content .btn-replica-speed {
-        flex-direction: column;
-        gap: 2px;
-        line-height: 1.1;
-        font-size: 8px;
-        font-weight: 600;
-        letter-spacing: 0.5px;
+    .instruction-content .rep-switch {
+        position: relative; flex-shrink: 0;
+        width: 46px; height: 28px;
+        border-radius: 28px;
+        background: var(--toggle-off, #D8DEE8);
     }
-    .instruction-content .btn-replica-speed .speed-val {
-        font-size: 16px;
-        font-weight: 800;
+    .instruction-content .rep-switch::before {
+        content: '';
+        position: absolute; top: 3px; left: 3px;
+        width: 22px; height: 22px;
+        border-radius: 50%;
+        background: #FFFFFF;
+        box-shadow: 0 1px 3px rgba(18,28,46,0.22);
+    }
+    .instruction-content .rep-switch.on { background: var(--green, #2FA8E0); }
+    .instruction-content .rep-switch.on::before { left: 21px; }
+
+    .instruction-content .rep-mapgrid {
+        display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px;
+    }
+    .instruction-content .rep-style {
+        display: flex; align-items: center; justify-content: center;
+        min-height: 56px; padding: 8px 4px;
+        border-radius: 10px;
+        border: 1px solid var(--line, rgba(18,28,46,0.10));
+        background: var(--surface-muted, #F1F4F8);
+        color: var(--text-body, #46505F);
+        font-size: 11px; font-weight: 600; line-height: 1.2;
+        text-align: center;
+    }
+    .instruction-content .rep-style.active {
+        border-color: var(--green, #2FA8E0);
+        background: var(--green-tint, rgba(47,168,224,0.10));
+        color: var(--green-dark, #1E90D0);
+        box-shadow: 0 0 0 1px var(--green-line-soft, rgba(47,168,224,0.26));
+    }
+
+    .instruction-content .rep-phrase {
+        display: inline-flex; align-items: center; justify-content: center;
+        min-height: 30px; padding: 5px 10px;
+        border-radius: 10px;
+        background: var(--green-tint, rgba(47,168,224,0.10));
+        border: 1px solid var(--green-line-soft, rgba(47,168,224,0.26));
+        color: var(--green-dark, #1E90D0);
+        font-size: 11px; font-weight: 600;
+        white-space: nowrap;
+    }
+    .instruction-content .rep-num {
+        display: inline-flex; align-items: baseline; gap: 3px;
+        padding: 5px 8px;
+        border-radius: 8px;
+        border: 1px solid var(--line, rgba(18,28,46,0.10));
+        background: var(--surface-muted, #F1F4F8);
+        font-size: 13px; font-weight: 700;
+    }
+    .instruction-content .rep-num small { font-size: 9px; font-weight: 600; opacity: 0.65; }
+
+    .instruction-content .rep-slider {
+        position: relative;
+        height: 6px; margin: 10px 8px 6px;
+        border-radius: 6px;
+        background: var(--line-soft, rgba(18,28,46,0.10));
+    }
+    .instruction-content .rep-slider-fill {
+        position: absolute; top: 0; bottom: 0; left: 0;
+        border-radius: 6px;
+        background: var(--green, #2FA8E0);
+    }
+    .instruction-content .rep-slider-knob {
+        position: absolute; top: 50%;
+        width: 18px; height: 18px;
+        border-radius: 50%;
+        background: #FFFFFF;
+        border: 1px solid var(--line-strong, rgba(18,28,46,0.20));
+        box-shadow: 0 1px 4px rgba(18,28,46,0.25);
+        transform: translate(-50%, -50%);
+    }
+    .instruction-content .rep-slider-caption {
+        display: flex; justify-content: space-between;
+        font-size: 11px; font-weight: 600;
+        color: var(--text-muted, rgba(18,28,46,0.62));
+    }
+    .instruction-content .rep-hint { font-size: 12px; color: var(--text-muted, rgba(18,28,46,0.62)); }
+
+    /* Тонкая полоса перегрузки в самом верху экрана */
+    .instruction-content .rep-shock { display: flex; align-items: center; gap: 8px; }
+    .instruction-content .rep-shock-value { font-size: 11px; font-weight: 800; font-variant-numeric: tabular-nums; }
+    .instruction-content .rep-shock-track {
+        position: relative; flex: 1; height: 4px;
+        border-radius: 4px;
+        background: var(--line-soft, rgba(18,28,46,0.10));
+        overflow: hidden;
+    }
+    .instruction-content .rep-shock-fill { position: absolute; top: 0; bottom: 0; left: 0; }
+
+    /* Круглые кнопки карты */
+    .instruction-content .rep-circle {
+        display: inline-flex; align-items: center; justify-content: center;
+        width: 52px; height: 52px;
+        border-radius: 16px;
+        background: var(--surface, #FFFFFF);
+        border: 1px solid var(--line-surface, rgba(18,28,46,0.16));
+        box-shadow: var(--shadow-float, 0 8px 24px rgba(18,28,46,0.18));
+        color: var(--text, #121A28);
+        flex-shrink: 0;
+    }
+    .instruction-content .rep-circle svg { width: 22px; height: 22px; fill: currentColor; }
+    .instruction-content .rep-circle.active {
+        background: var(--green-soft, #E7F4FC);
+        border-color: var(--green, #2FA8E0);
+        color: var(--green-dark, #1E90D0);
+    }
+    .instruction-content .rep-speed { flex-direction: column; gap: 1px; line-height: 1.1; }
+    .instruction-content .rep-speed .unit { font-size: 8px; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase; }
+    .instruction-content .rep-speed .val { font-size: 16px; font-weight: 800; }
+
+    .instruction-content .rep-pill-label {
+        display: inline-flex; align-items: center;
+        max-width: 100%;
+        padding: 7px 14px;
+        border-radius: 100px;
+        background: rgba(18,28,46,0.62);
+        color: #FFFFFF;
+        font-size: 12px; font-weight: 700;
+        white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+
+    /* Нижняя панель */
+    .instruction-content .rep-hud-cmd {
+        display: flex; align-items: center; gap: 10px;
+        width: 100%; min-height: 52px; padding: 4px 8px;
+        border-radius: 14px;
+        background: var(--surface, #FFFFFF);
+        border: 1px solid var(--line-surface, rgba(18,28,46,0.16));
+        box-shadow: var(--shadow-card, 0 4px 16px rgba(18,28,46,0.12));
+    }
+    .instruction-content .rep-hud-cmd.past {
+        background: var(--surface-muted, #F1F4F8);
+        border-color: var(--line-soft, rgba(18,28,46,0.10));
+        box-shadow: none;
+        opacity: 0.75;
+        padding: 2px 8px;
+    }
+    .instruction-content .rep-badge {
+        position: relative; flex-shrink: 0;
+        width: 52px; height: 52px;
+        display: flex; align-items: center; justify-content: center;
+        border-radius: 12px;
+        border: 1px solid var(--line, rgba(18,28,46,0.10));
+        background: var(--surface-muted, #F1F4F8);
+    }
+    .instruction-content .rep-dot {
+        width: 44px; height: 44px; flex-shrink: 0;
+        display: flex; align-items: center; justify-content: center;
+        border-radius: 50%;
+        border: 2px solid var(--c, #007AFF);
+        background: color-mix(in srgb, var(--c, #007AFF) 32%, #121A28);
+        color: #FFFFFF;
+        font: 900 15px/1 Arial, sans-serif;
+        text-shadow: 0 1px 2px rgba(0,0,0,0.8);
+    }
+    .instruction-content .rep-badge .speaker {
+        position: absolute; right: 1px; bottom: 1px;
+        width: 16px; height: 16px;
+        display: flex; align-items: center; justify-content: center;
+        border-radius: 8px;
+        background: var(--surface, #FFFFFF);
+        border: 1px solid var(--line, rgba(18,28,46,0.10));
+        box-shadow: var(--shadow-card, 0 2px 8px rgba(18,28,46,0.12));
+        color: var(--text, #121A28);
+    }
+    .instruction-content .rep-badge .speaker svg { width: 11px; height: 11px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+    .instruction-content .rep-hud-text { flex: 1; min-width: 0; font-size: 18px; font-weight: 700; letter-spacing: -0.2px; }
+    .instruction-content .rep-hud-cmd.past .rep-hud-text { font-size: 15px; }
+    .instruction-content .rep-hud-cmd,
+    .instruction-content .rep-point,
+    .instruction-content .rep-group { text-align: left; }
+    .instruction-content .rep-hud-dist {
+        display: flex; flex-direction: column; align-items: center;
+        flex-shrink: 0; padding: 6px 10px;
+        border-radius: 8px;
+        border: 1px solid var(--line, rgba(18,28,46,0.10));
+        background: var(--surface-muted, #F1F4F8);
+        font-size: 15px; font-weight: 700; line-height: 1.2;
+        font-variant-numeric: tabular-nums;
+    }
+    .instruction-content .rep-hud-dist small { font-size: 9px; font-weight: 600; opacity: 0.7; text-transform: uppercase; letter-spacing: 0.5px; }
+    .instruction-content .rep-hud-dist.in-range {
+        border-color: var(--green, #2FA8E0);
+        background: var(--green-soft, #E7F4FC);
+        color: var(--green, #2FA8E0);
+    }
+    .instruction-content .rep-comment {
+        width: 100%;
+        padding: 8px 12px;
+        border-radius: 10px;
+        border: 1px solid var(--line-soft, rgba(18,28,46,0.10));
+        background: var(--surface-subtle, #F7F9FC);
+        color: var(--text-body, #46505F);
+        font-size: 13px; line-height: 1.4;
+    }
+    .instruction-content .rep-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 8px; width: 100%; }
+    .instruction-content .rep-actions-caption {
+        width: 100%; text-align: center;
+        font-size: 11px; font-weight: 600;
+        color: var(--text-muted, rgba(18,28,46,0.62));
+        margin: 6px 0 2px;
+    }
+    .instruction-content .rep-nav-btn {
+        display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
+        width: 104px; height: 56px;
+        border-radius: 16px;
+        background: var(--surface, #FFFFFF);
+        border: 1px solid var(--line-surface, rgba(18,28,46,0.16));
+        box-shadow: var(--shadow-float, 0 8px 24px rgba(18,28,46,0.18));
+        color: var(--text, #121A28);
+        font-size: 12px; font-weight: 600; line-height: 1;
+    }
+    .instruction-content .rep-nav-btn svg { width: 24px; height: 24px; fill: currentColor; }
+    .instruction-content .rep-nav-btn.stop {
+        background: var(--danger, #DC2626);
+        border-color: var(--danger, #DC2626);
+        color: #FFFFFF;
+    }
+
+    /* Список точек */
+    .instruction-content .rep-list { display: flex; flex-direction: column; gap: 6px; width: 100%; }
+    .instruction-content .rep-point {
+        display: flex; align-items: center; gap: 10px;
+        min-height: 52px; padding: 4px 8px;
+        border-radius: 12px;
+        background: var(--surface, #FFFFFF);
+        border: 1px solid var(--line-surface, rgba(18,28,46,0.16));
+        box-shadow: var(--shadow-card, 0 4px 16px rgba(18,28,46,0.12));
+    }
+    .instruction-content .rep-point.active { border: 2px solid var(--green, #2FA8E0); }
+    .instruction-content .rep-point.passed { opacity: 0.45; }
+    .instruction-content .rep-point .rep-point-text { flex: 1; min-width: 0; font-size: 16px; font-weight: 700; }
+    .instruction-content .rep-point .rep-hud-dist { font-size: 13px; padding: 5px 8px; }
+    .instruction-content .rep-point .pl-icon {
+        width: 44px; height: 44px; flex-shrink: 0;
+        display: flex; align-items: center; justify-content: center;
     }
 </style>
 
@@ -131,79 +398,228 @@
 
     <h1 style="text-align:center">Навигатор автоинструктора</h1>
 
-    <h2 style="text-align:center">Элементы управления</h2>
+    <p>Приложение показывает маршрут практического экзамена, ведёт по точкам и голосом подсказывает команды. Ниже — что делает каждый элемент интерфейса.</p>
 
-    <p><strong>Верхняя панель</strong> — переключает разделы: «Маршруты», «Инструкция» и «Настройки». Повторное нажатие на активную вкладку или кнопка ✕ в шапке закрывает раздел и возвращает к карте.</p>
+    <h2>Верхняя панель</h2>
 
     <div class="icon-row icon-row-v">
-        <div class="icon"><span class="btn-replica btn-replica-pill">Маршруты</span></div>
-        <div class="desc">
-            <div class="label">Кнопка «Маршруты» — Открывает список видимых маршрутов. Папки строятся автоматически из названий маршрутов: части названия через «/» становятся вложенными папками. Выберите маршрут и приблизьтесь к первой точке маршрута ближе 25 метров, приложение озвучит команду. После этого текущей целью становится следующая точка — она выделяется зелёным кольцом, её команда и расстояние до неё показываются в нижней панели, и приложение ведёт по следующим точкам маршрута.</div>
-        </div>
-    </div>
-
-    <div class="icon-row">
-        <div class="icon"><span class="btn-replica"><svg width="22" height="22" viewBox="0 0 24 24"><path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58a.49.49 0 00.12-.61l-1.92-3.32a.488.488 0 00-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.484.484 0 00-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.07.62-.07.94s.02.64.07.94l-2.03 1.58a.49.49 0 00-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></svg></span></div>
-        <div class="desc">
-            <div class="label">Настройки — вид карты, настройки оповещений и комментарии.</div>
-        </div>
-    </div>
-
-    <p><strong>Вид карты</strong> — по умолчанию «Нижегородская обл. 3D»; можно выбрать другую подложку: «Нижегородская обл. 3D», «Россия 3D (VersaTiles)» или «Яндекс.Спутник».</p>
-    <p><strong>Настройки оповещений:</strong></p>
-<p><strong>Детекция ударов</strong> — при резком толчке (яма, лежачий полицейский) приложение озвучит фразу «Сильный удар» (можно изменить). Чувствительность 0.5g–3g, по умолчанию 1g.</p>
-    <p><strong>Превышение скорости</strong> — при превышении порога (км/ч) озвучивается фраза «Превышена максимальная скорость» (можно изменить). По умолчанию 58 км/ч.</p>
-    <p><strong>Комментарии</strong> — включение/отключение отображения и озвучивания комментариев к точкам.</p>
-    <p><strong>Инструкция</strong> — открывает данную инструкцию.</p>
-
-    <div class="icon-row">
-        <div class="icon"><span class="btn-replica"><svg width="22" height="22" viewBox="0 0 24 24"><path d="M12 8c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4zm8.94 3c-.46-4.17-3.77-7.48-7.94-7.94V1h-2v2.06C6.83 3.52 3.52 6.83 3.06 11H1v2h2.06c.46 4.17 3.77 7.48 7.94 7.94V23h2v-2.06c4.17-.46 7.48-3.77 7.94-7.94H23v-2h-2.06zM12 19c-3.87 0-7-3.13-7-7s3.13-7 7-7 7 3.13 7 7-3.13 7-7 7z"/></svg></span></div>
-        <div class="desc">
-            <div class="label">Привязка к геопозиции — Карта автоматически центрируется по вашему местоположению и поворачивается по направлению движения. Повторное нажатие отключает.</div>
-        </div>
-    </div>
-
-    <div class="icon-row">
-        <div class="icon"><span class="btn-replica btn-replica-speed"><span style="font-size:7px;font-weight:600;letter-spacing:0.3px;line-height:1;">КМ/Ч</span><span class="speed-val">0</span></span></div>
-        <div class="desc">
-            <div class="label">Скорость (спидометр) — Показывает текущую скорость в км/ч, во время симуляции — скорость симуляции (90 км/ч). Удерживайте, чтобы открыть редактор маршрутов.</div>
-        </div>
-    </div>
-
-    <h3>Нижняя панель</h3>
-    <div class="icon-row icon-row-v">
-        <div class="icon" style="flex-direction:column;gap:4px;min-width:unset;width:100%;">
-            <div style="display:flex;align-items:center;gap:10px;width:100%;padding:4px 6px;min-height:52px;border-radius:14px;background:var(--surface,#FFFFFF);border:1px solid var(--line,rgba(18,28,46,0.10));box-shadow:var(--shadow-card,0 2px 10px rgba(18,28,46,0.08));box-sizing:border-box;">
-                <svg width="44" height="44" viewBox="0 0 20 20"><circle cx="10" cy="10" r="9" style="fill:var(--surface,#FFFFFF)"/><circle cx="10" cy="10" r="9" fill="#FFD700" opacity="0.18"/><circle cx="10" cy="10" r="9" fill="none" stroke="#FFD700" stroke-width="1.6"/><text x="10" y="10.5" font-size="8" font-family="Arial" font-weight="900" text-anchor="middle" dominant-baseline="middle" style="fill:var(--text,#121A28)">1</text></svg>
-                <span style="flex:1;font-size:18px;font-weight:700;color:var(--text,#121A28);line-height:1.2;">На перекрестке направо</span>
-                <span style="display:inline-flex;flex-direction:column;align-items:center;line-height:1.2;flex-shrink:0;font-weight:700;padding:6px 10px;border:1px solid var(--line,rgba(18,28,46,0.10));border-radius:8px;background:var(--surface-muted,#F1F4F8);font-size:15px;color:var(--text,#121A28);">50<span style="font-size:9px;font-weight:600;opacity:0.7;text-transform:uppercase;letter-spacing:0.5px;">м</span></span>
+        <div class="icon">
+            <div class="rep-pill">
+                <div class="rep-tab active"><svg viewBox="0 0 24 24"><circle cx="6" cy="19" r="2.5"/><circle cx="18" cy="5" r="2.5"/><path d="M8.5 19H15a4 4 0 0 0 0-8H9a4 4 0 0 1 0-8h6"/></svg><span>Маршруты</span></div>
+                <div class="rep-tab"><svg viewBox="0 0 24 24"><path d="M12 6.2C10.4 4.9 8.2 4.2 5.5 4.2H4.5a1 1 0 0 0-1 1v11.6a1 1 0 0 0 1 1h1c2.7 0 4.9.7 6.5 2 1.6-1.3 3.8-2 6.5-2h1a1 1 0 0 0 1-1V5.2a1 1 0 0 0-1-1h-1c-2.7 0-4.9.7-6.5 2Z"/><path d="M12 6.2v13.6"/></svg><span>Инструкция</span></div>
+                <div class="rep-tab"><svg viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h2M10 17h10M4 12h4M12 12h8"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/><circle cx="10" cy="12" r="2"/></svg><span>Настройки</span></div>
+                <div class="rep-tab"><svg viewBox="0 0 24 24"><path d="M19.114 5.636a9 9 0 0 1 0 12.728M16.463 8.288a5.25 5.25 0 0 1 0 7.424M6.75 8.25l4.72-4.72a.75.75 0 0 1 1.28.53v15.88a.75.75 0 0 1-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.009 9.009 0 0 1 2.25 12c0-.83.112-1.633.322-2.396C2.806 8.756 3.63 8.25 4.51 8.25H6.75Z"/></svg><span>Оповещения</span></div>
             </div>
         </div>
         <div class="desc">
-            <div class="label">Блок команды — иконка точки с номером, текст команды, расстояние. Иконка с зелёным кольцом — текущая цель, расстояние считается до неё. Нажатие на иконку озвучит команду. Нажмите на текст команды — откроется список точек маршрута.</div>
+            <div class="label">Панель с четырьмя вкладками — плавающая «пилюля» вверху экрана. Открытая вкладка подсвечивается цветом. Повторное нажатие на активную вкладку или ✕ в шапке раздела закрывает его и возвращает к карте. Одновременно открыт только один раздел.</div>
         </div>
     </div>
 
+    <h3>Маршруты</h3>
+    <p>Открывает список доступных маршрутов. Папки строятся автоматически из названий: части названия через «/» становятся вложенными папками, а путь к текущей папке показан строкой-хлебными крошками над списком.</p>
+    <p>Выберите маршрут — карта подстроится под его первую точку. Когда вы подъедете к первой точке ближе 25 метров, приложение озвучит её команду. После этого текущей целью становится следующая точка: она выделяется зелёным кольцом, её команда и расстояние до неё показываются в нижней панели. Дальше навигатор ведёт вас по точкам маршрута.</p>
+
+    <h3>Инструкция</h3>
+    <p>Открывает эту инструкцию. Вкладка остаётся подсвеченной, пока раздел не будет закрыт.</p>
+
+    <h3>Настройки</h3>
+    <div class="rep-group">
+        <div class="rep-group-title">Аккаунт</div>
+        <div class="rep-setting">
+            <span class="rep-setting-label" style="font-weight:400;color:var(--text-muted,rgba(18,28,46,0.62));font-size:12px;">Войдите через Яндекс, чтобы аккаунт запоминался на этом устройстве.</span>
+            <span class="rep-btn-main">Войти с Яндексом</span>
+        </div>
+    </div>
+    <div class="rep-group">
+        <div class="rep-group-title">Оформление</div>
+        <div class="rep-setting">
+            <span class="rep-switch on"></span>
+            <span class="rep-setting-label">Тёмная тема</span>
+            <span class="rep-setting-value">Вкл</span>
+        </div>
+    </div>
+    <div class="rep-group">
+        <div class="rep-group-title">Вид карты</div>
+        <div class="rep-mapgrid">
+            <span class="rep-style active">Нижегородская обл. 3D</span>
+            <span class="rep-style">Россия 3D (VersaTiles)</span>
+            <span class="rep-style">Яндекс.Спутник</span>
+        </div>
+    </div>
+    <div class="rep-group">
+        <div class="rep-group-title">Комментарии</div>
+        <div class="rep-setting">
+            <span class="rep-switch on"></span>
+            <span class="rep-setting-label" style="font-weight:400;font-size:12px;">Включить отображение и озвучивание</span>
+        </div>
+    </div>
+    <ul>
+        <li><strong>Аккаунт</strong> — после входа показываются имя и почта, а кнопка меняется на «Выйти». Без входа приложение работает так же: вход нужен, чтобы аккаунт запоминался на этом устройстве.</li>
+        <li><strong>Тёмная тема</strong> (Выкл/Вкл) — переключает оформление сразу. Выбор действует до перезагрузки страницы: без ручного выбора приложение следует теме устройства.</li>
+        <li><strong>Вид карты</strong> — три плитки: «Нижегородская обл. 3D» (по умолчанию), «Россия 3D (VersaTiles)» и «Яндекс.Спутник». Активная плитка обведена цветом, выбор применяется сразу.</li>
+        <li><strong>Комментарии</strong> — показывает в нижней панели и озвучивает комментарии к точкам. Если выключить, команды остаются, а пояснения скрываются.</li>
+    </ul>
+
+    <h3>Оповещения</h3>
+    <div class="rep-group">
+        <div class="rep-setting">
+            <span class="rep-switch on"></span>
+            <span class="rep-phrase">Сильный удар</span>
+            <span class="rep-setting-value">1g</span>
+        </div>
+        <div class="rep-slider"><span class="rep-slider-fill" style="width:20%"></span><span class="rep-slider-knob" style="left:20%"></span></div>
+        <div class="rep-slider-caption"><span>0.5g</span><span>3g</span></div>
+    </div>
+    <div class="rep-group">
+        <div class="rep-setting">
+            <span class="rep-switch on"></span>
+            <span class="rep-phrase">Превышение скорости</span>
+            <span class="rep-num">58<small>км/ч</small></span>
+        </div>
+    </div>
+    <div class="rep-group">
+        <div class="rep-setting">
+            <span class="rep-switch on"></span>
+            <span class="rep-phrase">Резкое торможение</span>
+            <span class="rep-setting-value">4 м/с²</span>
+        </div>
+        <div class="rep-slider"><span class="rep-slider-fill" style="width:43%"></span><span class="rep-slider-knob" style="left:43%"></span></div>
+        <div class="rep-slider-caption"><span>Интенсивность 1–8 м/с²</span></div>
+        <div class="rep-slider"><span class="rep-slider-fill" style="width:21%"></span><span class="rep-slider-knob" style="left:21%"></span></div>
+        <div class="rep-slider-caption"><span>Время торможения 100–2000 мс</span><span>500 мс</span></div>
+    </div>
+    <p>У каждого оповещения есть переключатель и кнопка с фразой: нажмите её, чтобы прослушать, как звучит подсказка. Пока оповещение выключено, вместо значения показывается «Выкл».</p>
+    <ul>
+        <li><strong>Сильный удар</strong> — «Сильный удар». Срабатывает при толчке сильнее порога (яма, лежачий полицейский). Ползунок 0.5–3 g, по умолчанию 1 g.</li>
+        <li><strong>Превышение скорости</strong> — «Превышение скорости». Фраза звучит, когда скорость выше указанной в поле. По умолчанию 58 км/ч.</li>
+        <li><strong>Резкое торможение</strong> — «Резкое торможение». Нужны одновременно интенсивность выше порога и достаточное время торможения: интенсивность 1–8 м/с² (по умолчанию 4), время 100–2000 мс (по умолчанию 500).</li>
+    </ul>
+    <p><strong>Индикатор перегрузки.</strong> Если включён сильный удар или резкое торможение, в самом верху экрана появляется тонкая полоса с текущей перегрузкой. Она заполняется по мере удара, а цвет меняется от зелёного к жёлтому, оранжевому и красному.</p>
+    <div class="icon-row">
+        <div class="icon" style="min-width:64px;"><span class="rep-shock-value">0.6</span></div>
+        <div class="desc">
+            <div class="rep-shock"><span class="rep-shock-track"><span class="rep-shock-fill" style="width:18%;background:#16A34A"></span></span></div>
+        </div>
+    </div>
+    <p class="rep-hint">Датчики движения при первом включении требуют разрешения — приложение спросит его само. Если разрешение не выдано, переключатель вернётся в положение «Выкл».</p>
+
+    <h2>Карта</h2>
+
+    <div class="icon-row">
+        <div class="icon"><span class="rep-circle"><svg viewBox="0 0 24 24"><path d="M18.05 5.96 11.68 22.5l-2.42-7.76L1.5 12.32 18.05 5.96Z"/></svg></span></div>
+        <div class="desc">
+            <div class="label">Привязка к геопозиции (стрелка справа) — карта следит за вами и поворачивается по направлению движения. Нажатие включает и выключает привязку; активная кнопка подсвечена. Если вы сдвинули карту рукой, эта же кнопка возвращает камеру к вам, не выключая привязку. При включении привязки симуляция проезда останавливается.</div>
+        </div>
+    </div>
+
+    <div class="icon-row">
+        <div class="icon"><span class="rep-circle rep-speed"><span class="unit">КМ/Ч</span><span class="val">0</span></span></div>
+        <div class="desc">
+            <div class="label">Спидометр — текущая скорость в км/ч (во время симуляции — 90 км/ч, скорость проезда). Удерживайте кнопку, чтобы открыть редактор маршрутов.</div>
+        </div>
+    </div>
+
+    <div class="icon-row">
+        <div class="icon" style="min-width:150px;"><span class="rep-pill-label">Маршрут (1.2 км)</span></div>
+        <div class="desc">
+            <div class="label">Название маршрута — появляется вверху по центру над картой, когда маршрут выбран. В скобках указана общая длина маршрута.</div>
+        </div>
+    </div>
+
+    <h2>Нижняя панель</h2>
+    <p>Панель появляется снизу, когда маршрут выбран. Сверху вниз: предыдущая команда, текущая команда с комментарием и кнопки управления.</p>
+
     <div class="icon-row icon-row-v">
-        <div class="icon" style="flex-direction:column;gap:6px;min-width:unset;width:100%;">
-            <div style="display:flex;align-items:center;justify-content:center;gap:8px;width:100%;max-width:304px;">
-                <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;width:96px;height:48px;border-radius:16px;background:var(--surface,#FFFFFF);border:1px solid var(--line,rgba(18,28,46,0.10));box-shadow:var(--shadow-float,0 4px 16px rgba(18,28,46,0.08));font-size:11px;font-weight:600;line-height:1;color:var(--text,#121A28);"><svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"/></svg><span>Назад</span></div>
-                <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;width:96px;height:48px;border-radius:16px;background:var(--surface,#FFFFFF);border:1px solid var(--line,rgba(18,28,46,0.10));box-shadow:var(--shadow-float,0 4px 16px rgba(18,28,46,0.08));font-size:11px;font-weight:600;line-height:1;color:var(--text,#121A28);"><svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M8 5v14l11-7z"/></svg><span>Симуляция</span></div>
-                <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;width:96px;height:48px;border-radius:16px;background:var(--surface,#FFFFFF);border:1px solid var(--line,rgba(18,28,46,0.10));box-shadow:var(--shadow-float,0 4px 16px rgba(18,28,46,0.08));font-size:11px;font-weight:600;line-height:1;color:var(--text,#121A28);"><svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg><span>Вперёд</span></div>
+        <div class="icon">
+            <div class="rep-list" style="max-width:360px">
+                <div class="rep-hud-cmd past">
+                    <span class="rep-badge"><span class="rep-dot" style="--c:#FFD700">1</span></span>
+                    <span class="rep-hud-text">На перекрёстке направо</span>
+                </div>
+                <div class="rep-hud-cmd">
+                    <span class="rep-badge"><span class="rep-dot" style="--c:#FF9500">2</span><span class="speaker"><svg viewBox="0 0 24 24"><path d="M11 4.702a.705.705 0 0 0-1.203-.498L6.413 7.587A1.4 1.4 0 0 1 5.416 8H3a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2.416a1.4 1.4 0 0 1 .997.413l3.383 3.384A.705.705 0 0 0 11 19.298z"/><path d="M16 9a5 5 0 0 1 0 6"/><path d="M19.364 18.364a9 9 0 0 0 0-12.728"/></svg></span></span>
+                    <span class="rep-hud-text">Поворот направо</span>
+                    <span class="rep-hud-dist in-range">24<small>м</small></span>
+                </div>
+                <div class="rep-comment">Проверьте зеркала и уступите дорогу пешеходам.</div>
             </div>
         </div>
         <div class="desc">
-            <div class="label">Навигационная панель:<br>
-&lt; — переход к предыдущей точке<br>
-▶ — симуляция проезда с текущей точки: сначала озвучивается её команда. После озвучки текущей целью становится следующая точка — она выделяется зелёным кольцом, её команда и расстояние до неё показываются в нижней панели, а маркер начинает движение к ней. Во время проезда кнопка называется «Стоп»: нажатие ставит на паузу, ещё одно — продолжает с того же места.<br>
-&gt; — переход к следующей точке</div>
+            <div class="label">Блок команды — иконка точки с номером, текст команды и расстояние до неё.</div>
         </div>
     </div>
 
-    <h3>Симуляция проезда</h3>
+    <ul>
+        <li><strong>Предыдущая команда</strong> — приглушённая строка над основной: что вы проехали. Нажатие на её текст открывает список точек, бейдж озвучивает команду.</li>
+        <li><strong>Бейдж с номером</strong> — круг с цветом типа точки и небольшим динамиком в углу. Нажатие озвучивает команду точки ещё раз; повторное нажатие останавливает озвучку.</li>
+        <li><strong>Текст команды</strong> — нажатие открывает список точек маршрута. Приглушённый текст означает, что озвучка для команды ещё не загружена.</li>
+        <li><strong>Расстояние</strong> — до текущей цели. Когда до точки меньше 50 метров и вы смотрите в её сторону, плашка подсвечивается.</li>
+        <li><strong>Комментарий</strong> — пояснение к точке под командой. Показывается и озвучивается, если включены комментарии в настройках.</li>
+    </ul>
+
+    <div class="icon-row icon-row-v">
+        <div class="icon" style="flex-direction:column;width:100%;">
+            <div class="rep-actions">
+                <span class="rep-nav-btn"><svg viewBox="0 0 24 24"><path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"/></svg><span>Назад</span></span>
+                <span class="rep-nav-btn"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg><span>Симуляция</span></span>
+                <span class="rep-nav-btn"><svg viewBox="0 0 24 24"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg><span>Вперёд</span></span>
+            </div>
+            <div class="rep-actions-caption">обычный вид</div>
+            <div class="rep-actions">
+                <span class="rep-nav-btn"><svg viewBox="0 0 24 24"><path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"/></svg><span>Назад</span></span>
+                <span class="rep-nav-btn stop"><svg viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg><span>Стоп</span></span>
+                <span class="rep-nav-btn"><svg viewBox="0 0 24 24"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg><span>Вперёд</span></span>
+            </div>
+            <div class="rep-actions-caption">во время проезда</div>
+        </div>
+        <div class="desc">
+            <div class="label">Кнопки управления — три кнопки в ряд и красная «Стоп» во время проезда.</div>
+        </div>
+    </div>
+
+    <ul>
+        <li><strong>Назад</strong> — перейти к предыдущей точке маршрута. Останавливает симуляцию. Недоступна на первой точке.</li>
+        <li><strong>Симуляция</strong> — начать проезд с текущей точки. Если у точки нет записанного пути, кнопка недоступна.</li>
+        <li><strong>Стоп</strong> — та же кнопка во время проезда: становится красной, с иконкой паузы. Нажатие ставит проезд на паузу, ещё одно — продолжает с того же места.</li>
+        <li><strong>Вперёд</strong> — перейти к следующей точке. Останавливает симуляцию. Недоступна на последней точке.</li>
+    </ul>
+
+    <h2>Точки маршрута</h2>
+    <p>Список открывается нажатием на текст команды в нижней панели. В шапке — название «Точки маршрута» и ✕ для закрытия.</p>
+    <div class="icon-row icon-row-v">
+        <div class="icon">
+            <div class="rep-list" style="max-width:360px">
+                <div class="rep-point passed">
+                    <span class="pl-icon"><span class="rep-dot" style="--c:#FFD700">1</span></span>
+                    <span class="rep-point-text">На перекрёстке направо</span>
+                </div>
+                <div class="rep-point active">
+                    <span class="pl-icon"><span class="rep-dot" style="--c:#FF9500">2</span></span>
+                    <span class="rep-point-text">Поворот направо</span>
+                    <span class="rep-hud-dist">24<small>м</small></span>
+                </div>
+                <div class="rep-point">
+                    <span class="pl-icon"><span class="rep-dot" style="--c:#34C759">3</span></span>
+                    <span class="rep-point-text">Начало движения</span>
+                </div>
+            </div>
+        </div>
+        <div class="desc">
+            <div class="label">Список точек: пройденные приглушены, текущая цель обведена цветом.</div>
+        </div>
+    </div>
+    <ul>
+        <li>Нажатие на <strong>бейдж</strong> точки озвучивает её команду и не меняет цель.</li>
+        <li>Нажатие на <strong>строку</strong> делает точку текущей целью: карта подстраивается, симуляция останавливается.</li>
+        <li>У активной точки справа показывается расстояние до неё, а список сам прокручивается к ней.</li>
+        <li>Под командой серым блоком выводится комментарий к точке, если он есть.</li>
+    </ul>
+
+    <h2>Симуляция проезда</h2>
     <p>Симуляция повторяет поведение навигатора, но без движения на машине: маркер проезжает маршрут по записанной траектории с постоянной скоростью 90 км/ч. В нижней панели показываются команда, комментарий и расстояние до текущей цели, а сама цель на карте выделена зелёным кольцом.</p>
-    <p>Нажатие ▶ озвучивает команду выбранной точки. После озвучки цель переходит на следующую точку, и маркер начинает движение к ней. Когда маркер доезжает до точки, звучит её команда, затем целью становится следующая — и так до конца маршрута. На последней точке симуляция завершается.</p>
-    <p>Во время проезда кнопка называется «Стоп»: нажатие ставит на паузу — маркер остаётся на месте, расстояние в панели продолжает считаться от него. Следующее нажатие продолжает проезд с того же места. Клик по карте, кнопки «Назад»/«Вперёд» и выбор точки в списке останавливают симуляцию.</p>
+    <p>Нажатие «Симуляция» озвучивает команду выбранной точки. После озвучки цель переходит на следующую точку, и маркер начинает движение к ней. Когда маркер доезжает до точки, звучит её команда, затем целью становится следующая — и так до конца маршрута. На последней точке симуляция завершается.</p>
+    <p>Во время проезда кнопка называется «Стоп» и становится красной: нажатие ставит на паузу — маркер остаётся на месте, расстояние в панели продолжает считаться от него. Следующее нажатие продолжает проезд с того же места. Клик по карте, кнопки «Назад»/«Вперёд», выбор точки в списке и включение привязки останавливают симуляцию.</p>
 
     <h2>Цвета точек</h2>
     <div class="color-row"><div class="swatch" style="background:#FFD700"></div> <span>Маневры на перекрёстке</span></div>
@@ -215,20 +631,20 @@
     <div class="color-row"><div class="swatch" style="background:#5AC8FA"></div> <span>Разворот в ограниченном пространстве</span></div>
     <div class="color-row"><div class="swatch" style="background:#A2845E"></div> <span>Остановка</span></div>
     <div class="color-row"><div class="swatch" style="background:#34C759"></div> <span>Начало движения</span></div>
+    <p class="rep-hint">Красная точка в углу бейджа означает, что у точки есть комментарий.</p>
 
     <h2>Советы</h2>
     <ul>
-        <li>Разрешите геолокацию для корректной работы навигации.</li>
-        <li>Приложение работает только при включенном экране.</li>
-        <li>При ограничениях интернета может не работать — используйте VPN.</li>
-        <li>В некоторых местах могут глушить GPS — приложение может работать некорректно.</li>
-        
+        <li>Разрешите геолокацию — без неё навигация и озвучка точек не работают.</li>
+        <li>Экран во время движения остаётся включённым: приложение удерживает его самостоятельно.</li>
+        <li>Нужен интернет: из сети загружаются маршруты, карта и голосовые подсказки. При ограничениях связи может не работать — помогает VPN.</li>
+        <li>В некоторых местах GPS глушат или он теряется — приложение предупредит о слабом сигнале и продолжит вести приблизительно.</li>
     </ul>
 
     <hr>
     <p style="text-align:center; color:var(--text-soft,#8A95A5); font-size:13px;">
-        Телеграм бот <a href="https://t.me/E_ia_bot" style="color:var(--green,#16A34A); text-decoration:none;">@E_ia_bot</a><br>
-        Для вопросов и предложений телеграм <a href="https://t.me/Eliseev_I_A" style="color:var(--green,#16A34A); text-decoration:none;">@Eliseev_I_A</a>
+        Телеграм бот <a href="https://t.me/E_ia_bot" style="color:var(--green,#2FA8E0); text-decoration:none;">@E_ia_bot</a><br>
+        Для вопросов и предложений телеграм <a href="https://t.me/Eliseev_I_A" style="color:var(--green,#2FA8E0); text-decoration:none;">@Eliseev_I_A</a>
     </p>
 
 </div>
