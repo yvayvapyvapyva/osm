@@ -350,7 +350,7 @@ button, input, select, textarea {
 }
 
 #locateBtn {
-    top: calc(76px + env(safe-area-inset-top));
+    top: calc(64px + env(safe-area-inset-top));
     right: 12px;
     border-radius: var(--radius-card);
 }
@@ -390,7 +390,7 @@ button, input, select, textarea {
    ============================================ */
 #topCenterControls {
     position: absolute;
-    top: calc(70px + env(safe-area-inset-top));
+    top: calc(58px + env(safe-area-inset-top));
     left: 50%;
     transform: translateX(-50%);
     z-index: 9005;
@@ -1713,7 +1713,7 @@ button, input, select, textarea {
     z-index: 12000;
     display: flex;
     justify-content: center;
-    padding: max(16px, env(safe-area-inset-top)) 12px 16px;
+    padding: max(10px, env(safe-area-inset-top)) 12px 14px;
     background: transparent;
     box-sizing: border-box;
 }
