@@ -2452,7 +2452,7 @@ if (typeof maplibregl === 'undefined') {
         } else if (name === 'instruction') {
             if (typeof openInstruction !== 'function') return;
             if (isOpen('instructionModal')) closeInstruction();
-            else openInstruction();
+            else { closeAllSheets(); openInstruction(); }
         } else if (name === 'settings') {
             if (typeof openSettings === 'function') openSettings();
         } else if (name === 'driving') {
