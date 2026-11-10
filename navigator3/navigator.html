@@ -557,7 +557,7 @@ function driveAlongPath(fromIdx) {
     const totalDist = dists[path.length - 1];
     if (totalDist < 0.1) return;
 
-    APP._driveShowFrom = fromIdx;
+    APP._driveShowFrom = Math.min(fromIdx + 1, APP.navPoints.length - 1);
 
     APP._driveActive = true;
     let simulatedDist = resume ? resume.dist : 0;
@@ -630,28 +630,45 @@ function driveAlongPath(fromIdx) {
             currentAz = calcAzimuth(prevPt, lastPt);
             APP._driveMarker.update({ coordinates: [lastPt[1], lastPt[0]] });
             stopDrive();
+            APP._simCurPos = [lastPt[0], lastPt[1]];
+
             const nextIdx = fromIdx + 1;
-            if (nextIdx < APP.navPoints.length) {
-                const np = APP.navPoints[nextIdx];
-                if (np && np.pts && np.pts.length >= 2) {
-                    APP.navCurrentIndex = nextIdx;
-                    APP._driveShowFrom = nextIdx;
-                    renderRoutePoints();
-                    updateHud();
-                    updatePointsListActive();
-                    playPointAudio(np, () => {
-                        if (APP._driveShowFrom >= 0 && !APP._driveActive) driveAlongPath(nextIdx);
-                    });
-                    setPlayBtnState(true);
-                }
-            }
-            if (nextIdx >= APP.navPoints.length ||
-                !APP.navPoints[nextIdx] ||
-                !APP.navPoints[nextIdx].pts ||
-                APP.navPoints[nextIdx].pts.length < 2) {
+            if (nextIdx >= APP.navPoints.length) {
                 APP._simMode = false;
                 updateTiltState();
+                return;
             }
+
+            // Приехали в точку nextIdx: она становится текущей целью и
+            // озвучивается — как при срабатывании триггера в навигации.
+            const np = APP.navPoints[nextIdx];
+            APP.navCurrentIndex = nextIdx;
+            APP._driveShowFrom = nextIdx;
+            renderRoutePoints();
+            updateHud();
+            updatePointsListActive();
+            setPlayBtnState(true);
+
+            playPointAudio(np, () => {
+                if (APP._driveShowFrom < 0 || APP._driveActive) return;
+                const targetIdx = nextIdx + 1;
+                const target = APP.navPoints[targetIdx];
+                if (targetIdx >= APP.navPoints.length || !target ||
+                    !target.pts || target.pts.length < 2) {
+                    APP._simMode = false;
+                    updateTiltState();
+                    setPlayBtnState(false);
+                    return;
+                }
+                // После озвучки командой текущей цели становится следующая точка.
+                APP.navCurrentIndex = targetIdx;
+                APP._driveShowFrom = targetIdx;
+                renderRoutePoints();
+                updateHud();
+                updatePointsListActive();
+                driveAlongPath(nextIdx);
+                setPlayBtnState(true);
+            });
             return;
         }
 
@@ -2283,14 +2300,16 @@ if (typeof maplibregl === 'undefined') {
             return;
         }
         const idx = APP.navCurrentIndex;
-        if (APP._driveResume && APP._driveResume.idx === idx) {
+        // Цель в панели — точка idx, едем по пути предыдущей точки (idx - 1).
+        if (APP._driveResume && APP._driveResume.idx === idx - 1) {
             disableAutoCenter();
             APP._simMode = true;
             APP._simForceZoom = false;
             updateTiltState();
             APP._driveShowFrom = idx;
             renderRoutePoints();
-            driveAlongPath(idx);
+            driveAlongPath(idx - 1);
+            setPlayBtnState(true);
             return;
         }
         const p = APP.navPoints[idx];
@@ -2314,25 +2333,26 @@ if (typeof maplibregl === 'undefined') {
         }
         APP.navCurrentIndex = idx;
         APP._driveShowFrom = idx;
+        APP._simCurPos = [p.pts[0][0], p.pts[0][1]];
         renderRoutePoints();
         setPlayBtnState(true);
         const startSimAfterAudio = () => {
             if (APP._driveShowFrom < 0 || APP._driveActive) return;
-            const currentIdx = APP.navCurrentIndex;
-            const nextIdx = currentIdx + 1;
-            if (nextIdx >= APP.navPoints.length || !APP.navPoints[nextIdx] || !APP.navPoints[nextIdx].pts || APP.navPoints[nextIdx].pts.length < 2) {
+            const nextIdx = idx + 1;
+            if (nextIdx >= APP.navPoints.length) {
                 APP._simMode = false;
                 updateTiltState();
                 setPlayBtnState(false);
                 return;
             }
-            // Путь точки начинается с неё самой (pts[0] === координаты точки),
-            // поэтому едем по пути озвученной точки: currentIdx, а не previous.
-            APP._driveShowFrom = APP.navCurrentIndex;
+            // После озвучки командой текущей цели становится следующая точка,
+            // а движение идёт по пути озвученной точки (pts[0] === её координаты).
+            APP.navCurrentIndex = nextIdx;
+            APP._driveShowFrom = nextIdx;
             renderRoutePoints();
             updateHud();
             updatePointsListActive();
-            driveAlongPath(currentIdx);
+            driveAlongPath(idx);
         };
         const doPlay = () => playPointAudio(p, startSimAfterAudio);
         APP._simForceZoom ? setTimeout(doPlay, 2000) : doPlay();
