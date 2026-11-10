@@ -350,7 +350,7 @@ button, input, select, textarea {
 }
 
 #locateBtn {
-    top: calc(48px + env(safe-area-inset-top));
+    top: calc(76px + env(safe-area-inset-top));
     right: 12px;
     border-radius: var(--radius-card);
 }
@@ -390,7 +390,7 @@ button, input, select, textarea {
    ============================================ */
 #topCenterControls {
     position: absolute;
-    top: calc(16px + env(safe-area-inset-top));
+    top: calc(70px + env(safe-area-inset-top));
     left: 50%;
     transform: translateX(-50%);
     z-index: 9005;
@@ -456,7 +456,7 @@ button, input, select, textarea {
    ============================================ */
 #hud {
     position: absolute;
-    bottom: calc(84px + env(safe-area-inset-bottom));
+    bottom: calc(12px + env(safe-area-inset-bottom));
     left: 12px;
     right: 12px;
     z-index: 9000;
@@ -1703,23 +1703,23 @@ button, input, select, textarea {
 }
 
 /* ============================================
-   Нижняя навигационная панель (стиль Telegram)
+   Верхняя навигационная панель (стиль Telegram)
    ============================================ */
-.bottom-nav {
+.top-nav {
     position: fixed;
     left: 0;
     right: 0;
-    bottom: 0;
+    top: 0;
     z-index: 12000;
     display: flex;
     justify-content: center;
-    padding: env(safe-area-inset-bottom) 12px 18px;
+    padding: max(16px, env(safe-area-inset-top)) 12px 16px;
     background: transparent;
     box-sizing: border-box;
 }
 
 /* Pill-контейнер по центру */
-.bottom-nav-container {
+.top-nav-container {
     position: relative;
     display: flex;
     align-items: center;
@@ -1737,7 +1737,7 @@ button, input, select, textarea {
 }
 
 /* Кнопки без фона, без рамок — только иконка + текст */
-.bottom-nav-btn {
+.top-nav-btn {
     flex: 1;
     display: flex;
     flex-direction: column;
@@ -1761,7 +1761,7 @@ button, input, select, textarea {
     -webkit-tap-highlight-color: transparent;
 }
 
-.bottom-nav-btn svg {
+.top-nav-btn svg {
     display: block;
     width: 22px;
     height: 22px;
@@ -1774,7 +1774,7 @@ button, input, select, textarea {
     transition: transform 0.18s ease, filter 0.18s ease;
 }
 
-.bottom-nav-btn span {
+.top-nav-btn span {
     display: block;
     white-space: nowrap;
     overflow: hidden;
@@ -1782,13 +1782,13 @@ button, input, select, textarea {
     max-width: 100%;
 }
 
-.bottom-nav-btn:active:not(.active) {
+.top-nav-btn:active:not(.active) {
     transform: scale(0.94);
     color: var(--text);
 }
 
 /* Активная вкладка — светящаяся рамка-пилюля, как на gdebenz.ru */
-.bottom-nav-btn.active {
+.top-nav-btn.active {
     color: var(--green);
     background: color-mix(in srgb, var(--green) 12%, transparent);
     border: 1px solid var(--green-line-soft);
@@ -1796,34 +1796,34 @@ button, input, select, textarea {
     box-shadow: 0 0 14px var(--green-glow);
 }
 
-.bottom-nav-btn.active svg {
+.top-nav-btn.active svg {
     color: var(--green);
     filter: drop-shadow(0 0 8px var(--green-glow));
 }
 
-.bottom-nav-btn.active span {
+.top-nav-btn.active span {
     font-weight: 700;
     color: var(--green);
 }
 
 @media (max-width: 380px) {
-    .bottom-nav-container {
+    .top-nav-container {
         height: 52px;
         padding: 5px 6px;
         border-radius: 24px;
     }
 
-    .bottom-nav-btn {
+    .top-nav-btn {
         padding: 7px 3px 5px;
         font-size: 9px;
     }
 
-    .bottom-nav-btn svg {
+    .top-nav-btn svg {
         width: 20px;
         height: 20px;
     }
 
-    .bottom-nav-btn.active {
+    .top-nav-btn.active {
         border-radius: 24px;
     }
 }
