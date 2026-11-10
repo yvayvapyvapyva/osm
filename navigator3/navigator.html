@@ -244,7 +244,7 @@ const APP = {
     _lastBrakeTime: 0, _brakeEnabled: false, _brakeStartTime: null,
     _motionPermissionGranted: false,
     _gravityX: 0, _gravityY: 0, _gravityZ: 0,
-    _driveState: null, _driveResume: null,
+    _driveState: null, _driveResume: null, _simSeq: 0,
     _driveSpeed: 90,
     _simCurPos: null,
     markerRotation: 0, _arrowRaf: null, _arrowPos: null,
@@ -504,14 +504,14 @@ function setMapLocation(center, zoom, azimuth, duration = 400) {
     }
 }
 
-function stopDrive() {
+// Общая часть остановки и паузы: гасим кадры, анимацию карты, аудио и подсветку.
+// Также увеличиваем счётчик запусков — по нему отменяются отложенные колбэки
+// (озвучка точки могла ещё не закончиться, когда симуляцию уже выключили).
+function haltDrive() {
     APP._driveActive = false;
-    APP._driveShowFrom = -1;
-    APP._driveState = null;
-    APP._driveResume = null;
+    APP._simSeq++;
     if (APP._driveRaf) { cancelAnimationFrame(APP._driveRaf); APP._driveRaf = null; }
     if (APP.map) APP.map.stop();
-    if (APP._driveMarker) { APP._driveMarker.element.style.display = 'none'; }
     APP.navAudio.pause();
     APP._commentAudio.pause();
     APP.navAudio.onended = null;
@@ -521,21 +521,37 @@ function stopDrive() {
     $('telSpeed').textContent = Math.round(APP.currentSpeed);
 }
 
+function stopDrive() {
+    haltDrive();
+    APP._driveShowFrom = -1;
+    APP._driveState = null;
+    APP._driveResume = null;
+    if (APP._driveMarker) { APP._driveMarker.element.style.display = 'none'; }
+}
+
 function pauseDrive() {
     if (!APP._driveActive) return;
-    APP._driveActive = false;
-    APP._simCurPos = null;
-    if (APP._driveRaf) { cancelAnimationFrame(APP._driveRaf); APP._driveRaf = null; }
-    if (APP.map) APP.map.stop();
-    APP._driveResume = APP._driveState ? { ...APP._driveState } : null;
+    const state = APP._driveState ? { ...APP._driveState } : null;
+    haltDrive();
+    APP._driveResume = state;
     APP._driveState = null;
-    APP.navAudio.pause();
-    APP._commentAudio.pause();
-    APP.navAudio.onended = null;
-    APP._commentAudio.onended = null;
-    document.querySelectorAll('.playing').forEach(e => e.classList.remove('playing'));
-    setPlayBtnState(false);
-    $('telSpeed').textContent = Math.round(APP.currentSpeed);
+    // Маркер и _simCurPos не сбрасываем: на паузе расстояние в панели
+    // продолжает считаться от маркера, а не от реального GPS.
+}
+
+function endSimulation() {
+    stopDrive();
+    APP._simMode = false;
+    updateTiltState();
+}
+
+// Новая текущая цель симуляции: панель, зелёное кольцо и список точек.
+// renderRoutePoints() в конце сам вызывает updateHud().
+function setSimTarget(idx) {
+    APP.navCurrentIndex = idx;
+    APP._driveShowFrom = idx;
+    renderRoutePoints();
+    updatePointsListActive();
 }
 
 function driveAlongPath(fromIdx) {
@@ -543,8 +559,6 @@ function driveAlongPath(fromIdx) {
     if (!p || !p.pts || p.pts.length < 2) return;
 
     const resume = APP._driveResume && APP._driveResume.idx === fromIdx ? APP._driveResume : null;
-    stopDrive();
-    APP._driveActive = true;
 
     const path = p.pts;
     if (!p._dists) {
@@ -555,11 +569,16 @@ function driveAlongPath(fromIdx) {
     }
     const dists = p._dists;
     const totalDist = dists[path.length - 1];
-    if (totalDist < 0.1) return;
+    if (totalDist < 0.1) {
+        showToast('Путь точки слишком короткий для симуляции', 'info');
+        endSimulation();
+        return;
+    }
 
+    stopDrive();
+    APP._driveActive = true;
     APP._driveShowFrom = Math.min(fromIdx + 1, APP.navPoints.length - 1);
 
-    APP._driveActive = true;
     let simulatedDist = resume ? resume.dist : 0;
     let currentSeg = resume ? resume.seg : 0;
     let currentAz = resume ? resume.az : calcAzimuth(path[0], path[1]);
@@ -626,7 +645,7 @@ function driveAlongPath(fromIdx) {
 
         if (simulatedDist >= totalDist) {
             const lastPt = path[path.length - 1];
-            const prevPt = path.length >= 2 ? path[path.length - 2] : lastPt;
+            const prevPt = path[path.length - 2];
             currentAz = calcAzimuth(prevPt, lastPt);
             APP._driveMarker.update({ coordinates: [lastPt[1], lastPt[0]] });
             stopDrive();
@@ -634,40 +653,30 @@ function driveAlongPath(fromIdx) {
 
             const nextIdx = fromIdx + 1;
             if (nextIdx >= APP.navPoints.length) {
-                APP._simMode = false;
-                updateTiltState();
+                endSimulation();
                 return;
             }
 
             // Приехали в точку nextIdx: она становится текущей целью и
             // озвучивается — как при срабатывании триггера в навигации.
-            const np = APP.navPoints[nextIdx];
-            APP.navCurrentIndex = nextIdx;
-            APP._driveShowFrom = nextIdx;
-            renderRoutePoints();
-            updateHud();
-            updatePointsListActive();
+            setSimTarget(nextIdx);
             setPlayBtnState(true);
 
-            playPointAudio(np, () => {
-                if (APP._driveShowFrom < 0 || APP._driveActive) return;
+            // stopDrive() выше уже увеличил _simSeq — запоминаем его, чтобы
+            // отменённая симуляция не продолжилась после озвучки.
+            const simSeq = APP._simSeq;
+            playPointAudio(APP.navPoints[nextIdx], () => {
+                if (simSeq !== APP._simSeq || APP._driveActive) return;
                 const targetIdx = nextIdx + 1;
                 const target = APP.navPoints[targetIdx];
                 if (targetIdx >= APP.navPoints.length || !target ||
                     !target.pts || target.pts.length < 2) {
-                    APP._simMode = false;
-                    updateTiltState();
-                    setPlayBtnState(false);
+                    endSimulation();
                     return;
                 }
                 // После озвучки командой текущей цели становится следующая точка.
-                APP.navCurrentIndex = targetIdx;
-                APP._driveShowFrom = targetIdx;
-                renderRoutePoints();
-                updateHud();
-                updatePointsListActive();
+                setSimTarget(targetIdx);
                 driveAlongPath(nextIdx);
-                setPlayBtnState(true);
             });
             return;
         }
@@ -706,11 +715,13 @@ function driveAlongPath(fromIdx) {
         }
         APP._driveMarker.update({ coordinates: [mp.lon, mp.lat] });
         APP._simCurPos = [mp.lat, mp.lon];
-        updateHud();
-        $('telSpeed').textContent = Math.round(APP._driveSpeed);
+        // На кадре меняется только расстояние — полный updateHud() здесь
+        // пересобирал бы SVG, innerHTML и обработчики 60 раз в секунду.
+        updateHudPos(APP._simCurPos);
         APP._driveRaf = requestAnimationFrame(frame);
     }
 
+    $('telSpeed').textContent = Math.round(APP._driveSpeed);
     APP._driveRaf = requestAnimationFrame(frame);
     setPlayBtnState(true);
 }
@@ -1500,9 +1511,7 @@ function updateRouteNameDisplay() {
 }
 
 function clearRoute() {
-    stopDrive();
-    APP._simMode = false;
-    updateTiltState();
+    endSimulation();
     removeRouteObjects();
     APP.navPoints = [];
     APP.navCurrentIndex = 0;
@@ -1637,25 +1646,14 @@ function updateHud() {
     };
     $('hudCmd').onclick = openPointsList;
 
-    const pos = (APP._driveShowFrom >= 0 && APP._simCurPos) ? APP._simCurPos : APP.lastPos;
-    if (pos) {
-        const d = getGeoDistance(pos, [t.lat, t.lon]);
-        let ad = APP.hasHeading ? Math.abs(APP.lastAz - t.az) % 360 : 180;
-        if (ad > 180) ad = 360 - ad;
-        $('hudCmdDist').innerHTML = formatDistance(d);
-        $('hudCmdDist').classList.toggle('in-range', d < 50 && ad <= APP.navConfig.AZ_TOLERANCE);
-        updatePointsListDist();
-    } else {
-        $('hudCmdDist').innerHTML = '---';
-        $('hudCmdDist').classList.remove('in-range');
-    }
+    updateHudPos((APP._driveShowFrom >= 0 && APP._simCurPos) ? APP._simCurPos : APP.lastPos);
 
     const prevBtn = $('prevBtn'), nextBtn = $('nextBtn');
     prevBtn.disabled = (idx <= 0);
     nextBtn.disabled = (idx >= APP.navPoints.length - 1);
-    prevBtn.onclick = () => { stopDrive(); APP._simMode = false; updateTiltState(); idx > 0 && setTarget(idx - 1); tempDisableAutoCenter(5000); };
+    prevBtn.onclick = () => { endSimulation(); idx > 0 && setTarget(idx - 1); tempDisableAutoCenter(5000); };
 
-    nextBtn.onclick = () => { if (idx < APP.navPoints.length - 1) { stopDrive(); APP._simMode = false; updateTiltState(); setTarget(idx + 1); tempDisableAutoCenter(5000); } };
+    nextBtn.onclick = () => { if (idx < APP.navPoints.length - 1) { endSimulation(); setTarget(idx + 1); tempDisableAutoCenter(5000); } };
 
     const playBtn = $('playBtn');
     if (playBtn) {
@@ -1757,6 +1755,23 @@ function updateHudDist(d, ad) {
     $('hudCmdDist').innerHTML = formatDistance(d);
     $('hudCmdDist').classList.toggle('in-range', d < 50 && ad <= APP.navConfig.AZ_TOLERANCE);
     updatePointsListDist();
+}
+
+// Обновляет только расстояние до текущей цели (и расстояние в списке точек) —
+// этого достаточно на каждом кадре симуляции.
+function updateHudPos(pos) {
+    const idx = Math.min(APP.navCurrentIndex, APP.navPoints.length - 1);
+    const t = APP.navPoints[idx];
+    if (!t) return;
+    if (!pos) {
+        $('hudCmdDist').innerHTML = '---';
+        $('hudCmdDist').classList.remove('in-range');
+        return;
+    }
+    const d = getGeoDistance(pos, [t.lat, t.lon]);
+    let ad = APP.hasHeading ? Math.abs(APP.lastAz - t.az) % 360 : 180;
+    if (ad > 180) ad = 360 - ad;
+    updateHudDist(d, ad);
 }
 
 function updatePointsListDist() {
@@ -2294,9 +2309,7 @@ if (typeof maplibregl === 'undefined') {
         }
         if ((!APP.navAudio.paused && APP.navAudio.currentTime > 0) ||
             (!APP._commentAudio.paused && APP._commentAudio.currentTime > 0)) {
-            stopDrive();
-            APP._simMode = false;
-            updateTiltState();
+            endSimulation();
             return;
         }
         const idx = APP.navCurrentIndex;
@@ -2306,10 +2319,8 @@ if (typeof maplibregl === 'undefined') {
             APP._simMode = true;
             APP._simForceZoom = false;
             updateTiltState();
-            APP._driveShowFrom = idx;
-            renderRoutePoints();
+            setSimTarget(idx);
             driveAlongPath(idx - 1);
-            setPlayBtnState(true);
             return;
         }
         const p = APP.navPoints[idx];
@@ -2331,37 +2342,33 @@ if (typeof maplibregl === 'undefined') {
             const bearing = (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
             setMapLocation(from, 19, bearing, 2000);
         }
-        APP.navCurrentIndex = idx;
-        APP._driveShowFrom = idx;
         APP._simCurPos = [p.pts[0][0], p.pts[0][1]];
-        renderRoutePoints();
+        setSimTarget(idx);
         setPlayBtnState(true);
+        // Озвучка идёт асинхронно: запоминаем запуск, чтобы отмена (стоп,
+        // клик по карте) не воскресила симуляцию после окончания аудио.
+        const simSeq = APP._simSeq;
         const startSimAfterAudio = () => {
-            if (APP._driveShowFrom < 0 || APP._driveActive) return;
+            if (simSeq !== APP._simSeq || APP._driveActive) return;
             const nextIdx = idx + 1;
             if (nextIdx >= APP.navPoints.length) {
-                APP._simMode = false;
-                updateTiltState();
-                setPlayBtnState(false);
+                endSimulation();
                 return;
             }
             // После озвучки командой текущей цели становится следующая точка,
             // а движение идёт по пути озвученной точки (pts[0] === её координаты).
-            APP.navCurrentIndex = nextIdx;
-            APP._driveShowFrom = nextIdx;
-            renderRoutePoints();
-            updateHud();
-            updatePointsListActive();
+            setSimTarget(nextIdx);
             driveAlongPath(idx);
         };
-        const doPlay = () => playPointAudio(p, startSimAfterAudio);
+        const doPlay = () => {
+            if (simSeq !== APP._simSeq) return;
+            playPointAudio(p, startSimAfterAudio);
+        };
         APP._simForceZoom ? setTimeout(doPlay, 2000) : doPlay();
     });
 
     document.getElementById('map').addEventListener('click', () => {
-        stopDrive();
-        APP._simMode = false;
-        updateTiltState();
+        endSimulation();
     });
 
     $('pointsListWrap').addEventListener('click', (e) => {
@@ -2391,9 +2398,7 @@ if (typeof maplibregl === 'undefined') {
         const idx = +item.dataset.idx;
         if (!isNaN(idx) && idx >= 0 && idx < APP.navPoints.length) {
             closePointsList();
-            stopDrive();
-            APP._simMode = false;
-            updateTiltState();
+            endSimulation();
             setTarget(idx);
             tempDisableAutoCenter(5000);
         }
