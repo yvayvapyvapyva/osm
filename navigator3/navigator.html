@@ -509,7 +509,6 @@ function stopDrive() {
     APP._driveShowFrom = -1;
     APP._driveState = null;
     APP._driveResume = null;
-    APP._simCurPos = null;
     if (APP._driveRaf) { cancelAnimationFrame(APP._driveRaf); APP._driveRaf = null; }
     if (APP.map) APP.map.stop();
     if (APP._driveMarker) { APP._driveMarker.element.style.display = 'none'; }
@@ -524,7 +523,6 @@ function stopDrive() {
 function pauseDrive() {
     if (!APP._driveActive) return;
     APP._driveActive = false;
-    APP._simCurPos = null;
     if (APP._driveRaf) { cancelAnimationFrame(APP._driveRaf); APP._driveRaf = null; }
     if (APP.map) APP.map.stop();
     APP._driveResume = APP._driveState ? { ...APP._driveState } : null;
@@ -1617,7 +1615,7 @@ function updateHud() {
     };
     $('hudCmd').onclick = openPointsList;
 
-    const pos = APP._driveActive && APP._simCurPos ? APP._simCurPos : APP.lastPos;
+    const pos = (APP._driveShowFrom >= 0 && APP._simCurPos) ? APP._simCurPos : APP.lastPos;
     if (pos) {
         const d = getGeoDistance(pos, [t.lat, t.lon]);
         let ad = APP.hasHeading ? Math.abs(APP.lastAz - t.az) % 360 : 180;
@@ -1743,7 +1741,7 @@ function updatePointsListDist() {
     const modal = $('pointsListModal');
     if (!modal || modal.classList.contains('hidden')) return;
     const activeItem = modal.querySelector('.pl-active');
-    const pos = APP._driveActive && APP._simCurPos ? APP._simCurPos : APP.lastPos;
+    const pos = (APP._driveShowFrom >= 0 && APP._simCurPos) ? APP._simCurPos : APP.lastPos;
     if (!activeItem || !pos || APP.navCurrentIndex < 0) return;
     const t = APP.navPoints[APP.navCurrentIndex];
     if (!t) return;
