@@ -2465,13 +2465,13 @@ if (typeof maplibregl === 'undefined') {
                             <input type="checkbox" class="toggle-input" id="triggerShockToggle" onchange="updateShockDisplay();applyShockConfig()">
                             <span class="toggle-slider"></span>
                         </label>
+                        <div class="trigger-pad">
+                            <button type="button" class="trigger-phrase-btn" onclick="playCommand('Сильный удар')" aria-label="Озвучить: Сильный удар">Сильный удар</button>
+                        </div>
                         <span class="value" id="triggerShockVal">Выкл</span>
                     </div>
                     <div>
                         <input type="range" id="triggerShock" min="0.5" max="3" value="1" step="0.25" oninput="updateShockDisplay();applyShockConfig()">
-                        <div class="trigger-pad">
-                            <button type="button" class="trigger-phrase-btn" onclick="playCommand('Сильный удар')" aria-label="Озвучить: Сильный удар">Сильный удар</button>
-                        </div>
                     </div>
                 </div>
                 <div class="trigger-desc">Оповещает о резком ударе или яме, если удар превышает заданный порог.</div>
@@ -2485,12 +2485,10 @@ if (typeof maplibregl === 'undefined') {
                             <input type="checkbox" class="toggle-input" id="triggerSpeedAlertToggle" onchange="applySpeedConfig()">
                             <span class="toggle-slider"></span>
                         </label>
-                        <input type="text" inputmode="numeric" pattern="[0-9]*" id="triggerSpeedAlert" value="58" class="trigger-input-num speed-input-inline" oninput="this.value=this.value.replace(/[^0-9]/g,'');applySpeedConfig()">
-                    </div>
-                    <div>
                         <div class="trigger-pad">
                             <button type="button" class="trigger-phrase-btn" onclick="playCommand('Превышена максимальная скорость')" aria-label="Озвучить: Превышена максимальная скорость">Превышена максимальная скорость</button>
                         </div>
+                        <input type="text" inputmode="numeric" pattern="[0-9]*" id="triggerSpeedAlert" value="58" class="trigger-input-num speed-input-inline" oninput="this.value=this.value.replace(/[^0-9]/g,'');applySpeedConfig()">
                     </div>
                 </div>
                 <div class="trigger-desc">Оповещает, если превышена установленная максимальная скорость движения.</div>
@@ -2504,6 +2502,9 @@ if (typeof maplibregl === 'undefined') {
                             <input type="checkbox" class="toggle-input" id="triggerBrakeToggle" onchange="applyBrakeConfig()">
                             <span class="toggle-slider"></span>
                         </label>
+                        <div class="trigger-pad">
+                            <button type="button" class="trigger-phrase-btn" onclick="playCommand('Резкое торможение')" aria-label="Озвучить: Резкое торможение">Резкое торможение</button>
+                        </div>
                         <span class="value" id="triggerBrakeVal">Выкл</span>
                     </div>
                     <div>
@@ -2515,9 +2516,6 @@ if (typeof maplibregl === 'undefined') {
                             <label style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:2px;">Время торможения (мс)</label>
                             <input type="range" id="triggerBrakeTime" min="100" max="2000" value="500" step="100" oninput="updateBrakeTimeDisplay();applyBrakeConfig()">
                             <span class="value" id="triggerBrakeTimeVal">500 мс</span>
-                        </div>
-                        <div class="trigger-pad">
-                            <button type="button" class="trigger-phrase-btn" onclick="playCommand('Резкое торможение')" aria-label="Озвучить: Резкое торможение">Резкое торможение</button>
                         </div>
                     </div>
                 </div>
