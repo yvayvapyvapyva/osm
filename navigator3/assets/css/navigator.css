@@ -1786,7 +1786,7 @@ button, input, select, textarea {
     color: var(--green);
     background: color-mix(in srgb, var(--green) 12%, transparent);
     border: 1px solid var(--green-line-soft);
-    border-radius: 20px;
+    border-radius: 26px;
     box-shadow: 0 0 14px var(--green-glow);
 }
 
@@ -1818,7 +1818,7 @@ button, input, select, textarea {
     }
 
     .bottom-nav-btn.active {
-        border-radius: 14px;
+        border-radius: 24px;
     }
 }
 
