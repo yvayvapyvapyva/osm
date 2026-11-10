@@ -1494,7 +1494,7 @@ function renderRoutePoints() {
         const isKeyPoint = isCurrent || isPrevious || isNext;
         const shouldShow = isKeyPoint || !isPassed;
         const markerSize = isCurrent ? 64 : (isNext || isPrevious ? 48 : 30);
-        const markerOpacity = isCurrent || isNext ? '' : '0.5';
+        const markerOpacity = isCurrent || isNext ? '' : '0.9';
 
         const markerZIndex = isCurrent ? 100 : (isNext ? 90 : 10);
 
@@ -1544,7 +1544,7 @@ function renderRoutePoints() {
             // Следующая точка важнее остальных: номер должен читаться,
             // поэтому приглушаем её меньше, чем пройденные и дальние.
             if (pt.placemark.element) {
-                pt.placemark.element.style.opacity = isNext ? '0.75' : '0.5';
+                pt.placemark.element.style.opacity = isNext ? '0.75' : '0.9';
             }
             mapAddChild(pt.placemark);
         }
