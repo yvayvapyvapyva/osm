@@ -66,8 +66,8 @@
     /* Масштаб стрелки текущего положения: обновляется из JS по зуму */
     --nav-mk-scale: 1;
 
-    /* Полноэкранные разделы: контент начинается под таб-баром */
-    --screen-top: calc(48px + var(--nav-gap) + env(safe-area-inset-top) + 10px);
+    /* Полноэкранные разделы: контент начинается под безопасной зоной сверху */
+    --screen-top: env(safe-area-inset-top);
 }
 
 /* Тёмная оболочка. Карта остаётся светлой: --map-bg не переопределяется. */
@@ -152,7 +152,6 @@ button, input, select, textarea {
 #telemetryPanel,
 .hud-cmd,
 .nav-action-btn,
-.top-action-btn,
 .settings-group,
 .pl-item-row,
 .routes-folder-row,
@@ -164,8 +163,7 @@ button, input, select, textarea {
 
 .circle-btn,
 #telemetryPanel,
-.nav-action-btn,
-.top-action-btn {
+.nav-action-btn {
     box-shadow: var(--shadow-float), var(--inset-highlight);
 }
 
@@ -348,7 +346,7 @@ button, input, select, textarea {
 }
 
 #locateBtn {
-    top: calc(76px + env(safe-area-inset-top));
+    top: calc(48px + env(safe-area-inset-top));
     right: 12px;
     border-radius: var(--radius-card);
 }
@@ -388,7 +386,7 @@ button, input, select, textarea {
    ============================================ */
 #topCenterControls {
     position: absolute;
-    top: calc(64px + env(safe-area-inset-top));
+    top: calc(16px + env(safe-area-inset-top));
     left: 50%;
     transform: translateX(-50%);
     z-index: 9005;
@@ -454,7 +452,7 @@ button, input, select, textarea {
    ============================================ */
 #hud {
     position: absolute;
-    bottom: calc(8px + env(safe-area-inset-bottom));
+    bottom: calc(84px + env(safe-area-inset-bottom));
     left: 12px;
     right: 12px;
     z-index: 9000;
@@ -1698,8 +1696,127 @@ button, input, select, textarea {
 }
 
 /* ============================================
-   Верхняя навигация: отдельные кнопки
+   Нижняя навигационная панель (стиль Telegram / Instagram)
    ============================================ */
+.bottom-nav {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 12000;
+    display: flex;
+    justify-content: center;
+    padding: env(safe-area-inset-bottom) 12px 18px;
+    background: transparent;
+    box-sizing: border-box;
+}
+
+/* Плавающая pill-подобная панель по центру */
+.bottom-nav-container {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    height: 56px;
+    padding: 6px 10px;
+    max-width: 560px;
+    width: 100%;
+    border-radius: 28px;
+    background: color-mix(in srgb, var(--surface) 88%, transparent);
+    backdrop-filter: blur(24px) saturate(1.5);
+    -webkit-backdrop-filter: blur(24px) saturate(1.5);
+    border: 1px solid var(--line-surface);
+    box-shadow: var(--shadow-float);
+    box-sizing: border-box;
+}
+
+.bottom-nav-btn {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    min-width: 0;
+    padding: 6px 8px 4px;
+    color: var(--text-muted);
+    font-size: 10px;
+    font-weight: 700;
+    line-height: 1.05;
+    letter-spacing: 0.1px;
+    cursor: pointer;
+    touch-action: manipulation;
+    transition: color 0.2s ease, filter 0.2s ease;
+    background: transparent !important;
+    border: none !important;
+    border-radius: 0 !important;
+    outline: none !important;
+    box-shadow: none !important;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.bottom-nav-btn svg {
+    display: block;
+    width: 24px;
+    height: 24px;
+    fill: currentColor;
+    flex-shrink: 0;
+    transition: transform 0.2s ease, filter 0.2s ease;
+}
+
+.bottom-nav-btn span {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+    display: block;
+}
+
+.bottom-nav-btn:active:not(.active) {
+    transform: scale(0.94);
+    color: var(--text-soft);
+}
+
+/* Активная вкладка — только она получает pill-заливку, как в Telegram */
+.bottom-nav-btn.active {
+    color: var(--green);
+    background: var(--green-tint-strong) !important;
+    border-radius: 20px !important;
+    box-shadow: 0 0 0 1px var(--green-line-soft);
+}
+
+.bottom-nav-btn.active svg {
+    color: var(--green);
+    filter: drop-shadow(0 0 8px var(--green-glow));
+    transform: scale(1.05);
+}
+
+.bottom-nav-btn.active span {
+    font-weight: 800;
+}
+
+@media (max-width: 380px) {
+    .bottom-nav-container {
+        height: 52px;
+        padding: 5px 8px;
+        border-radius: 26px;
+    }
+
+    .bottom-nav-btn {
+        padding: 5px 6px 3px;
+        border-radius: 18px;
+        font-size: 9px;
+    }
+
+    .bottom-nav-btn svg {
+        width: 22px;
+        height: 22px;
+    }
+}
+
+/* ============================================
+   Верхняя навигация: отдельные кнопки (удалена, перенесена вниз)
+   ============================================ */
+
 /* Атрибуция карты в правом нижнем углу */
 .maplibregl-ctrl-bottom-right {
     bottom: calc(12px + env(safe-area-inset-bottom));
@@ -1726,103 +1843,6 @@ button, input, select, textarea {
 }
 .maplibregl-ctrl-attrib.maplibregl-compact:after {
     content: none !important;
-}
-
-.top-actions {
-    position: fixed;
-    left: 50%;
-    top: calc(var(--nav-gap) + env(safe-area-inset-top));
-    transform: translateX(-50%);
-    z-index: 12000;
-    display: flex;
-    gap: 8px;
-    padding: 0;
-    box-sizing: border-box;
-    pointer-events: auto;
-    max-width: min(360px, calc(100% - 24px));
-    width: max-content;
-}
-
-.top-action-btn {
-    position: relative;
-    z-index: 1;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 3px;
-    min-width: 0;
-    padding: 0;
-    margin: 0;
-    border-radius: var(--radius-card);
-    color: var(--text);
-    font-family: inherit;
-    font-size: 12px;
-    font-weight: 600;
-    letter-spacing: 0.1px;
-    line-height: 1;
-    cursor: pointer;
-    touch-action: manipulation;
-    -webkit-tap-highlight-color: transparent;
-    width: 104px;
-    flex: 0 0 auto;
-    transition: color 0.18s ease, border-color 0.18s ease, background 0.18s ease, transform 0.12s ease;
-    height: 56px;
-}
-
-.top-action-btn svg {
-    display: block;
-    width: 24px;
-    height: 24px;
-    flex-shrink: 0;
-}
-
-.top-action-btn.active {
-    color: var(--text);
-    border-color: var(--green-line);
-    background: var(--surface);
-    box-shadow: var(--shadow-float), inset 0 0 0 1px var(--green-line-soft);
-}
-
-.top-action-btn.active svg {
-    color: var(--green);
-}
-
-.top-action-btn:active {
-    transform: scale(0.94);
-    background: var(--surface-muted);
-}
-
-.top-action-btn:focus-visible {
-    outline: 2px solid var(--green);
-    outline-offset: -2px;
-}
-
-@media (max-height: 520px) {
-    .top-action-btn svg {
-        width: 20px;
-        height: 20px;
-    }
-}
-
-@media (max-width: 380px) {
-    .top-action-btn {
-        width: 88px;
-        height: 52px;
-        font-size: 10px;
-        letter-spacing: 0;
-    }
-
-    .top-action-btn svg {
-        width: 20px;
-        height: 20px;
-    }
-}
-
-@media (prefers-reduced-motion: reduce) {
-    .top-action-btn {
-        transition: none;
-    }
 }
 
 /* ============================================
@@ -1870,7 +1890,6 @@ button, input, select, textarea {
 
 .circle-btn,
 .nav-action-btn,
-.top-action-btn,
 #telemetryPanel,
 .hud-cmd {
     backdrop-filter: blur(8px);
