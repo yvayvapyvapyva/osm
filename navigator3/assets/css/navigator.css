@@ -1781,11 +1781,12 @@ button, input, select, textarea {
     color: var(--text-soft);
 }
 
-/* Активная вкладка — pill-заливка только под активной кнопкой, как в Telegram */
+/* Активная вкладка — сияющая рамка-пилюля вокруг кнопки */
 .bottom-nav-btn.active {
     color: var(--green);
-    background: var(--green-tint-strong);
+    background: transparent;
     border-radius: 16px;
+    box-shadow: 0 0 0 2px var(--green-line-soft);
 }
 
 .bottom-nav-btn.active svg {
