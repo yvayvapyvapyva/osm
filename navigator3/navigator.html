@@ -2303,7 +2303,20 @@ if (typeof maplibregl === 'undefined') {
         renderRoutePoints();
         setPlayBtnState(true);
         const startSimAfterAudio = () => {
-            if (APP._driveShowFrom >= 0 && !APP._driveActive) driveAlongPath(idx);
+            if (APP._driveShowFrom < 0 || APP._driveActive) return;
+            const nextIdx = APP.navCurrentIndex + 1;
+            if (nextIdx >= APP.navPoints.length || !APP.navPoints[nextIdx] || !APP.navPoints[nextIdx].pts || APP.navPoints[nextIdx].pts.length < 2) {
+                APP._simMode = false;
+                updateTiltState();
+                setPlayBtnState(false);
+                return;
+            }
+            APP.navCurrentIndex = nextIdx;
+            APP._driveShowFrom = nextIdx;
+            renderRoutePoints();
+            updateHud();
+            updatePointsListActive();
+            driveAlongPath(nextIdx);
         };
         const doPlay = () => playPointAudio(p, startSimAfterAudio);
         APP._simForceZoom ? setTimeout(doPlay, 2000) : doPlay();
