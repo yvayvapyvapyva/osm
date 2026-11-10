@@ -1732,14 +1732,14 @@ button, input, select, textarea {
 
 /* Кнопки без фона, без рамок — только иконка + текст */
 .bottom-nav-btn {
-    flex: 0 0 auto;
+    flex: 1;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
     gap: 3px;
     min-width: 0;
-    padding: 8px 6px 6px;
+    padding: 6px 8px 4px;
     color: var(--text-muted);
     font-size: 10px;
     font-weight: 600;
@@ -1788,7 +1788,6 @@ button, input, select, textarea {
     border: 1px solid var(--green-line-soft);
     border-radius: 20px;
     box-shadow: 0 0 14px var(--green-glow);
-    padding: 8px 6px 6px;
 }
 
 .bottom-nav-btn.active svg {
@@ -1820,7 +1819,6 @@ button, input, select, textarea {
 
     .bottom-nav-btn.active {
         border-radius: 14px;
-        padding: 7px 4px 5px;
     }
 }
 
