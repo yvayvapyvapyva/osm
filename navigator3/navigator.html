@@ -518,11 +518,13 @@ function stopDrive() {
     APP._commentAudio.onended = null;
     document.querySelectorAll('.playing').forEach(e => e.classList.remove('playing'));
     setPlayBtnState(false);
+    $('telSpeed').textContent = Math.round(APP.currentSpeed);
 }
 
 function pauseDrive() {
     if (!APP._driveActive) return;
     APP._driveActive = false;
+    APP._simCurPos = null;
     if (APP._driveRaf) { cancelAnimationFrame(APP._driveRaf); APP._driveRaf = null; }
     if (APP.map) APP.map.stop();
     APP._driveResume = APP._driveState ? { ...APP._driveState } : null;
@@ -533,6 +535,7 @@ function pauseDrive() {
     APP._commentAudio.onended = null;
     document.querySelectorAll('.playing').forEach(e => e.classList.remove('playing'));
     setPlayBtnState(false);
+    $('telSpeed').textContent = Math.round(APP.currentSpeed);
 }
 
 function driveAlongPath(fromIdx) {
@@ -686,6 +689,7 @@ function driveAlongPath(fromIdx) {
         APP._driveMarker.update({ coordinates: [mp.lon, mp.lat] });
         APP._simCurPos = [mp.lat, mp.lon];
         updateHud();
+        $('telSpeed').textContent = Math.round(APP._driveSpeed);
         APP._driveRaf = requestAnimationFrame(frame);
     }
 
@@ -748,7 +752,7 @@ function onGeoPosition(pos) {
     const duration = Math.max(500, Math.min(1500, (dt ? dt * 1000 : 1000) + 200));
     animateUserMarker(lat, lon, APP.hasHeading ? APP.lastAz : null, duration);
     if (APP.autoCenter) followCamera(lat, lon, duration);
-    $('telSpeed').textContent = Math.round(APP.currentSpeed);
+    $('telSpeed').textContent = Math.round(APP._driveActive ? APP._driveSpeed : APP.currentSpeed);
 
     if (APP.navCurrentIndex >= 0) navCheckTriggers();
 }
