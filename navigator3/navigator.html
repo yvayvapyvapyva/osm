@@ -259,6 +259,8 @@ const APP = {
     _autoCenterTimer: null
 };
 
+loadNavConfig();
+
 const $ = id => document.getElementById(id);
 
 const NAV_PLAY_ICONS = {
@@ -867,6 +869,23 @@ function applyShockConfig() {
     APP.navConfig.SHOCK_PHRASE = phrase;
     updateShockBarVisibility();
     if (val > 0) ensureMotionTracking();
+    saveNavConfig();
+}
+
+function saveNavConfig() {
+    try {
+        localStorage.setItem('osm_nav_config_v1', JSON.stringify(APP.navConfig));
+    } catch (e) {}
+}
+
+function loadNavConfig() {
+    try {
+        const raw = localStorage.getItem('osm_nav_config_v1');
+        if (raw) {
+            const saved = JSON.parse(raw);
+            Object.assign(APP.navConfig, saved);
+        }
+    } catch (e) {}
 }
 function applySpeedConfig() {
     const on = $('triggerSpeedAlertToggle').checked;
@@ -874,6 +893,7 @@ function applySpeedConfig() {
     const phrase = $('triggerSpeedAlertPhrase').value.trim() || 'Превышена максимальная скорость';
     APP.navConfig.SPEED_ALERT_THRESHOLD = val;
     APP.navConfig.SPEED_ALERT_PHRASE = phrase;
+    saveNavConfig();
 }
 function updateBrakeDisplay() {
     if (!$('triggerBrakeToggle').checked) {
@@ -898,6 +918,7 @@ function applyBrakeConfig() {
     APP.navConfig.BRAKE_PHRASE = phrase;
     $('triggerBrakeVal').textContent = on ? val + ' м/с²' : 'Выкл';
     if (on) ensureMotionTracking();
+    saveNavConfig();
 }
 
 function applyCommentConfig() {
@@ -907,6 +928,7 @@ function applyCommentConfig() {
     ct.style.display = APP._commentEnabled && ct.textContent.trim() ? 'block' : 'none';
     // Комментарий меняет высоту панели — сразу пересчитываем отступ камеры.
     syncFollowPadding();
+    saveNavConfig();
 }
 
 async function requestMotionPermission() {
@@ -927,10 +949,6 @@ function ensureMotionTracking() {
         if (granted) {
             APP._motionTracked = true;
             window.addEventListener('devicemotion', onMotion);
-        } else {
-            APP.navConfig.SHOCK_THRESHOLD = 0;
-            $('triggerShock').value = 0;
-            updateShockDisplay();
         }
         updateShockBarVisibility();
         return granted;
@@ -2331,7 +2349,6 @@ if (typeof maplibregl === 'undefined') {
     // Скрываем оверлей сразу, не дожидаясь загрузки карты
     $('loading').classList.add('hidden');
     MenuModule.init(loadRouteFromJSON);
-    ensureMotionTracking();
 
     document.addEventListener('click', function activateAudio() {
         APP.navAudio.muted = true;
