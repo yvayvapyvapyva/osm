@@ -350,7 +350,7 @@ button, input, select, textarea {
 }
 
 #locateBtn {
-    top: calc(64px + env(safe-area-inset-top));
+    top: calc(48px + env(safe-area-inset-top));
     right: 12px;
     border-radius: var(--radius-card);
 }
@@ -390,7 +390,7 @@ button, input, select, textarea {
    ============================================ */
 #topCenterControls {
     position: absolute;
-    top: calc(58px + env(safe-area-inset-top));
+    top: calc(96px + env(safe-area-inset-top));
     left: 50%;
     transform: translateX(-50%);
     z-index: 9005;
