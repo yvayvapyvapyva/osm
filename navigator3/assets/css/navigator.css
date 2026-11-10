@@ -206,15 +206,15 @@ button, input, select, textarea {
     transform: scale(var(--nav-mk-scale, 1));
     transform-origin: 50% 50%;
 }
-.trigger-input { width:100%;padding:10px 14px;border-radius:10px;background:var(--surface-muted);color:var(--text);font-size:14px;outline:none;box-sizing:border-box;border:1px solid var(--line); }
+.trigger-input { width:100%;padding:8px 10px;border-radius:10px;background:var(--surface-muted);color:var(--text);font-size:13px;outline:none;box-sizing:border-box;border:1px solid var(--line); }
 .trigger-input:focus { background:var(--surface);border-color:var(--green-focus); }
-.trigger-pad { padding:4px 0 6px; }
-.trigger-input-num { width:100%;padding:10px 14px;border-radius:10px;border:1px solid var(--line);background:var(--surface-muted);color:var(--text);font-size:16px;font-weight:600;outline:none;box-sizing:border-box; }
-.trigger-phrase-btn { display:inline-flex;align-items:center;justify-content:center;min-height:42px;padding:8px 14px;border:1px solid var(--green-line-soft);border-radius:10px;background:var(--green-tint);color:var(--green-dark);font:inherit;font-size:12px;font-weight:600;white-space:nowrap;cursor:pointer;touch-action:manipulation;-webkit-tap-highlight-color:transparent;box-sizing:border-box;box-shadow:var(--shadow-card);transition:background 0.15s ease,border-color 0.15s ease,transform 0.1s ease; }
+.trigger-pad { padding:2px 0 3px; }
+.trigger-input-num { width:100%;padding:8px 6px;border-radius:8px;border:1px solid var(--line);background:var(--surface-muted);color:var(--text);font-size:13px;font-weight:600;outline:none;box-sizing:border-box; }
+.trigger-phrase-btn { display:inline-flex;align-items:center;justify-content:center;min-height:34px;padding:6px 10px;border:1px solid var(--green-line-soft);border-radius:10px;background:var(--green-tint);color:var(--green-dark);font:inherit;font-size:11px;font-weight:600;white-space:nowrap;cursor:pointer;touch-action:manipulation;-webkit-tap-highlight-color:transparent;box-sizing:border-box;box-shadow:var(--shadow-card);transition:background 0.15s ease,border-color 0.15s ease,transform 0.1s ease; }
 .trigger-phrase-btn:active { background:var(--surface-muted);transform:scale(0.96); }
 .trigger-phrase-btn:focus-visible { outline:2px solid var(--green);outline-offset:-2px; }
-.trigger-desc { font-size:11px;color:var(--text-muted);margin:4px 8px 8px;line-height:1.3; }
-.speed-input-inline { width:60px !important;padding:10px 8px !important;text-align:center;font-size:14px !important;border-radius:8px !important;border:1px solid var(--line) !important;flex-shrink:0; }
+.trigger-desc { font-size:10px;color:var(--text-muted);margin:2px 4px 4px;line-height:1.25; }
+.speed-input-inline { width:60px !important;padding:8px 6px !important;text-align:center;font-size:13px !important;border-radius:8px !important;border:1px solid var(--line) !important;flex-shrink:0; }
 
 /* ============================================
    Стили карты (общие)
@@ -1273,10 +1273,10 @@ button, input, select, textarea {
 
 .settings-group {
     border-radius: var(--radius-control);
-    padding: 8px;
+    padding: 6px;
     display: flex;
     flex-direction: column;
-    gap: 10px;
+    gap: 6px;
 }
 
 /* Авторский display:flex иначе перебивает UA-правило [hidden]. */
@@ -1285,7 +1285,7 @@ button, input, select, textarea {
 }
 
 .settings-group + .settings-group {
-    margin-top: 12px;
+    margin-top: 6px;
 }
 
 /* Блок аккаунта в настройках (navigator3) */
@@ -1378,25 +1378,27 @@ button, input, select, textarea {
 .trigger-setting-row {
     display: flex;
     flex-direction: column;
+    gap: 0;
+    padding-bottom: 3px;
 }
 
 .trigger-setting-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 14px;
-    padding: 0 0 6px 0;
+    gap: 10px;
+    padding: 0 0 3px 0;
 }
 
 .trigger-setting-row .label {
-    font-size: 14px;
+    font-size: 13px;
     font-weight: 600;
     color: var(--text);
     flex: 1;
 }
 
 .trigger-setting-row .value {
-    font-size: 14px;
+    font-size: 13px;
     font-weight: 700;
     color: var(--text-muted);
     min-width: 28px;
@@ -1405,7 +1407,7 @@ button, input, select, textarea {
 
 .trigger-setting-row input[type="range"] {
     width: 100%;
-    height: 32px;
+    height: 24px;
     margin: 0;
     padding: 0;
     accent-color: var(--green);
@@ -1416,8 +1418,8 @@ button, input, select, textarea {
 }
 
 .trigger-setting-row input[type="range"]::-webkit-slider-runnable-track {
-    height: 10px;
-    border-radius: 5px;
+    height: 6px;
+    border-radius: 3px;
     background: var(--surface-muted);
 }
 
