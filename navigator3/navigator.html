@@ -2325,12 +2325,13 @@ if (typeof maplibregl === 'undefined') {
                 setPlayBtnState(false);
                 return;
             }
-            APP.navCurrentIndex = nextIdx;
-            APP._driveShowFrom = nextIdx;
+            // Не переключаем панель — оставить текущую точку (которую только что озвучили)
+            // APP.navCurrentIndex уже указывает на неё
+            APP._driveShowFrom = APP.navCurrentIndex;
             renderRoutePoints();
             updateHud();
             updatePointsListActive();
-            driveAlongPath(currentIdx);
+            driveAlongPath(APP.navCurrentIndex);
         };
         const doPlay = () => playPointAudio(p, startSimAfterAudio);
         APP._simForceZoom ? setTimeout(doPlay, 2000) : doPlay();
