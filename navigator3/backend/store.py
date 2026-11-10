@@ -171,7 +171,7 @@ def upsert_user(yandex_id, login, email, display_name):
         UPDATE users
         SET login = $login,
             email = $email,
-            display_name = $display_name,
+            display_name = CASE WHEN display_name IS NULL OR display_name = '' THEN $display_name ELSE display_name END,
             last_login_at = $now
         WHERE yandex_id = $yandex_id;
     """
