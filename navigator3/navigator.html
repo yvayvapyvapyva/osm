@@ -2430,14 +2430,13 @@ if (typeof maplibregl === 'undefined') {
         </header>
         <div class="settings-body">
             <div class="settings-group">
-                <div class="settings-label">Настройки оповещений</div>
+                <div class="settings-label">Детекция ударов</div>
                 <div class="trigger-setting-row">
                     <div class="trigger-setting-header">
                         <label class="toggle-switch">
                             <input type="checkbox" class="toggle-input" id="triggerShockToggle" onchange="updateShockDisplay();applyShockConfig()">
                             <span class="toggle-slider"></span>
                         </label>
-                        <span class="label">Детекция ударов</span>
                         <span class="value" id="triggerShockVal">Выкл</span>
                     </div>
                     <div>
@@ -2448,14 +2447,16 @@ if (typeof maplibregl === 'undefined') {
                     </div>
                 </div>
                 <div class="trigger-desc">Оповещает о резком ударе или яме, если удар превышает заданный порог.</div>
+            </div>
 
+            <div class="settings-group">
+                <div class="settings-label">Превышение скорости</div>
                 <div class="trigger-setting-row">
                     <div class="trigger-setting-header">
                         <label class="toggle-switch">
                             <input type="checkbox" class="toggle-input" id="triggerSpeedAlertToggle" onchange="applySpeedConfig()">
                             <span class="toggle-slider"></span>
                         </label>
-                        <span class="label">Превышение скорости</span>
                         <input type="text" inputmode="numeric" pattern="[0-9]*" id="triggerSpeedAlert" value="58" class="trigger-input-num speed-input-inline" oninput="this.value=this.value.replace(/[^0-9]/g,'');applySpeedConfig()">
                     </div>
                     <div>
@@ -2465,14 +2466,16 @@ if (typeof maplibregl === 'undefined') {
                     </div>
                 </div>
                 <div class="trigger-desc">Оповещает, если превышена установленная максимальная скорость движения.</div>
+            </div>
 
+            <div class="settings-group">
+                <div class="settings-label">Резкое торможение</div>
                 <div class="trigger-setting-row">
                     <div class="trigger-setting-header">
                         <label class="toggle-switch">
                             <input type="checkbox" class="toggle-input" id="triggerBrakeToggle" onchange="applyBrakeConfig()">
                             <span class="toggle-slider"></span>
                         </label>
-                        <span class="label">Резкое торможение</span>
                         <span class="value" id="triggerBrakeVal">Выкл</span>
                     </div>
                     <div>
