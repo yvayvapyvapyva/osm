@@ -1754,6 +1754,7 @@ function updatePointsListDist() {
 
 function setTarget(i) {
     APP.navCurrentIndex = i;
+    APP._simCurPos = null;
     renderRoutePoints();
     updateHud();
     fitMapToCurrentTarget();
