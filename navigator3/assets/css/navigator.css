@@ -1460,7 +1460,7 @@ button, input, select, textarea {
 
 .screen-panel {
     position: absolute;
-    top: var(--screen-top);
+    top: calc(var(--screen-top) + 74px);
     bottom: 0;
     left: 0;
     right: 0;
