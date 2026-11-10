@@ -1697,7 +1697,7 @@ button, input, select, textarea {
 }
 
 /* ============================================
-   Нижняя навигационная панель (стиль Telegram / Instagram)
+   Нижняя навигационная панель (стиль Telegram)
    ============================================ */
 .bottom-nav {
     position: fixed;
@@ -1712,64 +1712,64 @@ button, input, select, textarea {
     box-sizing: border-box;
 }
 
-/* Плавающая pill-подобная панель по центру */
+/* Pill-контейнер по центру */
 .bottom-nav-container {
+    position: relative;
     display: flex;
     align-items: center;
-    gap: 8px;
     height: 56px;
-    padding: 6px 10px;
-    max-width: 560px;
+    padding: 6px 8px;
+    max-width: 640px;
     width: 100%;
-    border-radius: 28px;
-    background: color-mix(in srgb, var(--surface) 88%, transparent);
-    backdrop-filter: blur(24px) saturate(1.5);
-    -webkit-backdrop-filter: blur(24px) saturate(1.5);
+    border-radius: 26px;
+    background: color-mix(in srgb, var(--surface) 92%, transparent);
+    backdrop-filter: blur(20px) saturate(1.4);
+    -webkit-backdrop-filter: blur(20px) saturate(1.4);
     border: 1px solid var(--line-surface);
     box-shadow: var(--shadow-float);
     box-sizing: border-box;
 }
 
+/* Кнопки без фона, без рамок — только иконка + текст */
 .bottom-nav-btn {
     flex: 1;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 4px;
+    gap: 3px;
     min-width: 0;
-    padding: 6px 8px 4px;
+    padding: 8px 4px 6px;
     color: var(--text-muted);
     font-size: 10px;
-    font-weight: 700;
+    font-weight: 600;
     line-height: 1.05;
-    letter-spacing: 0.1px;
     cursor: pointer;
     touch-action: manipulation;
-    transition: color 0.2s ease, filter 0.2s ease;
-    background: transparent !important;
-    border: none !important;
-    border-radius: 0 !important;
-    outline: none !important;
-    box-shadow: none !important;
+    transition: color 0.18s ease, transform 0.12s ease;
+    background: transparent;
+    border: none;
+    border-radius: 0;
+    outline: none;
+    box-shadow: none;
     -webkit-tap-highlight-color: transparent;
 }
 
 .bottom-nav-btn svg {
     display: block;
-    width: 24px;
-    height: 24px;
+    width: 22px;
+    height: 22px;
     fill: currentColor;
     flex-shrink: 0;
-    transition: transform 0.2s ease, filter 0.2s ease;
+    transition: transform 0.18s ease, filter 0.18s ease;
 }
 
 .bottom-nav-btn span {
+    display: block;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
     max-width: 100%;
-    display: block;
 }
 
 .bottom-nav-btn:active:not(.active) {
@@ -1777,40 +1777,42 @@ button, input, select, textarea {
     color: var(--text-soft);
 }
 
-/* Активная вкладка — только она получает pill-заливку, как в Telegram */
+/* Активная вкладка — pill-заливка только под активной кнопкой, как в Telegram */
 .bottom-nav-btn.active {
     color: var(--green);
-    background: var(--green-tint-strong) !important;
-    border-radius: 20px !important;
-    box-shadow: 0 0 0 1px var(--green-line-soft);
+    background: var(--green-tint-strong);
+    border-radius: 16px;
 }
 
 .bottom-nav-btn.active svg {
     color: var(--green);
-    filter: drop-shadow(0 0 8px var(--green-glow));
-    transform: scale(1.05);
+    filter: drop-shadow(0 0 6px var(--green-glow));
 }
 
 .bottom-nav-btn.active span {
-    font-weight: 800;
+    font-weight: 700;
+    color: var(--green);
 }
 
 @media (max-width: 380px) {
     .bottom-nav-container {
         height: 52px;
-        padding: 5px 8px;
-        border-radius: 26px;
+        padding: 5px 6px;
+        border-radius: 24px;
     }
 
     .bottom-nav-btn {
-        padding: 5px 6px 3px;
-        border-radius: 18px;
+        padding: 7px 3px 5px;
         font-size: 9px;
     }
 
     .bottom-nav-btn svg {
-        width: 22px;
-        height: 22px;
+        width: 20px;
+        height: 20px;
+    }
+
+    .bottom-nav-btn.active {
+        border-radius: 14px;
     }
 }
 
