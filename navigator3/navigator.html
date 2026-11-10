@@ -1357,7 +1357,7 @@ function ensureRouteLayers() {
                 source: ROUTE_SOURCE_ID,
                 filter: ['==', ['get', 'priority'], 30],
                 layout: { 'line-join': 'round', 'line-cap': 'round' },
-                paint: { 'line-color': ['get', 'color'], 'line-width': 12, 'line-opacity': 0.9 }
+                paint: { 'line-color': ['get', 'color'], 'line-width': 12, 'line-opacity': 0.35 }
             });
         }
         if (!APP.map.getLayer('nav-routes-active-casing')) {
@@ -1494,7 +1494,7 @@ function renderRoutePoints() {
         const isKeyPoint = isCurrent || isPrevious || isNext;
         const shouldShow = isKeyPoint || !isPassed;
         const markerSize = isCurrent ? 64 : (isNext || isPrevious ? 48 : 30);
-        const markerOpacity = isCurrent || isNext ? '' : '0.9';
+        const markerOpacity = isCurrent || isNext ? '' : (isPrevious ? '0.9' : '0.5');
 
         const markerZIndex = isCurrent ? 100 : (isNext ? 90 : 10);
 
@@ -1519,8 +1519,8 @@ function renderRoutePoints() {
                     coordinates: p.pts.map(pt => [pt[1], pt[0]])
                 },
                 properties: {
-                    color: isCurrent ? p.hex : hexToRgba(p.hex, 0.9),
-                    casingColor: 'rgba(18,28,46,0.9)',
+                    color: isCurrent ? p.hex : (isPrevious ? hexToRgba(p.hex, 0.9) : hexToRgba(p.hex, 0.5)),
+                    casingColor: isPrevious ? 'rgba(18,28,46,0.9)' : 'rgba(18,28,46,0.65)',
                     casingWidth: isCurrent ? 12 : 8,
                     width: isCurrent ? 8 : 6,
                     priority: isCurrent ? 30 : 10
@@ -1544,7 +1544,7 @@ function renderRoutePoints() {
             // Следующая точка важнее остальных: номер должен читаться,
             // поэтому приглушаем её меньше, чем пройденные и дальние.
             if (pt.placemark.element) {
-                pt.placemark.element.style.opacity = isNext ? '0.75' : '0.9';
+                pt.placemark.element.style.opacity = isNext ? '0.75' : (isPrev ? '0.9' : '0.5');
             }
             mapAddChild(pt.placemark);
         }
