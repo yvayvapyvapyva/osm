@@ -1746,7 +1746,7 @@ button, input, select, textarea {
     gap: 3px;
     min-width: 0;
     padding: 6px 8px 4px;
-    color: var(--text-muted);
+    color: var(--text);
     font-size: 10px;
     font-weight: 600;
     line-height: 1.05;
@@ -1784,7 +1784,7 @@ button, input, select, textarea {
 
 .bottom-nav-btn:active:not(.active) {
     transform: scale(0.94);
-    color: var(--text-soft);
+    color: var(--text);
 }
 
 /* Активная вкладка — светящаяся рамка-пилюля, как на gdebenz.ru */
