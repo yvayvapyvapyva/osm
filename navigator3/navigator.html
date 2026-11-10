@@ -126,6 +126,14 @@
             </svg>
             <span>Настройки</span>
         </button>
+        <button type="button" class="bottom-nav-btn" data-tab="driving">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <circle cx="12" cy="12" r="9"/>
+                <path d="M5.4 5.4l13.2 13.2"/>
+                <path d="M9.4 14.6l.4-2.4a.4.4 0 0 1 .4-.4h2.4a.4.4 0 0 1 .4.4l.4 2.4"/>
+            </svg>
+            <span>Контроль вождения</span>
+        </button>
     </div>
 </div>
 
@@ -1133,6 +1141,7 @@ function updateTiltState() {
 function closeAllSheets() {
     closePointsList();
     closeSettings();
+    closeDrivingControl();
     closeInstruction();
     if (typeof MenuModule !== 'undefined') MenuModule.hide();
 }
@@ -1141,15 +1150,8 @@ function openSettings() {
     if (!$('navSettingsModal').classList.contains('hidden')) { closeSettings(); return; }
     closeAllSheets();
     renderMapSettings();
-    const shockOn = APP.navConfig.SHOCK_THRESHOLD > 0;
-    $('triggerShockToggle').checked = shockOn;
-    $('triggerShock').value = shockOn ? APP.navConfig.SHOCK_THRESHOLD : 1;
-    $('triggerShockPhrase').value = APP.navConfig.SHOCK_PHRASE;
-    const speedOn = APP.navConfig.SPEED_ALERT_THRESHOLD > 0;
-    $('triggerSpeedAlertToggle').checked = speedOn;
-    $('triggerSpeedAlert').value = speedOn ? APP.navConfig.SPEED_ALERT_THRESHOLD : 58;
-    $('triggerSpeedAlertPhrase').value = APP.navConfig.SPEED_ALERT_PHRASE;
-    $('triggerShockVal').textContent = shockOn ? APP.navConfig.SHOCK_THRESHOLD + 'g' : 'Выкл';
+    $('themeToggle').checked = document.documentElement.getAttribute('data-theme') === 'dark';
+    $('themeValue').textContent = document.documentElement.getAttribute('data-theme') === 'dark' ? 'Вкл' : 'Выкл';
     $('commentToggle').checked = APP._commentEnabled;
     $('navSettingsModal').classList.remove('hidden');
 }
@@ -1161,6 +1163,25 @@ function hideScreen(modalId) {
 
 function closeSettings() {
     hideScreen('navSettingsModal');
+}
+
+function openDrivingControl() {
+    if (!$('drivingControlModal').classList.contains('hidden')) { closeDrivingControl(); return; }
+    closeAllSheets();
+    const shockOn = APP.navConfig.SHOCK_THRESHOLD > 0;
+    $('triggerShockToggle').checked = shockOn;
+    $('triggerShock').value = shockOn ? APP.navConfig.SHOCK_THRESHOLD : 1;
+    $('triggerShockPhrase').value = APP.navConfig.SHOCK_PHRASE;
+    const speedOn = APP.navConfig.SPEED_ALERT_THRESHOLD > 0;
+    $('triggerSpeedAlertToggle').checked = speedOn;
+    $('triggerSpeedAlert').value = speedOn ? APP.navConfig.SPEED_ALERT_THRESHOLD : 58;
+    $('triggerSpeedAlertPhrase').value = APP.navConfig.SPEED_ALERT_PHRASE;
+    $('triggerShockVal').textContent = shockOn ? APP.navConfig.SHOCK_THRESHOLD + 'g' : 'Выкл';
+    $('drivingControlModal').classList.remove('hidden');
+}
+
+function closeDrivingControl() {
+    hideScreen('drivingControlModal');
 }
 
 function getNavIconSvg(col, txt, isCurr = false, hasComm = false) {
@@ -2316,6 +2337,31 @@ if (typeof maplibregl === 'undefined') {
             </div>
 
             <div class="settings-group">
+                <div class="settings-label">Комментарии</div>
+                <div class="trigger-setting-row">
+                    <div class="trigger-setting-header">
+                        <label class="toggle-switch">
+                            <input type="checkbox" class="toggle-input" id="commentToggle" checked onchange="applyCommentConfig()">
+                            <span class="toggle-slider"></span>
+                        </label>
+                        <span class="label">Включить отображение и озвучивание</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="drivingControlModal" class="hidden screen-modal">
+    <div class="screen-panel" id="drivingControlScreen">
+        <header class="screen-head">
+            <h1 class="screen-title">Контроль вождения</h1>
+            <button type="button" class="screen-close" onclick="closeDrivingControl()" aria-label="Закрыть">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+            </button>
+        </header>
+        <div class="settings-body">
+            <div class="settings-group">
                 <div class="settings-label">Настройки оповещений</div>
                 <div class="trigger-setting-row">
                     <div class="trigger-setting-header">
@@ -2350,19 +2396,6 @@ if (typeof maplibregl === 'undefined') {
                     </div>
                 </div>
             </div>
-
-            <div class="settings-group">
-                <div class="settings-label">Комментарии</div>
-                <div class="trigger-setting-row">
-                    <div class="trigger-setting-header">
-                        <label class="toggle-switch">
-                            <input type="checkbox" class="toggle-input" id="commentToggle" checked onchange="applyCommentConfig()">
-                            <span class="toggle-slider"></span>
-                        </label>
-                        <span class="label">Включить отображение и озвучивание</span>
-                    </div>
-                </div>
-            </div>
         </div>
     </div>
 </div>
@@ -2393,6 +2426,7 @@ if (typeof maplibregl === 'undefined') {
     const sync = () => {
         if (isOpen('jsonModal')) setActive('routes');
         else if (isOpen('navSettingsModal')) setActive('settings');
+        else if (isOpen('drivingControlModal')) setActive('driving');
         else if (isOpen('instructionModal')) setActive('instruction');
         else tabs.forEach(tab => {
             tab.classList.remove('active');
@@ -2423,6 +2457,8 @@ if (typeof maplibregl === 'undefined') {
             else openInstruction();
         } else if (name === 'settings') {
             if (typeof openSettings === 'function') openSettings();
+        } else if (name === 'driving') {
+            if (typeof openDrivingControl === 'function') openDrivingControl();
         } else if (typeof closeAllSheets === 'function') {
             closeAllSheets();
         }
@@ -2440,6 +2476,7 @@ if (typeof maplibregl === 'undefined') {
     };
 
     observe('navSettingsModal');
+    observe('drivingControlModal');
     observe('instructionModal');
     if (!observe('jsonModal')) {
         const wait = new MutationObserver(() => {
