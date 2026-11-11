@@ -784,6 +784,24 @@ button, input, select, textarea {
     transition: opacity 0.35s ease;
     pointer-events: none;
 }
+/* Значение точки пика: подпись под ней, у краёв экрана не обрезается. */
+#shockBarPeakValue {
+    position: absolute;
+    top: 9px;
+    left: 0;
+    transform: translateX(-50%);
+    font-size: 9px;
+    font-weight: 800;
+    color: var(--text);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.3px;
+    text-shadow: 0 1px 3px rgba(255, 255, 255, 0.95), 0 0 6px var(--text-faint);
+    line-height: 1;
+    white-space: nowrap;
+    opacity: 0;
+    transition: opacity 0.35s ease;
+    pointer-events: none;
+}
 #shockBarValue {
     position: absolute;
     top: calc(50% - 2px);
