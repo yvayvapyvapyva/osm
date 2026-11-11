@@ -543,6 +543,9 @@ function endSimulation() {
     stopDrive();
     APP._simMode = false;
     updateTiltState();
+    // stopDrive() сбрасывает _driveShowFrom, но сам по себе не перерисовывает
+    // маршрут: без этого после финиша остаются скрытыми пройденные точки.
+    renderRoutePoints();
 }
 
 // Новая текущая цель симуляции: панель, зелёное кольцо и список точек.
@@ -552,6 +555,19 @@ function setSimTarget(idx) {
     APP._driveShowFrom = idx;
     renderRoutePoints();
     updatePointsListActive();
+}
+
+// Последняя точка маршрута: следующей точки нет, но собственный путь точки —
+// это финишный хвост маршрута. Доезжаем его и только потом завершаем
+// симуляцию, иначе анимация обрывается, не доходя до конца линии.
+function driveLastPointPath(idx) {
+    const p = APP.navPoints[idx];
+    if (!p || !p.pts || p.pts.length < 2) {
+        endSimulation();
+        return;
+    }
+    setSimTarget(idx);
+    driveAlongPath(idx);
 }
 
 function driveAlongPath(fromIdx) {
@@ -668,9 +684,14 @@ function driveAlongPath(fromIdx) {
             playPointAudio(APP.navPoints[nextIdx], () => {
                 if (simSeq !== APP._simSeq || APP._driveActive) return;
                 const targetIdx = nextIdx + 1;
+                if (targetIdx >= APP.navPoints.length) {
+                    // Приехали в последнюю точку: следующей нет, но её путь —
+                    // финишный хвост маршрута, его тоже проезжаем.
+                    driveLastPointPath(nextIdx);
+                    return;
+                }
                 const target = APP.navPoints[targetIdx];
-                if (targetIdx >= APP.navPoints.length || !target ||
-                    !target.pts || target.pts.length < 2) {
+                if (!target || !target.pts || target.pts.length < 2) {
                     endSimulation();
                     return;
                 }
@@ -2348,13 +2369,16 @@ if (typeof maplibregl === 'undefined') {
         }
         const idx = APP.navCurrentIndex;
         // Цель в панели — точка idx, едем по пути предыдущей точки (idx - 1).
-        if (APP._driveResume && APP._driveResume.idx === idx - 1) {
+        // На паузе посреди хвоста последней точки путь и цель совпадают.
+        const resumeIdx = APP._driveResume ? APP._driveResume.idx : -1;
+        const isLastTarget = idx >= APP.navPoints.length - 1;
+        if (APP._driveResume && (resumeIdx === idx - 1 || (isLastTarget && resumeIdx === idx))) {
             disableAutoCenter();
             APP._simMode = true;
             APP._simForceZoom = false;
             updateTiltState();
             setSimTarget(idx);
-            driveAlongPath(idx - 1);
+            driveAlongPath(resumeIdx);
             return;
         }
         const p = APP.navPoints[idx];
@@ -2386,7 +2410,9 @@ if (typeof maplibregl === 'undefined') {
             if (simSeq !== APP._simSeq || APP._driveActive) return;
             const nextIdx = idx + 1;
             if (nextIdx >= APP.navPoints.length) {
-                endSimulation();
+                // Последняя точка: следующей нет, поэтому едем её собственный
+                // путь до конца маршрута.
+                driveLastPointPath(idx);
                 return;
             }
             // После озвучки командой текущей цели становится следующая точка,
