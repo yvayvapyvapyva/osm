@@ -133,7 +133,6 @@
 <div id="shockBar">
     <div id="shockBarFill"></div>
     <div id="shockBarPeak" aria-hidden="true"></div>
-    <span id="shockBarPeakValue" aria-hidden="true"></span>
     <span id="shockBarValue">0.0</span>
 </div>
 
@@ -1094,7 +1093,6 @@ function onMotion(event) {
 let _shockFill = null;
 let _shockLabel = null;
 let _shockPeak = null;
-let _shockPeakLabel = null;
 let _shockLastG = -1;
 let _shockLastColor = '';
 let _shockPeakLastG = -1;
@@ -1137,7 +1135,6 @@ function updateShockBar(g) {
     if (!_shockFill) _shockFill = $('shockBarFill');
     if (!_shockLabel) _shockLabel = $('shockBarValue');
     if (!_shockPeak) _shockPeak = $('shockBarPeak');
-    if (!_shockPeakLabel) _shockPeakLabel = $('shockBarPeakValue');
     if (!_shockFill) return;
 
     const value = Math.max(0, g);
@@ -1161,18 +1158,14 @@ function updateShockBar(g) {
     if (Math.abs(peak - _shockPeakLastG) >= 0.01) {
         _shockPeakLastG = peak;
         const pct = shockBarPercent(peak);
-        /* У краёв экрана сдвигаем точку и подпись внутрь, чтобы не обрезались. */
-        _shockPeak.style.left = `clamp(4px, ${pct}%, calc(100% - 4px))`;
+        /* У краёв экрана сдвигаем точку внутрь, чтобы она не обрезалась. */
+        _shockPeak.style.left = `clamp(20px, ${pct}%, calc(100% - 20px))`;
         _shockPeak.style.background = shockBarColor(peak);
-        if (_shockPeakLabel) {
-            _shockPeakLabel.textContent = peak > 0 ? peak.toFixed(2) : '';
-            _shockPeakLabel.style.left = `clamp(16px, ${pct}%, calc(100% - 16px))`;
-        }
+        _shockPeak.textContent = peak > 0 ? peak.toFixed(2) : '';
     }
     if (showPeak !== _shockPeakShown) {
         _shockPeakShown = showPeak;
         _shockPeak.style.opacity = showPeak ? '1' : '0';
-        if (_shockPeakLabel) _shockPeakLabel.style.opacity = showPeak ? '1' : '0';
     }
 }
 
