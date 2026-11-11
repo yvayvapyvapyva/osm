@@ -768,6 +768,22 @@ button, input, select, textarea {
     width: 0%;
     background: var(--green);
 }
+/* Точка пика: держится на максимуме, потом плавно гаснет. */
+#shockBarPeak {
+    position: absolute;
+    top: 50%;
+    left: 0;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--green);
+    border: 1px solid rgba(255, 255, 255, 0.9);
+    box-shadow: 0 0 4px rgba(0, 0, 0, 0.35);
+    transform: translate(-50%, -50%);
+    opacity: 0;
+    transition: opacity 0.35s ease;
+    pointer-events: none;
+}
 #shockBarValue {
     position: absolute;
     top: calc(50% - 2px);
