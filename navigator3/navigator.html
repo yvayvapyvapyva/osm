@@ -1836,9 +1836,43 @@ function updatePointsListActive() {
 function fitMapToCurrentTarget() {
     const p = APP.navPoints[APP.navCurrentIndex];
     if (!p || !p.pts || p.pts.length < 1 || !APP.map) return;
-    const [latitude, longitude] = p.pts[0];
-    if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return;
-    setMapLocation([latitude, longitude], undefined, undefined, 400);
+    
+    const coords = p.pts;
+    if (coords.length === 1) {
+        const [lat, lng] = coords[0];
+        if (Number.isFinite(lat) && Number.isFinite(lng)) {
+            setMapLocation([lat, lng], undefined, undefined, 400);
+        }
+        return;
+    }
+    
+    let minLat = coords[0][0], maxLat = coords[0][0];
+    let minLng = coords[0][1], maxLng = coords[0][1];
+    for (let i = 1; i < coords.length; i++) {
+        const [lat, lng] = coords[i];
+        if (!Number.isFinite(lat) || !Number.isFinite(lng)) continue;
+        if (lat < minLat) minLat = lat;
+        if (lat > maxLat) maxLat = lat;
+        if (lng < minLng) minLng = lng;
+        if (lng > maxLng) maxLng = lng;
+    }
+    
+    if (minLat === maxLat || minLng === maxLng) {
+        const [lat, lng] = coords[0];
+        setMapLocation([lat, lng], undefined, undefined, 400);
+        return;
+    }
+    
+    const bounds = [
+        [minLng, minLat],
+        [maxLng, maxLat]
+    ];
+    
+    APP.map.fitBounds(bounds, {
+        padding: { top: 120, bottom: 180, left: 24, right: 24 },
+        maxZoom: 18,
+        duration: 400
+    });
 }
 
 
