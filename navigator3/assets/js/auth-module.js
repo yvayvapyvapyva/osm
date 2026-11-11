@@ -85,8 +85,14 @@ const AuthModule = {
             window.location.pathname +
             window.location.search +
             window.location.hash;
-        window.location.href =
-            '/auth/yandex/start?return=' + encodeURIComponent(returnTo);
+        // base — origin, на котором должен закончиться вход: на публичном
+        // домене он совпадает с PUBLIC_BASE_URL, редактор на домене шлюза
+        // передаёт свой. Бэкенд принимает только адреса из белого списка.
+        const params = new URLSearchParams({
+            return: returnTo,
+            base: window.location.origin,
+        });
+        window.location.href = '/auth/yandex/start?' + params.toString();
     },
 
     async logout() {

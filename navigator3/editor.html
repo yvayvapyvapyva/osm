@@ -620,6 +620,13 @@ async function initializeEditorAuth() {
     const error = $('editorAuthError');
     const message = $('editorAuthMessage');
     const login = $('editorAuthLogin');
+    const returnTo = window.location.pathname + window.location.search + window.location.hash;
+    // Редактор открывается на домене шлюза (CDN перед ainstruktor.ru запрещает
+    // POST, а сохранение идёт через POST /api/admin). Вход должен закончиться
+    // на том же хосте, поэтому передаём свой origin параметром base.
+    const startUrl = '/auth/yandex/start?return=' + encodeURIComponent(returnTo)
+        + '&base=' + encodeURIComponent(window.location.origin);
+    login.href = startUrl;
     try {
         const response = await fetch('/api/me', {
             credentials: 'same-origin',
@@ -627,8 +634,7 @@ async function initializeEditorAuth() {
             cache: 'no-store'
         });
         if (response.status === 401) {
-            const returnTo = window.location.pathname + window.location.search + window.location.hash;
-            window.location.replace('/auth/yandex/start?return=' + encodeURIComponent(returnTo));
+            window.location.replace(startUrl);
             return;
         }
         if (!response.ok) {

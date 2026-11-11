@@ -61,15 +61,30 @@ def alternate_base_urls():
 
 
 def base_url_for_event(event=None):
-    """Origin для OAuth-callback — всегда публичный домен.
+    """Origin, на котором должен закончиться вход.
 
-    Раньше здесь брался заголовок Host, но CDN перед публичным доменом
-    подменяет его на адрес шлюза. Тогда redirect_uri уводил пользователя на
-    служебный домен, и cookie сессии оказывалась на чужом хосте. OAuth-cookie
-    живут на конкретном хосте, поэтому вход должен заканчиваться ровно там,
-    откуда пользователь его начал, то есть на PUBLIC_BASE_URL.
+    По умолчанию — PUBLIC_BASE_URL: CDN перед публичным доменом подменяет
+    заголовок Host на адрес шлюза, поэтому верить Host нельзя. Редактор
+    при этом открывается прямо на домене шлюза (там разрешён POST), и ему
+    нужно закончить вход на том же хосте, иначе state-cookie не совпадёт.
+    Такой origin передаётся параметром base и принимается только из белого
+    списка (PUBLIC_BASE_URL и PUBLIC_ALTERNATE_URLS).
     """
-    return public_base_url()
+    base = public_base_url()
+    if not event:
+        return base
+    query = event.get("queryStringParameters") or {}
+    raw = query.get("base") if isinstance(query, dict) else ""
+    if not isinstance(raw, str):
+        return base
+    candidate = raw.strip().rstrip("/")
+    if not candidate:
+        return base
+    for item in [base] + alternate_base_urls():
+        item = item.rstrip("/")
+        if item.lower() == candidate.lower():
+            return item
+    return base
 
 
 def client_id():

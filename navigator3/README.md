@@ -158,7 +158,7 @@ owner_user_id Utf8         -- users.user_id владельца маршрута
 | GET | `/api/folder?folder_id=<id>` | содержимое папки с геометрией её маршрутов |
 | GET | `/api/route?m=<m>` | маршрут с `data` |
 | POST | `/api/admin?action=...` | операции редактора |
-| GET | `/auth/yandex/start?return=/...` | 302 на Яндекс + state-cookie |
+| GET | `/auth/yandex/start?return=/...&base=https://...` | 302 на Яндекс + state-cookie |
 | GET | `/auth/yandex/callback` | 302 обратно + sid-cookie |
 | GET | `/auth/logout?t=<token>&return=/...` | 302 обратно + удаление cookie |
 | POST | `/auth/logout` | 200 + удаление cookie |
@@ -168,6 +168,12 @@ owner_user_id Utf8         -- users.user_id владельца маршрута
 до функции не доходит. Ссылка на выход подписана HMAC-токеном из `/api/me`
 (`logout_token`), чтобы разлогинить пользователя нельзя было переходом с
 чужого сайта.
+
+Параметр `base` задаёт origin, на котором закончится вход, и принимается
+только из списка `PUBLIC_BASE_URL` + `PUBLIC_ALTERNATE_URLS`. Он нужен
+редактору: он открывается на домене шлюза (там разрешён `POST /api/admin`),
+и `redirect_uri` должен указывать на тот же хост, иначе state-cookie не
+совпадёт с callback.
 
 ### Редактор
 
