@@ -465,10 +465,10 @@
         <div class="rep-setting">
             <span class="rep-switch on"></span>
             <span class="rep-phrase">Резкое торможение</span>
-            <span class="rep-setting-value">4 м/с²</span>
+            <span class="rep-setting-value">0.25g</span>
         </div>
-        <div class="rep-slider"><span class="rep-slider-fill" style="width:43%"></span><span class="rep-slider-knob" style="left:43%"></span></div>
-        <div class="rep-slider-caption"><span>Интенсивность 1–8 м/с²</span></div>
+        <div class="rep-slider"><span class="rep-slider-fill" style="width:14%"></span><span class="rep-slider-knob" style="left:14%"></span></div>
+        <div class="rep-slider-caption"><span>Интенсивность 0.05–1.5 g</span></div>
         <div class="rep-slider"><span class="rep-slider-fill" style="width:21%"></span><span class="rep-slider-knob" style="left:21%"></span></div>
         <div class="rep-slider-caption"><span>Время торможения 100–2000 мс</span><span>500 мс</span></div>
     </div>
@@ -476,7 +476,7 @@
     <ul>
         <li><strong>Сильный удар</strong> — «Сильный удар». Срабатывает при толчке сильнее порога (яма, лежачий полицейский). Ползунок 0.5–3 g, по умолчанию 1 g.</li>
         <li><strong>Превышение скорости</strong> — «Превышение скорости». Фраза звучит, когда скорость выше указанной в поле. По умолчанию 58 км/ч.</li>
-        <li><strong>Резкое торможение</strong> — «Резкое торможение». Нужны одновременно интенсивность выше порога и достаточное время торможения: интенсивность 1–8 м/с² (по умолчанию 4), время 100–2000 мс (по умолчанию 500).</li>
+        <li><strong>Резкое торможение</strong> — «Резкое торможение». Считается по той же величине, что и «Сильный удар» (отклонение ускорения от 1g), но порог ниже, а удар должен держаться заданное время — так ловится клевок в конце торможения, а яма или лежачий полицейский не считаются торможением. Интенсивность 0.05–1.5 g (по умолчанию 0.25), время 100–2000 мс (по умолчанию 500).</li>
     </ul>
     <p class="rep-hint">Датчики движения при первом включении требуют разрешения — приложение спросит его само. Если разрешение не выдано, переключатель вернётся в положение «Выкл».</p>
 
