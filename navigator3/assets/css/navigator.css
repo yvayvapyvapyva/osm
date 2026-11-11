@@ -1624,9 +1624,17 @@ button, input, select, textarea {
     align-items: center;
     justify-content: center;
     cursor: pointer;
-    border-radius: 50%;
+    border-radius: var(--radius-control);
+    width: 44px;
+    height: 44px;
+    padding: 4px;
+    position: relative;
+    cursor: pointer;
+    border: 1px solid var(--line);
+    background: var(--surface-muted);
     transition: transform 0.1s, opacity 0.1s;
     -webkit-tap-highlight-color: transparent;
+    box-sizing: border-box;
 }
 .pl-item-icon:active {
     transform: scale(0.85);

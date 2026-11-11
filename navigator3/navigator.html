@@ -1355,6 +1355,32 @@ function getPointBadgeSvg(hex, txt, size = 44) {
     return `<svg width="${size}" height="${size}" viewBox="0 0 20 20"><circle cx="10" cy="10" r="9" fill="#121A28"/><circle cx="10" cy="10" r="9" fill="${safeCol}" opacity="0.3"/><circle cx="10" cy="10" r="9" fill="none" stroke="${safeCol}" stroke-width="1.5"/><text x="10" y="10.5" font-size="8" font-family="Arial" font-weight="900" text-anchor="middle" dominant-baseline="middle" fill="#ffffff">${escapeHtml(String(txt ?? ''))}</text></svg>`;
 }
 
+function getPointBadgeSvgWithSpeaker(hex, txt, size = 44) {
+    const safeCol = /^#[0-9a-f]{6}$/i.test(hex) ? hex : '#007AFF';
+    const sz = Math.max(20, size);
+    const cx = sz / 2;
+    const cy = sz / 2;
+    const speakerSize = Math.max(12, sz * 0.36);
+    const speakerX = sz - speakerSize / 2 - 1;
+    const speakerY = sz - speakerSize / 2 - 1;
+    return `<svg width="${sz}" height="${sz}" viewBox="0 0 ${sz} ${sz}" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="#000" flood-opacity="0.25"/>
+    </filter>
+  </defs>
+  <circle cx="${cx}" cy="${cy}" r="${sz/2 - 2}" fill="#121A28" filter="url(#shadow)"/>
+  <circle cx="${cx}" cy="${cy}" r="9" fill="#121A28"/>
+  <circle cx="${cx}" cy="${cy}" r="9" fill="${safeCol}" opacity="0.3"/>
+  <circle cx="${cx}" cy="${cy}" r="9" fill="none" stroke="${safeCol}" stroke-width="1.5"/>
+  <text x="${cx}" y="${cy + 1}" font-size="${Math.max(8, sz * 0.36)}" font-family="Arial" font-weight="900" text-anchor="middle" dominant-baseline="middle" fill="#ffffff">${escapeHtml(String(txt ?? ''))}</text>
+  <g transform="translate(${speakerX - speakerSize/2}, ${speakerY - speakerSize/2})">
+    <rect x="0" y="0" width="${speakerSize}" height="${speakerSize}" rx="8" fill="#121A28" opacity="0.9"/>
+    <svg x="2" y="2" width="${speakerSize-4}" height="${speakerSize-4}" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4.702a.705.705 0 0 0-1.203-.498L6.413 7.587A1.4 1.4 0 0 1 5.416 8H3a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2.416a1.4 1.4 0 0 1 .997.413l3.383 3.384A.705.705 0 0 0 11 19.298z"/><path d="M16 9a5 5 0 0 1 0 6"/><path d="M19.364 18.364a9 9 0 0 0 0-12.728"/></svg>
+  </g>
+</svg>`;
+}
+
 window.getNavigatorPointIcon = getNavIconSvg;
 
 
@@ -1732,7 +1758,7 @@ function openPointsList() {
         return `<div class="${cls}" data-idx="${i}">
             <div class="pl-item-row"${activeStyle}>
                 <div class="pl-item-row-main">
-                    <div class="pl-item-icon" data-play="${i}">${getPointBadgeSvg(p.hex, p.id)}</div>
+                    <div class="pl-item-icon" data-play="${i}">${getPointBadgeSvgWithSpeaker(p.hex, p.id)}</div>
                     <div class="pl-item-text">${escapeHtml(p.cmd)}</div>
                     ${dist ? `<div class="pl-item-dist">${dist}</div>` : ''}
                 </div>
