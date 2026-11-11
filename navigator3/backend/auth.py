@@ -13,7 +13,7 @@ import os
 import secrets
 from datetime import datetime, timezone
 from urllib.error import HTTPError, URLError
-from urllib.parse import quote, unquote, urlencode, urlsplit
+from urllib.parse import quote, unquote, urlencode
 from urllib.request import Request, urlopen
 
 AUTHORIZE_URL = "https://oauth.yandex.ru/authorize"
@@ -61,27 +61,15 @@ def alternate_base_urls():
 
 
 def base_url_for_event(event=None):
-    """Возвращает origin текущего запроса, если он разрешён.
+    """Origin для OAuth-callback — всегда публичный домен.
 
-    OAuth-cookie живут на конкретном хосте, поэтому redirect_uri должен
-    указывать на тот же хост, с которого пользователь начал вход. Любой
-    другой Host сведётся к PUBLIC_BASE_URL.
+    Раньше здесь брался заголовок Host, но CDN перед публичным доменом
+    подменяет его на адрес шлюза. Тогда redirect_uri уводил пользователя на
+    служебный домен, и cookie сессии оказывалась на чужом хосте. OAuth-cookie
+    живут на конкретном хосте, поэтому вход должен заканчиваться ровно там,
+    откуда пользователь его начал, то есть на PUBLIC_BASE_URL.
     """
-    base = public_base_url()
-    if not event:
-        return base
-    host = ""
-    headers = event.get("headers") or {}
-    for key, value in headers.items():
-        if str(key).lower() == "host" and isinstance(value, str):
-            host = value.strip().lower()
-            break
-    if not host:
-        return base
-    for candidate in [base] + alternate_base_urls():
-        if urlsplit(candidate).netloc.lower() == host:
-            return candidate
-    return base
+    return public_base_url()
 
 
 def client_id():
@@ -328,6 +316,42 @@ def session_cookie(sid):
 
 def clear_session_cookie():
     return clear_cookie(SESSION_COOKIE, path="/")
+
+
+def signing_key():
+    """Ключ для подписи служебных токенов.
+
+    Отдельная переменная AUTH_SIGNING_KEY не обязательна: если её нет,
+    используется секрет OAuth-приложения.
+    """
+    raw = _env("AUTH_SIGNING_KEY") or _env("YANDEX_CLIENT_SECRET")
+    if not raw:
+        raise AuthConfigError("AUTH_SIGNING_KEY is not configured")
+    return raw.encode("utf-8")
+
+
+def logout_token(sid):
+    """Подпись сессии для выхода GET-запросом.
+
+    POST через CDN перед публичным доменом запрещён, поэтому выход делается
+    обычным переходом. Подпись нужна, чтобы выход нельзя было навязать
+    пользователю ссылкой с чужого сайта (CSRF): сама cookie HttpOnly и
+    прочитать её со стороны нельзя.
+    """
+    if not sid:
+        return ""
+    message = b"logout:" + sid.encode("ascii", "ignore")
+    return hmac.new(signing_key(), message, hashlib.sha256).hexdigest()[:32]
+
+
+def logout_token_valid(sid, token):
+    if not sid or not isinstance(token, str) or not token:
+        return False
+    try:
+        expected = logout_token(sid)
+    except AuthConfigError:
+        return False
+    return bool(expected) and hmac.compare_digest(expected, token)
 
 
 def _response_headers(extra=None):

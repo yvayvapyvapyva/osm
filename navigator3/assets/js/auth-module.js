@@ -7,6 +7,7 @@
  */
 const AuthModule = {
     user: null,
+    logoutToken: '',
     enabled: false,
     _initialized: false,
 
@@ -15,6 +16,7 @@ const AuthModule = {
         this._initialized = true;
         this._bind();
         this._showUrlError();
+        this._showLoggedOut();
         await this._load();
     },
 
@@ -43,8 +45,13 @@ const AuthModule = {
             if (response.ok) {
                 const data = await response.json();
                 this.user = data && data.user ? data.user : null;
+                this.logoutToken =
+                    data && typeof data.logout_token === 'string'
+                        ? data.logout_token
+                        : '';
             } else {
                 this.user = null;
+                this.logoutToken = '';
             }
             this.render();
         } catch (e) {
@@ -88,17 +95,47 @@ const AuthModule = {
             button.disabled = true;
             button.textContent = 'Выходим…';
         }
+        // CDN перед публичным доменом пропускает только GET, HEAD и OPTIONS,
+        // поэтому выходим обычным переходом по подписанной ссылке.
+        if (this.logoutToken) {
+            const url = new URL('/auth/logout', window.location.origin);
+            url.searchParams.set('t', this.logoutToken);
+            url.searchParams.set(
+                'return',
+                window.location.pathname + window.location.search
+            );
+            // replace, чтобы ссылка с токеном не оставалась в истории.
+            window.location.replace(url.toString());
+            return;
+        }
+        // Запасной путь для старых сборок бэкенда, где токена ещё нет.
         try {
-            await fetch('/auth/logout', {
+            const response = await fetch('/auth/logout', {
                 method: 'POST',
                 credentials: 'same-origin',
                 headers: { Accept: 'application/json' },
             });
+            if (!response.ok) throw new Error('HTTP ' + response.status);
         } catch (e) {
-            // Даже при сетевой ошибке перезагружаем страницу: cookie могла
-            // уже удалиться, а /api/me покажет актуальное состояние.
+            if (button) {
+                button.disabled = false;
+                button.textContent = 'Выйти';
+            }
+            if (typeof window.showToast === 'function') {
+                window.showToast('Не удалось выйти, попробуйте ещё раз', 'error', 4000);
+            }
+            return;
         }
         window.location.reload();
+    },
+
+    _showLoggedOut() {
+        const params = new URLSearchParams(window.location.search);
+        if (!params.get('logged_out')) return;
+        if (typeof window.showToast === 'function') {
+            window.showToast('Вы вышли из аккаунта', 'success', 4000);
+        }
+        this._cleanUrl(params, 'logged_out');
     },
 
     _showUrlError() {
@@ -114,12 +151,16 @@ const AuthModule = {
             storage_failed: 'Ошибка сохранения пользователя, попробуйте позже',
             blocked: 'Доступ для этого аккаунта заблокирован',
             auth_not_configured: 'Вход временно недоступен',
+            logout_failed: 'Не удалось выйти из аккаунта, попробуйте снова',
         };
         if (typeof window.showToast === 'function') {
             window.showToast(messages[code] || 'Не удалось войти', 'error', 5000);
         }
+        this._cleanUrl(params, 'auth_error');
+    },
 
-        params.delete('auth_error');
+    _cleanUrl(params, key) {
+        params.delete(key);
         const query = params.toString();
         const clean =
             window.location.pathname +

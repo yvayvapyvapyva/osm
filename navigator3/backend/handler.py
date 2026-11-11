@@ -9,7 +9,8 @@
 Вход:
   GET  /auth/yandex/start
   GET  /auth/yandex/callback
-  POST /auth/logout
+  GET  /auth/logout?t=<подпись>&return=<путь>  — выход (CDN запрещает POST)
+  POST /auth/logout                            — выход для прямых вызовов
 
 Редактор (нужна сессия Яндекс ID; данные ограничены владельцем):
   POST /api/admin?action=list|get|get_meta|save|save_meta|delete
@@ -771,6 +772,10 @@ def _auth_logout(event):
         return auth.json_response(403, {"error": "forbidden_origin"})
 
     sid = auth.parse_cookies(event).get(auth.SESSION_COOKIE)
+    method = _request_meta(event)[1]
+    if method == "GET":
+        return _auth_logout_get(event, sid)
+
     if sid:
         try:
             store.delete_session(sid)
@@ -780,6 +785,39 @@ def _auth_logout(event):
         200,
         {"status": "logged_out"},
         cookies=[auth.clear_session_cookie()],
+    )
+
+
+def _with_query(path, key, value):
+    """Добавляет query-параметр к локальному пути, не ломая существующие."""
+    if "?" not in path:
+        separator = "?"
+    elif path.endswith(("?", "&")):
+        separator = ""
+    else:
+        separator = "&"
+    return f"{path}{separator}{key}={value}"
+
+
+def _auth_logout_get(event, sid):
+    """Выход без POST: CDN перед публичным доменом разрешает только GET.
+
+    Ссылка подписана токеном из /api/me, поэтому посторонний сайт не может
+    разлогинить пользователя простым переходом.
+    """
+    params = _query(event)
+    return_to = auth.safe_return(params.get("return"), "/")
+    if not auth.logout_token_valid(sid, params.get("t")):
+        return auth.redirect_response(
+            _with_query(return_to, "auth_error", "logout_failed")
+        )
+    try:
+        store.delete_session(sid)
+    except Exception as exc:  # noqa: BLE001
+        print(f"[auth] session delete failed: {exc}")
+    return auth.redirect_response(
+        _with_query(return_to, "logged_out", "1"),
+        [auth.clear_session_cookie()],
     )
 
 
@@ -828,7 +866,12 @@ def _api_me(event):
     user = _current_user(event)
     if not user:
         return auth.json_response(401, {"error": "unauthorized"})
-    return auth.json_response(200, {"user": _public_user(user)})
+    payload = {"user": _public_user(user)}
+    sid = auth.parse_cookies(event).get(auth.SESSION_COOKIE)
+    token = auth.logout_token(sid)
+    if token:
+        payload["logout_token"] = token
+    return auth.json_response(200, payload)
 
 
 def _api_folder(event):
@@ -1270,7 +1313,7 @@ def _handle_api(event, path, method):
     if normalized == "/auth/yandex/callback" and method == "GET":
         return _auth_callback(event)
 
-    if normalized == "/auth/logout" and method == "POST":
+    if normalized == "/auth/logout" and method in ("GET", "POST"):
         return _auth_logout(event)
 
     return auth.json_response(404, {"error": "not_found"})

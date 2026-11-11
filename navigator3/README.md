@@ -153,14 +153,21 @@ owner_user_id Utf8         -- users.user_id владельца маршрута
 | Метод | Путь | Ответ |
 |---|---|---|
 | GET | `/api/health` | `{"status":"ok"}` |
-| GET | `/api/me` | `{"user":{...}}` или 401 |
+| GET | `/api/me` | `{"user":{...},"logout_token":"..."}` или 401 |
 | GET | `/api/catalog` | `{"folders":[...],"routes":[...],"user":...}` без геометрии |
 | GET | `/api/folder?folder_id=<id>` | содержимое папки с геометрией её маршрутов |
 | GET | `/api/route?m=<m>` | маршрут с `data` |
 | POST | `/api/admin?action=...` | операции редактора |
 | GET | `/auth/yandex/start?return=/...` | 302 на Яндекс + state-cookie |
 | GET | `/auth/yandex/callback` | 302 обратно + sid-cookie |
+| GET | `/auth/logout?t=<token>&return=/...` | 302 обратно + удаление cookie |
 | POST | `/auth/logout` | 200 + удаление cookie |
+
+Выход сделан через GET, потому что CDN перед публичным доменом
+`ainstruktor.ru` разрешает только `GET`, `HEAD` и `OPTIONS`: запрос `POST`
+до функции не доходит. Ссылка на выход подписана HMAC-токеном из `/api/me`
+(`logout_token`), чтобы разлогинить пользователя нельзя было переходом с
+чужого сайта.
 
 ### Редактор
 
