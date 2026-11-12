@@ -415,16 +415,16 @@ html, body {
 
 .top-controls {
     position: fixed;
-    top: calc(10px + env(safe-area-inset-top));
-    left: 50%;
-    transform: translateX(-50%);
+    left: 0;
+    right: 0;
+    top: 0;
     z-index: 17000;
     display: flex;
     flex-direction: column;
     align-items: center;
     gap: 8px;
     width: 100%;
-    padding: 0 12px;
+    padding: max(10px, env(safe-area-inset-top)) 12px 14px;
     box-sizing: border-box;
     pointer-events: none;
 }
@@ -439,11 +439,11 @@ html, body {
     height: 56px;
     padding: 6px 8px;
     border-radius: 26px;
-    background: var(--glass-bg);
+    background: color-mix(in srgb, var(--surface) 75%, transparent);
     backdrop-filter: blur(8px);
     -webkit-backdrop-filter: blur(8px);
-    border: 0.5px solid var(--glass-border);
-    box-shadow: var(--shadow-soft), inset 0 0.5px 0 var(--glass-highlight);
+    border: 1px solid var(--line-surface);
+    box-shadow: var(--shadow-float);
     box-sizing: border-box;
     pointer-events: auto;
 }
@@ -457,17 +457,19 @@ html, body {
     gap: 3px;
     min-width: 0;
     padding: 6px 8px 4px;
-    color: var(--text-primary);
+    color: var(--text);
     font-family: inherit;
     font-size: 10px;
     font-weight: 600;
     line-height: 1.05;
     cursor: pointer;
     touch-action: manipulation;
-    transition: color 0.18s ease, transform 0.12s ease, background 0.18s ease;
+    transition: color 0.18s ease, transform 0.12s ease;
     background: transparent;
-    border: 1px solid transparent;
-    border-radius: 26px;
+    border: none;
+    border-radius: 0;
+    outline: none;
+    box-shadow: none;
     -webkit-tap-highlight-color: transparent;
 }
 
@@ -494,23 +496,25 @@ html, body {
 
 .editor-top-nav-btn:active:not(.active) {
     transform: scale(0.94);
+    color: var(--text);
 }
 
 .editor-top-nav-btn.active {
-    color: var(--accent-green);
-    background: rgba(48, 209, 88, 0.12);
-    border-color: rgba(48, 209, 88, 0.28);
-    box-shadow: 0 0 14px var(--accent-green-glow);
+    color: var(--green);
+    background: color-mix(in srgb, var(--green) 12%, transparent);
+    border: 1px solid var(--green-line-soft);
+    border-radius: 26px;
+    box-shadow: 0 0 14px var(--green-glow);
 }
 
 .editor-top-nav-btn.active svg {
-    color: var(--accent-green);
-    filter: drop-shadow(0 0 8px var(--accent-green-glow));
+    color: var(--green);
+    filter: drop-shadow(0 0 8px var(--green-glow));
 }
 
 .editor-top-nav-btn.active span {
     font-weight: 700;
-    color: var(--accent-green);
+    color: var(--green);
 }
 
 @media (max-width: 380px) {
@@ -2357,12 +2361,6 @@ select,
 
 #editorAuthError {
     color: var(--danger) !important;
-}
-
-.editor-top-nav-btn.active {
-    background: var(--green-tint);
-    border-color: var(--green-line-soft);
-    box-shadow: 0 0 14px var(--green-glow);
 }
 
 #toast.success {
