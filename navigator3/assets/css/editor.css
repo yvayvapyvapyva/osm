@@ -472,6 +472,53 @@ html, body {
     overflow-wrap: anywhere;
 }
 
+.settings-name-row {
+    display: flex;
+    gap: 8px;
+}
+
+.settings-name-input {
+    flex: 1;
+    min-width: 0;
+    padding: 12px;
+    border-radius: 12px;
+    border: 0.5px solid var(--glass-border);
+    background: rgba(255, 255, 255, 0.06);
+    color: var(--text-primary);
+    font-family: inherit;
+    font-size: 15px;
+    outline: none;
+    box-sizing: border-box;
+    -webkit-user-select: text;
+    user-select: text;
+}
+
+.settings-name-input:focus {
+    border-color: var(--accent-green);
+}
+
+.settings-name-save {
+    flex-shrink: 0;
+    padding: 0 14px;
+    border-radius: 12px;
+    border: 0.5px solid rgba(103, 255, 153, 0.45);
+    background: rgba(48, 209, 88, 0.22);
+    color: var(--text-primary);
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.settings-name-save:active {
+    background: rgba(48, 209, 88, 0.35);
+}
+
+.settings-name-save:disabled {
+    opacity: 0.6;
+    cursor: default;
+}
+
 /* ---- Выбор слоя карты ---- */
 .map-style-grid {
     display: grid;

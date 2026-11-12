@@ -874,6 +874,30 @@ def _api_me(event):
     return auth.json_response(200, payload)
 
 
+def _api_profile_update(event):
+    """Смена отображаемого имени текущего пользователя."""
+    if not auth.origin_allowed(event):
+        return auth.json_response(403, {"error": "forbidden_origin"})
+    user = _current_user(event)
+    if not user:
+        return auth.json_response(401, {"error": "unauthorized"})
+    body = _body_json(event)
+    if body is None:
+        return auth.json_response(400, {"error": "invalid_json_body"})
+
+    display_name = _text(body.get("display_name")).strip()
+    if len(display_name) > 60:
+        return auth.json_response(400, {"error": "display_name_too_long"})
+
+    try:
+        updated = store.update_display_name(user.get("yandex_id"), display_name)
+    except Exception as exc:  # noqa: BLE001
+        print(f"[profile] display_name update failed: {exc}")
+        return auth.json_response(500, {"error": "storage_failed"})
+
+    return auth.json_response(200, {"user": _public_user(updated or user)})
+
+
 def _api_folder(event):
     """Содержимое папки со всей геометрией её маршрутов."""
     folder_id = (_query(event).get("folder_id") or "").strip()
@@ -1287,6 +1311,11 @@ def _handle_api(event, path, method):
 
     if normalized == "/api/me" and method == "GET":
         return _api_me(event)
+
+    if normalized == "/api/profile":
+        if method != "POST":
+            return auth.json_response(405, {"error": "method_not_allowed"})
+        return _api_profile_update(event)
 
     if normalized == "/api/catalog" and method == "GET":
         return _api_catalog(event)

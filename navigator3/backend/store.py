@@ -202,6 +202,32 @@ def upsert_user(yandex_id, login, email, display_name):
     return existing
 
 
+def update_display_name(yandex_id, display_name):
+    """Меняет только отображаемое имя, профиль Яндекса не трогает."""
+    query = """
+        DECLARE $yandex_id AS Utf8;
+        DECLARE $display_name AS Utf8;
+
+        UPDATE users
+        SET display_name = $display_name
+        WHERE yandex_id = $yandex_id;
+    """
+
+    def update(session):
+        prepared = session.prepare(query)
+        return session.transaction().execute(
+            prepared,
+            {
+                "$yandex_id": str(yandex_id),
+                "$display_name": str(display_name or ""),
+            },
+            commit_tx=True,
+        )
+
+    get_pool().retry_operation_sync(update)
+    return get_user_by_yandex_id(yandex_id)
+
+
 def create_session(yandex_id, user_id, user_agent="", ip=""):
     """Создаёт непрозрачную сессию и возвращает sid для cookie."""
     sid = secrets.token_urlsafe(32)
