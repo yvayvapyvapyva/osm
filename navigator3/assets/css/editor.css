@@ -2377,6 +2377,7 @@ select,
     max-width: none;
     padding: 8px 12px calc(12px + env(safe-area-inset-bottom));
     box-sizing: border-box;
+    z-index: 15501;
     border: 1px solid var(--line);
     border-bottom: none;
     border-radius: 22px 22px 0 0;
@@ -2389,6 +2390,7 @@ select,
     background: var(--sheet-scrim);
     backdrop-filter: none;
     -webkit-backdrop-filter: none;
+    z-index: 15500;
 }
 
 #pointsOrderModal.compact {
