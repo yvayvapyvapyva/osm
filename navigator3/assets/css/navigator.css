@@ -1762,7 +1762,7 @@ button, input, select, textarea {
 #pointsListWrap {
     flex: 1;
     overflow-y: auto;
-    padding: 8px 8px calc(74px + env(safe-area-inset-bottom)) 0;
+    padding: 8px 12px calc(74px + env(safe-area-inset-bottom)) 12px;
     -webkit-overflow-scrolling: touch;
 }
 #pointsListWrap::after {
@@ -1828,7 +1828,7 @@ button, input, select, textarea {
     background: var(--surface-muted);
     transition: transform 0.1s, opacity 0.1s;
     -webkit-tap-highlight-color: transparent;
-    box-sizing: border-box;
+    box-sizing: content-box;
 }
 .pl-item-icon::after {
     content: '';
