@@ -3,7 +3,7 @@
 Публичное API (через API Gateway, тот же origin):
   GET  /api/health            — проверка функции
   GET  /api/me                — текущий пользователь
-  GET  /api/catalog           — папки и видимые маршруты без геометрии
+  GET  /api/catalog           — папки и видимые маршруты (открытые — с геометрией)
   GET  /api/route?m=<m>       — геометрия одного маршрута
 
 Вход:
@@ -968,68 +968,6 @@ def _api_profile_update(event):
     return auth.json_response(200, {"user": _public_user(updated or user)})
 
 
-def _api_folder(event):
-    """Содержимое папки со всей геометрией её маршрутов."""
-    folder_id = (_query(event).get("folder_id") or "").strip()
-    user = _current_user(event)
-    try:
-        folders, route_rows, by_id = _catalog_data(include_geometry=True)
-        if folder_id and folder_id not in by_id:
-            return auth.json_response(404, {"error": "folder_not_found"})
-
-        child_folders = []
-        for folder in folders:
-            if _text(folder["parent_id"]) != folder_id:
-                continue
-            child_folders.append(
-                {
-                    "folder_id": folder["folder_id"],
-                    "parent_id": folder["parent_id"],
-                    "name": folder["name"],
-                    "sort_order": folder["sort_order"],
-                }
-            )
-        child_folders.sort(key=lambda f: (f["sort_order"], f["name"]))
-
-        owner_root = by_id.get(folder_id, {})
-        owner_root_id = _text(owner_root.get("owner_user_id"))
-        routes = []
-        for row in route_rows:
-            row_folder_id = _text(_row_value(row, "folder_id"))
-            row_owner_id = _text(_row_value(row, "owner_user_id"))
-            if owner_root.get("is_owner_root"):
-                if (
-                    row_owner_id != owner_root_id
-                    or (row_folder_id and row_folder_id in by_id)
-                ):
-                    continue
-                route_folder_id = folder_id
-            elif not folder_id or row_folder_id != folder_id:
-                continue
-            else:
-                route_folder_id = row_folder_id
-            route = _route_public_dict(
-                row, by_id, folder_id_override=route_folder_id, user=user
-            )
-            if not route["locked"]:
-                route["data"] = _json_value(_row_value(row, "json"))
-            routes.append(route)
-        routes.sort(key=lambda r: r.get("name", ""))
-
-        return auth.json_response(
-            200,
-            {
-                "folder_id": folder_id,
-                "folders": child_folders,
-                "routes": routes,
-                "user": _public_user(user) if user else None,
-            },
-        )
-    except Exception as exc:  # noqa: BLE001
-        print(f"[api] folder failed: {exc}")
-        return auth.json_response(500, {"error": "storage_failed"})
-
-
 def _api_route(event):
     """Геометрия одного видимого маршрута."""
     m_val = _query(event).get("m") or ""
@@ -1405,9 +1343,6 @@ def _handle_api(event, path, method):
 
     if normalized == "/api/catalog" and method == "GET":
         return _api_catalog(event)
-
-    if normalized == "/api/folder" and method == "GET":
-        return _api_folder(event)
 
     if normalized == "/api/route" and method == "GET":
         return _api_route(event)
