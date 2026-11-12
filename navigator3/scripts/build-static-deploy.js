@@ -108,7 +108,6 @@ function buildLegalPage() {
     const inn = (env.LEGAL_INN || '').trim() || 'Не указан';
     const email = (env.LEGAL_EMAIL || '').trim();
     const phone = (env.LEGAL_PHONE || '').trim();
-    const address = (env.LEGAL_ADDRESS || '').trim() || 'Не указан';
     const telegramRaw = (env.LEGAL_TELEGRAM || '').trim();
     const telegram = telegramRaw
         .replace(/^https?:\/\/t\.me\//i, '')
@@ -128,7 +127,7 @@ function buildLegalPage() {
         'Доступ предоставляется сразу после подтверждения оплаты. ' +
         'До активации премиума пользователь может отказаться от услуги и получить полный возврат. ' +
         'После активации возврат возможен за неиспользованный период или при технической ошибке.';
-    const refund = (env.LEGAL_REFUND_TERMS || '').trim() || refundDefault;
+    const refund = refundDefault;
 
     const price = (env.PREMIUM_PRICE_RUB || '299').trim() || '299';
     const days = (env.PREMIUM_DAYS || '30').trim() || '30';
@@ -140,7 +139,6 @@ function buildLegalPage() {
         '{{LEGAL_INN}}': escapeHtml(inn),
         '{{LEGAL_CONTACT_EMAIL}}': emailHtml,
         '{{LEGAL_CONTACT_PHONE}}': phoneHtml,
-        '{{LEGAL_ADDRESS}}': escapeHtml(address),
         '{{LEGAL_CONTACT_TELEGRAM}}': telegramHtml,
         '{{LEGAL_REFUND_TERMS}}': escapeHtml(refund).replace(/\n/g, '<br>'),
         '{{PREMIUM_PRICE_RUB}}': escapeHtml(price),
