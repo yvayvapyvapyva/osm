@@ -2486,13 +2486,28 @@ if (typeof maplibregl === 'undefined') {
     });
 
 
-    // Копирайт держим свёрнутым (кнопка ⓘ)
+    // Копирайт держим свёрнутым (кнопка ⓘ), пока пользователь сам его не откроет.
+    let attributionTouched = false;
+    const bindAttributionTouch = () => {
+        const control = document.querySelector('.maplibregl-ctrl-attrib');
+        if (!control || control.dataset.touchBound) return;
+        control.dataset.touchBound = '1';
+        const touch = () => { attributionTouched = true; };
+        control.addEventListener('pointerdown', touch);
+        control.addEventListener('click', touch);
+    };
     const collapseAttribution = () => {
+        bindAttributionTouch();
+        if (attributionTouched) return;
         document.querySelectorAll('.maplibregl-ctrl-attrib.maplibregl-compact-show')
             .forEach(el => el.classList.remove('maplibregl-compact-show'));
     };
     collapseAttribution();
     APP.map.once('load', collapseAttribution);
+    APP.map.on('styledata', collapseAttribution);
+    APP.map.on('idle', collapseAttribution);
+    setTimeout(collapseAttribution, 500);
+    setTimeout(collapseAttribution, 1500);
 
     APP.map.once('load', restoreRouteLayers);
     APP.map.on('styledata', restoreRouteLayers);
