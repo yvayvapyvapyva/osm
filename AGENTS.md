@@ -35,10 +35,19 @@
 - В кабинете ЮKassa указать HTTP-уведомления (POST, только домен шлюза): `https://d5dsd5u1tsc8fm9dbsg5.s183zexc.apigw.yandexcloud.net/api/premium/yookassa/webhook`. События: `payment.succeeded`, `payment.canceled`.
 - `POST /api/premium/yookassa/webhook` не доверяет телу уведомления: перепроверяет платёж через `GET /v3/payments/{id}`, сверяет сумму и идемпотентно продлевает `users.premium_until`.
 - После оплаты ЮKassa возвращает браузер на `https://ainstruktor.ru/navigator.html?payment=success`.
-- `GET /api/premium/status` — цена, срок, активность подписки и `payments_available`.
+- `GET /api/premium/status` — цена, срок, активность подписки, `payments_available` и список `providers`.
 - Тестовый режим: тестовые `YOOKASSA_SHOP_ID` и `YOOKASSA_SECRET_KEY`.
 - Миграция: `migrations/add_premium_subscriptions.py` (добавляет `users.premium_until` и таблицу `payments`).
 - Страница `/legal.html` генерируется при сборке из `legal.template.html` и переменных `LEGAL_NAME`, `LEGAL_INN`, `LEGAL_EMAIL`, `LEGAL_PHONE`, `LEGAL_TELEGRAM`. Без них будут заглушки «Не указано».
+
+## Оплата (Робокасса)
+- Второй провайдер рядом с ЮKassa. Если настроены оба, в профиле и в окне предложения под основной кнопкой показывается «Оплатить через Робокассу».
+- Переменные функции: `ROBOKASSA_LOGIN`, `ROBOKASSA_PASSWORD1`, `ROBOKASSA_PASSWORD2`, `ROBOKASSA_TEST` (`1` — тест, тогда нужны тестовые пароли из технических настроек и в ссылку добавляется `IsTest=1`).
+- `GET /api/premium/checkout?provider=robokassa` создаёт числовой `InvId`, пишет платёж в `payments` с `provider=robokassa` и отдаёт ссылку на `https://auth.robokassa.ru/Merchant/Index.aspx`.
+- Подпись ссылки: MD5 `MerchantLogin:OutSum:InvId:Пароль#1`.
+- ResultURL (POST): `https://d5dsd5u1tsc8fm9dbsg5.s183zexc.apigw.yandexcloud.net/api/premium/robokassa/result`, подпись MD5 `OutSum:InvId:Пароль#2`, ответ `OK<InvId>`.
+- FailURL: `https://ainstruktor.ru/navigator.html?payment=fail` (или `.../api/premium/robokassa/fail`, он помечает платёж отменённым и редиректит туда же).
+- SuccessURL: `https://ainstruktor.ru/navigator.html?payment=success`.
 
 ## Команда YC
 - `yc` установлен: `/Users/mb/yandex-cloud/bin/yc`

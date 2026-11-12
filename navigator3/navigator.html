@@ -1404,7 +1404,15 @@ function renderPremiumUi() {
     const status = APP.premiumStatus || {};
     const logged = !!(status.logged_in || (window.AuthModule && AuthModule.user));
     const active = !!status.active;
-    const available = !!status.payments_available;
+    const providers = Array.isArray(status.providers) && status.providers.length
+        ? status.providers
+        : (status.payments_available ? ['yookassa'] : []);
+    const available = providers.length > 0;
+    const primaryProvider = providers[0] || '';
+    const altProvider = providers.includes('yookassa') && providers.includes('robokassa')
+        ? 'robokassa'
+        : '';
+    APP.premiumProvider = primaryProvider;
     const price = status.price || '299';
     const days = status.days || 30;
     const until = formatPremiumDate(status.until);
@@ -1452,6 +1460,13 @@ function renderPremiumUi() {
         offerBtn.textContent = !logged ? 'Войти с Яндексом' : button;
         offerBtn.disabled = logged ? disabled : false;
     }
+
+    [$('premiumRbkBtn'), $('premiumOfferRbkBtn')].forEach(alt => {
+        if (!alt) return;
+        const show = logged && !!altProvider;
+        alt.hidden = !show;
+        alt.disabled = !show || disabled;
+    });
 }
 
 async function loadPremiumStatus() {
@@ -1488,21 +1503,30 @@ function closePremiumOffer() {
     hideScreen('premiumModal');
 }
 
-async function startPremiumCheckout() {
+async function startPremiumCheckout(provider) {
+    if (typeof provider !== 'string' || !provider) {
+        provider = APP.premiumProvider || '';
+    }
     const loggedIn = !!((window.AuthModule && AuthModule.user) ||
         (APP.premiumStatus && APP.premiumStatus.logged_in));
     if (!loggedIn) {
         if (window.AuthModule) AuthModule.login(true);
         return;
     }
-    const buttons = [$('premiumBuyBtn'), $('premiumOfferBtn')].filter(Boolean);
+    const buttons = [
+        $('premiumBuyBtn'),
+        $('premiumOfferBtn'),
+        $('premiumRbkBtn'),
+        $('premiumOfferRbkBtn')
+    ].filter(Boolean);
     const original = buttons.map(button => button.textContent);
     buttons.forEach(button => {
         button.disabled = true;
         button.textContent = 'Переходим к оплате…';
     });
     try {
-        const response = await fetch('/api/premium/checkout', {
+        const query = provider ? ('?provider=' + encodeURIComponent(provider)) : '';
+        const response = await fetch('/api/premium/checkout' + query, {
             credentials: 'same-origin',
             headers: { Accept: 'application/json' },
             cache: 'no-store'
@@ -1521,6 +1545,7 @@ async function startPremiumCheckout() {
             button.disabled = false;
             button.textContent = original[index];
         });
+        renderPremiumUi();
         if (typeof showToast === 'function') {
             showToast(
                 error && error.message === 'payments_not_configured'
@@ -2810,6 +2835,9 @@ if (typeof maplibregl === 'undefined') {
                     <button type="button" class="premium-buy-btn" id="premiumBuyBtn" disabled>
                         Купить
                     </button>
+                    <button type="button" class="premium-alt-btn" id="premiumRbkBtn" hidden>
+                        Оплатить через Робокассу
+                    </button>
                     <a class="premium-legal-link" href="/legal.html" target="_blank" rel="noopener">Пользовательское соглашение · Политика конфиденциальности · Контакты и реквизиты</a>
                 </div>
             </div>
@@ -2879,6 +2907,9 @@ if (typeof maplibregl === 'undefined') {
                 </div>
                 <button type="button" class="premium-buy-btn" id="premiumOfferBtn" disabled>
                     Оформить
+                </button>
+                <button type="button" class="premium-alt-btn" id="premiumOfferRbkBtn" hidden>
+                    Оплатить через Робокассу
                 </button>
                 <a class="premium-legal-link" href="/legal.html#payment" target="_blank" rel="noopener">
                     Условия оплаты
@@ -3069,6 +3100,10 @@ if (typeof maplibregl === 'undefined') {
         if (buy) buy.addEventListener('click', startPremiumCheckout);
         const offer = document.getElementById('premiumOfferBtn');
         if (offer) offer.addEventListener('click', startPremiumCheckout);
+        const rbk = document.getElementById('premiumRbkBtn');
+        if (rbk) rbk.addEventListener('click', () => startPremiumCheckout('robokassa'));
+        const offerRbk = document.getElementById('premiumOfferRbkBtn');
+        if (offerRbk) offerRbk.addEventListener('click', () => startPremiumCheckout('robokassa'));
     };
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', bind);

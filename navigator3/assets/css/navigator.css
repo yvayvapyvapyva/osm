@@ -1486,6 +1486,36 @@ button, input, select, textarea {
     transform: none;
 }
 
+.premium-alt-btn {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: transparent;
+    color: var(--text);
+    font: inherit;
+    font-size: 14px;
+    font-weight: 650;
+    cursor: pointer;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+    transition: transform 0.12s ease, opacity 0.15s ease;
+}
+
+.premium-alt-btn[hidden] {
+    display: none;
+}
+
+.premium-alt-btn:active {
+    transform: scale(0.98);
+}
+
+.premium-alt-btn:disabled {
+    opacity: 0.6;
+    cursor: default;
+    transform: none;
+}
+
 .premium-offer {
     display: flex;
     flex-direction: column;
