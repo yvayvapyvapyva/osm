@@ -204,6 +204,12 @@ const MenuModule = {
                 if (route.title) desc.title = route.title;
                 if (route.premium !== undefined) desc.premium = !!route.premium;
                 if (route.locked !== undefined) desc.locked = !!route.locked;
+                if (Number.isFinite(route.point_count)) {
+                    desc.point_count = route.point_count;
+                }
+                if (Number.isFinite(route.distance_meters)) {
+                    desc.distance_meters = route.distance_meters;
+                }
             }
             if (route.locked) continue;
             if (Array.isArray(route.data)) {
@@ -215,6 +221,9 @@ const MenuModule = {
                 }
             }
         }
+        // Каталог больше не считает метрики сам: точки и длина приходят
+        // вместе с содержимым папки, поэтому обновляем сводку здесь.
+        if (routes.length) this._buildCatalog();
     },
     async _fetchRoute(routeM) {
         const key = String(routeM);

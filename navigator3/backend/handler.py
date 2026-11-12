@@ -95,6 +95,17 @@ def execute_get_folder_owner(session, folder_id):
 
 def execute_list_public_routes(session):
     query = """
+        SELECT m, description, folder_id, title, owner_user_id, premium
+        FROM roads
+        WHERE visible = true
+        ORDER BY title, m;
+    """
+    prepared = session.prepare(query)
+    return session.transaction().execute(prepared, commit_tx=True)
+
+
+def execute_list_public_routes_geometry(session):
+    query = """
         SELECT m, description, json, folder_id, title, owner_user_id, premium
         FROM roads
         WHERE visible = true
@@ -488,8 +499,9 @@ def _route_locked(row, user):
     return not owner_user_id or owner_user_id != user_id
 
 
-def _route_public_dict(row, by_id, folder_id_override=None, user=None):
-    data = _json_value(_row_value(row, "json"))
+def _route_public_dict(
+    row, by_id, folder_id_override=None, user=None, with_metrics=True
+):
     raw_folder_id = _text(_row_value(row, "folder_id"))
     folder_id = (
         raw_folder_id if folder_id_override is None else folder_id_override
@@ -506,7 +518,8 @@ def _route_public_dict(row, by_id, folder_id_override=None, user=None):
         "premium": _is_premium(row),
         "locked": _route_locked(row, user),
     }
-    route.update(_route_metrics(data))
+    if with_metrics:
+        route.update(_route_metrics(_json_value(_row_value(row, "json"))))
     return route
 
 
@@ -599,10 +612,15 @@ def _current_user(event):
     return user
 
 
-def _catalog_data():
+def _catalog_data(include_geometry=False):
     pool = store.get_pool()
     folder_rows = _rows(pool.retry_operation_sync(execute_list_folders))
-    route_rows = _rows(pool.retry_operation_sync(execute_list_public_routes))
+    route_query = (
+        execute_list_public_routes_geometry
+        if include_geometry
+        else execute_list_public_routes
+    )
+    route_rows = _rows(pool.retry_operation_sync(route_query))
     owner_rows = _rows(pool.retry_operation_sync(execute_list_owner_names))
     owner_names = {
         _text(_row_value(row, "user_id")): (
@@ -870,7 +888,11 @@ def _api_catalog(event):
                 folder_id = _owner_folder_id(owner_user_id)
             routes.append(
                 _route_public_dict(
-                    row, by_id, folder_id_override=folder_id, user=user
+                    row,
+                    by_id,
+                    folder_id_override=folder_id,
+                    user=user,
+                    with_metrics=False,
                 )
             )
         return auth.json_response(
@@ -936,7 +958,7 @@ def _api_folder(event):
     folder_id = (_query(event).get("folder_id") or "").strip()
     user = _current_user(event)
     try:
-        folders, route_rows, by_id = _catalog_data()
+        folders, route_rows, by_id = _catalog_data(include_geometry=True)
         if folder_id and folder_id not in by_id:
             return auth.json_response(404, {"error": "folder_not_found"})
 
