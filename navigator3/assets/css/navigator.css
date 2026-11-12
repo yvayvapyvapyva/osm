@@ -1067,6 +1067,22 @@ button, input, select, textarea {
     font-weight: 600;
 }
 
+.routes-folder-premium-badge {
+    flex: 0 0 auto;
+    padding: 2px 6px;
+    border-radius: 999px;
+    background: rgba(255, 176, 32, 0.2);
+    color: #B7791F;
+    font-size: 10px;
+    font-weight: 700;
+    line-height: 1.4;
+}
+
+[data-theme="dark"] .routes-folder-premium-badge {
+    background: rgba(255, 176, 32, 0.22);
+    color: #FFC65C;
+}
+
 .routes-folder-chevron {
     flex: 0 0 auto;
     color: var(--text-faint);
