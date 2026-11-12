@@ -1376,7 +1376,7 @@ input, textarea, select {
 
 .route-info-btn {
     position: absolute;
-    top: 5px;
+    top: calc(50% - 18px);
     right: 10px;
     width: 36px;
     height: 36px;
