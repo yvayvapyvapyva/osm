@@ -416,7 +416,7 @@ html, body {
     top: calc(10px + env(safe-area-inset-top));
     left: 50%;
     transform: translateX(-50%);
-    z-index: 9005;
+    z-index: 17000;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -1877,8 +1877,8 @@ select,
     justify-content: center;
     padding: 0;
     background: var(--scrim);
-    backdrop-filter: blur(4px);
-    -webkit-backdrop-filter: blur(4px);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
     box-sizing: border-box;
 }
 
@@ -1902,10 +1902,10 @@ select,
 .instruction-sheet {
     position: relative;
     width: 100%;
-    max-width: 640px;
+    max-width: none;
     height: auto;
     max-height: 90vh;
-    margin: 0 auto;
+    margin: 0;
     padding: 0 0 env(safe-area-inset-bottom);
     display: flex;
     flex-direction: column;
@@ -1934,16 +1934,16 @@ select,
 #confirmDeleteModal .modal-sheet-compact,
 #confirmDeletePointModal .modal-sheet-compact,
 #shareModal .modal-sheet-compact {
-    max-width: 520px;
+    max-width: none;
     padding: 20px 20px calc(20px + env(safe-area-inset-bottom));
     gap: 16px;
 }
 
 .modal-sheet-compact {
-    max-width: 520px;
+    max-width: none;
     height: auto;
     padding: 20px 20px calc(20px + env(safe-area-inset-bottom));
-    margin: 0 auto;
+    margin: 0;
     gap: 16px;
 }
 
@@ -2326,10 +2326,11 @@ select,
     left: 0;
     right: 0;
     transform: none;
-    margin: 0 auto;
+    margin: 0;
     width: 100%;
-    max-width: 640px;
+    max-width: none;
     padding: 8px 12px calc(12px + env(safe-area-inset-bottom));
+    box-sizing: border-box;
     border: 1px solid var(--line);
     border-bottom: none;
     border-radius: 22px 22px 0 0;
@@ -2340,16 +2341,16 @@ select,
 
 .dropdown-overlay {
     background: var(--scrim);
-    backdrop-filter: blur(4px);
-    -webkit-backdrop-filter: blur(4px);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
 }
 
 #pointsOrderModal.compact {
     align-items: flex-end;
     justify-content: center;
     background: var(--scrim);
-    backdrop-filter: blur(4px);
-    -webkit-backdrop-filter: blur(4px);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
 }
 
 #editorAuthError {
@@ -2424,8 +2425,8 @@ select,
     justify-content: center;
     padding: 0;
     background: var(--scrim);
-    backdrop-filter: blur(4px);
-    -webkit-backdrop-filter: blur(4px);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
 }
 
 .instruction-overlay.visible {
