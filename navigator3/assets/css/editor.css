@@ -429,15 +429,30 @@ html, body {
     margin: 0 auto;
 }
 
+/* ---- Группы настроек ---- */
+.settings-card {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 14px;
+    border-radius: 16px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 0.5px solid var(--glass-border);
+}
+
+.settings-card-title {
+    color: var(--text-tertiary);
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+}
+
 /* ---- Профиль пользователя в настройках ---- */
 .settings-profile {
     display: flex;
     align-items: center;
     gap: 12px;
-    padding: 12px;
-    border-radius: 14px;
-    background: rgba(255, 255, 255, 0.05);
-    border: 0.5px solid var(--glass-border);
 }
 
 .settings-profile-avatar {
@@ -457,6 +472,7 @@ html, body {
 
 .settings-profile-info {
     min-width: 0;
+    flex: 1;
 }
 
 .settings-profile-name {
@@ -470,6 +486,28 @@ html, body {
     color: var(--text-secondary);
     font-size: 13px;
     overflow-wrap: anywhere;
+}
+
+.settings-logout-btn {
+    flex-shrink: 0;
+    padding: 9px 12px;
+    border-radius: 10px;
+    border: 0.5px solid rgba(255, 110, 110, 0.45);
+    background: rgba(255, 69, 58, 0.18);
+    color: var(--text-primary);
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.settings-logout-btn:active {
+    background: rgba(255, 69, 58, 0.32);
+}
+
+.settings-logout-btn:disabled {
+    opacity: 0.6;
+    cursor: default;
 }
 
 .settings-name-row {
@@ -521,22 +559,23 @@ html, body {
 
 /* ---- Выбор слоя карты ---- */
 .map-style-grid {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 8px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
 }
 
 .map-style-btn {
+    flex: 1 1 auto;
     min-width: 0;
-    padding: 12px 10px;
-    border-radius: 12px;
+    padding: 8px 10px;
+    border-radius: 10px;
     border: 0.5px solid var(--glass-border);
     background: rgba(255, 255, 255, 0.06);
     color: var(--text-primary);
     font-family: inherit;
-    font-size: 13px;
+    font-size: 12px;
     font-weight: 600;
-    line-height: 1.25;
+    line-height: 1.2;
     text-align: center;
     white-space: normal;
     overflow-wrap: anywhere;
