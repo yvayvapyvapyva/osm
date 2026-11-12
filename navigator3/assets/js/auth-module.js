@@ -22,7 +22,7 @@ const AuthModule = {
 
     _bind() {
         const login = document.getElementById('accountLogin');
-        if (login) login.addEventListener('click', () => this.login());
+        if (login) login.addEventListener('click', () => this.login(true));
 
         const logout = document.getElementById('accountLogout');
         if (logout) logout.addEventListener('click', () => this.logout());
@@ -80,7 +80,7 @@ const AuthModule = {
         }
     },
 
-    login() {
+    login(forceConfirm = false) {
         const returnTo =
             window.location.pathname +
             window.location.search +
@@ -92,6 +92,9 @@ const AuthModule = {
             return: returnTo,
             base: window.location.origin,
         });
+        // force_confirm заставляет Яндекс показать форму входа, даже если
+        // аккаунт уже сохранён: можно выбрать другой или ввести почту.
+        if (forceConfirm) params.set('force_confirm', '1');
         window.location.href = '/auth/yandex/start?' + params.toString();
     },
 
@@ -142,6 +145,8 @@ const AuthModule = {
             window.showToast('Вы вышли из аккаунта', 'success', 4000);
         }
         this._cleanUrl(params, 'logged_out');
+        // Сразу открываем форму Яндекса с выбором аккаунта.
+        this.login(true);
     },
 
     _showUrlError() {
