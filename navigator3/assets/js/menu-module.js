@@ -10,6 +10,7 @@ const MenuModule = {
     _folders: [],
     _folderMap: new Map(),
     _folderCounts: new Map(),
+    _folderPremiumCounts: new Map(),
     _folderPath: [],
     _previewObserver: null,
     _previewImages: new Map(),
@@ -228,6 +229,7 @@ const MenuModule = {
     _buildCatalog() {
         const catalog = [];
         this._folderCounts = new Map();
+        this._folderPremiumCounts = new Map();
 
         for (const [key, route] of Object.entries(this.routesDescriptions)) {
             const chain = this._folderChain(route.folder_id);
@@ -259,6 +261,12 @@ const MenuModule = {
                     folderId,
                     (this._folderCounts.get(folderId) || 0) + 1
                 );
+                if (route.premium) {
+                    this._folderPremiumCounts.set(
+                        folderId,
+                        (this._folderPremiumCounts.get(folderId) || 0) + 1
+                    );
+                }
             }
         }
 
@@ -354,7 +362,8 @@ const MenuModule = {
             .filter(folder => (folder.parent_id || '') === parent)
             .map(folder => ({
                 ...folder,
-                count: this._folderCounts.get(folder.folder_id) || 0
+                count: this._folderCounts.get(folder.folder_id) || 0,
+                premiumCount: this._folderPremiumCounts.get(folder.folder_id) || 0
             }))
             .sort((a, b) => {
                 const ao = Number.isFinite(a.sort_order) ? a.sort_order : 0;
@@ -440,11 +449,19 @@ const MenuModule = {
                 button.className = 'routes-folder-row';
                 button.dataset.folderId = folder.folder_id;
                 button.dataset.folderName = folder.name;
+                const premiumCount = folder.premiumCount || 0;
+                const countText = premiumCount > 0
+                    ? `${folder.count} (${premiumCount})`
+                    : `${folder.count}`;
+                const countAria = `${folder.count} ${this._pluralize(folder.count, 'маршрут', 'маршрута', 'маршрутов')}` +
+                    (premiumCount > 0
+                        ? `, из них ${premiumCount} ${this._pluralize(premiumCount, 'премиум-маршрут', 'премиум-маршрута', 'премиум-маршрутов')}`
+                        : '');
                 button.innerHTML = `
                     <span class="routes-folder-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6.5A1.5 1.5 0 0 1 4.5 5h5l2 2h8A1.5 1.5 0 0 1 21 8.5v9a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 17.5z"/></svg></span>
                     <span class="routes-folder-name">${this._escape(folder.name)}</span>
-                    <span class="routes-folder-count" aria-label="${folder.count} ${this._pluralize(folder.count, 'маршрут', 'маршрута', 'маршрутов')}">
-                        ${folder.count} ${this._pluralize(folder.count, 'маршрут', 'маршрута', 'маршрутов')}
+                    <span class="routes-folder-count" aria-label="${countAria}">
+                        ${countText}
                     </span>
                     <span class="routes-folder-chevron" aria-hidden="true">›</span>
                 `;
@@ -1004,6 +1021,7 @@ const MenuModule = {
         this._folders = [];
         this._folderMap.clear();
         this._folderCounts.clear();
+        this._folderPremiumCounts.clear();
         this._routeDataCache.clear();
         this._routeRequests.clear();
     },
