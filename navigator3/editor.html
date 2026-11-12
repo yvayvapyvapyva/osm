@@ -102,16 +102,16 @@
 </div></div></div>
 <div id="settingsRouteModal" onclick="if(event.target===this) toggleM('settingsRouteModal')"><div class="modal-sheet" style="gap:0;"><div class="modal-header"><h3 id="settingsRouteTitle">Настройки маршрута</h3><button class="close-circle" onclick="toggleM('settingsRouteModal')">✕</button></div><div class="modal-body-scroll">
 <div class="field-label">Название маршрута</div>
-<div class="input-wrapper" style="padding:3px;border-radius:12px;margin-bottom:8px;"><textarea id="routeDisplayName" placeholder="Введите название маршрута" rows="2" style="width:100%;padding:10px;border:none;font-size:16px;outline:none;background:transparent;color:var(--text);font-family:inherit;resize:none;min-height:56px;box-sizing:border-box;"></textarea></div>
+<div class="input-wrapper" style="padding:3px;border-radius:12px;"><textarea id="routeDisplayName" placeholder="Введите название маршрута" rows="2" style="width:100%;padding:10px;border:none;font-size:16px;outline:none;background:transparent;color:var(--text);font-family:inherit;resize:none;min-height:56px;box-sizing:border-box;"></textarea></div>
 <div class="field-label">Папка</div>
-<div class="input-wrapper" style="padding:3px;border-radius:12px;margin-bottom:8px;"><select id="routeFolderSelect" style="width:100%;padding:12px 10px;border:none;font-size:16px;outline:none;background:transparent;color:var(--text);font-family:inherit;box-sizing:border-box;"></select></div>
+<div class="input-wrapper" style="padding:3px;border-radius:12px;"><select id="routeFolderSelect" style="width:100%;padding:12px 10px;border:none;font-size:16px;outline:none;background:transparent;color:var(--text);font-family:inherit;box-sizing:border-box;"></select></div>
 <div class="field-label">Описание маршрута</div>
-<div class="input-wrapper" style="padding:3px;border-radius:12px;margin-bottom:8px;"><textarea id="routeDescription" placeholder="Введите описание маршрута" rows="2" style="width:100%;padding:10px;border:none;font-size:16px;outline:none;background:transparent;color:var(--text);font-family:inherit;resize:none;min-height:56px;"></textarea></div>
+<div class="input-wrapper" style="padding:3px;border-radius:12px;"><textarea id="routeDescription" placeholder="Введите описание маршрута" rows="2" style="width:100%;padding:10px;border:none;font-size:16px;outline:none;background:transparent;color:var(--text);font-family:inherit;resize:none;min-height:56px;"></textarea></div>
 
 <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:14px;background:var(--surface-muted);border:1px solid var(--line);">
 <label style="display:flex;align-items:center;gap:10px;cursor:pointer;flex:1;">
 <input type="checkbox" id="routeVisible" style="width:20px;height:20px;accent-color:var(--green);cursor:pointer;">
-<span style="font-size:16px;font-weight:600;color:var(--text);">Отображать маршрут в публичном списке</span>
+<span style="font-size:16px;font-weight:600;color:var(--text);">Виден в публичном списке</span>
 </label>
 </div>
 <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:14px;background:var(--surface-muted);border:1px solid var(--line);">
@@ -121,11 +121,11 @@
 </label>
 </div>
 </div>
-<div style="display:flex;flex-direction:column;gap:8px;padding:20px;padding-top:0;">
-<button class="btn-action" onclick="saveRouteMeta();">💾 Сохранить метаданные</button>
-<button class="btn-action" onclick="openInNavigator();">🧭 Открыть в навигаторе</button>
-<button class="btn-action" onclick="shareRouteFromSettings();">🔗 Скопировать ссылку</button>
-<button class="btn-action btn-danger" onclick="confirmDeleteRoute();">🗑️ Удалить маршрут</button>
+<div class="route-settings-actions">
+<button class="btn-action" onclick="saveRouteMeta();">💾 Сохранить</button>
+<button class="btn-action" onclick="openInNavigator();">🧭 В навигатор</button>
+<button class="btn-action" onclick="shareRouteFromSettings();">🔗 Ссылка</button>
+<button class="btn-action btn-danger" onclick="confirmDeleteRoute();">🗑️ Удалить</button>
 </div></div></div>
 <div id="confirmDeleteModal" onclick="if(event.target===this) toggleM('confirmDeleteModal')"><div class="modal-sheet modal-sheet-compact"><h3 class="modal-title">Удалить маршрут?</h3><p id="confirmDeleteText" class="modal-desc-text" style="font-size:16px;"></p><div class="modal-actions"><button class="btn-action flex-1" onclick="toggleM('confirmDeleteModal')">Отмена</button><button id="confirmDeleteRouteBtn" class="btn-action btn-danger flex-1" onclick="executeDeleteRoute()">Удалить</button></div></div></div>
 <div id="confirmDeletePointModal" onclick="if(event.target===this) toggleM('confirmDeletePointModal')"><div class="modal-sheet modal-sheet-compact"><h3 class="modal-title">Удалить точку?</h3><p class="modal-desc-text" style="font-size:16px;">Вы уверены, что хотите удалить эту точку?</p><div class="modal-actions"><button class="btn-action flex-1" onclick="toggleM('confirmDeletePointModal')">Отмена</button><button class="btn-action btn-danger flex-1" onclick="executeDeletePoint()">Удалить</button></div></div></div>
@@ -1191,7 +1191,7 @@ function renderRouteItem(route, container) {
 
     const visibility = document.createElement('span');
     visibility.className = 'route-visibility-badge' + (route.visible ? ' is-visible' : '');
-    visibility.textContent = route.visible ? 'В навигаторе' : 'Скрыт';
+    visibility.textContent = route.visible ? 'Виден' : 'Скрыт';
     title.appendChild(visibility);
 
     if (route.premium) {
