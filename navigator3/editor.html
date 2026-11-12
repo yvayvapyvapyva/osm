@@ -649,10 +649,6 @@ async function initializeEditorAuth() {
         + '&base=' + encodeURIComponent(window.location.origin)
         + '&force_confirm=1';
     login.href = startUrl;
-    if (justLoggedOut) {
-        window.location.replace(startUrl);
-        return;
-    }
     try {
         const response = await fetch('/api/me', {
             credentials: 'same-origin',

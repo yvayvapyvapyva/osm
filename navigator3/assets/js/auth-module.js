@@ -145,8 +145,6 @@ const AuthModule = {
             window.showToast('Вы вышли из аккаунта', 'success', 4000);
         }
         this._cleanUrl(params, 'logged_out');
-        // Сразу открываем форму Яндекса с выбором аккаунта.
-        this.login(true);
     },
 
     _showUrlError() {
