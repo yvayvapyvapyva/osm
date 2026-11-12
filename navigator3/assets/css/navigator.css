@@ -45,6 +45,8 @@
     --green-focus: rgba(47, 168, 224, 0.55);
     --green-glow: rgba(47, 168, 224, 0.18);
     --success-solid: #2FA8E0;
+    --violet: #7C4DFF;
+    --violet-dark: #6A3DE8;
     --danger: #DC2626;
     --danger-soft: #FDE8E8;
     --danger-line: rgba(220, 38, 38, 0.28);
@@ -110,6 +112,8 @@
     --green-focus: rgba(47, 168, 224, 0.70);
     --green-glow: rgba(47, 168, 224, 0.22);
     --success-solid: #2FA8E0;
+    --violet: #8B6BFF;
+    --violet-dark: #7A55F5;
     --danger: #F87171;
     --danger-soft: #3A1D20;
     --danger-line: rgba(248, 113, 113, 0.40);
@@ -1488,18 +1492,24 @@ button, input, select, textarea {
 
 .premium-alt-btn {
     width: 100%;
-    padding: 10px;
-    border: 1px solid var(--line);
+    padding: 12px;
+    border: none;
     border-radius: 12px;
-    background: transparent;
-    color: var(--text);
+    background: var(--violet);
+    color: #FFFFFF;
     font: inherit;
-    font-size: 14px;
-    font-weight: 650;
+    font-size: 15px;
+    font-weight: 700;
     cursor: pointer;
     touch-action: manipulation;
     -webkit-tap-highlight-color: transparent;
     transition: transform 0.12s ease, opacity 0.15s ease;
+}
+
+/* Если Робокасса станет основным провайдером, основная кнопка тоже
+   окрашивается в фиолетовый. */
+.premium-buy-btn.is-robokassa {
+    background: var(--violet);
 }
 
 .premium-alt-btn[hidden] {

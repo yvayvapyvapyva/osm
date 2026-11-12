@@ -1450,6 +1450,7 @@ function renderPremiumUi() {
     if (buyBtn) {
         buyBtn.textContent = button;
         buyBtn.disabled = disabled;
+        buyBtn.classList.toggle('is-robokassa', primaryProvider === 'robokassa');
     }
 
     const offerTitle = $('premiumOfferTitle');
@@ -1464,6 +1465,7 @@ function renderPremiumUi() {
     if (offerBtn) {
         offerBtn.textContent = !logged ? 'Войти с Яндексом' : button;
         offerBtn.disabled = logged ? disabled : false;
+        offerBtn.classList.toggle('is-robokassa', primaryProvider === 'robokassa');
     }
 
     const altText = active
