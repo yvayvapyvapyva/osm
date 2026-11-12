@@ -2122,9 +2122,11 @@ function fitMapToCurrentTarget() {
         [minLng, minLat],
         [maxLng, maxLat]
     ];
-    
+
+    const follow = followPadding();
+    const bottomPadding = Math.max(180, (follow.bottom || 0) + 24);
     APP.map.fitBounds(bounds, {
-        padding: { top: 120, bottom: 180, left: 24, right: 24 },
+        padding: { top: 120, bottom: bottomPadding, left: 24, right: 24 },
         maxZoom: 18,
         duration: 400
     });
