@@ -500,7 +500,12 @@ def _route_locked(row, user):
 
 
 def _route_public_dict(
-    row, by_id, folder_id_override=None, user=None, with_metrics=True
+    row,
+    by_id,
+    folder_id_override=None,
+    user=None,
+    with_metrics=True,
+    data=None,
 ):
     raw_folder_id = _text(_row_value(row, "folder_id"))
     folder_id = (
@@ -519,7 +524,10 @@ def _route_public_dict(
         "locked": _route_locked(row, user),
     }
     if with_metrics:
-        route.update(_route_metrics(_json_value(_row_value(row, "json"))))
+        metrics_source = (
+            data if data is not None else _json_value(_row_value(row, "json"))
+        )
+        route.update(_route_metrics(metrics_source))
     return route
 
 
@@ -876,25 +884,32 @@ def _auth_logout_get(event, sid):
 
 
 def _api_catalog(event):
-    """Папки и видимые маршруты без геометрии."""
+    """Папки и видимые маршруты вместе с геометрией открытых маршрутов.
+
+    Геометрия приходит сразу, чтобы переходы по папкам и открытие маршрута
+    работали на клиенте без дополнительных запросов. Закрытые премиум-маршруты
+    отдаются без data.
+    """
     user = _current_user(event)
     try:
-        folders, route_rows, by_id = _catalog_data()
+        folders, route_rows, by_id = _catalog_data(include_geometry=True)
         routes = []
         for row in route_rows:
             owner_user_id = _text(_row_value(row, "owner_user_id"))
             folder_id = _text(_row_value(row, "folder_id"))
             if not folder_id or folder_id not in by_id:
                 folder_id = _owner_folder_id(owner_user_id)
-            routes.append(
-                _route_public_dict(
-                    row,
-                    by_id,
-                    folder_id_override=folder_id,
-                    user=user,
-                    with_metrics=False,
-                )
+            data = _json_value(_row_value(row, "json"))
+            route = _route_public_dict(
+                row,
+                by_id,
+                folder_id_override=folder_id,
+                user=user,
+                data=data,
             )
+            if not route["locked"]:
+                route["data"] = data if isinstance(data, list) else []
+            routes.append(route)
         return auth.json_response(
             200,
             {

@@ -18,10 +18,8 @@ const MenuModule = {
     _previewQueuedKeys: new Set(),
     _previewFetching: new Set(),
     _previewActive: false,
-    _folderCache: new Map(),
     _catalogLoaded: false,
     API_CATALOG_URL: '/api/catalog',
-    API_FOLDER_URL: '/api/folder',
     API_ROUTE_URL: '/api/route',
 
     // Кэш полных маршрутов: нужен для повторного открытия и превью.
@@ -101,20 +99,17 @@ const MenuModule = {
         };
         const attempt = async () => {
             try {
-                // Дерево папок и метаданные всех маршрутов берём из каталога
-                // один раз. Геометрию потом догружаем попапочной функцией
-                // /api/folder, чтобы не тянуть все маршруты сразу.
+                // Каталог грузим один раз: дерево папок, метаданные и
+                // геометрия всех открытых маршрутов. Переходы по папкам и
+                // открытие маршрута дальше работают из памяти.
                 if (!this._catalogLoaded) {
                     await this._fetchFromAPI();
                 }
-                const folderId = this._folderPath[this._folderPath.length - 1] || '';
-                const payload = await this._fetchFolder(folderId);
-                this._applyFolderData(payload);
                 this._routesLoaded = true;
                 this._buildRoutesList();
                 return true;
             } catch (e) {
-                console.warn('Не удалось загрузить содержимое папки:', e);
+                console.warn('Не удалось загрузить каталог маршрутов:', e);
                 showLoadError();
                 return false;
             }
@@ -129,9 +124,10 @@ const MenuModule = {
     },
 
     /**
-     * Запрос к API за каталогом без геометрии.
+     * Запрос к API за каталогом вместе с геометрией маршрутов.
      *
-     * Сервер отдаёт дерево папок и метаданные маршрутов без геометрии.
+     * Сервер отдаёт дерево папок, метаданные и data открытых маршрутов.
+     * Дальше переходы по папкам и открытие маршрута идут из памяти.
      */
     async _fetchFromAPI() {
         const response = await fetch(this.API_CATALOG_URL, {
@@ -160,6 +156,9 @@ const MenuModule = {
         for (const route of data) {
             const key = route.m;
             if (!key) continue;
+            if (!route.locked && Array.isArray(route.data)) {
+                this._routeDataCache.set(key, route);
+            }
             routesFlat[key] = {
                 m: route.m,
                 name: route.name || route.title || route.m,
@@ -178,53 +177,6 @@ const MenuModule = {
         this._buildCatalog();
     },
 
-    async _fetchFolder(folderId) {
-        const key = folderId || '';
-        if (this._folderCache.has(key)) {
-            return this._folderCache.get(key);
-        }
-        const url = this.API_FOLDER_URL + (key ? '?folder_id=' + encodeURIComponent(key) : '');
-        const response = await fetch(url, { credentials: 'same-origin', headers: { Accept: 'application/json' }, cache: 'no-store' });
-        if (!response.ok) {
-            throw new Error(`HTTP ${response.status}`);
-        }
-        const payload = await response.json();
-        this._folderCache.set(key, payload);
-        return payload;
-    },
-
-    _applyFolderData(payload) {
-        if (!payload || typeof payload !== 'object') return;
-        const routes = Array.isArray(payload.routes) ? payload.routes : [];
-        for (const route of routes) {
-            if (!route || !route.m) continue;
-            const desc = this.routesDescriptions[route.m];
-            if (desc) {
-                if (route.name) desc.name = route.name;
-                if (route.title) desc.title = route.title;
-                if (route.premium !== undefined) desc.premium = !!route.premium;
-                if (route.locked !== undefined) desc.locked = !!route.locked;
-                if (Number.isFinite(route.point_count)) {
-                    desc.point_count = route.point_count;
-                }
-                if (Number.isFinite(route.distance_meters)) {
-                    desc.distance_meters = route.distance_meters;
-                }
-            }
-            if (route.locked) continue;
-            if (Array.isArray(route.data)) {
-                this._routeDataCache.set(route.m, route);
-                if (!desc) {
-                    this.routesDescriptions[route.m] = route;
-                } else {
-                    desc.data = route.data;
-                }
-            }
-        }
-        // Каталог больше не считает метрики сам: точки и длина приходят
-        // вместе с содержимым папки, поэтому обновляем сводку здесь.
-        if (routes.length) this._buildCatalog();
-    },
     async _fetchRoute(routeM) {
         const key = String(routeM);
         if (this._routeDataCache.has(key)) return this._routeDataCache.get(key);
@@ -1050,7 +1002,6 @@ const MenuModule = {
         this._folders = [];
         this._folderMap.clear();
         this._folderCounts.clear();
-        this._folderCache.clear();
         this._routeDataCache.clear();
         this._routeRequests.clear();
     },
