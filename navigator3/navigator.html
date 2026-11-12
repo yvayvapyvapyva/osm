@@ -1970,6 +1970,12 @@ function escapeHtml(str) {
     return d.innerHTML;
 }
 
+function pointDistanceHtml(p) {
+    const pos = (APP._driveShowFrom >= 0 && APP._simCurPos) ? APP._simCurPos : APP.lastPos;
+    if (!pos || !p || !p.pts || !p.pts[0]) return '---';
+    return formatDistance(getGeoDistance(pos, [p.pts[0][0], p.pts[0][1]]));
+}
+
 function openPointsList() {
     if (!$('pointsListModal').classList.contains('hidden')) { closePointsList(); return; }
     closeAllSheets();
@@ -1977,18 +1983,14 @@ function openPointsList() {
     if (!wrap || APP.navPoints.length === 0) return;
     wrap.innerHTML = APP.navPoints.map((p, i) => {
         const isCurrent = i === APP.navCurrentIndex;
-        const isPrev = i < APP.navCurrentIndex;
-        const dist = isCurrent && APP.lastPos && p.pts && p.pts[0]
-            ? formatDistance(getGeoDistance(APP.lastPos, [p.pts[0][0], p.pts[0][1]]))
-            : '';
-        const cls = `pl-item${isCurrent ? ' pl-active' : ''}${isPrev ? ' pl-prev' : ''}`;
-        const activeStyle = isCurrent ? ` style="border-color:#2FA8E0;border-width:2px"` : '';
+        const dist = pointDistanceHtml(p);
+        const cls = `pl-item${isCurrent ? ' pl-active' : ''}`;
         return `<div class="${cls}" data-idx="${i}">
-            <div class="pl-item-row"${activeStyle}>
+            <div class="pl-item-row">
                 <div class="pl-item-row-main">
                     <div class="pl-item-icon" data-play="${i}">${getPointBadgeSvg(p.hex, p.id)}</div>
                     <div class="pl-item-text">${escapeHtml(p.cmd)}</div>
-                    ${dist ? `<div class="pl-item-dist">${dist}</div>` : ''}
+                    <div class="pl-item-dist">${dist}</div>
                 </div>
                 ${p.comm && p.comm.trim() ? `<div class="pl-comment">${escapeHtml(p.comm)}</div>` : ''}
             </div>
@@ -2031,14 +2033,12 @@ function updateHudPos(pos) {
 function updatePointsListDist() {
     const modal = $('pointsListModal');
     if (!modal || modal.classList.contains('hidden')) return;
-    const activeItem = modal.querySelector('.pl-active');
-    const pos = (APP._driveShowFrom >= 0 && APP._simCurPos) ? APP._simCurPos : APP.lastPos;
-    if (!activeItem || !pos || APP.navCurrentIndex < 0) return;
-    const t = APP.navPoints[APP.navCurrentIndex];
-    if (!t) return;
-    const d = getGeoDistance(pos, [t.lat, t.lon]);
-    const distEl = activeItem.querySelector('.pl-item-dist');
-    if (distEl) distEl.innerHTML = formatDistance(d);
+    modal.querySelectorAll('.pl-item').forEach(el => {
+        const idx = parseInt(el.dataset.idx, 10);
+        const p = APP.navPoints[idx];
+        const distEl = el.querySelector('.pl-item-dist');
+        if (distEl) distEl.innerHTML = pointDistanceHtml(p);
+    });
 }
 
 
@@ -2059,30 +2059,8 @@ function updatePointsListActive() {
         const idx = parseInt(el.dataset.idx);
         const isCurrent = idx === APP.navCurrentIndex;
         el.classList.toggle('pl-active', isCurrent);
-        el.classList.toggle('pl-prev', idx < APP.navCurrentIndex);
-
-        const row = el.querySelector('.pl-item-row');
-        if (row) row.style.cssText = isCurrent ? 'border-color:#2FA8E0;border-width:2px' : '';
-
-        const pt = APP.navPoints[idx];
-        let distEl = el.querySelector('.pl-item-dist');
-        if (isCurrent && APP.lastPos && pt && pt.pts && pt.pts[0]) {
-            const distText = formatDistance(getGeoDistance(APP.lastPos, [pt.pts[0][0], pt.pts[0][1]]));
-            if (distEl) {
-                distEl.innerHTML = distText;
-            } else {
-                const main = el.querySelector('.pl-item-row-main');
-                if (main) {
-                    distEl = document.createElement('div');
-                    distEl.className = 'pl-item-dist';
-                    distEl.innerHTML = distText;
-                    main.appendChild(distEl);
-                }
-            }
-        } else if (distEl) {
-            distEl.remove();
-        }
     });
+    updatePointsListDist();
     const active = modal.querySelector('.pl-active');
     if (active) active.scrollIntoView({ block: 'center', behavior: 'smooth' });
 }

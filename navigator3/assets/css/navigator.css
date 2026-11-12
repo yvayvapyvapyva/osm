@@ -1790,6 +1790,9 @@ button, input, select, textarea {
     min-height: 52px;
     border-radius: var(--radius-sm);
     box-sizing: border-box;
+    background: color-mix(in srgb, var(--surface) 75%, transparent);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
 }
 
 .pl-item-row-main {
@@ -1800,11 +1803,6 @@ button, input, select, textarea {
     padding: 2px 0;
 }
 
-.pl-item.pl-active .pl-item-row {
-    border-width: 2px;
-    box-shadow: 0 0 12px rgba(0,255,0,0.15), 0 2px 8px rgba(0, 0, 0, 0.2), inset 0 0.5px 0 rgba(255, 255, 255, 0.15);
-}
-
 .pl-item-icon {
     flex-shrink: 0;
     display: flex;
@@ -1812,8 +1810,8 @@ button, input, select, textarea {
     justify-content: center;
     cursor: pointer;
     border-radius: var(--radius-control);
-    width: 44px;
-    height: 44px;
+    width: 52px;
+    height: 52px;
     padding: 4px;
     position: relative;
     cursor: pointer;
@@ -1852,14 +1850,11 @@ button, input, select, textarea {
     background: rgba(22,163,74,0.10);
 }
 
-.pl-prev {
-    opacity: 0.45;
-}
-
 .pl-item-text {
     flex: 1;
     font-size: 18px;
     font-weight: 700;
+    letter-spacing: -0.2px;
     min-width: 0;
     word-break: break-word;
     line-height: normal;
