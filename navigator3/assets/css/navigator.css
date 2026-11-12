@@ -1790,9 +1790,9 @@ button, input, select, textarea {
     min-height: 52px;
     border-radius: var(--radius-sm);
     box-sizing: border-box;
-    background: color-mix(in srgb, var(--surface) 75%, transparent);
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
+    /* Без backdrop-filter: в списке десятки карточек, и blur на каждой
+       сильно тормозит прокрутку. Полупрозрачный фон сохраняет вид. */
+    background: color-mix(in srgb, var(--surface) 88%, transparent);
 }
 
 .pl-prev {
