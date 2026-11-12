@@ -1401,6 +1401,113 @@ button, input, select, textarea {
     cursor: default;
 }
 
+/* Блок премиум-подписки в настройках */
+.premium-card {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 14px;
+    border-radius: var(--radius-control);
+    background: var(--surface-subtle);
+    border: 1px solid var(--line);
+}
+
+.premium-card-head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.premium-star {
+    flex: 0 0 36px;
+    width: 36px;
+    height: 36px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 176, 32, 0.16);
+    color: #B7791F;
+    font-size: 20px;
+    line-height: 1;
+}
+
+[data-theme="dark"] .premium-star {
+    background: rgba(255, 176, 32, 0.22);
+    color: #FFC65C;
+}
+
+.premium-card-text {
+    min-width: 0;
+}
+
+.premium-title {
+    color: var(--text);
+    font-size: 15px;
+    font-weight: 650;
+}
+
+.premium-status {
+    color: var(--text-muted);
+    font-size: 13px;
+    line-height: 1.35;
+    overflow-wrap: anywhere;
+}
+
+.premium-buy-btn {
+    width: 100%;
+    padding: 12px;
+    border: none;
+    border-radius: 12px;
+    background: var(--green);
+    color: #FFFFFF;
+    font: inherit;
+    font-size: 15px;
+    font-weight: 700;
+    cursor: pointer;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+    transition: transform 0.12s ease, opacity 0.15s ease;
+}
+
+.premium-buy-btn:active {
+    transform: scale(0.98);
+}
+
+.premium-buy-btn:disabled {
+    opacity: 0.6;
+    cursor: default;
+    transform: none;
+}
+
+.premium-offer {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 14px;
+    padding: 28px 18px;
+    text-align: center;
+}
+
+.premium-offer-star {
+    color: #F5A623;
+    font-size: 44px;
+    line-height: 1;
+}
+
+.premium-offer-title {
+    color: var(--text);
+    font-size: 19px;
+    font-weight: 700;
+}
+
+.premium-offer-text {
+    max-width: 360px;
+    color: var(--text-muted);
+    font-size: 15px;
+    line-height: 1.45;
+}
+
 .map-style-grid {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));

@@ -595,7 +595,9 @@ const MenuModule = {
         btn.addEventListener('click', event => {
             event.stopPropagation();
             if (route.locked) {
-                if (typeof showToast === 'function') {
+                if (typeof window.openPremiumOffer === 'function') {
+                    window.openPremiumOffer();
+                } else if (typeof showToast === 'function') {
                     showToast('Премиум-маршрут доступен по подписке', 'info', 4000);
                 }
                 return;
@@ -1041,7 +1043,11 @@ const MenuModule = {
             console.error('[MenuModule] Ошибка загрузки маршрута:', e);
             if (typeof showToast === 'function') {
                 if (e && e.message === 'premium_locked') {
-                    showToast('Премиум-маршрут доступен по подписке', 'info', 4000);
+                    if (typeof window.openPremiumOffer === 'function') {
+                        window.openPremiumOffer();
+                    } else {
+                        showToast('Премиум-маршрут доступен по подписке', 'info', 4000);
+                    }
                 } else {
                     showToast('Ошибка загрузки: ' + e.message, 'error', 5000);
                 }

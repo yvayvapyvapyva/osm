@@ -19,11 +19,14 @@
 """
 
 import base64
+import datetime as dt
 import hashlib
 import hmac
 import json
 import math
+import os
 import secrets
+from urllib.parse import parse_qs, urlencode
 
 import auth
 import store
@@ -487,16 +490,116 @@ def _is_premium(row):
     return bool(_row_value(row, "premium"))
 
 
-def _route_locked(row, user):
-    """Премиум-маршрут закрыт для всех, кроме владельца.
+def _premium_until(user):
+    value = (user or {}).get("premium_until")
+    if isinstance(value, dt.datetime):
+        if value.tzinfo is None:
+            return value.replace(tzinfo=dt.timezone.utc)
+        return value.astimezone(dt.timezone.utc)
+    return None
 
-    Пока доступ выдаётся только владельцу; подписки появятся позже.
-    """
+
+def _premium_active(user):
+    until = _premium_until(user)
+    return bool(until and until > store.now())
+
+
+def _premium_days():
+    try:
+        value = int(os.getenv("PREMIUM_DAYS", "30"))
+    except (TypeError, ValueError):
+        value = 30
+    return max(1, min(value, 3650))
+
+
+def _premium_price_rub():
+    raw = _text(os.getenv("PREMIUM_PRICE_RUB", "299")).replace(",", ".")
+    try:
+        value = float(raw)
+    except (TypeError, ValueError):
+        value = 299.0
+    return max(1.0, round(value, 2))
+
+
+def _premium_amount_kopecks():
+    return int(round(_premium_price_rub() * 100))
+
+
+def _premium_price_text():
+    value = _premium_price_rub()
+    if abs(value - round(value)) < 1e-9:
+        return str(int(round(value)))
+    return f"{value:.2f}"
+
+
+def _robokassa_config():
+    login = _text(os.getenv("ROBOKASSA_LOGIN")).strip()
+    password1 = _text(os.getenv("ROBOKASSA_PASSWORD1")).strip()
+    password2 = _text(os.getenv("ROBOKASSA_PASSWORD2")).strip()
+    test = _text(os.getenv("ROBOKASSA_TEST", "1")).strip().lower() in (
+        "1", "true", "yes", "on"
+    )
+    return login, password1, password2, test
+
+
+def _robokassa_ready():
+    login, password1, password2, _test = _robokassa_config()
+    return bool(login and password1 and password2)
+
+
+def _md5_signature(*parts):
+    source = ":".join(str(part) for part in parts)
+    return hashlib.md5(source.encode("utf-8")).hexdigest()
+
+
+def _robokassa_payment_url(inv_id, amount, description):
+    login, password1, _password2, test = _robokassa_config()
+    signature = _md5_signature(login, amount, inv_id, password1)
+    params = {
+        "MerchantLogin": login,
+        "OutSum": amount,
+        "InvId": str(inv_id),
+        "Description": description,
+        "SignatureValue": signature,
+        "Culture": "ru",
+        "Encoding": "utf-8",
+    }
+    if test:
+        params["IsTest"] = "1"
+    return "https://auth.robokassa.ru/Merchant/Index.aspx?" + urlencode(params)
+
+
+def _form_values(event):
+    values = {}
+    query = _query(event)
+    if isinstance(query, dict):
+        for key, value in query.items():
+            if isinstance(value, list):
+                values[str(key)] = str(value[0]) if value else ""
+            elif value is not None:
+                values[str(key)] = str(value)
+    body = event.get("body") or ""
+    if event.get("isBase64Encoded"):
+        try:
+            body = base64.b64decode(body).decode("utf-8")
+        except (ValueError, UnicodeDecodeError):
+            body = ""
+    if body:
+        parsed = parse_qs(body, keep_blank_values=True)
+        for key, items in parsed.items():
+            values[str(key)] = str(items[0]) if items else ""
+    return values
+
+
+def _route_locked(row, user):
+    """Премиум-маршрут закрыт для всех, кроме владельца и активной подписки."""
     if not _is_premium(row):
         return False
     owner_user_id = _text(_row_value(row, "owner_user_id"))
     user_id = _text((user or {}).get("user_id"))
-    return not owner_user_id or owner_user_id != user_id
+    if owner_user_id and owner_user_id == user_id:
+        return False
+    return not _premium_active(user)
 
 
 def _route_public_dict(
@@ -550,11 +653,14 @@ def _route_editor_dict(row, by_id):
 
 
 def _public_user(user):
+    until = _premium_until(user)
     return {
         "user_id": _text(user.get("user_id")),
         "login": _text(user.get("login")),
         "display_name": _text(user.get("display_name")),
         "email": _text(user.get("email")),
+        "premium_until": until.isoformat() if until else None,
+        "premium_active": _premium_active(user),
     }
 
 
@@ -968,6 +1074,152 @@ def _api_profile_update(event):
     return auth.json_response(200, {"user": _public_user(updated or user)})
 
 
+# ---------------------------------------------------------------------------
+# Премиум-подписка и Робокасса
+# ---------------------------------------------------------------------------
+
+
+def _plain_response(status, text):
+    return {
+        "statusCode": int(status),
+        "headers": {
+            "Content-Type": "text/plain; charset=utf-8",
+            "Cache-Control": "no-store",
+        },
+        "body": text,
+        "isBase64Encoded": False,
+    }
+
+
+def _premium_status_payload(user):
+    until = _premium_until(user)
+    return {
+        "active": _premium_active(user),
+        "until": until.isoformat() if until else None,
+        "price": _premium_price_text(),
+        "price_value": _premium_price_rub(),
+        "currency": "RUB",
+        "days": _premium_days(),
+        "payments_available": _robokassa_ready(),
+        "logged_in": bool(user),
+    }
+
+
+def _api_premium_status(event):
+    user = _current_user(event)
+    return auth.json_response(200, _premium_status_payload(user))
+
+
+def _api_premium_checkout(event):
+    """Создаёт счёт Робокассы и возвращает ссылку на оплату.
+
+    GET вместо POST: CDN на публичном домене пропускает только GET/HEAD/OPTIONS.
+    """
+    user = _current_user(event)
+    if not user:
+        return auth.json_response(401, {"error": "unauthorized"})
+    if not _robokassa_ready():
+        return auth.json_response(503, {"error": "payments_not_configured"})
+
+    amount_kopecks = _premium_amount_kopecks()
+    amount = f"{amount_kopecks / 100:.2f}"
+    days = _premium_days()
+    description = f"Премиум-подписка на {days} дней"
+
+    inv_id = ""
+    for _ in range(5):
+        candidate = str(secrets.randbelow(2_000_000_000) + 1)
+        if not store.get_payment(candidate):
+            inv_id = candidate
+            break
+    if not inv_id:
+        return auth.json_response(500, {"error": "payment_id_failed"})
+
+    try:
+        payment_url = _robokassa_payment_url(inv_id, amount, description)
+        store.create_payment(
+            inv_id=inv_id,
+            user_id=_text(user.get("user_id")),
+            yandex_id=_text(user.get("yandex_id")),
+            amount_kopecks=amount_kopecks,
+            currency="RUB",
+            payment_url=payment_url,
+        )
+    except Exception as exc:  # noqa: BLE001
+        print(f"[premium] checkout failed: {exc}")
+        return auth.json_response(500, {"error": "payment_create_failed"})
+
+    return auth.json_response(
+        200,
+        {
+            "payment_url": payment_url,
+            "inv_id": inv_id,
+            "amount": _premium_price_text(),
+            "currency": "RUB",
+            "days": days,
+        },
+    )
+
+
+def _api_premium_robokassa_result(event):
+    """ResultURL Робокассы: единственный источник правды об оплате."""
+    _login, _password1, password2, _test = _robokassa_config()
+    if not password2:
+        return _plain_response(503, "payments not configured")
+
+    values = _form_values(event)
+    out_sum = values.get("OutSum", "")
+    inv_id = values.get("InvId", "")
+    signature = values.get("SignatureValue", "")
+    if not out_sum or not inv_id or not signature:
+        return _plain_response(400, "missing parameters")
+
+    expected = _md5_signature(out_sum, inv_id, password2)
+    if not hmac.compare_digest(signature.lower(), expected.lower()):
+        print(f"[premium] bad result signature for invoice {inv_id}")
+        return _plain_response(400, "bad signature")
+
+    payment = store.get_payment(inv_id)
+    if not payment:
+        return _plain_response(404, "unknown invoice")
+    if payment.get("provider") != "robokassa":
+        return _plain_response(400, "unknown provider")
+
+    try:
+        paid_kopecks = int(round(float(out_sum.replace(",", ".")) * 100))
+    except (TypeError, ValueError):
+        return _plain_response(400, "bad amount")
+    if paid_kopecks < payment["amount_kopecks"]:
+        print(
+            f"[premium] amount mismatch {inv_id}: "
+            f"{paid_kopecks} < {payment['amount_kopecks']}"
+        )
+        return _plain_response(400, "amount mismatch")
+
+    if payment["status"] != "succeeded":
+        try:
+            store.mark_payment_succeeded(inv_id)
+            until = store.extend_premium(payment["yandex_id"], _premium_days())
+            print(f"[premium] invoice {inv_id} paid, premium until {until}")
+        except Exception as exc:  # noqa: BLE001
+            print(f"[premium] failed to apply payment {inv_id}: {exc}")
+            return _plain_response(500, "storage failed")
+
+    return _plain_response(200, f"OK{inv_id}")
+
+
+def _api_premium_robokassa_success(event):
+    # Доступ выдаёт только ResultURL после проверки подписи. SuccessURL —
+    # это просто возврат браузера, поэтому здесь не проверяем подпись.
+    base = _text(os.getenv("PUBLIC_BASE_URL", "")).rstrip("/") or "https://ainstruktor.ru"
+    return auth.redirect_response(f"{base}/navigator.html?payment=success")
+
+
+def _api_premium_robokassa_fail(event):
+    base = _text(os.getenv("PUBLIC_BASE_URL", "")).rstrip("/") or "https://ainstruktor.ru"
+    return auth.redirect_response(f"{base}/navigator.html?payment=fail")
+
+
 def _api_route(event):
     """Геометрия одного видимого маршрута."""
     m_val = _query(event).get("m") or ""
@@ -1346,6 +1598,21 @@ def _handle_api(event, path, method):
 
     if normalized == "/api/route" and method == "GET":
         return _api_route(event)
+
+    if normalized == "/api/premium/status" and method == "GET":
+        return _api_premium_status(event)
+
+    if normalized == "/api/premium/checkout" and method in ("GET", "POST"):
+        return _api_premium_checkout(event)
+
+    if normalized == "/api/premium/robokassa/result" and method == "POST":
+        return _api_premium_robokassa_result(event)
+
+    if normalized == "/api/premium/robokassa/success" and method == "GET":
+        return _api_premium_robokassa_success(event)
+
+    if normalized == "/api/premium/robokassa/fail" and method == "GET":
+        return _api_premium_robokassa_fail(event)
 
     if normalized == "/api/admin":
         if method != "POST":

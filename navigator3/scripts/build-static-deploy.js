@@ -9,7 +9,7 @@ const faviconFile = 'assets/favicon-128.png';
 
 // Бюджет бандла: сборка должна падать, если «один файл» незаметно растолстел.
 const BUDGET = {
-    bundle: 220 * 1024,
+    bundle: 230 * 1024,
     gzip: 80 * 1024,
     favicon: 32 * 1024,
 };

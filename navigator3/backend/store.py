@@ -85,6 +85,7 @@ def _user_dict(row):
         "created_at": row.created_at,
         "last_login_at": row.last_login_at,
         "blocked": bool(row.blocked) if row.blocked is not None else False,
+        "premium_until": _as_utc(getattr(row, "premium_until", None)),
     }
 
 
@@ -92,7 +93,7 @@ def get_user_by_yandex_id(yandex_id):
     query = """
         DECLARE $yandex_id AS Utf8;
         SELECT yandex_id, user_id, login, email, display_name,
-               created_at, last_login_at, blocked
+               created_at, last_login_at, blocked, premium_until
         FROM users
         WHERE yandex_id = $yandex_id;
     """
@@ -159,6 +160,7 @@ def upsert_user(yandex_id, login, email, display_name):
             "created_at": now,
             "last_login_at": now,
             "blocked": False,
+            "premium_until": None,
         }
 
     query = """
@@ -370,3 +372,204 @@ def delete_user_sessions(yandex_id):
         )
 
     get_pool().retry_operation_sync(operation)
+
+
+# ---------------------------------------------------------------------------
+# Премиум-подписка и платежи
+# ---------------------------------------------------------------------------
+
+
+def extend_premium(yandex_id, days):
+    """Продлевает премиум на days дней от максимума(сейчас, текущий срок)."""
+    user = get_user_by_yandex_id(yandex_id)
+    if not user:
+        return None
+    now = _now()
+    current = _as_utc(user.get("premium_until"))
+    base = current if current and current > now else now
+    premium_until = base + dt.timedelta(days=max(1, int(days)))
+
+    query = """
+        DECLARE $yandex_id AS Utf8;
+        DECLARE $premium_until AS Timestamp;
+
+        UPDATE users
+        SET premium_until = $premium_until
+        WHERE yandex_id = $yandex_id;
+    """
+
+    def operation(session):
+        prepared = session.prepare(query)
+        return session.transaction().execute(
+            prepared,
+            {
+                "$yandex_id": str(yandex_id),
+                "$premium_until": premium_until,
+            },
+            commit_tx=True,
+        )
+
+    get_pool().retry_operation_sync(operation)
+    return premium_until
+
+
+def _payment_dict(row):
+    return {
+        "inv_id": _text(getattr(row, "inv_id", "")),
+        "user_id": _text(getattr(row, "user_id", "")),
+        "yandex_id": _text(getattr(row, "yandex_id", "")),
+        "amount_kopecks": int(getattr(row, "amount_kopecks", 0) or 0),
+        "currency": _text(getattr(row, "currency", "RUB")),
+        "status": _text(getattr(row, "status", "")),
+        "provider": _text(getattr(row, "provider", "robokassa")),
+        "payment_url": _text(getattr(row, "payment_url", "")),
+        "created_at": _as_utc(getattr(row, "created_at", None)),
+        "paid_at": _as_utc(getattr(row, "paid_at", None)),
+    }
+
+
+def create_payment(inv_id, user_id, yandex_id, amount_kopecks, currency,
+                   payment_url, provider="robokassa", status="pending"):
+    now = _now()
+    query = """
+        DECLARE $inv_id AS Utf8;
+        DECLARE $user_id AS Utf8;
+        DECLARE $yandex_id AS Utf8;
+        DECLARE $amount_kopecks AS Uint64;
+        DECLARE $currency AS Utf8;
+        DECLARE $status AS Utf8;
+        DECLARE $provider AS Utf8;
+        DECLARE $payment_url AS Utf8;
+        DECLARE $created_at AS Timestamp;
+
+        INSERT INTO payments
+            (inv_id, user_id, yandex_id, amount_kopecks, currency,
+             status, provider, payment_url, created_at)
+        VALUES
+            ($inv_id, $user_id, $yandex_id, $amount_kopecks, $currency,
+             $status, $provider, $payment_url, $created_at);
+    """
+
+    def operation(session):
+        prepared = session.prepare(query)
+        return session.transaction().execute(
+            prepared,
+            {
+                "$inv_id": str(inv_id),
+                "$user_id": str(user_id),
+                "$yandex_id": str(yandex_id),
+                "$amount_kopecks": int(amount_kopecks),
+                "$currency": str(currency),
+                "$status": str(status),
+                "$provider": str(provider),
+                "$payment_url": str(payment_url),
+                "$created_at": now,
+            },
+            commit_tx=True,
+        )
+
+    get_pool().retry_operation_sync(operation)
+    return {
+        "inv_id": str(inv_id),
+        "user_id": str(user_id),
+        "yandex_id": str(yandex_id),
+        "amount_kopecks": int(amount_kopecks),
+        "currency": str(currency),
+        "status": str(status),
+        "provider": str(provider),
+        "payment_url": str(payment_url),
+        "created_at": now,
+        "paid_at": None,
+    }
+
+
+def get_payment(inv_id):
+    query = """
+        DECLARE $inv_id AS Utf8;
+        SELECT inv_id, user_id, yandex_id, amount_kopecks, currency,
+               status, provider, payment_url, created_at, paid_at
+        FROM payments
+        WHERE inv_id = $inv_id;
+    """
+
+    def operation(session):
+        prepared = session.prepare(query)
+        return session.transaction().execute(
+            prepared, {"$inv_id": str(inv_id)}, commit_tx=True
+        )
+
+    result = get_pool().retry_operation_sync(operation)
+    rows = result[0].rows
+    if not rows:
+        return None
+    return _payment_dict(rows[0])
+
+
+def mark_payment_succeeded(inv_id, paid_at=None):
+    paid_at = paid_at or _now()
+    query = """
+        DECLARE $inv_id AS Utf8;
+        DECLARE $status AS Utf8;
+        DECLARE $paid_at AS Timestamp;
+
+        UPDATE payments
+        SET status = $status, paid_at = $paid_at
+        WHERE inv_id = $inv_id;
+    """
+
+    def operation(session):
+        prepared = session.prepare(query)
+        return session.transaction().execute(
+            prepared,
+            {
+                "$inv_id": str(inv_id),
+                "$status": "succeeded",
+                "$paid_at": paid_at,
+            },
+            commit_tx=True,
+        )
+
+    get_pool().retry_operation_sync(operation)
+    return paid_at
+
+
+def mark_payment_canceled(inv_id):
+    query = """
+        DECLARE $inv_id AS Utf8;
+        DECLARE $status AS Utf8;
+        UPDATE payments SET status = $status WHERE inv_id = $inv_id;
+    """
+
+    def operation(session):
+        prepared = session.prepare(query)
+        return session.transaction().execute(
+            prepared,
+            {"$inv_id": str(inv_id), "$status": "canceled"},
+            commit_tx=True,
+        )
+
+    get_pool().retry_operation_sync(operation)
+
+
+def latest_payment_for_user(user_id):
+    query = """
+        DECLARE $user_id AS Utf8;
+        SELECT inv_id, user_id, yandex_id, amount_kopecks, currency,
+               status, provider, payment_url, created_at, paid_at
+        FROM payments
+        WHERE user_id = $user_id
+        ORDER BY created_at DESC
+        LIMIT 1;
+    """
+
+    def operation(session):
+        prepared = session.prepare(query)
+        return session.transaction().execute(
+            prepared, {"$user_id": str(user_id)}, commit_tx=True
+        )
+
+    result = get_pool().retry_operation_sync(operation)
+    rows = result[0].rows
+    if not rows:
+        return None
+    return _payment_dict(rows[0])

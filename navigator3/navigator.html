@@ -259,7 +259,8 @@ const APP = {
     _simMode: false,
     _navSeq: 0,
     _audioPending: 0,
-    _autoCenterTimer: null
+    _autoCenterTimer: null,
+    premiumStatus: null
 };
 
 const $ = id => document.getElementById(id);
@@ -1342,6 +1343,7 @@ function closeAllSheets() {
     closeSettings();
     closeDrivingControl();
     closeInstruction();
+    closePremiumOffer();
     if (typeof MenuModule !== 'undefined') MenuModule.hide();
 }
 
@@ -1352,6 +1354,8 @@ function openSettings() {
     $('themeToggle').checked = document.documentElement.getAttribute('data-theme') === 'dark';
     $('themeValue').textContent = document.documentElement.getAttribute('data-theme') === 'dark' ? 'Вкл' : 'Выкл';
     $('commentToggle').checked = APP._commentEnabled;
+    renderPremiumUi();
+    loadPremiumStatus().catch(() => {});
     $('navSettingsModal').classList.remove('hidden');
 }
 
@@ -1362,6 +1366,192 @@ function hideScreen(modalId) {
 
 function closeSettings() {
     hideScreen('navSettingsModal');
+}
+
+/* ---------- Премиум-подписка ---------- */
+
+function formatPremiumDate(value) {
+    if (!value) return '';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return '';
+    return date.toLocaleDateString('ru-RU', {
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric'
+    });
+}
+
+function renderPremiumUi() {
+    const status = APP.premiumStatus || {};
+    const logged = !!(status.logged_in || (window.AuthModule && AuthModule.user));
+    const active = !!status.active;
+    const available = !!status.payments_available;
+    const price = status.price || '299';
+    const days = status.days || 30;
+    const until = formatPremiumDate(status.until);
+
+    let text = '';
+    let button = 'Купить';
+    let disabled = false;
+
+    if (!logged) {
+        text = 'Войдите, чтобы оформить подписку';
+        button = 'Войти с Яндексом';
+    } else if (active) {
+        text = until ? `Активен до ${until}` : 'Премиум активен';
+        button = `Продлить на ${days} дней`;
+        disabled = !available;
+    } else {
+        text = `Доступ к премиум-маршрутам на ${days} дней`;
+        button = `Купить за ${price} ₽`;
+        disabled = !available;
+    }
+    if (logged && !available) {
+        text = 'Оплата временно недоступна';
+    }
+
+    const title = $('premiumTitle');
+    if (title) title.textContent = active ? 'Премиум активен' : 'Премиум-подписка';
+    const statusEl = $('premiumStatus');
+    if (statusEl) statusEl.textContent = text;
+    const buyBtn = $('premiumBuyBtn');
+    if (buyBtn) {
+        buyBtn.textContent = button;
+        buyBtn.disabled = disabled;
+    }
+
+    const offerTitle = $('premiumOfferTitle');
+    if (offerTitle) offerTitle.textContent = 'Премиум-маршрут';
+    const offerText = $('premiumOfferText');
+    if (offerText) {
+        offerText.textContent = logged
+            ? `Оформите премиум на ${days} дней за ${price} ₽ и откроется доступ ко всем премиум-маршрутам.`
+            : 'Войдите через Яндекс, чтобы оформить премиум и открыть этот маршрут.';
+    }
+    const offerBtn = $('premiumOfferBtn');
+    if (offerBtn) {
+        offerBtn.textContent = !logged ? 'Войти с Яндексом' : button;
+        offerBtn.disabled = logged ? disabled : false;
+    }
+}
+
+async function loadPremiumStatus() {
+    try {
+        const response = await fetch('/api/premium/status', {
+            credentials: 'same-origin',
+            headers: { Accept: 'application/json' },
+            cache: 'no-store'
+        });
+        if (!response.ok) throw new Error('HTTP ' + response.status);
+        APP.premiumStatus = await response.json();
+    } catch (error) {
+        APP.premiumStatus = APP.premiumStatus || {
+            active: false,
+            price: '299',
+            days: 30,
+            payments_available: false,
+            logged_in: !!(window.AuthModule && AuthModule.user)
+        };
+    }
+    renderPremiumUi();
+    return APP.premiumStatus;
+}
+
+function openPremiumOffer() {
+    closeAllSheets();
+    renderPremiumUi();
+    const modal = $('premiumModal');
+    if (modal) modal.classList.remove('hidden');
+    loadPremiumStatus().catch(() => {});
+}
+
+function closePremiumOffer() {
+    hideScreen('premiumModal');
+}
+
+async function startPremiumCheckout() {
+    const loggedIn = !!((window.AuthModule && AuthModule.user) ||
+        (APP.premiumStatus && APP.premiumStatus.logged_in));
+    if (!loggedIn) {
+        if (window.AuthModule) AuthModule.login(true);
+        return;
+    }
+    const buttons = [$('premiumBuyBtn'), $('premiumOfferBtn')].filter(Boolean);
+    const original = buttons.map(button => button.textContent);
+    buttons.forEach(button => {
+        button.disabled = true;
+        button.textContent = 'Переходим к оплате…';
+    });
+    try {
+        const response = await fetch('/api/premium/checkout', {
+            credentials: 'same-origin',
+            headers: { Accept: 'application/json' },
+            cache: 'no-store'
+        });
+        const data = await response.json().catch(() => ({}));
+        if (response.status === 401) {
+            AuthModule.login(true);
+            return;
+        }
+        if (!response.ok || !data.payment_url) {
+            throw new Error(data.error || 'Не удалось создать платёж');
+        }
+        window.location.href = data.payment_url;
+    } catch (error) {
+        buttons.forEach((button, index) => {
+            button.disabled = false;
+            button.textContent = original[index];
+        });
+        if (typeof showToast === 'function') {
+            showToast(
+                error && error.message === 'payments_not_configured'
+                    ? 'Оплата временно недоступна'
+                    : 'Не удалось перейти к оплате',
+                'error',
+                4000
+            );
+        }
+    }
+}
+
+async function handlePremiumReturn() {
+    const params = new URLSearchParams(window.location.search);
+    const payment = params.get('payment');
+    if (!payment) return;
+    params.delete('payment');
+    const query = params.toString();
+    const cleanUrl = window.location.pathname + (query ? '?' + query : '') + window.location.hash;
+
+    if (payment === 'fail') {
+        if (typeof showToast === 'function') {
+            showToast('Оплата не завершена', 'error', 4000);
+        }
+        window.history.replaceState(null, '', cleanUrl);
+        return;
+    }
+    if (payment !== 'success') return;
+
+    if (typeof showToast === 'function') {
+        showToast('Проверяем оплату…', 'info', 3000);
+    }
+    for (let attempt = 0; attempt < 15; attempt++) {
+        try {
+            const status = await loadPremiumStatus();
+            if (status && status.active) {
+                if (typeof showToast === 'function') {
+                    showToast('Премиум активирован', 'success', 4000);
+                }
+                window.history.replaceState(null, '', cleanUrl);
+                setTimeout(() => window.location.reload(), 600);
+                return;
+            }
+        } catch (error) {}
+        await new Promise(resolve => setTimeout(resolve, 2000));
+    }
+    if (typeof showToast === 'function') {
+        showToast('Платёж обрабатывается. Проверьте статус в настройках.', 'info', 5000);
+    }
+    window.history.replaceState(null, '', cleanUrl);
 }
 
 function openDrivingControl() {
@@ -2571,6 +2761,22 @@ if (typeof maplibregl === 'undefined') {
             </div>
 
             <div class="settings-group">
+                <div class="settings-label">Премиум</div>
+                <div class="premium-card">
+                    <div class="premium-card-head">
+                        <span class="premium-star" aria-hidden="true">★</span>
+                        <div class="premium-card-text">
+                            <div class="premium-title" id="premiumTitle">Премиум-подписка</div>
+                            <div class="premium-status" id="premiumStatus">Проверяем…</div>
+                        </div>
+                    </div>
+                    <button type="button" class="premium-buy-btn" id="premiumBuyBtn" disabled>
+                        Купить
+                    </button>
+                </div>
+            </div>
+
+            <div class="settings-group">
                 <div class="settings-label">Оформление</div>
                 <div class="trigger-setting-row">
                     <div class="trigger-setting-header">
@@ -2600,6 +2806,29 @@ if (typeof maplibregl === 'undefined') {
                         <span class="label">Включить отображение и озвучивание</span>
                     </div>
                 </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="premiumModal" class="hidden screen-modal">
+    <div class="screen-panel" id="premiumScreen">
+        <header class="screen-head">
+            <h1 class="screen-title">Премиум</h1>
+            <button type="button" class="screen-close" onclick="closePremiumOffer()" aria-label="Закрыть">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+            </button>
+        </header>
+        <div class="settings-body">
+            <div class="premium-offer">
+                <div class="premium-offer-star" aria-hidden="true">★</div>
+                <div class="premium-offer-title" id="premiumOfferTitle">Премиум-маршрут</div>
+                <div class="premium-offer-text" id="premiumOfferText">
+                    Этот маршрут доступен по премиум-подписке.
+                </div>
+                <button type="button" class="premium-buy-btn" id="premiumOfferBtn" disabled>
+                    Оформить
+                </button>
             </div>
         </div>
     </div>
@@ -2773,6 +3002,30 @@ if (typeof maplibregl === 'undefined') {
         wait.observe(document.body, { childList: true, subtree: true });
     }
     sync();
+})();
+</script>
+<script>
+(function () {
+    const bind = () => {
+        const buy = document.getElementById('premiumBuyBtn');
+        if (buy) buy.addEventListener('click', startPremiumCheckout);
+        const offer = document.getElementById('premiumOfferBtn');
+        if (offer) offer.addEventListener('click', startPremiumCheckout);
+    };
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', bind);
+    } else {
+        bind();
+    }
+    window.addEventListener('load', () => {
+        setTimeout(() => {
+            if (typeof handlePremiumReturn === 'function') handlePremiumReturn();
+        }, 600);
+    });
+    window.openPremiumOffer = openPremiumOffer;
+    window.closePremiumOffer = closePremiumOffer;
+    window.startPremiumCheckout = startPremiumCheckout;
+    window.loadPremiumStatus = loadPremiumStatus;
 })();
 </script>
 </body>

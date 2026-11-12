@@ -28,6 +28,20 @@
 - `pad/deploy.sh` — функция `pad-osm` (ID `d4esfoiand5dinv3mfth`).
 - `tts/navigator/deploy.sh` — функция TTS (ID `d4e3cj3q3ff36qlrhbg8`).
 
+## Оплата (Робокасса)
+- Разовый платёж на `PREMIUM_DAYS` дней (по умолчанию 30), цена `PREMIUM_PRICE_RUB` (по умолчанию 299 ₽).
+- Переменные функции: `ROBOKASSA_LOGIN`, `ROBOKASSA_PASSWORD1`, `ROBOKASSA_PASSWORD2`, `ROBOKASSA_TEST`, `PREMIUM_PRICE_RUB`, `PREMIUM_DAYS`.
+- В кабинете Робокассы:
+  - `ResultURL` (POST, только домен шлюза): `https://d5dsd5u1tsc8fm9dbsg5.s183zexc.apigw.yandexcloud.net/api/premium/robokassa/result`
+  - `SuccessURL` (GET, apex): `https://ainstruktor.ru/api/premium/robokassa/success`
+  - `FailURL` (GET, apex): `https://ainstruktor.ru/api/premium/robokassa/fail`
+- `GET /api/premium/checkout` создаёт счёт и возвращает ссылку на оплату. GET, потому что CDN на apex не пропускает POST.
+- `POST /api/premium/robokassa/result` — источник правды: проверяет подпись `Password#2`, сумму и продлевает `users.premium_until`. Отвечает `OK<InvId>`.
+- `GET /api/premium/robokassa/success` проверяет `Password#1` и редиректит в навигатор с `?payment=success`.
+- `GET /api/premium/status` — цена, срок, активность подписки и `payments_available`.
+- Тестовый режим: `ROBOKASSA_TEST=1` добавляет `IsTest=1` в ссылку.
+- Миграция: `migrations/add_premium_subscriptions.py` (добавляет `users.premium_until` и таблицу `payments`).
+
 ## Команда YC
 - `yc` установлен: `/Users/mb/yandex-cloud/bin/yc`
 - cloud-id: `b1gtnlal9r2s3rvqadjn`, folder-id: `b1gepvq09nl4oobiemtr`
