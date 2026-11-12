@@ -46,8 +46,9 @@
 - `GET /api/premium/checkout?provider=robokassa` создаёт числовой `InvId`, пишет платёж в `payments` с `provider=robokassa` и отдаёт ссылку на `https://auth.robokassa.ru/Merchant/Index.aspx`.
 - Подпись ссылки: MD5 `MerchantLogin:OutSum:InvId:Пароль#1`.
 - ResultURL (GET): `https://d5dsd5u1tsc8fm9dbsg5.s183zexc.apigw.yandexcloud.net/api/premium/robokassa/result`, подпись MD5 `OutSum:InvId:Пароль#2`, ответ `OK<InvId>`. Обработчик принимает и GET, и POST.
-- FailURL: `https://ainstruktor.ru/navigator.html?payment=fail` (или `.../api/premium/robokassa/fail`, он помечает платёж отменённым и редиректит туда же).
-- SuccessURL: `https://ainstruktor.ru/navigator.html?payment=success`.
+- URL в кабинете Робокассы должны быть без параметров, иначе GET не примет: SuccessURL и FailURL — чистые адреса на шлюзе, они сами редиректят навигатор.
+- SuccessURL (GET): `https://d5dsd5u1tsc8fm9dbsg5.s183zexc.apigw.yandexcloud.net/api/premium/robokassa/success` → редирект на `https://ainstruktor.ru/navigator.html?payment=success`.
+- FailURL (GET): `https://d5dsd5u1tsc8fm9dbsg5.s183zexc.apigw.yandexcloud.net/api/premium/robokassa/fail` → помечает платёж отменённым и редиректит на `...?payment=fail`.
 
 ## Команда YC
 - `yc` установлен: `/Users/mb/yandex-cloud/bin/yc`

@@ -1425,6 +1425,16 @@ def _api_premium_robokassa_result(event):
     return _text_response(200, f"OK{inv_id}")
 
 
+def _api_premium_robokassa_success(event):
+    """Success URL: возвращаем пользователя в навигатор.
+
+    Робокасса требует, чтобы настроенный URL был без параметров, поэтому
+    результат оформляем редиректом на страницу с ?payment=success.
+    """
+    base = _text(os.getenv("PUBLIC_BASE_URL", "")).rstrip("/") or "https://ainstruktor.ru"
+    return auth.redirect_response(f"{base}/navigator.html?payment=success")
+
+
 def _api_premium_robokassa_fail(event):
     """Fail URL: пользователь отказался или оплата не прошла."""
     params = dict(_query(event))
@@ -1836,6 +1846,9 @@ def _handle_api(event, path, method):
 
     if normalized == "/api/premium/robokassa/result" and method in ("GET", "POST"):
         return _api_premium_robokassa_result(event)
+
+    if normalized == "/api/premium/robokassa/success" and method in ("GET", "POST"):
+        return _api_premium_robokassa_success(event)
 
     if normalized == "/api/premium/robokassa/fail" and method in ("GET", "POST"):
         return _api_premium_robokassa_fail(event)
