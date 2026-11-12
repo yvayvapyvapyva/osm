@@ -5,6 +5,21 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
     <title>Инструкция — Редактор маршрутов</title>
     <style>
+        :root {
+            --fill-1: rgba(255,255,255,0.04);
+            --fill-2: rgba(255,255,255,0.10);
+            --line: rgba(255,255,255,0.14);
+            --line-strong: rgba(255,255,255,0.22);
+            --text: #f5f7fa;
+            --text-muted: #8b8f99;
+            --surface-muted: rgba(255,255,255,0.08);
+            --green: #2FA8E0;
+            --green-dark: #60A5FA;
+            --green-tint: rgba(47,168,224,0.14);
+            --green-tint-strong: rgba(47,168,224,0.22);
+            --green-line-soft: rgba(47,168,224,0.32);
+            --danger: #F87171;
+        }
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
@@ -75,7 +90,7 @@
 .icon-row {
     display: flex; align-items: center; gap: 12px;
     padding: 10px 14px;
-    background: rgba(255,255,255,0.04);
+    background: var(--fill-1);
     border-radius: 12px;
     margin: 6px 0;
 }
@@ -88,19 +103,18 @@
 }
 .icon-row .desc { flex: 1; min-width: 0; }
 .icon-row .label { font-weight: 600; font-size: 15px; }
-.icon-row .hint { font-size: 13px; color: #8b8f99; margin-top: 2px; }
-
+.icon-row .hint { font-size: 13px; color: var(--text-muted); margin-top: 2px; }
 .icon-row-v {
     display: flex; flex-direction: column; align-items: center; gap: 8px;
     padding: 14px;
-    background: rgba(255,255,255,0.04);
+    background: var(--fill-1);
     border-radius: 12px;
     margin: 10px 0;
 }
 .icon-row-v .icon { display: flex; align-items: center; justify-content: center; }
 .icon-row-v .desc { width: 100%; text-align: left; }
 .icon-row-v .label { font-weight: 600; font-size: 15px; }
-.subtitle { text-align: center; color: #8b8f99; font-size: 14px; margin-bottom: 24px; }
+.subtitle { text-align: center; color: var(--text-muted); font-size: 14px; margin-bottom: 24px; }
 .badge {
     display: inline-block;
     padding: 2px 10px;
@@ -108,29 +122,29 @@
     font-size: 13px;
     font-weight: 600;
 }
-.badge-green { background: rgba(48,209,88,0.2); color: #30D158; }
-.badge-blue { background: rgba(0,122,255,0.2); color: #5AC8FA; }
-.badge-gray { background: rgba(139,143,153,0.2); color: #8b8f99; }
+.badge-green { background: var(--green-tint-strong); color: var(--green-dark); }
+.badge-blue { background: rgba(10,132,255,0.14); color: #0A84FF; }
+.badge-gray { background: var(--fill-2); color: var(--text-muted); }
 .color-row {
     display: flex; align-items: center; gap: 10px;
     padding: 8px 12px;
-    background: rgba(255,255,255,0.04);
+    background: var(--fill-1);
     border-radius: 10px;
     margin: 4px 0;
 }
 .swatch { width: 16px; height: 16px; border-radius: 50%; flex-shrink: 0; }
 .tip {
-    background: rgba(48,209,88,0.08);
-    border-left: 3px solid #30D158;
+    background: var(--green-tint);
+    border-left: 3px solid var(--green);
     padding: 12px 16px;
     border-radius: 0 10px 10px 0;
     margin: 12px 0;
     font-size: 14px;
 }
-.tip strong { color: #30D158; }
+.tip strong { color: var(--green-dark); }
 kbd {
-    background: rgba(255,255,255,0.1);
-    border: 0.5px solid rgba(255,255,255,0.15);
+    background: var(--fill-2);
+    border: 0.5px solid var(--line);
     border-radius: 6px;
     padding: 2px 8px;
     font-size: 13px;
@@ -143,11 +157,11 @@ kbd {
     width: 52px;
     height: 52px;
     border-radius: 50%;
-    background: rgba(15, 15, 15, 0.8);
-    border: 0.5px solid rgba(255, 255, 255, 0.12);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3), inset 0 0.5px 0 rgba(255, 255, 255, 0.1);
+    background: var(--surface-muted);
+    border: 0.5px solid var(--line);
+    box-shadow: none;
     flex-shrink: 0;
-    color: #fff;
+    color: var(--text);
     box-sizing: border-box;
 }
 .btn-replica svg {
@@ -200,11 +214,11 @@ kbd {
     display: inline-flex;
     align-items: stretch;
     gap: 0;
-    border: 0.5px solid rgba(255,255,255,0.25);
+    border: 0.5px solid var(--line-strong);
 }
 .btn-replica-hud .hud-idx {
-    background: rgba(255,255,255,0.15);
-    border-right: 0.5px solid rgba(255,255,255,0.2);
+    background: var(--fill-2);
+    border-right: 0.5px solid var(--line);
     padding: 0 12px;
     display: flex;
     align-items: center;
@@ -223,8 +237,8 @@ kbd {
     justify-content: center;
 }
 .btn-replica-hud .hud-dist {
-    background: rgba(255,255,255,0.15);
-    border-left: 0.5px solid rgba(255,255,255,0.2);
+    background: var(--fill-2);
+    border-left: 0.5px solid var(--line);
     padding: 0 12px;
     display: flex;
     align-items: center;
@@ -249,10 +263,12 @@ kbd {
     height: 16px;
 }
 .btn-replica-green {
-    background: linear-gradient(180deg, rgba(52,199,89,0.9), rgba(40,160,70,0.85));
+    background: var(--green);
+    color: #FFFFFF;
 }
 .btn-replica-danger {
-    background: rgba(255,80,80,0.8);
+    background: var(--danger);
+    color: #FFFFFF;
 }
 .btn-replica-select {
     border-radius: 12px;
@@ -262,8 +278,8 @@ kbd {
     font-size: 15px;
     font-weight: 600;
     white-space: nowrap;
-    border: 1px solid rgba(255,255,255,0.25);
-    box-shadow: 0 2px 8px rgba(0,0,0,0.2), inset 0 0.5px 0 rgba(255,255,255,0.15);
+    border: 1px solid var(--line-strong);
+    box-shadow: none;
 }
 .btn-replica-small {
     width: 32px;
@@ -297,7 +313,7 @@ kbd {
     </div>
 
     <div class="icon-row icon-row-v">
-        <div class="icon"><span class="btn-replica btn-replica-action" style="background:rgba(0,122,255,0.25);border-color:rgba(0,122,255,0.4);">Создать папку</span></div>
+        <div class="icon"><span class="btn-replica btn-replica-action" style="background:var(--green-tint-strong);border-color:var(--green-line-soft);color:var(--green-dark);">Создать папку</span></div>
         <div class="desc">
             <div class="label">Создание папки — Введите название. Папка появится в списке и в неё можно перетаскивать маршруты.</div>
         </div>

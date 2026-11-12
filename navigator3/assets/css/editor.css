@@ -2,29 +2,144 @@
    Общие переменные и базовые стили
    ============================================ */
 :root {
-    --bg: #000000;
-    --glass-bg: rgba(15, 15, 15, 0.75);
-    --glass-bg-heavy: rgba(12, 12, 12, 0.82);
-    --glass-border: rgba(255, 255, 255, 0.12);
-    --glass-border-bright: rgba(255, 255, 255, 0.2);
-    --glass-highlight: rgba(255, 255, 255, 0.08);
-    --btn-txt: #ffffff;
-    --accent-green: #30D158;
-    --accent-green-glow: rgba(48, 209, 88, 0.35);
+    color-scheme: light;
+
+    /* Поверхности */
+    --bg: #F4F6FA;
+    --surface: #FFFFFF;
+    --surface-muted: #F1F4F8;
+    --surface-subtle: #F7F9FC;
+    --scrim: rgba(18, 28, 46, 0.28);
+    --toggle-off: #D8DEE8;
+
+    /* Текст */
+    --text: #121A28;
+    --text-muted: rgba(18, 28, 46, 0.62);
+    --text-body: #46505F;
+    --text-soft: rgba(18, 28, 46, 0.42);
+    --text-faint: rgba(18, 28, 46, 0.24);
+
+    /* Линии и нейтральные заливки */
+    --line: rgba(18, 28, 46, 0.10);
+    --line-soft: rgba(18, 28, 46, 0.08);
+    --line-faint: rgba(18, 28, 46, 0.06);
+    --line-strong: rgba(18, 28, 46, 0.14);
+    --line-surface: rgba(18, 28, 46, 0.16);
+    --fill-1: rgba(18, 28, 46, 0.04);
+    --fill-2: rgba(18, 28, 46, 0.07);
+    --fill-3: rgba(18, 28, 46, 0.12);
+    --text-halo: rgba(255, 255, 255, 0.92);
+
+    /* Акценты */
+    --green: #2FA8E0;
+    --green-dark: #1E90D0;
+    --green-soft: #E7F4FC;
+    --green-tint: rgba(47, 168, 224, 0.10);
+    --green-tint-strong: rgba(47, 168, 224, 0.16);
+    --green-line: rgba(47, 168, 224, 0.42);
+    --green-line-soft: rgba(47, 168, 224, 0.26);
+    --green-focus: rgba(47, 168, 224, 0.55);
+    --green-glow: rgba(47, 168, 224, 0.18);
+    --danger: #DC2626;
+    --danger-soft: #FDE8E8;
+    --danger-line: rgba(220, 38, 38, 0.28);
+
+    /* Тени */
+    --shadow-card: 0 4px 16px rgba(18, 28, 46, 0.16);
+    --shadow-float: 0 8px 24px rgba(18, 28, 46, 0.18);
+    --shadow-raised: 0 12px 40px rgba(18, 28, 46, 0.16);
+    --shadow-panel: 0 -24px 48px rgba(18, 28, 46, 0.18);
+    --inset-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.90);
+
+    /* Имена, которые уже использовались в editor.css */
+    --glass-bg: rgba(255, 255, 255, 0.75);
+    --glass-bg-heavy: rgba(255, 255, 255, 0.92);
+    --glass-border: rgba(18, 28, 46, 0.16);
+    --glass-border-bright: rgba(18, 28, 46, 0.24);
+    --glass-highlight: rgba(255, 255, 255, 0.65);
+    --btn-txt: #121A28;
+    --text-primary: var(--text);
+    --text-secondary: var(--text-muted);
+    --text-tertiary: var(--text-soft);
+    --accent-green: var(--green);
+    --accent-green-glow: var(--green-glow);
     --accent-blue: #0A84FF;
     --accent-red: #FF453A;
     --accent-orange: #FF9F0A;
-    --text-primary: #ffffff;
-    --text-secondary: rgba(255, 255, 255, 0.7);
-    --text-tertiary: rgba(255, 255, 255, 0.5);
-    --shadow-soft: 0 8px 32px rgba(0, 0, 0, 0.3);
-    --shadow-medium: 0 12px 40px rgba(0, 0, 0, 0.4);
-    --shadow-strong: 0 20px 60px rgba(0, 0, 0, 0.4);
+    --success: #2FA8E0;
+    --shadow-soft: var(--shadow-card);
+    --shadow-medium: var(--shadow-float);
+    --shadow-strong: var(--shadow-raised);
     --radius-sm: 14px;
     --radius-md: 18px;
     --radius-lg: 24px;
     --radius-xl: 28px;
     --radius-full: 100px;
+}
+
+[data-theme="dark"] {
+    color-scheme: dark;
+
+    --bg: #0F141C;
+    --surface: #161D27;
+    --surface-muted: #1E2733;
+    --surface-subtle: #1A2230;
+    --scrim: rgba(0, 0, 0, 0.55);
+    --toggle-off: #3A4556;
+
+    --text: #E8EDF5;
+    --text-muted: rgba(232, 237, 245, 0.66);
+    --text-body: rgba(232, 237, 245, 0.74);
+    --text-soft: rgba(232, 237, 245, 0.46);
+    --text-faint: rgba(232, 237, 245, 0.26);
+
+    --line: rgba(232, 237, 245, 0.14);
+    --line-soft: rgba(232, 237, 245, 0.10);
+    --line-faint: rgba(232, 237, 245, 0.07);
+    --line-strong: rgba(232, 237, 245, 0.20);
+    --line-surface: var(--line);
+    --fill-1: rgba(232, 237, 245, 0.06);
+    --fill-2: rgba(232, 237, 245, 0.10);
+    --fill-3: rgba(232, 237, 245, 0.16);
+    --text-halo: rgba(0, 0, 0, 0.72);
+
+    --green: #2FA8E0;
+    --green-dark: #60A5FA;
+    --green-soft: #0A4A6B;
+    --green-tint: rgba(47, 168, 224, 0.14);
+    --green-tint-strong: rgba(47, 168, 224, 0.22);
+    --green-line: rgba(47, 168, 224, 0.55);
+    --green-line-soft: rgba(47, 168, 224, 0.32);
+    --green-focus: rgba(47, 168, 224, 0.70);
+    --green-glow: rgba(47, 168, 224, 0.22);
+    --danger: #F87171;
+    --danger-soft: #3A1D20;
+    --danger-line: rgba(248, 113, 113, 0.40);
+
+    --shadow-card: 0 2px 10px rgba(0, 0, 0, 0.35);
+    --shadow-float: 0 4px 16px rgba(0, 0, 0, 0.45);
+    --shadow-raised: 0 12px 40px rgba(0, 0, 0, 0.55);
+    --shadow-panel: 0 -24px 48px rgba(0, 0, 0, 0.55);
+    --inset-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+
+    --glass-bg: rgba(15, 15, 15, 0.75);
+    --glass-bg-heavy: rgba(12, 12, 12, 0.82);
+    --glass-border: rgba(255, 255, 255, 0.12);
+    --glass-border-bright: rgba(255, 255, 255, 0.20);
+    --glass-highlight: rgba(255, 255, 255, 0.08);
+    --btn-txt: #FFFFFF;
+    --text-primary: var(--text);
+    --text-secondary: var(--text-muted);
+    --text-tertiary: var(--text-soft);
+    --accent-green: var(--green);
+    --accent-green-glow: var(--green-glow);
+    --accent-blue: #0A84FF;
+    --accent-red: #FF453A;
+    --accent-orange: #FF9F0A;
+    --success: #2FA8E0;
+    --shadow-soft: var(--shadow-card);
+    --shadow-medium: var(--shadow-float);
+    --shadow-strong: var(--shadow-raised);
 }
 
 * {
@@ -283,28 +398,11 @@ html, body {
 /* ============================================
    Стили редактора (editor.html)
    ============================================ */
-:root {
-    --app-bg: #0f1115;
-    --glass-bg-editor: linear-gradient(180deg, rgba(40, 40, 45, 0.44), rgba(28, 28, 32, 0.34));
-    --glass-border-editor: rgba(255, 255, 255, 0.22);
-    --glass-blur: blur(22px);
-    --glass-text: #f3f4f6;
-    --btn: #007AFF;
-    --text: #ffffff;
-    --danger: #ff6b6b;
-    --success: #34C759;
-    --border: rgba(255, 255, 255, 0.25);
-    --bg-sec: rgba(10, 10, 12, 0.6);
-    --warn: #ffb84d;
-    --dark-panel: linear-gradient(180deg, rgba(20, 20, 20, 0.85), rgba(10, 10, 10, 0.8));
-    --panel-blur: blur(22px);
-}
-
 #welcomeScreen {
     position: fixed;
     inset: 0;
     z-index: 5000;
-    background: rgba(10, 11, 15, 0.45);
+    background: var(--scrim);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -1670,4 +1768,739 @@ input, textarea, select {
 .info-points-body .comm-input {
     margin: 0 0 6px;
     min-height: 40px;
+}
+
+/* ============================================
+   Темы, шторки и общая гармонизация
+   ============================================ */
+
+/* ---- Переключатель темы ---- */
+.theme-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    cursor: pointer;
+    min-height: 32px;
+}
+
+.theme-row-label {
+    flex: 1;
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text);
+}
+
+.theme-switch {
+    position: relative;
+    flex: 0 0 auto;
+    width: 52px;
+    height: 32px;
+}
+
+.theme-switch input {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    opacity: 0;
+    cursor: pointer;
+    z-index: 2;
+}
+
+.theme-switch-track {
+    position: absolute;
+    inset: 0;
+    border-radius: 999px;
+    background: var(--toggle-off);
+    transition: background 0.2s ease;
+}
+
+.theme-switch-thumb {
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    background: #FFFFFF;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
+    transition: transform 0.2s ease;
+}
+
+.theme-switch input:checked + .theme-switch-track {
+    background: var(--green);
+}
+
+.theme-switch input:checked + .theme-switch-track .theme-switch-thumb {
+    transform: translateX(20px);
+}
+
+/* ---- Базовые цвета ---- */
+html, body {
+    background: var(--bg);
+    color: var(--text);
+}
+
+button, input, select, textarea {
+    font-family: inherit;
+}
+
+input::placeholder,
+textarea::placeholder {
+    color: var(--text-soft);
+}
+
+input,
+textarea,
+select,
+#newRouteNameInput {
+    color: var(--text);
+}
+
+/* ---- Общие оверлеи: все окна выезжают снизу ---- */
+#mapSettingsModal,
+#pointsOrderModal,
+#settingsModal,
+#folderSettingsModal,
+#settingsRouteModal,
+#createRouteModal,
+#createFolderModal,
+#shareModal,
+#confirmDeleteModal,
+#confirmDeletePointModal {
+    position: fixed;
+    inset: 0;
+    z-index: 13000;
+    display: none;
+    align-items: flex-end;
+    justify-content: center;
+    padding: 0;
+    background: var(--scrim);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    box-sizing: border-box;
+}
+
+#createRouteModal,
+#createFolderModal { z-index: 14500; }
+#shareModal { z-index: 14000; }
+#confirmDeleteModal,
+#confirmDeletePointModal { z-index: 15000; }
+
+/* ---- Единая шторка ---- */
+#mapSettingsModal .modal-sheet,
+#pointsOrderModal .modal-sheet,
+#settingsModal .modal-sheet,
+#folderSettingsModal .modal-sheet,
+#settingsRouteModal .modal-sheet,
+#createRouteModal .modal-sheet,
+#createFolderModal .modal-sheet,
+#shareModal .modal-sheet,
+#confirmDeleteModal .modal-sheet,
+#confirmDeletePointModal .modal-sheet,
+.instruction-sheet {
+    position: relative;
+    width: 100%;
+    max-width: 640px;
+    height: auto;
+    max-height: 90vh;
+    margin: 0 auto;
+    padding: 0 0 env(safe-area-inset-bottom);
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    background: var(--surface);
+    color: var(--text);
+    border: 1px solid var(--line);
+    border-bottom: none;
+    border-radius: 22px 22px 0 0;
+    box-shadow: var(--shadow-panel);
+    overflow: hidden;
+    box-sizing: border-box;
+    animation: editor-sheet-in 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+#settingsModal .modal-sheet,
+#folderSettingsModal .modal-sheet,
+#settingsRouteModal .modal-sheet,
+#pointsOrderModal .modal-sheet,
+.instruction-sheet {
+    height: 88vh;
+}
+
+#createRouteModal .modal-sheet-compact,
+#createFolderModal .modal-sheet-compact,
+#confirmDeleteModal .modal-sheet-compact,
+#confirmDeletePointModal .modal-sheet-compact,
+#shareModal .modal-sheet-compact {
+    max-width: 520px;
+    padding: 20px 20px calc(20px + env(safe-area-inset-bottom));
+    gap: 16px;
+}
+
+.modal-sheet-compact {
+    max-width: 520px;
+    height: auto;
+    padding: 20px 20px calc(20px + env(safe-area-inset-bottom));
+    margin: 0 auto;
+    gap: 16px;
+}
+
+@keyframes editor-sheet-in {
+    from {
+        opacity: 0;
+        transform: translateY(100%);
+    }
+    to {
+        opacity: 1;
+        transform: none;
+    }
+}
+
+/* ---- Шапка и низ шторки ---- */
+.modal-header,
+.instruction-header {
+    min-height: 52px;
+    padding: 10px 12px 10px 16px;
+    gap: 8px;
+    border-bottom: 1px solid var(--line-faint);
+    background: var(--surface);
+    box-sizing: border-box;
+}
+
+.modal-header h3,
+#settingsTitle,
+.instruction-title {
+    color: var(--text);
+    font-size: 17px;
+    font-weight: 650;
+    letter-spacing: -0.2px;
+}
+
+.modal-body-scroll {
+    padding: 16px;
+    gap: 12px;
+}
+
+.modal-footer {
+    padding: 12px 16px 12px;
+    border-top: 1px solid var(--line-faint);
+}
+
+.modal-actions-sm {
+    padding: 12px 16px 12px;
+    gap: 8px;
+}
+
+.modal-actions {
+    gap: 10px;
+}
+
+.modal-desc-text {
+    color: var(--text-muted);
+    font-size: 15px;
+}
+
+.modal-title {
+    color: var(--text);
+}
+
+.field-label {
+    color: var(--text-soft);
+}
+
+.close-circle,
+.instruction-close {
+    width: 44px;
+    height: 44px;
+    min-width: 44px;
+    border: none;
+    border-radius: 50%;
+    background: var(--surface-muted);
+    color: var(--text-muted);
+    font-size: 17px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    transition: background 0.15s ease, color 0.15s ease, transform 0.12s ease;
+}
+
+.close-circle:active,
+.instruction-close:active {
+    background: var(--line);
+    color: var(--text);
+    transform: scale(0.94);
+}
+
+/* ---- Кнопки ---- */
+.btn-action {
+    background: var(--surface-muted);
+    color: var(--text);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 14px;
+    font-size: 15px;
+    box-shadow: none;
+}
+
+.btn-action:active {
+    background: var(--line);
+    box-shadow: none;
+}
+
+.btn-primary {
+    background: var(--green);
+    border-color: transparent;
+    color: #FFFFFF;
+}
+
+.btn-danger {
+    background: var(--danger);
+    border-color: transparent;
+    color: #FFFFFF;
+}
+
+.btn-action.loading {
+    background: var(--surface-muted) !important;
+    color: var(--text-muted) !important;
+}
+
+.settings-tool-btn {
+    background: var(--surface-muted);
+    color: var(--text);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    box-shadow: none;
+}
+
+.settings-tool-btn-green {
+    background: var(--green);
+    border-color: transparent;
+    color: #FFFFFF;
+}
+
+.settings-tool-btn-blue {
+    background: var(--green-tint-strong);
+    border-color: var(--green-line-soft);
+    color: var(--green-dark);
+}
+
+/* ---- Поля ввода ---- */
+.input-wrapper {
+    background: var(--surface-muted);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    box-shadow: none;
+}
+
+.input-wrapper:focus-within {
+    border-color: var(--green-focus);
+}
+
+.settings-name-input {
+    background: var(--surface-muted);
+    border: 1px solid var(--line);
+    color: var(--text);
+    border-radius: 12px;
+}
+
+.settings-name-save {
+    background: var(--green);
+    border-color: transparent;
+    color: #FFFFFF;
+    border-radius: 12px;
+}
+
+.cmd-input,
+.comm-input {
+    background: var(--surface-muted);
+    color: var(--text);
+    border: 1px solid var(--line);
+}
+
+.cmd-input:focus {
+    border-color: var(--green-focus);
+}
+
+/* ---- Настройки, профиль, слои ---- */
+.settings-card {
+    background: var(--surface-muted);
+    border: 1px solid var(--line);
+}
+
+.settings-card-title {
+    color: var(--text-soft);
+}
+
+.settings-profile-avatar {
+    background: var(--green-tint-strong);
+    border-color: var(--green-line-soft);
+    color: var(--green-dark);
+}
+
+.settings-logout-btn {
+    background: var(--danger-soft);
+    border-color: var(--danger-line);
+    color: var(--danger);
+}
+
+.settings-logout-btn:active {
+    background: var(--danger-line);
+}
+
+.map-style-btn {
+    background: var(--surface-subtle);
+    color: var(--text);
+    border: 1px solid var(--line);
+}
+
+.map-style-btn:active {
+    background: var(--line);
+}
+
+.map-style-btn.active {
+    background: var(--green-tint);
+    border-color: var(--green);
+    color: var(--green-dark);
+    box-shadow: 0 0 12px var(--green-glow);
+}
+
+/* ---- Список маршрутов ---- */
+.category-name {
+    color: var(--text);
+}
+
+.category-count {
+    color: var(--text-muted);
+    background: var(--fill-2);
+}
+
+.route-item {
+    background: var(--surface-subtle);
+    border: 1px solid var(--line);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
+}
+
+.route-item:active {
+    background: var(--green-tint);
+    border-color: var(--green-line-soft);
+}
+
+.route-item.is-active {
+    background: var(--green-tint);
+    border-color: var(--green-line);
+    box-shadow: inset 3px 0 0 var(--green), 0 2px 6px rgba(0, 0, 0, 0.06);
+}
+
+.route-name {
+    color: var(--text);
+}
+
+.route-info-btn {
+    border: 1px solid var(--line-strong);
+    background: var(--surface-muted);
+    color: var(--text-muted);
+}
+
+.route-info-btn:active {
+    background: var(--green-tint-strong);
+    border-color: var(--green);
+    color: var(--text);
+}
+
+.route-visibility-badge,
+.route-active-badge {
+    background: var(--fill-2);
+    color: var(--text-muted);
+}
+
+.route-visibility-badge.is-visible,
+.route-active-badge {
+    background: var(--green-tint-strong);
+    color: var(--green-dark);
+}
+
+.route-premium-badge {
+    background: rgba(255, 176, 32, 0.2);
+    color: #B7791F;
+}
+
+[data-theme="dark"] .route-premium-badge {
+    color: #FFC65C;
+}
+
+.route-item-stats {
+    color: var(--text-soft);
+}
+
+.route-item-tail {
+    color: var(--text-faint);
+}
+
+.route-item.is-active .route-item-tail {
+    color: var(--green);
+}
+
+.route-preview {
+    border-color: var(--line);
+    background: linear-gradient(145deg, var(--surface-muted), var(--surface-subtle));
+}
+
+.route-preview.is-loading::after {
+    background: linear-gradient(100deg, transparent 20%, var(--fill-2) 50%, transparent 80%);
+}
+
+.route-preview.is-empty::after {
+    border-color: var(--line-strong);
+}
+
+/* ---- Карточки точек и выпадающий список цветов ---- */
+.sortable-point-item {
+    background: var(--surface-muted);
+    border: 1px solid var(--line);
+    box-shadow: none;
+}
+
+.sortable-point-item.active {
+    border-color: var(--line-strong);
+    box-shadow: 0 0 0 2px var(--fill-2);
+}
+
+.sort-handle {
+    color: var(--text-soft);
+}
+
+.point-number-text {
+    color: var(--text-muted);
+}
+
+.color-indicator-btn {
+    border: 1px solid var(--line-strong);
+    background: var(--surface-subtle);
+    color: var(--text);
+}
+
+.color-indicator-btn:hover {
+    background: var(--fill-2);
+}
+
+.btn-item-action {
+    background: var(--surface-muted);
+    color: var(--text);
+    border: 1px solid var(--line);
+    box-shadow: none;
+}
+
+.play-cmd-btn,
+.play-comm-btn {
+    border: 1px solid var(--line-strong);
+    background: var(--surface-subtle);
+    color: var(--text);
+}
+
+.play-cmd-btn.loading::after,
+.play-comm-btn.loading::after {
+    border-color: var(--line);
+    border-top-color: var(--green);
+}
+
+.info-points-toggle {
+    background: var(--fill-1);
+    color: var(--text-body);
+}
+
+.info-points-toggle:hover {
+    background: var(--fill-2);
+}
+
+.info-arrow {
+    color: var(--text-soft);
+}
+
+.color-dropdown {
+    top: auto;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    transform: none;
+    margin: 0 auto;
+    width: 100%;
+    max-width: 640px;
+    padding: 8px 12px calc(12px + env(safe-area-inset-bottom));
+    border: 1px solid var(--line);
+    border-bottom: none;
+    border-radius: 22px 22px 0 0;
+    background: var(--surface);
+    box-shadow: var(--shadow-panel);
+    animation: editor-sheet-in 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.dropdown-overlay {
+    background: var(--scrim);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+}
+
+#pointsOrderModal.compact {
+    align-items: flex-end;
+    justify-content: center;
+    background: var(--scrim);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+}
+
+#editorAuthError {
+    color: var(--danger) !important;
+}
+
+.editor-top-nav-btn.active {
+    background: var(--green-tint);
+    border-color: var(--green-line-soft);
+    box-shadow: 0 0 14px var(--green-glow);
+}
+
+#toast.success {
+    background: var(--green);
+    border-color: transparent;
+    color: #FFFFFF;
+}
+
+#toast.error {
+    background: var(--danger);
+    border-color: transparent;
+    color: #FFFFFF;
+}
+
+/* ---- Плавающие кнопки над картой ---- */
+#gpsModeBtn,
+.btn-add-main {
+    color: var(--text);
+    border-color: var(--glass-border);
+    box-shadow: var(--shadow-float);
+}
+
+#gpsModeBtn:active,
+.btn-add-main:active,
+.btn-save-glass:active {
+    background: var(--fill-2);
+}
+
+#routeNameDisplay {
+    color: var(--text);
+    text-shadow: 0 1px 4px var(--text-halo), 0 0 8px var(--text-halo);
+}
+
+.comm-input {
+    caret-color: var(--text);
+}
+
+.spinner-ring {
+    border-color: var(--line-strong);
+    border-top-color: var(--green);
+}
+
+.spinner-text {
+    color: var(--text);
+}
+
+.color-indicator-btn .swatch {
+    border-color: var(--line-strong);
+}
+
+/* ---- Инструкция ---- */
+.instruction-overlay {
+    position: fixed;
+    inset: 0;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 16000;
+    display: none;
+    align-items: flex-end;
+    justify-content: center;
+    padding: 0;
+    background: var(--scrim);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+}
+
+.instruction-overlay.visible {
+    display: flex;
+}
+
+.instruction-body {
+    padding: 16px;
+}
+
+.instruction-loading {
+    color: var(--text-muted);
+}
+
+/* ---- Экраны входа и загрузки ---- */
+#editorAuthGate {
+    background: var(--scrim) !important;
+}
+
+#editorAuthGate > div {
+    background: var(--surface) !important;
+    border-color: var(--line) !important;
+    box-shadow: var(--shadow-raised) !important;
+}
+
+#editorAuthGate h2 {
+    color: var(--text);
+}
+
+#editorAuthMessage {
+    color: var(--text-muted) !important;
+}
+
+#welcomeScreen {
+    background: var(--scrim) !important;
+}
+
+#welcomeScreen > div > div:last-child {
+    color: var(--text);
+}
+
+#loadingSpinner {
+    background: var(--scrim);
+}
+
+@media (max-width: 640px) {
+    #mapSettingsModal .modal-sheet,
+    #pointsOrderModal .modal-sheet,
+    #settingsModal .modal-sheet,
+    #folderSettingsModal .modal-sheet,
+    #settingsRouteModal .modal-sheet,
+    #createRouteModal .modal-sheet,
+    #createFolderModal .modal-sheet,
+    #shareModal .modal-sheet,
+    #confirmDeleteModal .modal-sheet,
+    #confirmDeletePointModal .modal-sheet,
+    .instruction-sheet,
+    .color-dropdown {
+        border-radius: 20px 20px 0 0;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    #mapSettingsModal .modal-sheet,
+    #pointsOrderModal .modal-sheet,
+    #settingsModal .modal-sheet,
+    #folderSettingsModal .modal-sheet,
+    #settingsRouteModal .modal-sheet,
+    #createRouteModal .modal-sheet,
+    #createFolderModal .modal-sheet,
+    #shareModal .modal-sheet,
+    #confirmDeleteModal .modal-sheet,
+    #confirmDeletePointModal .modal-sheet,
+    .instruction-sheet,
+    .color-dropdown {
+        animation: none;
+    }
 }
