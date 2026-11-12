@@ -1100,8 +1100,15 @@ let _shockPeakShown = false;
 const _shockSamples = [];
 
 const SHOCK_BAR_MAX_G = 3;
+const SHOCK_STEP_G = 0.05;
 const SHOCK_PEAK_HOLD_MS = 2000;
-const SHOCK_PEAK_MIN_DROP = 0.05;
+const SHOCK_PEAK_MIN_DROP = SHOCK_STEP_G / 2;
+
+/* Показываем только кратные 0.05 g: меньше перерисовок бара,
+   а мелкий шум датчика в покое вообще не двигает заливку. */
+function quantizeShockG(g) {
+    return Math.round(Math.max(0, g) / SHOCK_STEP_G) * SHOCK_STEP_G;
+}
 
 /* Максимум за последние SHOCK_PEAK_HOLD_MS: точка стоит на самом сильном
    значении окна и не дёргается от каждого следующего отсчёта. */
@@ -1137,10 +1144,10 @@ function updateShockBar(g) {
     if (!_shockPeak) _shockPeak = $('shockBarPeak');
     if (!_shockFill) return;
 
-    const value = Math.max(0, g);
+    const value = quantizeShockG(g);
     const now = Date.now();
 
-    if (Math.abs(value - _shockLastG) >= 0.01) {
+    if (value !== _shockLastG) {
         _shockLastG = value;
         _shockFill.style.width = shockBarPercent(value) + '%';
         const color = shockBarColor(value);
@@ -1151,11 +1158,11 @@ function updateShockBar(g) {
         if (_shockLabel) _shockLabel.textContent = value >= 0.05 ? value.toFixed(2) : '';
     }
 
-    const peak = shockPeakG(now, value);
+    const peak = quantizeShockG(shockPeakG(now, value));
     /* Точку видно, только когда текущее значение уже упало ниже пика:
        иначе она сливается с концом заливки и ничего не добавляет. */
     const showPeak = peak > 0 && peak - value > SHOCK_PEAK_MIN_DROP;
-    if (Math.abs(peak - _shockPeakLastG) >= 0.01) {
+    if (peak !== _shockPeakLastG) {
         _shockPeakLastG = peak;
         const pct = shockBarPercent(peak);
         /* У краёв экрана сдвигаем точку внутрь, чтобы она не обрезалась. */
