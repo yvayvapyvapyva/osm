@@ -629,9 +629,10 @@ async function initializeEditorAuth() {
         $('editorAuthGate').style.display = 'flex';
     };
 
-    // После выхода показываем экран входа и не запускаем OAuth автоматически.
+    // После выхода сразу открываем форму Яндекса с выбором аккаунта.
     const params = new URLSearchParams(window.location.search);
-    if (params.get('logged_out')) {
+    const justLoggedOut = Boolean(params.get('logged_out'));
+    if (justLoggedOut) {
         showToast('Вы вышли из аккаунта', 'success', 3000);
         params.delete('logged_out');
         const qs = params.toString();
@@ -642,9 +643,16 @@ async function initializeEditorAuth() {
     // Редактор открывается на домене шлюза (CDN перед ainstruktor.ru запрещает
     // POST, а сохранение идёт через POST /api/admin). Вход должен закончиться
     // на том же хосте, поэтому передаём свой origin параметром base.
+    // force_confirm заставляет Яндекс показать форму входа, даже если он уже
+    // помнит аккаунт: можно выбрать другой или ввести почту.
     const startUrl = '/auth/yandex/start?return=' + encodeURIComponent(returnTo)
-        + '&base=' + encodeURIComponent(window.location.origin);
+        + '&base=' + encodeURIComponent(window.location.origin)
+        + '&force_confirm=1';
     login.href = startUrl;
+    if (justLoggedOut) {
+        window.location.replace(startUrl);
+        return;
+    }
     try {
         const response = await fetch('/api/me', {
             credentials: 'same-origin',

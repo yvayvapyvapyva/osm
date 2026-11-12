@@ -680,7 +680,12 @@ def _auth_start(event):
         return_to = auth.safe_return(_query(event).get("return"))
         state = secrets.token_urlsafe(24)
         verifier, challenge = auth.make_pkce()
-        location = auth.build_authorize_url(state, challenge, event)
+        force_confirm = str(
+            _query(event).get("force_confirm") or ""
+        ).lower() in ("1", "yes", "true")
+        location = auth.build_authorize_url(
+            state, challenge, event, force_confirm=force_confirm
+        )
     except auth.AuthConfigError as exc:
         print(f"[auth] config error: {exc}")
         return auth.json_response(503, {"error": "auth_not_configured"})

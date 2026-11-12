@@ -138,7 +138,7 @@ def make_pkce():
     return verifier, challenge
 
 
-def build_authorize_url(state, challenge, event=None):
+def build_authorize_url(state, challenge, event=None, force_confirm=False):
     params = {
         "response_type": "code",
         "client_id": client_id(),
@@ -148,6 +148,10 @@ def build_authorize_url(state, challenge, event=None):
         "code_challenge": challenge,
         "code_challenge_method": "S256",
     }
+    # Всегда показываем форму Яндекса: так можно выбрать другой аккаунт
+    # или ввести почту, вместо мгновенного входа по сохранённой сессии.
+    if force_confirm:
+        params["force_confirm"] = "yes"
     return AUTHORIZE_URL + "?" + urlencode(params, quote_via=quote)
 
 
