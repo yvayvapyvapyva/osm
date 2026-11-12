@@ -487,16 +487,7 @@ button, input, select, textarea {
 
 .hud-cmd.hud-prev {
     width: 100%;
-    background: var(--surface-muted);
-    border-color: var(--line-soft);
-    box-shadow: none;
-    /* Пройденная точка — второстепенная: мелкий кегль, полный текст. */
-    font-size: 15px;
     opacity: 0.75;
-}
-
-.hud-cmd.hud-prev #hudPrevCmdNum {
-    opacity: 0.85;
 }
 
 #hudPrevCmdNum {
@@ -504,8 +495,8 @@ button, input, select, textarea {
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
-    width: 44px;
-    height: 44px;
+    width: 52px;
+    height: 52px;
     padding: 4px;
     position: relative;
     cursor: pointer;
@@ -554,7 +545,6 @@ button, input, select, textarea {
 }
 
 #hudPrevCmdTextInner {
-    opacity: 0.8;
     display: block;
     text-align: left;
     width: 100%;
