@@ -61,33 +61,6 @@ html, body {
     z-index: 1;
 }
 
-#instructionBtn {
-    position: fixed;
-    bottom: calc(20px + env(safe-area-inset-bottom));
-    left: 50%;
-    transform: translateX(-50%);
-    z-index: 9005;
-    height: 52px;
-    padding: 0 16px;
-    border-radius: var(--radius-sm);
-    border: 1px solid rgba(255, 255, 255, 0.25);
-    background: var(--glass-bg);
-    color: #ffffff;
-    cursor: pointer;
-    transition: background 0.15s;
-    font-size: 15px;
-    font-weight: 600;
-    outline: none;
-    touch-action: manipulation;
-    -webkit-tap-highlight-color: transparent;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2), inset 0 0.5px 0 rgba(255, 255, 255, 0.15);
-}
-
-#instructionBtn:active {
-    transform: translateX(-50%) scale(0.95);
-    background: rgba(80, 80, 80, 0.6);
-}
-
 .instruction-overlay {
     position: fixed;
     top: calc(76px + env(safe-area-inset-top));
@@ -342,7 +315,7 @@ html, body {
 
 .top-controls {
     position: fixed;
-    top: calc(12px + env(safe-area-inset-top));
+    top: calc(10px + env(safe-area-inset-top));
     left: 50%;
     transform: translateX(-50%);
     z-index: 9005;
@@ -350,7 +323,116 @@ html, body {
     flex-direction: column;
     align-items: center;
     gap: 8px;
+    width: 100%;
+    padding: 0 12px;
+    box-sizing: border-box;
     pointer-events: none;
+}
+
+/* Верхняя панель-пилюля в стиле навигатора */
+.editor-top-nav {
+    position: relative;
+    display: flex;
+    align-items: center;
+    width: 100%;
+    max-width: 640px;
+    height: 56px;
+    padding: 6px 8px;
+    border-radius: 26px;
+    background: var(--glass-bg);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    border: 0.5px solid var(--glass-border);
+    box-shadow: var(--shadow-soft), inset 0 0.5px 0 var(--glass-highlight);
+    box-sizing: border-box;
+    pointer-events: auto;
+}
+
+.editor-top-nav-btn {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    min-width: 0;
+    padding: 6px 8px 4px;
+    color: var(--text-primary);
+    font-family: inherit;
+    font-size: 10px;
+    font-weight: 600;
+    line-height: 1.05;
+    cursor: pointer;
+    touch-action: manipulation;
+    transition: color 0.18s ease, transform 0.12s ease, background 0.18s ease;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 26px;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.editor-top-nav-btn svg {
+    display: block;
+    width: 22px;
+    height: 22px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    flex-shrink: 0;
+    transition: transform 0.18s ease, filter 0.18s ease;
+}
+
+.editor-top-nav-btn span {
+    display: block;
+    max-width: 100%;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.editor-top-nav-btn:active:not(.active) {
+    transform: scale(0.94);
+}
+
+.editor-top-nav-btn.active {
+    color: var(--accent-green);
+    background: rgba(48, 209, 88, 0.12);
+    border-color: rgba(48, 209, 88, 0.28);
+    box-shadow: 0 0 14px var(--accent-green-glow);
+}
+
+.editor-top-nav-btn.active svg {
+    color: var(--accent-green);
+    filter: drop-shadow(0 0 8px var(--accent-green-glow));
+}
+
+.editor-top-nav-btn.active span {
+    font-weight: 700;
+    color: var(--accent-green);
+}
+
+@media (max-width: 380px) {
+    .editor-top-nav {
+        height: 52px;
+        padding: 5px 6px;
+        border-radius: 24px;
+    }
+
+    .editor-top-nav-btn {
+        padding: 7px 3px 5px;
+        font-size: 9px;
+    }
+
+    .editor-top-nav-btn svg {
+        width: 20px;
+        height: 20px;
+    }
+
+    .editor-top-nav-btn.active {
+        border-radius: 24px;
+    }
 }
 
 .top-controls #routeNameDisplay {
@@ -359,13 +441,8 @@ html, body {
     left: auto;
     transform: none;
     z-index: auto;
-    max-width: none;
+    max-width: min(640px, calc(100vw - 150px));
     pointer-events: none;
-}
-
-#mapSettingsBtn {
-    top: calc(76px + env(safe-area-inset-top));
-    left: 12px;
 }
 
 #listPointsBtn {
@@ -376,36 +453,6 @@ html, body {
 #routeSettingsBtn {
     top: calc(140px + env(safe-area-inset-top));
     right: 12px;
-}
-
-.top-controls #settingsBtn {
-    position: relative;
-    width: auto;
-    padding: 0 18px;
-    border-radius: 100px;
-    height: 48px;
-    background: rgba(15, 15, 15, 0.75);
-    border: 0.5px solid rgba(255, 255, 255, 0.12);
-    color: #ffffff;
-    cursor: pointer;
-    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3), inset 0 0.5px 0 rgba(255, 255, 255, 0.1);
-    flex-shrink: 0;
-    pointer-events: auto;
-    font-weight: 700;
-    font-size: 15px;
-    white-space: nowrap;
-    letter-spacing: -0.1px;
-    gap: 6px;
-}
-
-.top-controls #settingsBtn:active {
-    transform: scale(0.94);
-    background: rgba(30, 30, 30, 0.5);
-    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4);
 }
 
 #mapSettingsModal {
