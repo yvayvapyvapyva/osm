@@ -6,11 +6,25 @@
 - `tts/` — озвучка.
 
 ## Деплой (справка)
-- `navigator3/deploy.sh` — функция `osmn3` (ID `d4e8ds1489g0q91dt7do`), API Gateway `https://d5dsd5u1tsc8fm9dbsg5.s183zexc.apigw.yandexcloud.net`, публичный домен `https://ainstruktor.ru`, статика в бакет `osmn-nav`.
-- **Cloudflare больше не проксирует apex.** Запись `ainstruktor.ru` в DNS-зоне Cloudflare переведена в **DNS only** (CNAME на `d5dsd5u1tsc8fm9dbsg5.s183zexc.apigw.yandexcloud.net`, TTL 300): браузер подключается напрямую к API Gateway, сертификат отдаёт Yandex Certificate Manager (`fpqp0bmtjpsj89butg6j`, Let's Encrypt `YR2`, apex+www, автопродление). Проверено: `GET /` 200, `/api/health` 200, HTTP→HTTPS 301 уже от шлюза, HSTS отдаёт шлюз, OAuth крутится на `https://ainstruktor.ru/auth/yandex/callback`. У шлюза нет IPv6, ALPN только `h2`, сжатие только gzip.
-- `www.ainstruktor.ru` **остаётся за Cloudflare** (оранжевое облако, CNAME на тот же шлюз) и работает только как редирект 301 на apex. Привязать www напрямую к шлюзу нельзя — исчерпана квота `serverless.apiGatewaysDomains.count`. Если www тоже уводить напрямую, нужно поднимать квоту в поддержке и добавлять обработку `Host` в функцию.
-- Историческая заметка: раньше apex шёл через Cloudflare с включённым ECH и не открывался с мобильных сетей РФ (SNI прятался за `cloudflare-ech.com`, DPI рвал соединение). Сейчас ECH неактуален: в DNS для apex нет HTTPS-записи, проксирования нет. Включать прокси обратно без причины не стоит — это вернёт старую проблему.
-- Откат при необходимости: вернуть `proxied: true` для записи apex в Cloudflare (5 минут с TTL 300).
+- `navigator3/deploy.sh` — функция `osmn3` (ID `d4e8ds1489g0q91dt7do`), API Gateway `osmn3` (ID `d5dsd5u1tsc8fm9dbsg5`, служебный домен `https://d5dsd5u1tsc8fm9dbsg5.s183zexc.apigw.yandexcloud.net`), статика в бакет `osmn-nav`.
+- Публичные домены `https://ainstruktor.ru` и `https://www.ainstruktor.ru` обслуживает **Yandex CDN**:
+  - ресурс `bc8rtmycecb7amyrix2h`;
+  - origin — служебный домен API Gateway;
+  - сертификат Certificate Manager `fpqp0bmtjpsj89butg6j` (apex + www, managed, автопродление);
+  - HTTP→HTTPS редирект на CDN.
+- **CDN обязателен и удалять его нельзя**: он проходит в белых списках мобильного интернета РФ. Обходить CDN или включать проксирование Cloudflare для apex не нужно — это возвращает проблему с DPI/ECH.
+- У CDN разрешены только `GET`, `HEAD`, `OPTIONS`. **POST включить нельзя.** Следствие:
+  - навигатор работает через `https://ainstruktor.ru`;
+  - редактор на apex/CDN **не сохраняет**: `POST /api/admin` возвращает `405`. Редактор открывается по служебному домену шлюза: `https://d5dsd5u1tsc8fm9dbsg5.s183zexc.apigw.yandexcloud.net/editor.html`;
+  - `editor.ainstruktor.ru` не настроен; через CDN он всё равно не заработает из-за отсутствия POST.
+- API отвечает с `Cache-Control: no-store`, поэтому CDN не кэширует ответы API. Статические JS/CSS в бакете отдаются с `Cache-Control: immutable`; у HTML cache-control отдельно не задан, поэтому после деплоя статики учитывайте возможный кэш CDN.
+- DNS в Cloudflare используется только как DNS:
+  - `ainstruktor.ru` — A-запись на edge Yandex CDN (`188.72.112.1`);
+  - `www.ainstruktor.ru` — CNAME на `9708731cbf7d9658.topology.gslb.yccdn.ru`;
+  - `www` обслуживается тем же CDN как secondary hostname, а не редиректом на apex.
+- На API Gateway также привязан домен `ainstruktor.ru` с сертификатом `fpqp0bmtjpsj89butg6j`, но публичный трафик apex/www идёт через CDN.
+- OAuth: `PUBLIC_BASE_URL=https://ainstruktor.ru`, `PUBLIC_ALTERNATE_URLS=https://d5dsd5u1tsc8fm9dbsg5.s183zexc.apigw.yandexcloud.net`. Редактор логинится с origin служебного домена шлюза.
+- Статика: `node navigator3/scripts/build-static-deploy.js`, затем `yc storage s3 cp --recursive navigator3/deploy-2files/ s3://osmn-nav/`. Внешние `maplibre-gl.js`, `maplibre-gl.css`, `pmtiles.js`, `sortable.min.js` лежат в бакете отдельно и в `deploy-2files/` не попадают — при их обновлении загружать вручную.
 - `pad/deploy.sh` — функция `pad-osm` (ID `d4esfoiand5dinv3mfth`).
 - `tts/navigator/deploy.sh` — функция TTS (ID `d4e3cj3q3ff36qlrhbg8`).
 
