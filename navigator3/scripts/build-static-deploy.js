@@ -74,6 +74,87 @@ function bodyContent(file) {
     return match[1];
 }
 
+function readDotEnv(file) {
+    const result = {};
+    if (!fs.existsSync(file)) return result;
+    const text = fs.readFileSync(file, 'utf8');
+    for (const line of text.split(/\r?\n/)) {
+        const match = line.match(/^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)$/);
+        if (!match) continue;
+        let value = match[2].trim();
+        if (
+            (value.startsWith('"') && value.endsWith('"')) ||
+            (value.startsWith("'") && value.endsWith("'"))
+        ) {
+            value = value.slice(1, -1);
+        }
+        result[match[1]] = value;
+    }
+    return result;
+}
+
+function escapeHtml(value) {
+    return String(value == null ? '' : value)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
+function buildLegalPage() {
+    const env = readDotEnv(path.join(root, '.env'));
+    const name = (env.LEGAL_NAME || '').trim() || 'Не указано';
+    const inn = (env.LEGAL_INN || '').trim() || 'Не указан';
+    const email = (env.LEGAL_EMAIL || '').trim();
+    const phone = (env.LEGAL_PHONE || '').trim();
+    const telegramRaw = (env.LEGAL_TELEGRAM || '').trim();
+    const telegram = telegramRaw
+        .replace(/^https?:\/\/t\.me\//i, '')
+        .replace(/^@/, '');
+
+    const emailHtml = email
+        ? `<a href="mailto:${escapeHtml(email)}">${escapeHtml(email)}</a>`
+        : 'Не указан';
+    const phoneHtml = phone
+        ? `<a href="tel:${escapeHtml(phone.replace(/[^\d+]/g, ''))}">${escapeHtml(phone)}</a>`
+        : 'Не указан';
+    const telegramHtml = telegram
+        ? `<a href="https://t.me/${escapeHtml(telegram)}" target="_blank" rel="noopener">@${escapeHtml(telegram)}</a>`
+        : 'Не указан';
+
+    const refundDefault =
+        'Доступ предоставляется сразу после подтверждения оплаты. ' +
+        'До активации премиума пользователь может отказаться от услуги и получить полный возврат. ' +
+        'После активации возврат возможен за неиспользованный период или при технической ошибке.';
+    const refund = (env.LEGAL_REFUND_TERMS || '').trim() || refundDefault;
+
+    const price = (env.PREMIUM_PRICE_RUB || '299').trim() || '299';
+    const days = (env.PREMIUM_DAYS || '30').trim() || '30';
+    const updated = new Date().toLocaleDateString('ru-RU');
+
+    const replacements = {
+        '{{LEGAL_NAME}}': escapeHtml(name),
+        '{{LEGAL_STATUS}}': escapeHtml('Самозанятый (налог на профессиональный доход)'),
+        '{{LEGAL_INN}}': escapeHtml(inn),
+        '{{LEGAL_CONTACT_EMAIL}}': emailHtml,
+        '{{LEGAL_CONTACT_PHONE}}': phoneHtml,
+        '{{LEGAL_CONTACT_TELEGRAM}}': telegramHtml,
+        '{{LEGAL_REFUND_TERMS}}': escapeHtml(refund).replace(/\n/g, '<br>'),
+        '{{PREMIUM_PRICE_RUB}}': escapeHtml(price),
+        '{{PREMIUM_DAYS}}': escapeHtml(days),
+        '{{LEGAL_UPDATED}}': escapeHtml(updated),
+    };
+
+    const templatePath = path.join(root, 'legal.template.html');
+    let html = fs.readFileSync(templatePath, 'utf8');
+    for (const [key, value] of Object.entries(replacements)) {
+        html = html.split(key).join(value);
+    }
+    fs.writeFileSync(path.join(output, 'legal.html'), html);
+    console.log(`  legal.html: ${formatKb(Buffer.byteLength(html))}`);
+}
+
 function formatKb(bytes) {
     return `${(bytes / 1024).toFixed(1)} KB`;
 }
@@ -155,4 +236,5 @@ function embedPage(file, bundle) {
 
 fs.mkdirSync(output, { recursive: true });
 for (const [file, bundle] of Object.entries(pageBundles)) embedPage(file, bundle);
+buildLegalPage();
 console.log(`Static deploy bundle created: ${output}`);

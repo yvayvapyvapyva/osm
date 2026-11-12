@@ -38,6 +38,7 @@
 - `GET /api/premium/status` — цена, срок, активность подписки и `payments_available`.
 - Тестовый режим: тестовые `YOOKASSA_SHOP_ID` и `YOOKASSA_SECRET_KEY`.
 - Миграция: `migrations/add_premium_subscriptions.py` (добавляет `users.premium_until` и таблицу `payments`).
+- Страница `/legal.html` генерируется при сборке из `legal.template.html` и переменных `LEGAL_NAME`, `LEGAL_INN`, `LEGAL_EMAIL`, `LEGAL_PHONE`, `LEGAL_TELEGRAM`, `LEGAL_REFUND_TERMS`. Без них будут заглушки «Не указано».
 
 ## Команда YC
 - `yc` установлен: `/Users/mb/yandex-cloud/bin/yc`
