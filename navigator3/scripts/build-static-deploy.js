@@ -108,6 +108,7 @@ function buildLegalPage() {
     const inn = (env.LEGAL_INN || '').trim() || 'Не указан';
     const email = (env.LEGAL_EMAIL || '').trim();
     const phone = (env.LEGAL_PHONE || '').trim();
+    const address = (env.LEGAL_ADDRESS || '').trim() || 'Не указан';
     const telegramRaw = (env.LEGAL_TELEGRAM || '').trim();
     const telegram = telegramRaw
         .replace(/^https?:\/\/t\.me\//i, '')
@@ -139,6 +140,7 @@ function buildLegalPage() {
         '{{LEGAL_INN}}': escapeHtml(inn),
         '{{LEGAL_CONTACT_EMAIL}}': emailHtml,
         '{{LEGAL_CONTACT_PHONE}}': phoneHtml,
+        '{{LEGAL_ADDRESS}}': escapeHtml(address),
         '{{LEGAL_CONTACT_TELEGRAM}}': telegramHtml,
         '{{LEGAL_REFUND_TERMS}}': escapeHtml(refund).replace(/\n/g, '<br>'),
         '{{PREMIUM_PRICE_RUB}}': escapeHtml(price),
