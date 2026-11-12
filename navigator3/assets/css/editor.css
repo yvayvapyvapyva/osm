@@ -1218,10 +1218,6 @@ input, textarea, select {
     font-style: normal;
 }
 
-.category-header [data-folder-add] {
-    margin-left: auto;
-}
-
 .category-header.expanded {
     background: rgba(0, 122, 255, 0.15);
 }
