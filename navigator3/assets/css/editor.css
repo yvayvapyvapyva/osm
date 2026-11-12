@@ -2353,6 +2353,7 @@ select,
 }
 
 .route-item:active {
+    transform: none;
     background: var(--surface-muted);
     border-color: var(--line-surface);
 }
@@ -2374,6 +2375,7 @@ select,
 }
 
 .route-info-btn:active {
+    transform: none;
     background: var(--green-tint-strong);
     border-color: var(--green);
     color: var(--text);
