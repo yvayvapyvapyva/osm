@@ -608,11 +608,23 @@ ROBOKASSA_PAYMENT_URL = "https://auth.robokassa.ru/Merchant/Index.aspx"
 
 def _robokassa_config():
     login = _text(os.getenv("ROBOKASSA_LOGIN")).strip()
-    password1 = _text(os.getenv("ROBOKASSA_PASSWORD1")).strip()
-    password2 = _text(os.getenv("ROBOKASSA_PASSWORD2")).strip()
     test = _text(os.getenv("ROBOKASSA_TEST", "")).strip().lower() in (
         "1", "true", "yes", "on"
     )
+    # В тестовом режиме Робокасса требует отдельную пару паролей из
+    # технических настроек. Если тестовые не заданы — берём боевые.
+    if test:
+        password1 = (
+            _text(os.getenv("ROBOKASSA_PASSWORD_TEST1")).strip()
+            or _text(os.getenv("ROBOKASSA_PASSWORD1")).strip()
+        )
+        password2 = (
+            _text(os.getenv("ROBOKASSA_PASSWORD_TEST2")).strip()
+            or _text(os.getenv("ROBOKASSA_PASSWORD2")).strip()
+        )
+    else:
+        password1 = _text(os.getenv("ROBOKASSA_PASSWORD1")).strip()
+        password2 = _text(os.getenv("ROBOKASSA_PASSWORD2")).strip()
     return login, password1, password2, test
 
 

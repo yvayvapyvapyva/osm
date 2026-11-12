@@ -42,7 +42,8 @@
 
 ## Оплата (Робокасса)
 - Второй провайдер рядом с ЮKassa. Если настроены оба, в профиле и в окне предложения под основной кнопкой показывается «Оплатить через Робокассу».
-- Переменные функции: `ROBOKASSA_LOGIN`, `ROBOKASSA_PASSWORD1`, `ROBOKASSA_PASSWORD2`, `ROBOKASSA_TEST` (`1` — тест, тогда нужны тестовые пароли из технических настроек и в ссылку добавляется `IsTest=1`).
+- Переменные функции: `ROBOKASSA_LOGIN`, `ROBOKASSA_PASSWORD1`, `ROBOKASSA_PASSWORD2`, `ROBOKASSA_TEST`, а также `ROBOKASSA_PASSWORD_TEST1`/`ROBOKASSA_PASSWORD_TEST2`.
+- `ROBOKASSA_TEST=1` переключает на тестовую пару паролей (если задана) и добавляет в ссылку `IsTest=1`; боевые пароли при этом остаются в `.env` рядом.
 - `GET /api/premium/checkout?provider=robokassa` создаёт числовой `InvId`, пишет платёж в `payments` с `provider=robokassa` и отдаёт ссылку на `https://auth.robokassa.ru/Merchant/Index.aspx`.
 - Подпись ссылки: MD5 `MerchantLogin:OutSum:InvId:Пароль#1`.
 - URL в кабинете Робокассы должны быть без параметров, иначе GET не примет.
