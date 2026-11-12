@@ -45,10 +45,11 @@
 - Переменные функции: `ROBOKASSA_LOGIN`, `ROBOKASSA_PASSWORD1`, `ROBOKASSA_PASSWORD2`, `ROBOKASSA_TEST` (`1` — тест, тогда нужны тестовые пароли из технических настроек и в ссылку добавляется `IsTest=1`).
 - `GET /api/premium/checkout?provider=robokassa` создаёт числовой `InvId`, пишет платёж в `payments` с `provider=robokassa` и отдаёт ссылку на `https://auth.robokassa.ru/Merchant/Index.aspx`.
 - Подпись ссылки: MD5 `MerchantLogin:OutSum:InvId:Пароль#1`.
-- ResultURL (GET): `https://d5dsd5u1tsc8fm9dbsg5.s183zexc.apigw.yandexcloud.net/api/premium/robokassa/result`, подпись MD5 `OutSum:InvId:Пароль#2`, ответ `OK<InvId>`. Обработчик принимает и GET, и POST.
-- URL в кабинете Робокассы должны быть без параметров, иначе GET не примет: SuccessURL и FailURL — чистые адреса на шлюзе, они сами редиректят навигатор.
-- SuccessURL (GET): `https://d5dsd5u1tsc8fm9dbsg5.s183zexc.apigw.yandexcloud.net/api/premium/robokassa/success` → редирект на `https://ainstruktor.ru/navigator.html?payment=success`.
-- FailURL (GET): `https://d5dsd5u1tsc8fm9dbsg5.s183zexc.apigw.yandexcloud.net/api/premium/robokassa/fail` → помечает платёж отменённым и редиректит на `...?payment=fail`.
+- URL в кабинете Робокассы должны быть без параметров, иначе GET не примет.
+- Схема у нас GET, поэтому все три адреса — на основном домене через CDN: `https://ainstruktor.ru/api/premium/robokassa/{result,success,fail}`. Домен шлюза нужен только для POST.
+- ResultURL: подпись MD5 `OutSum:InvId:Пароль#2`, ответ `OK<InvId>`. Обработчик принимает и GET, и POST.
+- SuccessURL → редирект на `https://ainstruktor.ru/navigator.html?payment=success`.
+- FailURL → помечает платёж отменённым и редиректит на `...?payment=fail`.
 
 ## Команда YC
 - `yc` установлен: `/Users/mb/yandex-cloud/bin/yc`
