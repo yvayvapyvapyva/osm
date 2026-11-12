@@ -14,7 +14,7 @@
             window.location.replace(editorUrl.href);
         }
     </script>
-    <link rel="stylesheet" href="assets/css/editor.css?v=4">
+    <link rel="stylesheet" href="assets/css/editor.css?v=5">
     <link rel="stylesheet" href="assets/css/maplibre-gl.css?v=4.7.1">
 </head>
 <body>
@@ -39,6 +39,9 @@
 <button id="layerSwitchBtn" class="circle-btn" onclick="toggleLayer()">
     <svg viewBox="0 0 24 24"><path d="M11.99 18.54l-7.37-5.73L3 14.07l9 7 9-7-1.63-1.27-7.38 5.74zM12 16l7.36-5.73L21 9l-9-7-9 7 1.63 1.27L12 16z"/></svg>
 </button>
+<button id="mapSettingsBtn" class="circle-btn" onclick="openMapSettingsModal()" title="Настройки карты" aria-label="Настройки карты">
+    <svg viewBox="0 0 24 24"><path d="M19.14 12.94c.04-.3.06-.61.06-.94c0-.32-.02-.64-.07-.94l2.03-1.58a.49.49 0 0 0 .12-.61l-1.92-3.32a.488.488 0 0 0-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.484.484 0 0 0-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58a.49.49 0 0 0-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6s3.6 1.62 3.6 3.6s-1.62 3.6-3.6 3.6z"/></svg>
+</button>
 <button id="listPointsBtn" class="circle-btn hidden-vis" onclick="openPointsOrderModal()">
     <svg viewBox="0 0 24 24"><path d="M3 13h2v-2H3v2zm0 4h2v-2H3v2zm0-8h2V7H3v2zm4 4h14v-2H7v2zm0 4h14v-2H7v2zM7 7v2h14V7H7z"/></svg>
 </button>
@@ -55,6 +58,7 @@
 <div id="dropdownOverlay" class="dropdown-overlay" onclick="closeD()"></div>
 <div id="listColorDropdown" class="color-dropdown"></div>
 
+<div id="mapSettingsModal" onclick="if(event.target===this) toggleM('mapSettingsModal')"><div class="modal-sheet"><div class="modal-header"><h3>Настройки карты</h3><button class="close-circle" onclick="toggleM('mapSettingsModal')">✕</button></div><div class="modal-body-scroll"><div class="field-label">Слой карты</div><div id="mapStyleGrid" class="map-style-grid"></div></div><div class="modal-actions-sm"><button class="btn-action flex-1" onclick="toggleM('mapSettingsModal')">Готово</button></div></div></div>
 <div id="pointsOrderModal" onclick="if(event.target===this) toggleM('pointsOrderModal')"><div class="modal-sheet" style="gap:0;"><div class="modal-header"><h3 id="orderModalTitle">Маршрут</h3><button class="close-circle" onclick="toggleM('pointsOrderModal')">✕</button></div><div id="pointsSortList" style="flex:1;overflow-y:auto;padding:14px;"></div><div class="modal-footer"><button id="saveInListBtn" class="btn-action" onclick="handleModalSave()"><span id="saveBtnText">Готово</span></button></div></div></div>
 <div id="settingsModal" onclick="if(event.target===this) toggleM('settingsModal')"><div class="modal-sheet"><div class="modal-header" style="padding:16px 20px 16px 20px;"><span id="settingsTitle">Маршруты</span><div style="display:flex;gap:6px;margin-left:auto;"><button class="close-circle" onclick="toggleM('settingsModal')">✕</button></div></div><div class="settings-body" id="routesList"></div><div class="modal-actions-sm"><button class="settings-tool-btn settings-tool-btn-green flex-1" onclick="openCreateRouteModal()" style="text-align:center;">Создать маршрут</button><button class="settings-tool-btn flex-1" onclick="window.createFolder()" style="text-align:center;background:rgba(0,122,255,0.25);border-color:rgba(0,122,255,0.4);">Создать папку</button></div></div></div>
 <div id="createRouteModal" onclick="if(event.target===this) toggleM('createRouteModal')"><div class="modal-sheet modal-sheet-compact"><h3 class="modal-title">Новый маршрут</h3><div class="input-wrapper" style="padding:4px;border-radius:14px;"><input type="text" id="newRouteNameInput" placeholder="Название маршрута"></div><div class="modal-actions"><button class="btn-action flex-1" onclick="toggleM('createRouteModal')">Отмена</button><button class="btn-action btn-primary flex-1" onclick="handleCreateNew()">Создать</button></div></div></div>
@@ -734,13 +738,49 @@ const applySnapshot = (snapshot) => {
 let initialCenter = [56.3399, 43.9332];
 let currentLayerType = 'yandex_sat';
 
+function syncMapStyleButtons() {
+    document.querySelectorAll('#mapStyleGrid .map-style-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.style === currentLayerType);
+    });
+}
+
+function renderMapStyleGrid() {
+    const grid = $('mapStyleGrid');
+    if (!grid) return;
+    grid.innerHTML = '';
+    Object.keys(MAP_STYLES).forEach(key => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'map-style-btn' + (currentLayerType === key ? ' active' : '');
+        btn.dataset.style = key;
+        btn.textContent = MAP_STYLES[key].label;
+        btn.title = MAP_STYLES[key].label;
+        btn.addEventListener('click', () => {
+            applyMapLayer(key);
+            toggleM('mapSettingsModal');
+        });
+        grid.appendChild(btn);
+    });
+}
+
+function applyMapLayer(type) {
+    if (!map || !MAP_STYLES[type] || type === currentLayerType) return;
+    currentLayerType = type;
+    map.setStyle(mapStyleDefinition(type));
+    syncMapStyleButtons();
+    showToast(MAP_STYLES[type].label, 'info', 1200);
+}
+
+function openMapSettingsModal() {
+    renderMapStyleGrid();
+    $('mapSettingsModal').style.display = 'flex';
+}
+
 function toggleLayer() {
     if (!map) return;
     const styles = Object.keys(MAP_STYLES);
-    currentLayerType = styles[(styles.indexOf(currentLayerType) + 1) % styles.length];
-    map.setStyle(mapStyleDefinition(currentLayerType));
-    const st = MAP_STYLES[currentLayerType];
-    if (st) showToast(st.label, 'info', 1200);
+    const next = styles[(styles.indexOf(currentLayerType) + 1) % styles.length];
+    applyMapLayer(next);
 }
 
 function initMapWithGeolocation() {
@@ -2244,6 +2284,7 @@ window.openPointsOrderModal = openPointsOrderModal;
 window.openSettingsModal = openSettingsModal;
 window.toggleGpsMode = toggleGpsMode;
 window.toggleLayer = toggleLayer;
+window.openMapSettingsModal = openMapSettingsModal;
 window.handleAddBtnClick = handleAddBtnClick;
 window.saveGist = saveGist;
 window.closeD = closeD;

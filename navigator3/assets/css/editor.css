@@ -368,6 +368,11 @@ html, body {
     left: 12px;
 }
 
+#mapSettingsBtn {
+    top: calc(140px + env(safe-area-inset-top));
+    left: 12px;
+}
+
 #listPointsBtn {
     top: calc(76px + env(safe-area-inset-top));
     right: 12px;
@@ -406,6 +411,62 @@ html, body {
     transform: scale(0.94);
     background: rgba(30, 30, 30, 0.5);
     box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4);
+}
+
+#mapSettingsModal {
+    position: fixed;
+    inset: 0;
+    z-index: 13000;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    background: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    box-sizing: border-box;
+}
+
+#mapSettingsModal .modal-sheet {
+    height: auto;
+    max-width: 420px;
+    max-height: 90vh;
+    margin: 0 auto;
+}
+
+/* ---- Выбор слоя карты ---- */
+.map-style-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+}
+
+.map-style-btn {
+    min-width: 0;
+    padding: 12px 10px;
+    border-radius: 12px;
+    border: 0.5px solid var(--glass-border);
+    background: rgba(255, 255, 255, 0.06);
+    color: var(--text-primary);
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    line-height: 1.25;
+    text-align: center;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.map-style-btn:active {
+    background: rgba(255, 255, 255, 0.12);
+}
+
+.map-style-btn.active {
+    border-color: var(--accent-green);
+    background: rgba(48, 209, 88, 0.18);
+    box-shadow: 0 0 12px var(--accent-green-glow);
 }
 
 .floating-save {
