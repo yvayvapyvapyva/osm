@@ -610,13 +610,11 @@ function closeInstruction() {
     if (modal) modal.classList.remove('visible');
 }
 
-const showToast = (text, type = 'info', duration = 2200) => {
+const showToast = (text, type = 'info', duration = 2000) => {
     const el = $('toast');
     el.textContent = text;
-    el.className = '';
-    el.classList.add(type || 'info');
+    el.className = `toast ${type || 'info'} show`;
     if (toastTimer) clearTimeout(toastTimer);
-    el.classList.add('show');
     toastTimer = setTimeout(() => el.classList.remove('show'), duration);
 };
 
