@@ -14,7 +14,7 @@
             window.location.replace(editorUrl.href);
         }
     </script>
-    <link rel="stylesheet" href="assets/css/editor.css?v=5">
+    <link rel="stylesheet" href="assets/css/editor.css?v=6">
     <link rel="stylesheet" href="assets/css/maplibre-gl.css?v=4.7.1">
 </head>
 <body>
@@ -55,7 +55,7 @@
 <div id="dropdownOverlay" class="dropdown-overlay" onclick="closeD()"></div>
 <div id="listColorDropdown" class="color-dropdown"></div>
 
-<div id="mapSettingsModal" onclick="if(event.target===this) toggleM('mapSettingsModal')"><div class="modal-sheet"><div class="modal-header"><h3>Настройки карты</h3><button class="close-circle" onclick="toggleM('mapSettingsModal')">✕</button></div><div class="modal-body-scroll"><div class="field-label">Слой карты</div><div id="mapStyleGrid" class="map-style-grid"></div><button id="editorLogoutBtn" class="btn-action btn-danger" style="width:100%;margin-top:14px;" onclick="logoutEditor()">Выйти из Яндекса</button></div><div class="modal-actions-sm"><button class="btn-action flex-1" onclick="toggleM('mapSettingsModal')">Готово</button></div></div></div>
+<div id="mapSettingsModal" onclick="if(event.target===this) toggleM('mapSettingsModal')"><div class="modal-sheet"><div class="modal-header"><h3>Настройки карты</h3><button class="close-circle" onclick="toggleM('mapSettingsModal')">✕</button></div><div class="modal-body-scroll"><div id="mapSettingsProfile" class="settings-profile" style="display:none;"><div id="settingsProfileAvatar" class="settings-profile-avatar"></div><div class="settings-profile-info"><div id="settingsProfileName" class="settings-profile-name"></div><div id="settingsProfileEmail" class="settings-profile-email"></div></div></div><div class="field-label">Слой карты</div><div id="mapStyleGrid" class="map-style-grid"></div><button id="editorLogoutBtn" class="btn-action btn-danger" style="width:100%;margin-top:14px;" onclick="logoutEditor()">Выйти из Яндекса</button></div><div class="modal-actions-sm"><button class="btn-action flex-1" onclick="toggleM('mapSettingsModal')">Готово</button></div></div></div>
 <div id="pointsOrderModal" onclick="if(event.target===this) toggleM('pointsOrderModal')"><div class="modal-sheet" style="gap:0;"><div class="modal-header"><h3 id="orderModalTitle">Маршрут</h3><button class="close-circle" onclick="toggleM('pointsOrderModal')">✕</button></div><div id="pointsSortList" style="flex:1;overflow-y:auto;padding:14px;"></div><div class="modal-footer"><button id="saveInListBtn" class="btn-action" onclick="handleModalSave()"><span id="saveBtnText">Готово</span></button></div></div></div>
 <div id="settingsModal" onclick="if(event.target===this) toggleM('settingsModal')"><div class="modal-sheet"><div class="modal-header" style="padding:16px 20px 16px 20px;"><span id="settingsTitle">Маршруты</span><div style="display:flex;gap:6px;margin-left:auto;"><button class="close-circle" onclick="toggleM('settingsModal')">✕</button></div></div><div class="settings-body" id="routesList"></div><div class="modal-actions-sm"><button class="settings-tool-btn settings-tool-btn-green flex-1" onclick="openCreateRouteModal()" style="text-align:center;">Создать маршрут</button><button class="settings-tool-btn flex-1" onclick="window.createFolder()" style="text-align:center;background:rgba(0,122,255,0.25);border-color:rgba(0,122,255,0.4);">Создать папку</button></div></div></div>
 <div id="createRouteModal" onclick="if(event.target===this) toggleM('createRouteModal')"><div class="modal-sheet modal-sheet-compact"><h3 class="modal-title">Новый маршрут</h3><div class="input-wrapper" style="padding:4px;border-radius:14px;"><input type="text" id="newRouteNameInput" placeholder="Название маршрута"></div><div class="modal-actions"><button class="btn-action flex-1" onclick="toggleM('createRouteModal')">Отмена</button><button class="btn-action btn-primary flex-1" onclick="handleCreateNew()">Создать</button></div></div></div>
@@ -663,6 +663,7 @@ async function initializeEditorAuth() {
             throw new Error('В ответе API отсутствует пользователь');
         }
         editorLogoutToken = typeof result.logout_token === 'string' ? result.logout_token : '';
+        editorUser = result.user;
         $('editorAuthGate').style.display = 'none';
         await handleInitialLoad();
     } catch (e) {
@@ -673,6 +674,7 @@ async function initializeEditorAuth() {
 }
 
 let editorLogoutToken = '';
+let editorUser = null;
 
 function logoutEditor() {
     const btn = $('editorLogoutBtn');
@@ -820,8 +822,26 @@ function applyMapLayer(type) {
 }
 
 function openMapSettingsModal() {
+    renderEditorProfile();
     renderMapStyleGrid();
     $('mapSettingsModal').style.display = 'flex';
+}
+
+function renderEditorProfile() {
+    const wrap = $('mapSettingsProfile');
+    if (!wrap) return;
+    if (!editorUser) {
+        wrap.style.display = 'none';
+        return;
+    }
+    wrap.style.display = 'flex';
+    const name = editorUser.display_name || editorUser.login || 'Пользователь';
+    $('settingsProfileName').textContent = name;
+    const email = editorUser.email || '';
+    $('settingsProfileEmail').textContent = email;
+    $('settingsProfileEmail').style.display = email ? 'block' : 'none';
+    $('settingsProfileAvatar').textContent =
+        name.trim().split(/\s+/).slice(0, 2).map(part => part[0] || '').join('').toUpperCase() || 'Я';
 }
 
 function initMapWithGeolocation() {

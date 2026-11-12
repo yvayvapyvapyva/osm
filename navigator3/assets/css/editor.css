@@ -429,6 +429,49 @@ html, body {
     margin: 0 auto;
 }
 
+/* ---- Профиль пользователя в настройках ---- */
+.settings-profile {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px;
+    border-radius: 14px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 0.5px solid var(--glass-border);
+}
+
+.settings-profile-avatar {
+    flex-shrink: 0;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: rgba(48, 209, 88, 0.22);
+    border: 1px solid rgba(103, 255, 153, 0.45);
+    color: var(--text-primary);
+    font-size: 16px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.settings-profile-info {
+    min-width: 0;
+}
+
+.settings-profile-name {
+    color: var(--text-primary);
+    font-size: 15px;
+    font-weight: 600;
+    overflow-wrap: anywhere;
+}
+
+.settings-profile-email {
+    color: var(--text-secondary);
+    font-size: 13px;
+    overflow-wrap: anywhere;
+}
+
 /* ---- Выбор слоя карты ---- */
 .map-style-grid {
     display: grid;
