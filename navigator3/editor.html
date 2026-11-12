@@ -621,6 +621,23 @@ async function initializeEditorAuth() {
     const error = $('editorAuthError');
     const message = $('editorAuthMessage');
     const login = $('editorAuthLogin');
+
+    const showLoginGate = (text) => {
+        message.textContent = text;
+        error.textContent = '';
+        login.style.display = 'block';
+        $('editorAuthGate').style.display = 'flex';
+    };
+
+    // После выхода показываем экран входа и не запускаем OAuth автоматически.
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('logged_out')) {
+        showToast('Вы вышли из аккаунта', 'success', 3000);
+        params.delete('logged_out');
+        const qs = params.toString();
+        history.replaceState(null, '', window.location.pathname + (qs ? '?' + qs : '') + window.location.hash);
+    }
+
     const returnTo = window.location.pathname + window.location.search + window.location.hash;
     // Редактор открывается на домене шлюза (CDN перед ainstruktor.ru запрещает
     // POST, а сохранение идёт через POST /api/admin). Вход должен закончиться
@@ -635,7 +652,7 @@ async function initializeEditorAuth() {
             cache: 'no-store'
         });
         if (response.status === 401) {
-            window.location.replace(startUrl);
+            showLoginGate('Войдите через Яндекс, чтобы открыть редактор.');
             return;
         }
         if (!response.ok) {
