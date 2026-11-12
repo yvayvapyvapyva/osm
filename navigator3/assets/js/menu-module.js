@@ -167,7 +167,9 @@ const MenuModule = {
                 folder_id: route.folder_id || '',
                 description: typeof route.description === 'string' ? route.description.trim() : '',
                 point_count: Number.isFinite(route.point_count) ? route.point_count : null,
-                distance_meters: Number.isFinite(route.distance_meters) ? route.distance_meters : null
+                distance_meters: Number.isFinite(route.distance_meters) ? route.distance_meters : null,
+                premium: !!route.premium,
+                locked: !!route.locked
             };
         }
 
@@ -196,14 +198,20 @@ const MenuModule = {
         const routes = Array.isArray(payload.routes) ? payload.routes : [];
         for (const route of routes) {
             if (!route || !route.m) continue;
+            const desc = this.routesDescriptions[route.m];
+            if (desc) {
+                if (route.name) desc.name = route.name;
+                if (route.title) desc.title = route.title;
+                if (route.premium !== undefined) desc.premium = !!route.premium;
+                if (route.locked !== undefined) desc.locked = !!route.locked;
+            }
+            if (route.locked) continue;
             if (Array.isArray(route.data)) {
                 this._routeDataCache.set(route.m, route);
-                if (!this.routesDescriptions[route.m]) {
+                if (!desc) {
                     this.routesDescriptions[route.m] = route;
                 } else {
-                    if (route.name) this.routesDescriptions[route.m].name = route.name;
-                    if (route.title) this.routesDescriptions[route.m].title = route.title;
-                    this.routesDescriptions[route.m].data = route.data;
+                    desc.data = route.data;
                 }
             }
         }
@@ -280,6 +288,8 @@ const MenuModule = {
                 folders,
                 folderNames,
                 description: typeof route.description === 'string' ? route.description.trim() : '',
+                premium: !!route.premium,
+                locked: !!route.locked,
                 ...this._routeStats(route)
             });
 
@@ -549,14 +559,18 @@ const MenuModule = {
         const isActive = route.key === this.currentRoute;
         const btn = document.createElement('button');
         btn.type = 'button';
-        btn.className = 'route-row' + (isActive ? ' is-active' : '');
+        btn.className = 'route-row' + (isActive ? ' is-active' : '') + (route.locked ? ' is-locked' : '');
         btn.dataset.routeKey = route.key;
         if (isActive) btn.setAttribute('aria-current', 'true');
+        if (route.locked) btn.setAttribute('aria-disabled', 'true');
 
         const preview = document.createElement('span');
-        preview.className = 'route-preview';
+        preview.className = 'route-preview' + (route.locked ? ' is-locked' : '');
         preview.dataset.routeKey = route.key;
         preview.setAttribute('aria-hidden', 'true');
+        if (route.locked) {
+            preview.innerHTML = '<svg class="route-preview-lock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="10.5" width="16" height="10" rx="2.5"/><path d="M8 10.5V7a4 4 0 0 1 8 0v3.5"/></svg>';
+        }
 
         const main = document.createElement('span');
         main.className = 'route-row-main';
@@ -568,6 +582,13 @@ const MenuModule = {
         name.className = 'route-row-name';
         name.textContent = route.name || route.m;
         title.appendChild(name);
+
+        if (route.premium) {
+            const premiumBadge = document.createElement('span');
+            premiumBadge.className = 'route-row-badge route-row-badge-premium';
+            premiumBadge.textContent = '★ Премиум';
+            title.appendChild(premiumBadge);
+        }
 
         if (isActive) {
             const badge = document.createElement('span');
@@ -612,6 +633,12 @@ const MenuModule = {
         btn.append(preview, main, tail);
         btn.addEventListener('click', event => {
             event.stopPropagation();
+            if (route.locked) {
+                if (typeof showToast === 'function') {
+                    showToast('Премиум-маршрут доступен по подписке', 'info', 4000);
+                }
+                return;
+            }
             if (route.m) this.loadRouteByName(route.m);
         });
         return btn;
@@ -649,6 +676,7 @@ const MenuModule = {
         this._previewActive = false;
         this._previewImages.clear();
         container.querySelectorAll('.route-preview').forEach(element => {
+            if (element.classList.contains('is-locked')) return;
             delete element.dataset.previewKey;
             element.replaceChildren();
             element.classList.remove('is-loading', 'is-empty');
@@ -657,7 +685,7 @@ const MenuModule = {
     },
 
     _observeRoutePreviews(container) {
-        const previews = container.querySelectorAll('.route-preview');
+        const previews = container.querySelectorAll('.route-preview:not(.is-locked)');
         if (!previews.length) return;
 
         const showPreviewImage = (element, key, imageUrl) => {
@@ -1034,6 +1062,10 @@ const MenuModule = {
         this.showSpinner();
         try {
             if (!routeM) throw new Error('Не указан маршрут');
+            const meta = this.routesDescriptions && this.routesDescriptions[routeM];
+            if (meta && meta.locked) {
+                throw new Error('premium_locked');
+            }
             this.currentRoute = routeM;
 
             this.hide();
@@ -1048,7 +1080,11 @@ const MenuModule = {
             this.hideSpinner();
             console.error('[MenuModule] Ошибка загрузки маршрута:', e);
             if (typeof showToast === 'function') {
-                showToast('Ошибка загрузки: ' + e.message, 'error', 5000);
+                if (e && e.message === 'premium_locked') {
+                    showToast('Премиум-маршрут доступен по подписке', 'info', 4000);
+                } else {
+                    showToast('Ошибка загрузки: ' + e.message, 'error', 5000);
+                }
             }
         }
     },

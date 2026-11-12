@@ -84,6 +84,12 @@
 <span style="font-size:16px;font-weight:600;color:#ffffff;">Отображать маршрут в публичном списке</span>
 </label>
 </div>
+<div style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:14px;background:rgba(25,25,30,0.7);border:1px solid rgba(255,255,255,0.25);">
+<label style="display:flex;align-items:center;gap:10px;cursor:pointer;flex:1;">
+<input type="checkbox" id="routePremium" style="width:20px;height:20px;accent-color:#FFB020;cursor:pointer;">
+<span style="font-size:16px;font-weight:600;color:#ffffff;">Премиум-маршрут <span style="color:#FFB020;">★</span></span>
+</label>
+</div>
 </div>
 <div style="display:flex;flex-direction:column;gap:8px;padding:20px;padding-top:0;">
 <button class="btn-action" onclick="saveRouteMeta();">💾 Сохранить метаданные</button>
@@ -1103,7 +1109,8 @@ function buildRouteTree() {
         node.routes.push({
             key,
             name: getRouteName(route),
-            visible: !(typeof route === 'string') && !!route.visible
+            visible: !(typeof route === 'string') && !!route.visible,
+            premium: !(typeof route === 'string') && !!route.premium
         });
     }
     for (const node of nodes.values()) {
@@ -1151,6 +1158,13 @@ function renderRouteItem(route, container) {
     visibility.className = 'route-visibility-badge' + (route.visible ? ' is-visible' : '');
     visibility.textContent = route.visible ? 'В навигаторе' : 'Скрыт';
     title.appendChild(visibility);
+
+    if (route.premium) {
+        const premiumBadge = document.createElement('span');
+        premiumBadge.className = 'route-premium-badge';
+        premiumBadge.textContent = '★ Премиум';
+        title.appendChild(premiumBadge);
+    }
 
     if (isActive) {
         const activeBadge = document.createElement('span');
@@ -1519,7 +1533,8 @@ async function moveRouteToFolder(routeKey, folderId) {
             title: meta.title || meta.name || routeKey,
             folder_id: folderId || '',
             description: meta.description || '',
-            visible: meta.visible !== undefined ? meta.visible : false
+            visible: meta.visible !== undefined ? meta.visible : false,
+            premium: !!meta.premium
         });
         if (curRoute === routeKey) {
             currentRouteMeta.title = meta.title || currentRouteMeta.title;
@@ -1742,6 +1757,7 @@ const loadRoute = async (routeName) => {
                 title: meta.title || meta.name || routeName,
                 description: meta.description || '',
                 visible: meta.visible !== undefined ? meta.visible : false,
+                premium: !!meta.premium,
                 folder_id: meta.folder_id || ''
             };
         } catch (e) {
@@ -1749,6 +1765,7 @@ const loadRoute = async (routeName) => {
                 title: routeName,
                 description: '',
                 visible: false,
+                premium: false,
                 folder_id: ''
             };
         }
@@ -1766,7 +1783,7 @@ const loadRoute = async (routeName) => {
 let _shareRouteName = null;
 
 let settingsRouteName = null;
-let currentRouteMeta = { title: '', description: '', visible: false, folder_id: '' };
+let currentRouteMeta = { title: '', description: '', visible: false, premium: false, folder_id: '' };
 
 const renderFolderOptions = (select, selectedId, excludeId = '') => {
     if (!select) return;
@@ -1817,19 +1834,22 @@ const openRouteSettings = async (routeName) => {
             title: meta.title || meta.name || routeName,
             description: meta.description || '',
             visible: meta.visible !== undefined ? meta.visible : false,
+            premium: !!meta.premium,
             folder_id: meta.folder_id || ''
         };
         $('settingsRouteTitle').textContent = currentRouteMeta.title;
         $('routeDisplayName').value = currentRouteMeta.title;
         $('routeDescription').value = currentRouteMeta.description;
         $('routeVisible').checked = currentRouteMeta.visible;
+        $('routePremium').checked = currentRouteMeta.premium;
         renderFolderOptions($('routeFolderSelect'), currentRouteMeta.folder_id);
     } catch (e) {
         $('loadingSpinner').classList.remove('active');
-        currentRouteMeta = { title: '', description: '', visible: false, folder_id: '' };
+        currentRouteMeta = { title: '', description: '', visible: false, premium: false, folder_id: '' };
         $('routeDisplayName').value = '';
         $('routeDescription').value = '';
         $('routeVisible').checked = false;
+        $('routePremium').checked = false;
         renderFolderOptions($('routeFolderSelect'), '');
     }
     toggleM('settingsRouteModal');
@@ -1840,6 +1860,7 @@ const saveRouteMeta = async () => {
     const title = $('routeDisplayName').value.trim();
     const description = $('routeDescription').value.trim();
     const visible = $('routeVisible').checked;
+    const premium = $('routePremium').checked;
     const folderId = $('routeFolderSelect') ? $('routeFolderSelect').value : '';
 
     if (!title) { showToast('Введите название маршрута', 'error'); return; }
@@ -1849,10 +1870,11 @@ const saveRouteMeta = async () => {
             title,
             folder_id: folderId,
             description,
-            visible
+            visible,
+            premium
         });
 
-        currentRouteMeta = { ...currentRouteMeta, title, description, visible, folder_id: folderId };
+        currentRouteMeta = { ...currentRouteMeta, title, description, visible, premium, folder_id: folderId };
 
         if (curRoute === settingsRouteName) {
             const rnd = $('routeNameDisplay');

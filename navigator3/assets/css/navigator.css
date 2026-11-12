@@ -1195,6 +1195,37 @@ button, input, select, textarea {
     line-height: 1.4;
 }
 
+.route-row-badge-premium {
+    background: rgba(255, 176, 32, 0.2);
+    color: #B7791F;
+}
+
+[data-theme="dark"] .route-row-badge-premium {
+    background: rgba(255, 176, 32, 0.22);
+    color: #FFC65C;
+}
+
+.route-row.is-locked .route-row-name {
+    color: var(--text-muted);
+}
+
+.route-preview.is-locked {
+    color: #B7791F;
+    background: linear-gradient(145deg, rgba(255, 176, 32, 0.16), rgba(255, 176, 32, 0.06));
+    border-color: rgba(255, 176, 32, 0.35);
+}
+
+[data-theme="dark"] .route-preview.is-locked {
+    color: #FFC65C;
+    background: linear-gradient(145deg, rgba(255, 176, 32, 0.22), rgba(255, 176, 32, 0.08));
+    border-color: rgba(255, 176, 32, 0.35);
+}
+
+.route-preview-lock {
+    width: 30px;
+    height: 30px;
+}
+
 .route-row-details {
     display: flex;
     flex-direction: column;

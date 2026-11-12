@@ -1264,6 +1264,17 @@ input, textarea, select {
     color: #79e795;
 }
 
+.route-premium-badge {
+    flex: 0 0 auto;
+    padding: 2px 6px;
+    border-radius: 999px;
+    background: rgba(255, 176, 32, 0.2);
+    color: #FFC65C;
+    font-size: 9px;
+    font-weight: 700;
+    line-height: 1.4;
+}
+
 .route-active-badge {
     background: rgba(48, 209, 88, 0.22);
     color: #79e795;

@@ -60,7 +60,7 @@ def execute_list_editor_folders(session, owner_user_id):
 def execute_list_editor_routes(session, owner_user_id):
     query = """
         DECLARE $owner_user_id AS Utf8;
-        SELECT m, description, visible, folder_id, title
+        SELECT m, description, visible, premium, folder_id, title
         FROM roads
         WHERE owner_user_id = $owner_user_id
         ORDER BY title, m;
@@ -95,7 +95,7 @@ def execute_get_folder_owner(session, folder_id):
 
 def execute_list_public_routes(session):
     query = """
-        SELECT m, description, json, folder_id, title, owner_user_id
+        SELECT m, description, json, folder_id, title, owner_user_id, premium
         FROM roads
         WHERE visible = true
         ORDER BY title, m;
@@ -117,7 +117,7 @@ def execute_get_owned_route(session, m_param, owner_user_id):
     query = """
         DECLARE $m AS Utf8;
         DECLARE $owner_user_id AS Utf8;
-        SELECT json, m, description, visible, folder_id, title
+        SELECT json, m, description, visible, premium, folder_id, title
         FROM roads
         WHERE m = $m AND owner_user_id = $owner_user_id;
     """
@@ -133,7 +133,7 @@ def execute_get_public_route(session, m_param):
     """Только видимый маршрут: скрытые и удалённые наружу не отдаём."""
     query = """
         DECLARE $m AS Utf8;
-        SELECT json, m, description, folder_id, title, owner_user_id
+        SELECT json, m, description, folder_id, title, owner_user_id, premium
         FROM roads
         WHERE m = $m AND visible = true;
     """
@@ -202,7 +202,7 @@ def execute_update_route_data(session, m_param, json_data, owner_user_id):
 
 
 def execute_update_route_meta(
-    session, m_param, folder_id, title, description, visible, owner_user_id
+    session, m_param, folder_id, title, description, visible, owner_user_id, premium
 ):
     query = """
         DECLARE $m AS Utf8;
@@ -210,12 +210,14 @@ def execute_update_route_meta(
         DECLARE $title AS Utf8;
         DECLARE $description AS Utf8;
         DECLARE $visible AS Bool;
+        DECLARE $premium AS Bool;
         DECLARE $owner_user_id AS Utf8;
         UPDATE roads
         SET folder_id = $folder_id,
             title = $title,
             description = $description,
-            visible = $visible
+            visible = $visible,
+            premium = $premium
         WHERE m = $m AND owner_user_id = $owner_user_id;
     """
     prepared = session.prepare(query)
@@ -227,6 +229,7 @@ def execute_update_route_meta(
             "$title": str(title),
             "$description": str(description),
             "$visible": bool(visible),
+            "$premium": bool(premium),
             "$owner_user_id": str(owner_user_id),
         },
         commit_tx=True,
@@ -242,6 +245,7 @@ def execute_rename_route(
     description,
     visible,
     owner_user_id,
+    premium,
 ):
     query = """
         DECLARE $old_m AS Utf8;
@@ -250,6 +254,7 @@ def execute_rename_route(
         DECLARE $title AS Utf8;
         DECLARE $description AS Utf8;
         DECLARE $visible AS Bool;
+        DECLARE $premium AS Bool;
         DECLARE $owner_user_id AS Utf8;
 
         $json = (
@@ -258,10 +263,11 @@ def execute_rename_route(
         );
 
         INSERT INTO roads
-            (m, json, folder_id, title, description, visible, owner_user_id)
+            (m, json, folder_id, title, description, visible, owner_user_id,
+             premium)
         VALUES
             ($new_m, $json, $folder_id, $title, $description, $visible,
-             $owner_user_id);
+             $owner_user_id, $premium);
         DELETE FROM roads
         WHERE m = $old_m AND owner_user_id = $owner_user_id;
     """
@@ -275,6 +281,7 @@ def execute_rename_route(
             "$title": str(title),
             "$description": str(description),
             "$visible": bool(visible),
+            "$premium": bool(premium),
             "$owner_user_id": str(owner_user_id),
         },
         commit_tx=True,
@@ -465,7 +472,23 @@ def _full_route_name(by_id, folder_id, title):
     return "/".join(part for part in parts if part)
 
 
-def _route_public_dict(row, by_id, folder_id_override=None):
+def _is_premium(row):
+    return bool(_row_value(row, "premium"))
+
+
+def _route_locked(row, user):
+    """Премиум-маршрут закрыт для всех, кроме владельца.
+
+    Пока доступ выдаётся только владельцу; подписки появятся позже.
+    """
+    if not _is_premium(row):
+        return False
+    owner_user_id = _text(_row_value(row, "owner_user_id"))
+    user_id = _text((user or {}).get("user_id"))
+    return not owner_user_id or owner_user_id != user_id
+
+
+def _route_public_dict(row, by_id, folder_id_override=None, user=None):
     data = _json_value(_row_value(row, "json"))
     raw_folder_id = _text(_row_value(row, "folder_id"))
     folder_id = (
@@ -480,6 +503,8 @@ def _route_public_dict(row, by_id, folder_id_override=None):
         if folder_id in by_id
         else title,
         "description": _text(_row_value(row, "description")),
+        "premium": _is_premium(row),
+        "locked": _route_locked(row, user),
     }
     route.update(_route_metrics(data))
     return route
@@ -499,6 +524,7 @@ def _route_editor_dict(row, by_id):
         "visible": bool(_row_value(row, "visible"))
         if _row_value(row, "visible") is not None
         else False,
+        "premium": _is_premium(row),
     }
 
 
@@ -843,7 +869,9 @@ def _api_catalog(event):
             if not folder_id or folder_id not in by_id:
                 folder_id = _owner_folder_id(owner_user_id)
             routes.append(
-                _route_public_dict(row, by_id, folder_id_override=folder_id)
+                _route_public_dict(
+                    row, by_id, folder_id_override=folder_id, user=user
+                )
             )
         return auth.json_response(
             200,
@@ -944,9 +972,10 @@ def _api_folder(event):
             else:
                 route_folder_id = row_folder_id
             route = _route_public_dict(
-                row, by_id, folder_id_override=route_folder_id
+                row, by_id, folder_id_override=route_folder_id, user=user
             )
-            route["data"] = _json_value(_row_value(row, "json"))
+            if not route["locked"]:
+                route["data"] = _json_value(_row_value(row, "json"))
             routes.append(route)
         routes.sort(key=lambda r: r.get("name", ""))
 
@@ -969,6 +998,7 @@ def _api_route(event):
     m_val = _query(event).get("m") or ""
     if not isinstance(m_val, str) or not m_val.strip():
         return auth.json_response(400, {"error": "missing_route_name"})
+    user = _current_user(event)
 
     try:
         rows = _rows(
@@ -986,7 +1016,18 @@ def _api_route(event):
         folder_id = _text(_row_value(row, "folder_id"))
         if not folder_id or folder_id not in by_id:
             folder_id = _owner_folder_id(owner_user_id)
-        payload = _route_public_dict(row, by_id, folder_id_override=folder_id)
+        payload = _route_public_dict(
+            row, by_id, folder_id_override=folder_id, user=user
+        )
+        if payload["locked"]:
+            return auth.json_response(
+                403,
+                {
+                    "error": "premium_locked",
+                    "m": payload["m"],
+                    "title": payload["title"],
+                },
+            )
         payload["data"] = data
         return auth.json_response(200, payload)
     except Exception as exc:  # noqa: BLE001
@@ -1116,6 +1157,7 @@ def _admin_save_meta(event, user):
 
     description = _text(body.get("description", current["description"]))
     visible = body.get("visible", current["visible"])
+    premium = bool(body.get("premium", current.get("premium", False)))
 
     new_m = _text(body.get("new_m")).strip()
 
@@ -1136,6 +1178,7 @@ def _admin_save_meta(event, user):
             description=description,
             visible=bool(visible),
             owner_user_id=owner_user_id,
+            premium=premium,
         )
         return auth.json_response(200, {"status": "meta_saved", "new_m": new_m})
 
@@ -1147,6 +1190,7 @@ def _admin_save_meta(event, user):
         description=description,
         visible=bool(visible),
         owner_user_id=owner_user_id,
+        premium=premium,
     )
     return auth.json_response(200, {"status": "meta_saved"})
 
