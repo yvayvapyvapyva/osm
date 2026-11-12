@@ -363,13 +363,8 @@ html, body {
     pointer-events: none;
 }
 
-#layerSwitchBtn {
-    top: calc(76px + env(safe-area-inset-top));
-    left: 12px;
-}
-
 #mapSettingsBtn {
-    top: calc(140px + env(safe-area-inset-top));
+    top: calc(76px + env(safe-area-inset-top));
     left: 12px;
 }
 
