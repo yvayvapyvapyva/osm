@@ -2215,6 +2215,77 @@ select,
 }
 
 /* ---- Список маршрутов ---- */
+.routes-breadcrumb {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    min-width: 0;
+    padding: 8px 16px 4px;
+    overflow-x: auto;
+    scrollbar-width: none;
+    flex-shrink: 0;
+}
+
+.routes-breadcrumb::-webkit-scrollbar {
+    display: none;
+}
+
+.routes-breadcrumb[hidden] {
+    display: none;
+}
+
+.routes-breadcrumb-item {
+    flex: 0 0 auto;
+    max-width: 42vw;
+    overflow: hidden;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 38px;
+    padding: 6px 12px;
+    border: 1px solid var(--green-line-soft);
+    border-radius: 10px;
+    background: var(--green-tint);
+    color: var(--green-dark);
+    font: inherit;
+    font-size: 12px;
+    font-weight: 600;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    cursor: pointer;
+    min-width: 44px;
+    text-align: center;
+    box-sizing: border-box;
+    box-shadow: var(--shadow-card);
+    transition: background 0.15s ease, border-color 0.15s ease, transform 0.1s ease;
+}
+
+.routes-breadcrumb-item:active {
+    background: var(--surface-muted);
+    transform: scale(0.96);
+}
+
+.routes-breadcrumb-item.current {
+    color: var(--green-dark);
+    font-weight: 700;
+    font-size: 13px;
+    border-color: var(--green-line);
+    background: var(--green-tint-strong);
+}
+
+.routes-breadcrumb-separator {
+    flex: 0 0 auto;
+    color: var(--text-faint);
+    font-size: 15px;
+}
+
+.category-chevron {
+    flex: 0 0 auto;
+    color: var(--text-soft);
+    font-size: 20px;
+    line-height: 1;
+}
+
 .category-name {
     color: var(--text);
 }

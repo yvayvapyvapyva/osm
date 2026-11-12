@@ -24,7 +24,7 @@
             window.location.replace(editorUrl.href);
         }
     </script>
-    <link rel="stylesheet" href="assets/css/editor.css?v=10">
+    <link rel="stylesheet" href="assets/css/editor.css?v=11">
     <link rel="stylesheet" href="assets/css/maplibre-gl.css?v=4.7.1">
 </head>
 <body>
@@ -87,7 +87,7 @@
 
 <div id="mapSettingsModal" onclick="if(event.target===this) toggleM('mapSettingsModal')"><div class="modal-sheet"><div class="modal-header"><h3>Настройки</h3><button class="close-circle" onclick="toggleM('mapSettingsModal')">✕</button></div><div class="modal-body-scroll"><div class="settings-card"><div class="settings-card-title">Аккаунт</div><div id="mapSettingsProfile" class="settings-profile" style="display:none;"><div id="settingsProfileAvatar" class="settings-profile-avatar"></div><div class="settings-profile-info"><div id="settingsProfileName" class="settings-profile-name"></div><div id="settingsProfileEmail" class="settings-profile-email"></div></div><button id="editorLogoutBtn" class="settings-logout-btn" onclick="logoutEditor()">Выйти</button></div><div class="settings-name-row"><input id="settingsDisplayNameInput" class="settings-name-input" type="text" maxlength="60" placeholder="Отображаемое имя" onkeydown="if(event.key==='Enter')saveEditorDisplayName()"><button id="settingsDisplayNameSave" class="settings-name-save" onclick="saveEditorDisplayName()">Сохранить</button></div></div><div class="settings-card"><div class="settings-card-title">Слой карты</div><div id="mapStyleGrid" class="map-style-grid"></div></div><div class="settings-card"><div class="settings-card-title">Тема</div><label class="theme-row"><span class="theme-row-label">Тёмная тема</span><span class="theme-switch"><input type="checkbox" id="editorThemeToggle" onchange="applyEditorTheme(this.checked ? 'dark' : 'light')"><span class="theme-switch-track"><span class="theme-switch-thumb"></span></span></span></label></div></div><div class="modal-actions-sm"><button class="btn-action flex-1" onclick="toggleM('mapSettingsModal')">Готово</button></div></div></div>
 <div id="pointsOrderModal" onclick="if(event.target===this) toggleM('pointsOrderModal')"><div class="modal-sheet" style="gap:0;"><div class="modal-header"><h3 id="orderModalTitle">Маршрут</h3><button class="close-circle" onclick="toggleM('pointsOrderModal')">✕</button></div><div id="pointsSortList" style="flex:1;overflow-y:auto;padding:14px;"></div><div class="modal-footer"><button id="saveInListBtn" class="btn-action" onclick="handleModalSave()"><span id="saveBtnText">Готово</span></button></div></div></div>
-<div id="settingsModal" onclick="if(event.target===this) toggleM('settingsModal')"><div class="modal-sheet"><div class="modal-header"><span id="settingsTitle">Маршруты</span><div style="display:flex;gap:6px;margin-left:auto;"><button class="close-circle" onclick="toggleM('settingsModal')">✕</button></div></div><div class="settings-body" id="routesList"></div><div class="modal-actions-sm"><button class="settings-tool-btn settings-tool-btn-green flex-1" onclick="openCreateRouteModal()" style="text-align:center;">Создать маршрут</button><button class="settings-tool-btn settings-tool-btn-blue flex-1" onclick="window.createFolder()" style="text-align:center;">Создать папку</button></div></div></div>
+<div id="settingsModal" onclick="if(event.target===this) toggleM('settingsModal')"><div class="modal-sheet"><div class="modal-header"><span id="settingsTitle">Маршруты</span><div style="display:flex;gap:6px;margin-left:auto;"><button class="close-circle" onclick="toggleM('settingsModal')">✕</button></div></div><nav id="editorRoutesBreadcrumb" class="routes-breadcrumb" aria-label="Путь к папке"></nav><div class="settings-body" id="routesList"></div><div class="modal-actions-sm"><button class="settings-tool-btn settings-tool-btn-green flex-1" onclick="openCreateRouteModal()" style="text-align:center;">Создать маршрут</button><button class="settings-tool-btn settings-tool-btn-blue flex-1" onclick="window.createFolder()" style="text-align:center;">Создать папку</button></div></div></div>
 <div id="createRouteModal" onclick="if(event.target===this) toggleM('createRouteModal')"><div class="modal-sheet modal-sheet-compact"><h3 class="modal-title">Новый маршрут</h3><div class="input-wrapper" style="padding:4px;border-radius:14px;"><input type="text" id="newRouteNameInput" placeholder="Название маршрута"></div><div class="modal-actions"><button class="btn-action flex-1" onclick="toggleM('createRouteModal')">Отмена</button><button class="btn-action btn-primary flex-1" onclick="handleCreateNew()">Создать</button></div></div></div>
 <div id="createFolderModal" onclick="if(event.target===this) toggleM('createFolderModal')"><div class="modal-sheet modal-sheet-compact"><h3 class="modal-title">Новая папка</h3><div class="input-wrapper" style="padding:4px;border-radius:14px;"><input type="text" id="newFolderNameInput" placeholder="Название папки"></div><div class="modal-actions"><button class="btn-action flex-1" onclick="toggleM('createFolderModal')">Отмена</button><button class="btn-action btn-primary flex-1" onclick="handleCreateFolder()">Создать</button></div></div></div>
 <div id="folderSettingsModal" onclick="if(event.target===this) toggleM('folderSettingsModal')"><div class="modal-sheet" style="gap:0;"><div class="modal-header"><h3 id="folderSettingsTitle">Настройки папки</h3><button class="close-circle" onclick="toggleM('folderSettingsModal')">✕</button></div><div class="modal-body-scroll">
@@ -473,7 +473,7 @@ let _currentFolderId = null;
 let _currentFolderParent = null;
 let _folderSettingsId = null;
 let settingsFolders = [];
-let _expandedFolders = new Set();
+let settingsFolderPath = [];
 const routePreviewImages = new Map();
 const routePreviewRequests = new Map();
 let routePreviewObserver = null;
@@ -1126,46 +1126,6 @@ const escapeHtml = value => String(value == null ? '' : value)
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
 
-function countNodeRoutes(node) {
-    let count = node.routes.length;
-    for (const child of node.children) count += countNodeRoutes(child);
-    return count;
-}
-
-function buildRouteTree() {
-    const root = { children: [], routes: [] };
-    const nodes = new Map();
-    for (const folder of settingsFolders) {
-        nodes.set(folder.folder_id, { ...folder, children: [], routes: [] });
-    }
-    for (const route of settingsRouteFiles) {
-        const key = typeof route === 'string' ? route : (route.m || '');
-        const node = (typeof route === 'string' ? null : nodes.get(route.folder_id)) || root;
-        node.routes.push({
-            key,
-            name: getRouteName(route),
-            visible: !(typeof route === 'string') && !!route.visible,
-            premium: !(typeof route === 'string') && !!route.premium
-        });
-    }
-    for (const node of nodes.values()) {
-        const parent = nodes.get(node.parent_id) || root;
-        parent.children.push(node);
-    }
-    const sortNode = node => {
-        node.children.sort((a, b) => {
-            const ao = Number.isFinite(a.sort_order) ? a.sort_order : 0;
-            const bo = Number.isFinite(b.sort_order) ? b.sort_order : 0;
-            if (ao !== bo) return ao - bo;
-            return String(a.name).localeCompare(String(b.name), 'ru');
-        });
-        node.routes.sort((a, b) => a.name.localeCompare(b.name, 'ru'));
-        node.children.forEach(sortNode);
-    };
-    sortNode(root);
-    return root;
-}
-
 function renderRouteItem(route, container) {
     const isActive = route.key === curRoute;
     const el = document.createElement('button');
@@ -1500,65 +1460,118 @@ function applyRoutePreview(routeKey, rendered) {
     });
 }
 
-function renderTreeLevel(node, container) {
-    const frag = document.createDocumentFragment();
+function currentSettingsFolderId() {
+    return settingsFolderPath[settingsFolderPath.length - 1] || '';
+}
 
-    for (const folder of node.children) {
-        const folderId = folder.folder_id;
-        const total = countNodeRoutes(folder);
-        const isExpanded = _expandedFolders.has(folderId);
-        const el = document.createElement('div');
-        el.className = 'category-folder';
-        el.setAttribute('data-path', folderId);
+function editorFolderMap() {
+    return new Map(settingsFolders.map(folder => [folder.folder_id, folder]));
+}
 
-        const header = document.createElement('div');
-        header.className = 'category-header' + (isExpanded ? ' expanded' : '');
-        header.innerHTML = `
-            <span class="category-icon">${isExpanded ? '📂' : '📁'}</span>
-            <span class="category-name">${escapeHtml(folder.name)}</span>
-            <span class="category-count">${total}</span>
-            <span class="route-info-btn" data-folder-add="${escapeHtml(folderId)}" title="Создать маршрут в папке">＋</span>
-            <span class="route-info-btn" data-folder-settings="${escapeHtml(folderId)}" title="Настройки папки">⚙️</span>
-        `;
-        header.addEventListener('click', event => {
-            const gear = event.target.closest('[data-folder-settings]');
-            if (gear) {
-                event.stopPropagation();
-                openFolderSettings(gear.dataset.folderSettings);
-                return;
-            }
-            const add = event.target.closest('[data-folder-add]');
-            if (add) {
-                event.stopPropagation();
-                openCreateRouteModal(add.dataset.folderAdd);
-                return;
-            }
-            if (_expandedFolders.has(folderId)) _expandedFolders.delete(folderId);
-            else _expandedFolders.add(folderId);
+function normalizeSettingsFolderPath(byId) {
+    const next = [];
+    let parentId = '';
+    for (const folderId of settingsFolderPath) {
+        const folder = byId.get(folderId);
+        if (!folder || (folder.parent_id || '') !== parentId) break;
+        next.push(folderId);
+        parentId = folderId;
+    }
+    settingsFolderPath = next;
+}
+
+function renderSettingsBreadcrumbs(byId) {
+    const nav = $('editorRoutesBreadcrumb');
+    if (!nav) return;
+    nav.innerHTML = '';
+    const labels = [{ id: '', name: 'Все маршруты' }];
+    for (const folderId of settingsFolderPath) {
+        const folder = byId.get(folderId);
+        if (folder) labels.push({ id: folderId, name: folder.name || folderId });
+    }
+    labels.forEach((label, index) => {
+        if (index > 0) {
+            const separator = document.createElement('span');
+            separator.className = 'routes-breadcrumb-separator';
+            separator.textContent = '›';
+            separator.setAttribute('aria-hidden', 'true');
+            nav.appendChild(separator);
+        }
+        const item = document.createElement('button');
+        item.type = 'button';
+        const isCurrent = index === labels.length - 1;
+        item.className = 'routes-breadcrumb-item' + (isCurrent ? ' current' : '');
+        item.textContent = label.name;
+        item.dataset.breadcrumbIndex = String(index);
+        if (isCurrent) item.setAttribute('aria-current', 'location');
+        item.addEventListener('click', () => {
+            settingsFolderPath = settingsFolderPath.slice(0, index);
             renderSettingsFileList();
         });
-        el.appendChild(header);
+        nav.appendChild(item);
+    });
+    nav.hidden = false;
+}
 
-        el.addEventListener('dragover', e => { e.preventDefault(); el.classList.add('drag-over'); });
-        el.addEventListener('dragleave', () => el.classList.remove('drag-over'));
-        el.addEventListener('drop', e => {
-            e.preventDefault(); el.classList.remove('drag-over');
-            const routeKey = e.dataTransfer.getData('text/plain');
-            if (routeKey) moveRouteToFolder(routeKey, folderId);
-        });
-
-        frag.appendChild(el);
-
-        if (isExpanded) {
-            const childWrap = document.createElement('div');
-            childWrap.style.cssText = 'padding-left:16px;display:flex;flex-direction:column;gap:6px;';
-            renderTreeLevel(folder, childWrap);
-            frag.appendChild(childWrap);
+function editorFolderCounts(byId) {
+    const counts = new Map();
+    for (const route of settingsRouteFiles) {
+        let folderId = route && route.folder_id ? route.folder_id : '';
+        if (!byId.has(folderId)) folderId = '';
+        const seen = new Set();
+        while (folderId && !seen.has(folderId)) {
+            seen.add(folderId);
+            counts.set(folderId, (counts.get(folderId) || 0) + 1);
+            const folder = byId.get(folderId);
+            folderId = folder ? (folder.parent_id || '') : '';
         }
     }
+    return counts;
+}
 
-    for (const route of node.routes) renderRouteItem(route, frag);
-    container.appendChild(frag);
+function renderEditorFolderRow(folder, total) {
+    const folderId = folder.folder_id;
+    const el = document.createElement('div');
+    el.className = 'category-folder';
+    el.dataset.path = folderId;
+
+    const header = document.createElement('div');
+    header.className = 'category-header';
+    header.innerHTML = `
+        <span class="category-icon">📁</span>
+        <span class="category-name">${escapeHtml(folder.name)}</span>
+        <span class="category-count">${total}</span>
+        <span class="category-chevron" aria-hidden="true">›</span>
+        <span class="route-info-btn" data-folder-add="${escapeHtml(folderId)}" title="Создать маршрут в папке">＋</span>
+        <span class="route-info-btn" data-folder-settings="${escapeHtml(folderId)}" title="Настройки папки">⚙️</span>
+    `;
+    header.addEventListener('click', event => {
+        const gear = event.target.closest('[data-folder-settings]');
+        if (gear) {
+            event.stopPropagation();
+            openFolderSettings(gear.dataset.folderSettings);
+            return;
+        }
+        const add = event.target.closest('[data-folder-add]');
+        if (add) {
+            event.stopPropagation();
+            openCreateRouteModal(add.dataset.folderAdd);
+            return;
+        }
+        settingsFolderPath.push(folderId);
+        renderSettingsFileList();
+    });
+    el.appendChild(header);
+
+    el.addEventListener('dragover', e => { e.preventDefault(); el.classList.add('drag-over'); });
+    el.addEventListener('dragleave', () => el.classList.remove('drag-over'));
+    el.addEventListener('drop', e => {
+        e.preventDefault(); el.classList.remove('drag-over');
+        const routeKey = e.dataTransfer.getData('text/plain');
+        if (routeKey) moveRouteToFolder(routeKey, folderId);
+    });
+
+    return el;
 }
 
 async function moveRouteToFolder(routeKey, folderId) {
@@ -1582,7 +1595,9 @@ async function moveRouteToFolder(routeKey, folderId) {
 }
 
 const openCreateRouteModal = (folderId) => {
-    _currentFolderId = folderId || null;
+    _currentFolderId = folderId === undefined
+        ? currentSettingsFolderId()
+        : (folderId || null);
     toggleM('createRouteModal');
     $('newRouteNameInput').value = '';
     setTimeout(() => $('newRouteNameInput').focus(), 100);
@@ -1605,22 +1620,50 @@ const renderSettingsFileList = () => {
         routePreviewObserver = null;
     }
     list.innerHTML = '';
-    if (settingsRouteFiles.length === 0 && settingsFolders.length === 0) {
-        list.innerHTML = '<div style="text-align:center;padding:40px 20px;color:var(--text-muted);font-size:15px;">Маршрутов пока нет.<br>Создайте первый маршрут.</div>';
-        $('settingsTitle').textContent = 'Маршруты: 0';
+    const byId = editorFolderMap();
+    normalizeSettingsFolderPath(byId);
+    renderSettingsBreadcrumbs(byId);
+
+    const folderId = currentSettingsFolderId();
+    const counts = editorFolderCounts(byId);
+    const childFolders = settingsFolders
+        .filter(folder => (folder.parent_id || '') === folderId)
+        .sort((a, b) => {
+            const ao = Number.isFinite(a.sort_order) ? a.sort_order : 0;
+            const bo = Number.isFinite(b.sort_order) ? b.sort_order : 0;
+            if (ao !== bo) return ao - bo;
+            return String(a.name).localeCompare(String(b.name), 'ru');
+        });
+    const routes = settingsRouteFiles
+        .filter(route => {
+            const routeFolder = route && route.folder_id ? route.folder_id : '';
+            return (byId.has(routeFolder) ? routeFolder : '') === folderId;
+        })
+        .sort((a, b) => getRouteName(a).localeCompare(getRouteName(b), 'ru'));
+
+    $('settingsTitle').textContent = `Маршруты: ${settingsRouteFiles.length}`;
+
+    if (!childFolders.length && !routes.length) {
+        list.innerHTML = folderId
+            ? '<div style="text-align:center;padding:40px 20px;color:var(--text-muted);font-size:15px;">В этой папке пока нет маршрутов.</div>'
+            : '<div style="text-align:center;padding:40px 20px;color:var(--text-muted);font-size:15px;">Маршрутов пока нет.<br>Создайте первый маршрут.</div>';
         return;
     }
-    if (curRoute) {
-        const current = settingsRouteFiles.find(route => route && route.m === curRoute);
-        let folderId = current ? current.folder_id : '';
-        const byId = new Map(settingsFolders.map(folder => [folder.folder_id, folder]));
-        while (folderId && byId.has(folderId)) {
-            _expandedFolders.add(folderId);
-            folderId = byId.get(folderId).parent_id || '';
-        }
+
+    const frag = document.createDocumentFragment();
+    for (const folder of childFolders) {
+        frag.appendChild(renderEditorFolderRow(folder, counts.get(folder.folder_id) || 0));
     }
-    const tree = buildRouteTree();
-    renderTreeLevel(tree, list);
+    for (const route of routes) {
+        renderRouteItem({
+            key: route.m || '',
+            name: getRouteName(route),
+            visible: !!route.visible,
+            premium: !!route.premium
+        }, frag);
+    }
+    list.appendChild(frag);
+    list.scrollTop = 0;
     observeRoutePreviews(list);
     $('settingsTitle').textContent = `Маршруты: ${settingsRouteFiles.length}`;
     if (!list.dataset.dragScroll) {
@@ -2355,7 +2398,7 @@ const findFolder = folderId =>
     settingsFolders.find(folder => folder.folder_id === folderId) || null;
 
 window.createFolder = () => {
-    _currentFolderId = '';
+    _currentFolderId = currentSettingsFolderId();
     $('newFolderNameInput').value = '';
     toggleM('createFolderModal');
     setTimeout(() => $('newFolderNameInput').focus(), 100);
