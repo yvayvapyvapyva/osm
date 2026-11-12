@@ -2,7 +2,7 @@
 """Add premium subscription fields and payment records.
 
 - users.premium_until — timestamp when the paid premium period ends.
-- payments — audit/idempotency table for Robokassa invoices.
+- payments — audit/idempotency table for YooKassa payments.
 """
 
 import os
