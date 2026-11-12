@@ -1700,6 +1700,10 @@ function ensureRouteLayers() {
                 }
             });
         }
+        // Свечение текущего пути — самым верхним слоем.
+        if (APP.map.getLayer('nav-routes-glow')) {
+            APP.map.moveLayer('nav-routes-glow');
+        }
     } catch (e) {
         // Стиль ещё не догрузился — повторно попробуем на styledata
     }
