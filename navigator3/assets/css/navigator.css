@@ -1511,20 +1511,29 @@ button, input, select, textarea {
     color: var(--text);
 }
 
-.legal-link {
-    display: block;
-    padding: 12px 14px;
-    border-radius: var(--radius-control);
-    background: var(--surface-subtle);
-    border: 1px solid var(--line);
-    color: var(--text);
-    font-size: 14px;
-    font-weight: 600;
-    text-decoration: none;
+.premium-legal-links {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 2px 5px;
+    font-size: 12px;
+    line-height: 1.45;
+    text-align: center;
 }
 
-.legal-link:active {
-    background: var(--surface-muted);
+.premium-legal-links a {
+    color: var(--text-muted);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+}
+
+.premium-legal-links a:active {
+    color: var(--text);
+}
+
+.premium-legal-sep {
+    color: var(--text-faint);
 }
 
 .map-style-grid {
