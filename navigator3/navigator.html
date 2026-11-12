@@ -1101,7 +1101,8 @@ const _shockSamples = [];
 
 const SHOCK_BAR_MAX_G = 3;
 const SHOCK_STEP_G = 0.05;
-const SHOCK_PEAK_HOLD_MS = 2000;
+const SHOCK_BAR_MIN_G = 0.25;
+const SHOCK_PEAK_HOLD_MS = 1000;
 const SHOCK_PEAK_MIN_DROP = SHOCK_STEP_G / 2;
 
 /* Показываем только кратные 0.05 g: меньше перерисовок бара,
@@ -1149,19 +1150,22 @@ function updateShockBar(g) {
 
     if (value !== _shockLastG) {
         _shockLastG = value;
-        _shockFill.style.width = shockBarPercent(value) + '%';
-        const color = shockBarColor(value);
-        if (color !== _shockLastColor) {
-            _shockLastColor = color;
-            _shockFill.style.background = color;
+        const showBar = value >= SHOCK_BAR_MIN_G;
+        _shockFill.style.width = showBar ? shockBarPercent(value) + '%' : '0%';
+        if (showBar) {
+            const color = shockBarColor(value);
+            if (color !== _shockLastColor) {
+                _shockLastColor = color;
+                _shockFill.style.background = color;
+            }
         }
-        if (_shockLabel) _shockLabel.textContent = value >= 0.05 ? value.toFixed(2) : '';
+        if (_shockLabel) _shockLabel.textContent = showBar ? value.toFixed(2) : '';
     }
 
     const peak = quantizeShockG(shockPeakG(now, value));
     /* Точку видно, только когда текущее значение уже упало ниже пика:
        иначе она сливается с концом заливки и ничего не добавляет. */
-    const showPeak = peak > 0 && peak - value > SHOCK_PEAK_MIN_DROP;
+    const showPeak = peak >= SHOCK_BAR_MIN_G && peak - value > SHOCK_PEAK_MIN_DROP;
     if (peak !== _shockPeakLastG) {
         _shockPeakLastG = peak;
         const pct = shockBarPercent(peak);
