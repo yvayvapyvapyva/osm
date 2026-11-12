@@ -61,6 +61,13 @@
             </svg>
             <span>Инструкция</span>
         </button>
+        <button type="button" class="top-nav-btn" data-tab="profile">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <circle cx="12" cy="8" r="4"/>
+                <path d="M4.5 20a7.5 7.5 0 0 1 15 0"/>
+            </svg>
+            <span>Профиль</span>
+        </button>
         <button type="button" class="top-nav-btn" data-tab="settings">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                 <path d="M4 7h10M18 7h2M4 17h2M10 17h10M4 12h4M12 12h8"/>
@@ -1341,10 +1348,24 @@ function updateTiltState() {
 function closeAllSheets() {
     closePointsList();
     closeSettings();
+    closeProfile();
     closeDrivingControl();
     closeInstruction();
     closePremiumOffer();
     if (typeof MenuModule !== 'undefined') MenuModule.hide();
+}
+
+function openProfile() {
+    if (!$('profileModal').classList.contains('hidden')) { closeProfile(); return; }
+    closeAllSheets();
+    if (window.AuthModule && typeof AuthModule.render === 'function') AuthModule.render();
+    renderPremiumUi();
+    loadPremiumStatus().catch(() => {});
+    $('profileModal').classList.remove('hidden');
+}
+
+function closeProfile() {
+    hideScreen('profileModal');
 }
 
 function openSettings() {
@@ -1354,8 +1375,6 @@ function openSettings() {
     $('themeToggle').checked = document.documentElement.getAttribute('data-theme') === 'dark';
     $('themeValue').textContent = document.documentElement.getAttribute('data-theme') === 'dark' ? 'Вкл' : 'Выкл';
     $('commentToggle').checked = APP._commentEnabled;
-    renderPremiumUi();
-    loadPremiumStatus().catch(() => {});
     $('navSettingsModal').classList.remove('hidden');
 }
 
@@ -2729,11 +2748,11 @@ if (typeof maplibregl === 'undefined') {
     </div>
 </div>
 
-<div id="navSettingsModal" class="hidden screen-modal">
-    <div class="screen-panel" id="navSettingsScreen">
+<div id="profileModal" class="hidden screen-modal">
+    <div class="screen-panel" id="profileScreen">
         <header class="screen-head">
-            <h1 class="screen-title">Настройки</h1>
-            <button type="button" class="screen-close" onclick="closeSettings()" aria-label="Закрыть">
+            <h1 class="screen-title">Профиль</h1>
+            <button type="button" class="screen-close" onclick="closeProfile()" aria-label="Закрыть">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
             </button>
         </header>
@@ -2776,16 +2795,23 @@ if (typeof maplibregl === 'undefined') {
                     <button type="button" class="premium-buy-btn" id="premiumBuyBtn" disabled>
                         Купить
                     </button>
-                    <div class="premium-legal-links">
-                        <a href="/legal.html#offer" target="_blank" rel="noopener">Пользовательское соглашение</a>
-                        <span class="premium-legal-sep" aria-hidden="true">·</span>
-                        <a href="/legal.html#privacy" target="_blank" rel="noopener">Политика конфиденциальности</a>
-                        <span class="premium-legal-sep" aria-hidden="true">·</span>
-                        <a href="/legal.html#requisites" target="_blank" rel="noopener">Контакты и реквизиты</a>
-                    </div>
+                    <a class="premium-legal-link" href="/legal.html" target="_blank" rel="noopener">Пользовательское соглашение · Политика конфиденциальности · Контакты и реквизиты</a>
                 </div>
             </div>
 
+        </div>
+    </div>
+</div>
+
+<div id="navSettingsModal" class="hidden screen-modal">
+    <div class="screen-panel" id="navSettingsScreen">
+        <header class="screen-head">
+            <h1 class="screen-title">Настройки</h1>
+            <button type="button" class="screen-close" onclick="closeSettings()" aria-label="Закрыть">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+            </button>
+        </header>
+        <div class="settings-body">
             <div class="settings-group">
                 <div class="settings-label">Оформление</div>
                 <div class="trigger-setting-row">
@@ -2952,6 +2978,7 @@ if (typeof maplibregl === 'undefined') {
 
     const sync = () => {
         if (isOpen('jsonModal')) setActive('routes');
+        else if (isOpen('profileModal')) setActive('profile');
         else if (isOpen('navSettingsModal')) setActive('settings');
         else if (isOpen('drivingControlModal')) setActive('driving');
         else if (isOpen('instructionModal')) setActive('instruction');
@@ -2982,6 +3009,8 @@ if (typeof maplibregl === 'undefined') {
             if (typeof openInstruction !== 'function') return;
             if (isOpen('instructionModal')) closeInstruction();
             else { closeAllSheets(); openInstruction(); }
+        } else if (name === 'profile') {
+            if (typeof openProfile === 'function') openProfile();
         } else if (name === 'settings') {
             if (typeof openSettings === 'function') openSettings();
         } else if (name === 'driving') {
@@ -3002,6 +3031,7 @@ if (typeof maplibregl === 'undefined') {
         return true;
     };
 
+    observe('profileModal');
     observe('navSettingsModal');
     observe('drivingControlModal');
     observe('instructionModal');

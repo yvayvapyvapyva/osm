@@ -1499,9 +1499,11 @@ button, input, select, textarea {
 }
 
 .premium-legal-link {
+    display: block;
     color: var(--text-muted);
-    font-size: 13px;
+    font-size: 12px;
     font-weight: 600;
+    line-height: 1.45;
     text-align: center;
     text-decoration: underline;
     text-underline-offset: 2px;
@@ -1509,31 +1511,6 @@ button, input, select, textarea {
 
 .premium-legal-link:active {
     color: var(--text);
-}
-
-.premium-legal-links {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    justify-content: center;
-    gap: 2px 5px;
-    font-size: 12px;
-    line-height: 1.45;
-    text-align: center;
-}
-
-.premium-legal-links a {
-    color: var(--text-muted);
-    text-decoration: underline;
-    text-underline-offset: 2px;
-}
-
-.premium-legal-links a:active {
-    color: var(--text);
-}
-
-.premium-legal-sep {
-    color: var(--text-faint);
 }
 
 .map-style-grid {
@@ -2017,6 +1994,12 @@ button, input, select, textarea {
 .top-nav-btn.active span {
     font-weight: 700;
     color: var(--green);
+}
+
+@media (max-width: 430px) {
+    .top-nav-btn {
+        padding: 6px 3px 4px;
+    }
 }
 
 @media (max-width: 380px) {
