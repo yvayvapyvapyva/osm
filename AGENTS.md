@@ -52,6 +52,12 @@
 - SuccessURL → редирект на `https://ainstruktor.ru/navigator.html?payment=success`.
 - FailURL → помечает платёж отменённым и редиректит на `...?payment=fail`.
 
+## Временный доступ для проверки
+- Вход без Яндекс ID: `GET /auth/demo?t=<токен>` → сессия демо-пользователя `demo-review` и редирект на `/navigator.html`.
+- Переменные функции: `DEMO_ACCESS_TOKEN`, `DEMO_ACCESS_UNTIL` (ISO, UTC), `DEMO_ACCESS_EMAIL`. Пока заданы и срок не истёк — ссылка работает; неверный токен и истёкший срок дают 403.
+- Ссылка нужна для проверки кабинета покупателя сторонними сервисами (например, менеджером ЮKassa). Демо-пользователь не владелец, поэтому редактор и чужие маршруты ему недоступны.
+- Отзыв доступа: убрать `DEMO_ACCESS_TOKEN` из `.env`, передеплоить функцию и удалить сессии `demo-review` из таблицы `sessions`.
+
 ## Команда YC
 - `yc` установлен: `/Users/mb/yandex-cloud/bin/yc`
 - cloud-id: `b1gtnlal9r2s3rvqadjn`, folder-id: `b1gepvq09nl4oobiemtr`
