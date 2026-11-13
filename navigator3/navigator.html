@@ -673,6 +673,10 @@ function driveAlongPath(fromIdx) {
             APP._driveMarker.update({ coordinates: [lastPt[1], lastPt[0]] });
             stopDrive();
             APP._simCurPos = [lastPt[0], lastPt[1]];
+            // stopDrive() прячет маркер; на время озвучки команды возвращаем
+            // его на место, иначе он пропадает до старта следующего отрезка.
+            mapAddChild(APP._driveMarker);
+            APP._driveMarker.element.style.display = '';
 
             const nextIdx = fromIdx + 1;
             if (nextIdx >= APP.navPoints.length) {
@@ -2264,6 +2268,9 @@ function playPointAudio(point, onDone) {
 }
 
 function navCheckTriggers() {
+    // В режиме симуляции дистанцию и переход к следующей точке считает
+    // только маркер: иначе реальный GPS перебивает показания в панели.
+    if (APP._simMode) return;
     if (APP.navCurrentIndex < 0 || !APP.lastPos || !APP.navPoints[APP.navCurrentIndex]) return;
     const t = APP.navPoints[APP.navCurrentIndex];
     const d = getGeoDistance(APP.lastPos, [t.lat, t.lon]);
