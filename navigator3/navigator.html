@@ -1693,7 +1693,8 @@ function ensureRouteLayers() {
                 },
                 paint: {
                     'line-color': ['get', 'casingColor'],
-                    'line-width': ['get', 'casingWidth']
+                    'line-width': ['+', ['get', 'width'], 2],
+                    'line-gap-width': ['get', 'width']
                 }
             });
         }
@@ -1724,7 +1725,8 @@ function ensureRouteLayers() {
                 layout: { 'line-join': 'round', 'line-cap': 'round' },
                 paint: {
                     'line-color': ['get', 'casingColor'],
-                    'line-width': ['get', 'casingWidth']
+                    'line-width': ['+', ['get', 'width'], 2],
+                    'line-gap-width': ['get', 'width']
                 }
             });
         }
@@ -1872,7 +1874,6 @@ function renderRoutePoints() {
                 properties: {
                     color: p.hex,
                     casingColor: '#121A28',
-                    casingWidth: 6,
                     width: 4,
                     priority: isCurrent ? 30 : 10
                 }
