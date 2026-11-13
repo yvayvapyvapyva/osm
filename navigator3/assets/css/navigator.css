@@ -1015,7 +1015,7 @@ button, input, select, textarea {
 .routes-folder-list {
     display: flex;
     flex-direction: column;
-    gap: 5px;
+    gap: 6px;
 }
 
 .routes-folder-row {
@@ -1023,9 +1023,9 @@ button, input, select, textarea {
     align-items: center;
     gap: 10px;
     width: 100%;
-    min-height: 64px;
-    padding: 9px 14px;
-    border-radius: var(--radius-control);
+    min-height: 78px;
+    padding: 10px 14px;
+    border-radius: var(--radius-sm);
     color: var(--text);
     text-align: left;
     cursor: pointer;
@@ -1041,17 +1041,17 @@ button, input, select, textarea {
     display: flex;
     align-items: center;
     justify-content: center;
-    flex: 0 0 34px;
-    width: 34px;
-    height: 34px;
-    border-radius: 10px;
+    flex: 0 0 42px;
+    width: 42px;
+    height: 42px;
+    border-radius: 12px;
     background: var(--green-tint);
     color: var(--green);
 }
 
 .routes-folder-icon svg {
-    width: 21px;
-    height: 21px;
+    width: 25px;
+    height: 25px;
 }
 
 .routes-folder-name {
