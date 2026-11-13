@@ -2017,22 +2017,16 @@ button, input, select, textarea {
 
 .nav-premium-badge {
     position: absolute;
-    top: -4px;
-    right: -8px;
-    width: 15px;
-    height: 15px;
-    border-radius: 50%;
-    background: #F5A623;
-    color: #FFFFFF;
-    font-size: 9px;
+    top: -6px;
+    right: -7px;
+    color: #F5A623;
+    font-size: 13px;
     font-style: normal;
     font-weight: 700;
     line-height: 1;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border: 1.5px solid var(--surface);
-    box-shadow: 0 1px 3px rgba(18, 28, 46, 0.28);
+    display: block;
+    -webkit-text-stroke: 1px var(--surface);
+    paint-order: stroke fill;
     pointer-events: none;
 }
 
