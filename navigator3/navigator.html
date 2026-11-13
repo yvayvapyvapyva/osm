@@ -1685,7 +1685,7 @@ function ensureRouteLayers() {
                 id: 'nav-routes-casing',
                 type: 'line',
                 source: ROUTE_SOURCE_ID,
-                filter: ['!=', ['get', 'priority'], 30],
+                filter: ['all', ['!=', ['get', 'priority'], 30], ['!=', ['get', 'dashed'], true]],
                 layout: {
                     'line-join': 'round',
                     'line-cap': 'round',
@@ -1703,7 +1703,7 @@ function ensureRouteLayers() {
                 id: 'nav-routes-main',
                 type: 'line',
                 source: ROUTE_SOURCE_ID,
-                filter: ['!=', ['get', 'priority'], 30],
+                filter: ['all', ['!=', ['get', 'priority'], 30], ['!=', ['get', 'dashed'], true]],
                 layout: {
                     'line-join': 'round',
                     'line-cap': 'round',
@@ -1712,6 +1712,22 @@ function ensureRouteLayers() {
                 paint: {
                     'line-color': ['get', 'color'],
                     'line-width': ['get', 'width']
+                }
+            });
+        }
+        // Пунктир: путь предыдущей точки. line-dasharray не data-driven
+        // в 4.7.1, поэтому вынесен отдельным слоем с фильтром по свойству.
+        if (!APP.map.getLayer('nav-routes-passed')) {
+            APP.map.addLayer({
+                id: 'nav-routes-passed',
+                type: 'line',
+                source: ROUTE_SOURCE_ID,
+                filter: ['==', ['get', 'dashed'], true],
+                layout: { 'line-join': 'round', 'line-cap': 'butt' },
+                paint: {
+                    'line-color': ['get', 'color'],
+                    'line-width': ['get', 'width'],
+                    'line-dasharray': [2, 2]
                 }
             });
         }
@@ -1875,7 +1891,8 @@ function renderRoutePoints() {
                     color: p.hex,
                     casingColor: '#121A28',
                     width: 4,
-                    priority: isCurrent ? 30 : 10
+                    priority: isCurrent ? 30 : 10,
+                    dashed: isPrevious
                 }
             });
         }
