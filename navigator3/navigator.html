@@ -1707,18 +1707,18 @@ function ensureRouteLayers() {
                 data: { type: 'FeatureCollection', features: [] }
             });
         }
-        // Нижняя группа: предыдущий (priority 20) и будущие (10) сегменты.
-        // line-sort-key гарантирует, что предыдущий рисуется поверх будущих.
+        // Порядок отрисовки задаётся номером точки: чем меньше номер,
+        // тем выше её путь. line-sort-key работает внутри слоя, поэтому
+        // все сегменты лежат в общих слоях без отдельных групп.
         if (!APP.map.getLayer('nav-routes-casing')) {
             APP.map.addLayer({
                 id: 'nav-routes-casing',
                 type: 'line',
                 source: ROUTE_SOURCE_ID,
-                filter: ['!=', ['get', 'priority'], 30],
                 layout: {
                     'line-join': 'round',
                     'line-cap': 'round',
-                    'line-sort-key': ['get', 'priority']
+                    'line-sort-key': ['-', 1000, ['get', 'index']]
                 },
                 paint: {
                     'line-color': ['get', 'casingColor'],
@@ -1732,11 +1732,10 @@ function ensureRouteLayers() {
                 id: 'nav-routes-main',
                 type: 'line',
                 source: ROUTE_SOURCE_ID,
-                filter: ['!=', ['get', 'priority'], 30],
                 layout: {
                     'line-join': 'round',
                     'line-cap': 'round',
-                    'line-sort-key': ['get', 'priority']
+                    'line-sort-key': ['-', 1000, ['get', 'index']]
                 },
                 paint: {
                     'line-color': ['get', 'color'],
@@ -1762,34 +1761,6 @@ function ensureRouteLayers() {
                     'icon-keep-upright': false,
                     'icon-allow-overlap': true,
                     'icon-ignore-placement': true
-                }
-            });
-        }
-        // Верхняя группа: только активный сегмент (priority 30) — всегда выше остальных.
-        if (!APP.map.getLayer('nav-routes-active-casing')) {
-            APP.map.addLayer({
-                id: 'nav-routes-active-casing',
-                type: 'line',
-                source: ROUTE_SOURCE_ID,
-                filter: ['==', ['get', 'priority'], 30],
-                layout: { 'line-join': 'round', 'line-cap': 'round' },
-                paint: {
-                    'line-color': ['get', 'casingColor'],
-                    'line-width': 1,
-                    'line-gap-width': ['get', 'width']
-                }
-            });
-        }
-        if (!APP.map.getLayer('nav-routes-active-main')) {
-            APP.map.addLayer({
-                id: 'nav-routes-active-main',
-                type: 'line',
-                source: ROUTE_SOURCE_ID,
-                filter: ['==', ['get', 'priority'], 30],
-                layout: { 'line-join': 'round', 'line-cap': 'round' },
-                paint: {
-                    'line-color': ['get', 'color'],
-                    'line-width': ['get', 'width']
                 }
             });
         }
@@ -1900,7 +1871,7 @@ function renderRoutePoints() {
         const shouldShow = isKeyPoint || !isPassed;
         const markerSize = 40;
 
-        const markerZIndex = isCurrent ? 100 : (isNext ? 90 : 10);
+        const markerZIndex = 1000 - i;
 
         if (shouldShow) {
             el.style.display = '';
@@ -1925,7 +1896,7 @@ function renderRoutePoints() {
                     color: p.hex,
                     casingColor: '#121A28',
                     width: 4,
-                    priority: isCurrent ? 30 : 10,
+                    index: i,
                     previous: isPrevious
                 }
             });
