@@ -1693,7 +1693,7 @@ function ensureRouteLayers() {
                 },
                 paint: {
                     'line-color': ['get', 'casingColor'],
-                    'line-width': ['+', ['get', 'width'], 1],
+                    'line-width': 1,
                     'line-gap-width': ['get', 'width']
                 }
             });
@@ -1725,7 +1725,7 @@ function ensureRouteLayers() {
                 layout: { 'line-join': 'round', 'line-cap': 'round' },
                 paint: {
                     'line-color': ['get', 'casingColor'],
-                    'line-width': ['+', ['get', 'width'], 1],
+                    'line-width': 1,
                     'line-gap-width': ['get', 'width']
                 }
             });
