@@ -1669,6 +1669,43 @@ window.getNavigatorPointIcon = getNavIconSvg;
 
 const ROUTE_SOURCE_ID = 'nav-routes';
 
+function ensureRouteArrowImage(color) {
+    if (!APP.map) return;
+    const hex = /^#[0-9a-f]{6}$/i.test(color) ? color : '#2FA8E0';
+    if (APP._arrowColor === hex && APP.map.hasImage('nav-route-arrow')) return;
+
+    const size = 32;
+    const canvas = document.createElement('canvas');
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    // Стрелка смотрит вправо: при symbol-placement='line' ось X иконки
+    // совмещается с направлением линии.
+    const draw = (width, stroke) => {
+        ctx.strokeStyle = stroke;
+        ctx.lineWidth = width;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        ctx.beginPath();
+        ctx.moveTo(10, 8);
+        ctx.lineTo(24, 16);
+        ctx.lineTo(10, 24);
+        ctx.stroke();
+    };
+    draw(8, '#121A28');
+    draw(4, hex);
+
+    const image = ctx.getImageData(0, 0, size, size);
+    if (APP.map.hasImage('nav-route-arrow')) {
+        APP.map.updateImage('nav-route-arrow', image);
+    } else {
+        APP.map.addImage('nav-route-arrow', image, { pixelRatio: 2 });
+    }
+    APP._arrowColor = hex;
+}
+
 function ensureRouteLayers() {
     if (!APP.map) return;
     try {
@@ -1685,7 +1722,7 @@ function ensureRouteLayers() {
                 id: 'nav-routes-casing',
                 type: 'line',
                 source: ROUTE_SOURCE_ID,
-                filter: ['all', ['!=', ['get', 'priority'], 30], ['!=', ['get', 'dashed'], true]],
+                filter: ['all', ['!=', ['get', 'priority'], 30], ['!=', ['get', 'previous'], true]],
                 layout: {
                     'line-join': 'round',
                     'line-cap': 'round',
@@ -1703,7 +1740,7 @@ function ensureRouteLayers() {
                 id: 'nav-routes-main',
                 type: 'line',
                 source: ROUTE_SOURCE_ID,
-                filter: ['all', ['!=', ['get', 'priority'], 30], ['!=', ['get', 'dashed'], true]],
+                filter: ['all', ['!=', ['get', 'priority'], 30], ['!=', ['get', 'previous'], true]],
                 layout: {
                     'line-join': 'round',
                     'line-cap': 'round',
@@ -1715,35 +1752,25 @@ function ensureRouteLayers() {
                 }
             });
         }
-        // Путь предыдущей точки — пунктиром с обводкой. Два слоя с
-        // одинаковым физическим шагом (18 px): у контура шаблон уменьшен
-        // пропорционально толщине, иначе штрихи разъедутся. Круглые концы
-        // дают обводку и на торцах штрихов.
-        if (!APP.map.getLayer('nav-routes-passed-dash-casing')) {
+        // Путь предыдущей точки — стрелками по направлению движения.
+        // Иконка рисуется в цвете маршрута с тёмной обводкой; при смене
+        // цвета изображение обновляется в renderRoutePoints.
+        ensureRouteArrowImage(APP._prevArrowColor || '#2FA8E0');
+        if (!APP.map.getLayer('nav-routes-previous-arrows')) {
             APP.map.addLayer({
-                id: 'nav-routes-passed-dash-casing',
-                type: 'line',
+                id: 'nav-routes-previous-arrows',
+                type: 'symbol',
                 source: ROUTE_SOURCE_ID,
-                filter: ['==', ['get', 'dashed'], true],
-                layout: { 'line-join': 'round', 'line-cap': 'round' },
-                paint: {
-                    'line-color': ['get', 'casingColor'],
-                    'line-width': 6,
-                    'line-dasharray': [1, 2]
-                }
-            });
-        }
-        if (!APP.map.getLayer('nav-routes-passed-dash')) {
-            APP.map.addLayer({
-                id: 'nav-routes-passed-dash',
-                type: 'line',
-                source: ROUTE_SOURCE_ID,
-                filter: ['==', ['get', 'dashed'], true],
-                layout: { 'line-join': 'round', 'line-cap': 'round' },
-                paint: {
-                    'line-color': ['get', 'color'],
-                    'line-width': 4,
-                    'line-dasharray': [1.5, 3]
+                filter: ['==', ['get', 'previous'], true],
+                layout: {
+                    'symbol-placement': 'line',
+                    'symbol-spacing': 32,
+                    'icon-image': 'nav-route-arrow',
+                    'icon-size': 0.8,
+                    'icon-rotation-alignment': 'map',
+                    'icon-keep-upright': false,
+                    'icon-allow-overlap': true,
+                    'icon-ignore-placement': true
                 }
             });
         }
@@ -1908,7 +1935,7 @@ function renderRoutePoints() {
                     casingColor: '#121A28',
                     width: 4,
                     priority: isCurrent ? 30 : 10,
-                    dashed: isPrevious
+                    previous: isPrevious
                 }
             });
         }
@@ -1935,6 +1962,13 @@ function renderRoutePoints() {
         if (curr && curr.placemark) {
             if (curr.placemark.element) curr.placemark.element.style.opacity = '';
             mapAddChild(curr.placemark);
+        }
+        const prevPoint = APP.navCurrentIndex > 0
+            ? APP.navPoints[APP.navCurrentIndex - 1]
+            : null;
+        if (prevPoint && prevPoint.hex) {
+            APP._prevArrowColor = prevPoint.hex;
+            ensureRouteArrowImage(prevPoint.hex);
         }
         ensureRouteLayers();
         updateRouteLines(features);
