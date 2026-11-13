@@ -1647,9 +1647,15 @@ function getNavIconSvgSized(col, txt, isCurr = false, hasComm = false, sizeOverr
     const safeCol = /^#[0-9a-f]{6}$/i.test(col) ? col : '#007AFF';
     const safeTxt = escapeHtml(String(txt ?? ''));
     const fontSize = Math.max(8, Math.round(s * 9 / 40));
-    const commR = Math.max(3, Math.round(s * 4 / 40));
-    const commCx = s - Math.round(s * 10 / 40);
-    const commCy = Math.round(s * 10 / 40);
+    const commR = Math.max(3.5, (s * 5.5) / 40);
+    const commCx = s - s * 0.25;
+    const commCy = s * 0.25;
+    // Значок комментария: белый пузырь с тремя точками.
+    const commTail = `M ${commCx - commR * 0.55} ${commCy + commR * 0.5} `
+        + `L ${commCx - commR * 0.25} ${commCy + commR * 1.35} `
+        + `L ${commCx + commR * 0.2} ${commCy + commR * 0.7} Z`;
+    const commDotR = commR * 0.17;
+    const commDotGap = commR * 0.48;
     const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${s}" height="${s}">
         <rect width="${s}" height="${s}" fill="transparent"/>
         ${isCurr ? `<circle cx="${c}" cy="${c}" r="${r + 3}" fill="none" stroke="#00FF00" stroke-width="2.5" opacity="0.9"/>` : ''}
@@ -1659,7 +1665,7 @@ function getNavIconSvgSized(col, txt, isCurr = false, hasComm = false, sizeOverr
         <circle cx="${c}" cy="${c}" r="${r}" fill="none" stroke="rgba(255,255,255,0.3)" stroke-width="0.5"/>
         <circle cx="${c}" cy="${c}" r="${r + 0.9}" fill="none" stroke="#000000" stroke-width="0.9"/>
         <text x="${c}" y="${c + 0.5}" font-size="${fontSize}" font-family="Arial" font-weight="900" text-anchor="middle" dominant-baseline="middle" fill="#ffffff" stroke="#000000" stroke-width="2" paint-order="stroke fill">${safeTxt}</text>
-        ${hasComm ? `<circle cx="${commCx}" cy="${commCy}" r="${commR}" fill="#EF4444" stroke="#FFFFFF" stroke-width="1.5"/>` : ''}
+        ${hasComm ? `<path d="${commTail}" fill="#FFFFFF" stroke="#000000" stroke-width="1" stroke-linejoin="round"/><rect x="${commCx - commR}" y="${commCy - commR}" width="${commR * 2}" height="${commR * 2}" rx="${commR * 0.5}" fill="#FFFFFF" stroke="#000000" stroke-width="1"/><circle cx="${commCx - commDotGap}" cy="${commCy}" r="${commDotR}" fill="#000000"/><circle cx="${commCx}" cy="${commCy}" r="${commDotR}" fill="#000000"/><circle cx="${commCx + commDotGap}" cy="${commCy}" r="${commDotR}" fill="#000000"/>` : ''}
     </svg>`;
     return 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svg)));
 }
