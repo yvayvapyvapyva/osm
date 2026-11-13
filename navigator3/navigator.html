@@ -3000,7 +3000,6 @@ if (typeof maplibregl === 'undefined') {
         if (rbk) rbk.addEventListener('click', () => startPremiumCheckout('robokassa'));
         const offerRbk = document.getElementById('premiumOfferRbkBtn');
         if (offerRbk) offerRbk.addEventListener('click', () => startPremiumCheckout('robokassa'));
-        loadPremiumStatus().catch(() => {});
     };
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', bind);

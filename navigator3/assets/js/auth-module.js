@@ -65,6 +65,11 @@ const AuthModule = {
         if (loginGroup) loginGroup.hidden = !this.enabled || !!this.user;
         if (userGroup) userGroup.hidden = !this.enabled || !this.user;
 
+        // Звезда премиума на иконке профиля: данные уже есть в /api/me.
+        if (typeof window.updatePremiumBadge === 'function') {
+            window.updatePremiumBadge(!!(this.user && this.user.premium_active));
+        }
+
         if (!this.user) return;
 
         const name = document.getElementById('accountName');
