@@ -1669,10 +1669,8 @@ window.getNavigatorPointIcon = getNavIconSvg;
 
 const ROUTE_SOURCE_ID = 'nav-routes';
 
-function ensureRouteArrowImage(color) {
-    if (!APP.map) return;
-    const hex = /^#[0-9a-f]{6}$/i.test(color) ? color : '#2FA8E0';
-    if (APP._arrowColor === hex && APP.map.hasImage('nav-route-arrow')) return;
+function ensureRouteArrowImage() {
+    if (!APP.map || APP.map.hasImage('nav-route-arrow')) return;
 
     const size = 32;
     const canvas = document.createElement('canvas');
@@ -1681,29 +1679,23 @@ function ensureRouteArrowImage(color) {
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    // Стрелка смотрит вправо: при symbol-placement='line' ось X иконки
-    // совмещается с направлением линии.
-    const draw = (width, stroke) => {
-        ctx.strokeStyle = stroke;
-        ctx.lineWidth = width;
-        ctx.lineCap = 'round';
-        ctx.lineJoin = 'round';
-        ctx.beginPath();
-        ctx.moveTo(10, 8);
-        ctx.lineTo(24, 16);
-        ctx.lineTo(10, 24);
-        ctx.stroke();
-    };
-    draw(8, '#121A28');
-    draw(4, hex);
+    // Острая чёрная стрелка, смотрит вправо: при symbol-placement='line'
+    // ось X иконки совмещается с направлением линии.
+    ctx.strokeStyle = '#000000';
+    ctx.lineWidth = 3.5;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.beginPath();
+    ctx.moveTo(9, 9);
+    ctx.lineTo(25, 16);
+    ctx.lineTo(9, 23);
+    ctx.stroke();
 
-    const image = ctx.getImageData(0, 0, size, size);
-    if (APP.map.hasImage('nav-route-arrow')) {
-        APP.map.updateImage('nav-route-arrow', image);
-    } else {
-        APP.map.addImage('nav-route-arrow', image, { pixelRatio: 2 });
-    }
-    APP._arrowColor = hex;
+    APP.map.addImage(
+        'nav-route-arrow',
+        ctx.getImageData(0, 0, size, size),
+        { pixelRatio: 2 }
+    );
 }
 
 function ensureRouteLayers() {
@@ -1722,7 +1714,7 @@ function ensureRouteLayers() {
                 id: 'nav-routes-casing',
                 type: 'line',
                 source: ROUTE_SOURCE_ID,
-                filter: ['all', ['!=', ['get', 'priority'], 30], ['!=', ['get', 'previous'], true]],
+                filter: ['!=', ['get', 'priority'], 30],
                 layout: {
                     'line-join': 'round',
                     'line-cap': 'round',
@@ -1740,7 +1732,7 @@ function ensureRouteLayers() {
                 id: 'nav-routes-main',
                 type: 'line',
                 source: ROUTE_SOURCE_ID,
-                filter: ['all', ['!=', ['get', 'priority'], 30], ['!=', ['get', 'previous'], true]],
+                filter: ['!=', ['get', 'priority'], 30],
                 layout: {
                     'line-join': 'round',
                     'line-cap': 'round',
@@ -1752,10 +1744,9 @@ function ensureRouteLayers() {
                 }
             });
         }
-        // Путь предыдущей точки — стрелками по направлению движения.
-        // Иконка рисуется в цвете маршрута с тёмной обводкой; при смене
-        // цвета изображение обновляется в renderRoutePoints.
-        ensureRouteArrowImage(APP._prevArrowColor || '#2FA8E0');
+        // Поверх линии предыдущего отрезка — чёрные стрелки по направлению
+        // движения. Линия под ними остаётся обычной сплошной.
+        ensureRouteArrowImage();
         if (!APP.map.getLayer('nav-routes-previous-arrows')) {
             APP.map.addLayer({
                 id: 'nav-routes-previous-arrows',
@@ -1962,13 +1953,6 @@ function renderRoutePoints() {
         if (curr && curr.placemark) {
             if (curr.placemark.element) curr.placemark.element.style.opacity = '';
             mapAddChild(curr.placemark);
-        }
-        const prevPoint = APP.navCurrentIndex > 0
-            ? APP.navPoints[APP.navCurrentIndex - 1]
-            : null;
-        if (prevPoint && prevPoint.hex) {
-            APP._prevArrowColor = prevPoint.hex;
-            ensureRouteArrowImage(prevPoint.hex);
         }
         ensureRouteLayers();
         updateRouteLines(features);
