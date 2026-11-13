@@ -1719,16 +1719,6 @@ function ensureRouteLayers() {
             });
         }
         // Верхняя группа: только активный сегмент (priority 30) — всегда выше остальных.
-        if (!APP.map.getLayer('nav-routes-glow')) {
-            APP.map.addLayer({
-                id: 'nav-routes-glow',
-                type: 'line',
-                source: ROUTE_SOURCE_ID,
-                filter: ['==', ['get', 'priority'], 30],
-                layout: { 'line-join': 'round', 'line-cap': 'round' },
-                paint: { 'line-color': ['get', 'color'], 'line-width': 8, 'line-opacity': 0.5 }
-            });
-        }
         if (!APP.map.getLayer('nav-routes-active-casing')) {
             APP.map.addLayer({
                 id: 'nav-routes-active-casing',
@@ -1754,10 +1744,6 @@ function ensureRouteLayers() {
                     'line-width': ['get', 'width']
                 }
             });
-        }
-        // Свечение текущего пути — самым верхним слоем.
-        if (APP.map.getLayer('nav-routes-glow')) {
-            APP.map.moveLayer('nav-routes-glow');
         }
     } catch (e) {
         // Стиль ещё не догрузился — повторно попробуем на styledata
