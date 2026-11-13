@@ -1748,20 +1748,26 @@ button, input, select, textarea {
 }
 
 .screen-title {
-    flex: 1;
-    min-width: 0;
+    position: absolute;
+    left: 68px;
+    right: 68px;
+    top: 50%;
+    transform: translateY(-50%);
     margin: 0;
     font-size: 17px;
     font-weight: 650;
     letter-spacing: -0.2px;
     line-height: 1.2;
     color: var(--text);
+    text-align: center;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    pointer-events: none;
 }
 
 .screen-close {
+    margin-left: auto;
     flex-shrink: 0;
     display: flex;
     align-items: center;
@@ -1782,6 +1788,44 @@ button, input, select, textarea {
     display: block;
     width: 20px;
     height: 20px;
+}
+
+.screen-back {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 48px;
+    height: 48px;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: var(--surface-muted);
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: background 0.15s ease, transform 0.12s ease;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.screen-back svg {
+    display: block;
+    width: 20px;
+    height: 20px;
+}
+
+.screen-back:active {
+    background: var(--line);
+    color: var(--text);
+    transform: scale(0.94);
+}
+
+.screen-back:focus-visible {
+    outline: 2px solid var(--green);
+    outline-offset: 2px;
+}
+
+.screen-back[hidden] {
+    display: none;
 }
 
 .screen-close:active {

@@ -488,6 +488,9 @@ const MenuModule = {
     },
 
     _renderBreadcrumbs() {
+        const back = document.getElementById('jsonModalBack');
+        if (back) back.hidden = this._folderPath.length === 0;
+
         const el = document.getElementById('routesBreadcrumb');
         if (!el) return;
         el.innerHTML = '';
@@ -955,6 +958,9 @@ const MenuModule = {
             <div id="jsonModal" class="screen-modal">
                 <div class="screen-panel" id="jsonModalScreen">
                     <header class="screen-head">
+                        <button type="button" class="screen-back" id="jsonModalBack" aria-label="Назад" hidden>
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg>
+                        </button>
                         <h1 class="screen-title">Маршруты</h1>
                         <button type="button" class="screen-close" id="jsonModalClose" aria-label="Закрыть">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
@@ -987,6 +993,15 @@ const MenuModule = {
 
         const closeBtn = document.getElementById('jsonModalClose');
         if (closeBtn) closeBtn.addEventListener('click', () => this.hide());
+
+        const backBtn = document.getElementById('jsonModalBack');
+        if (backBtn) {
+            backBtn.addEventListener('click', () => {
+                if (this._folderPath.length === 0) return;
+                this._folderPath = this._folderPath.slice(0, -1);
+                this._buildRoutesList();
+            });
+        }
 
         const breadcrumb = document.getElementById('routesBreadcrumb');
         if (breadcrumb) {
