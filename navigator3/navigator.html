@@ -62,10 +62,13 @@
             <span>Инструкция</span>
         </button>
         <button type="button" class="top-nav-btn" data-tab="profile">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                <circle cx="12" cy="8" r="4"/>
-                <path d="M4.5 20a7.5 7.5 0 0 1 15 0"/>
-            </svg>
+            <span class="top-nav-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <circle cx="12" cy="8" r="4"/>
+                    <path d="M4.5 20a7.5 7.5 0 0 1 15 0"/>
+                </svg>
+                <i class="nav-premium-badge" id="profilePremiumBadge" hidden title="Премиум активен" aria-label="Премиум активен">★</i>
+            </span>
             <span>Профиль</span>
         </button>
         <button type="button" class="top-nav-btn" data-tab="settings">
@@ -1331,6 +1334,11 @@ function formatPremiumDate(value) {
     });
 }
 
+function updatePremiumBadge(active) {
+    const badge = document.getElementById('profilePremiumBadge');
+    if (badge) badge.hidden = !active;
+}
+
 function renderPremiumUi() {
     const status = APP.premiumStatus || {};
     const logged = !!(status.logged_in || (window.AuthModule && AuthModule.user));
@@ -1372,6 +1380,7 @@ function renderPremiumUi() {
     if (logged && !available) {
         text = 'Оплата временно недоступна';
     }
+    updatePremiumBadge(active && logged);
 
     const title = $('premiumTitle');
     if (title) title.textContent = active ? 'Премиум активен' : 'Премиум-подписка';
@@ -1422,7 +1431,7 @@ async function loadPremiumStatus() {
         APP.premiumStatus = await response.json();
     } catch (error) {
         APP.premiumStatus = APP.premiumStatus || {
-            active: false,
+            active: !!(window.AuthModule && AuthModule.user && AuthModule.user.premium_active),
             price: '299',
             days: 30,
             payments_available: false,
@@ -2991,6 +3000,7 @@ if (typeof maplibregl === 'undefined') {
         if (rbk) rbk.addEventListener('click', () => startPremiumCheckout('robokassa'));
         const offerRbk = document.getElementById('premiumOfferRbkBtn');
         if (offerRbk) offerRbk.addEventListener('click', () => startPremiumCheckout('robokassa'));
+        loadPremiumStatus().catch(() => {});
     };
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', bind);

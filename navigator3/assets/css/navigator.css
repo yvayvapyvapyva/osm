@@ -2007,6 +2007,39 @@ button, input, select, textarea {
     -webkit-tap-highlight-color: transparent;
 }
 
+.top-nav-btn .top-nav-icon {
+    position: relative;
+    display: inline-flex;
+    overflow: visible;
+    text-overflow: clip;
+    max-width: none;
+}
+
+.nav-premium-badge {
+    position: absolute;
+    top: -4px;
+    right: -8px;
+    width: 15px;
+    height: 15px;
+    border-radius: 50%;
+    background: #F5A623;
+    color: #FFFFFF;
+    font-size: 9px;
+    font-style: normal;
+    font-weight: 700;
+    line-height: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1.5px solid var(--surface);
+    box-shadow: 0 1px 3px rgba(18, 28, 46, 0.28);
+    pointer-events: none;
+}
+
+.nav-premium-badge[hidden] {
+    display: none;
+}
+
 .top-nav-btn svg {
     display: block;
     width: 22px;
