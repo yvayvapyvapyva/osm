@@ -1715,35 +1715,35 @@ function ensureRouteLayers() {
                 }
             });
         }
-        // Путь предыдущей точки — точками. Круглый line-cap превращает
-        // почти нулевой штрих в круг диаметром line-width. Шаблон пунктира
-        // задан в толщинах линии, поэтому шаг 12 px держится на любом зуме.
-        // Контур — второй слой точек шириной 7 px под основными 5 px.
-        if (!APP.map.getLayer('nav-routes-passed-dots-casing')) {
+        // Путь предыдущей точки — пунктиром с обводкой. Два слоя с
+        // одинаковым физическим шагом (18 px): у контура шаблон уменьшен
+        // пропорционально толщине, иначе штрихи разъедутся. Круглые концы
+        // дают обводку и на торцах штрихов.
+        if (!APP.map.getLayer('nav-routes-passed-dash-casing')) {
             APP.map.addLayer({
-                id: 'nav-routes-passed-dots-casing',
+                id: 'nav-routes-passed-dash-casing',
                 type: 'line',
                 source: ROUTE_SOURCE_ID,
                 filter: ['==', ['get', 'dashed'], true],
                 layout: { 'line-join': 'round', 'line-cap': 'round' },
                 paint: {
                     'line-color': ['get', 'casingColor'],
-                    'line-width': 7,
-                    'line-dasharray': [0.007142857, 1.707142857]
+                    'line-width': 6,
+                    'line-dasharray': [1, 2]
                 }
             });
         }
-        if (!APP.map.getLayer('nav-routes-passed-dots')) {
+        if (!APP.map.getLayer('nav-routes-passed-dash')) {
             APP.map.addLayer({
-                id: 'nav-routes-passed-dots',
+                id: 'nav-routes-passed-dash',
                 type: 'line',
                 source: ROUTE_SOURCE_ID,
                 filter: ['==', ['get', 'dashed'], true],
                 layout: { 'line-join': 'round', 'line-cap': 'round' },
                 paint: {
                     'line-color': ['get', 'color'],
-                    'line-width': 5,
-                    'line-dasharray': [0.01, 2.39]
+                    'line-width': 4,
+                    'line-dasharray': [1.5, 3]
                 }
             });
         }
