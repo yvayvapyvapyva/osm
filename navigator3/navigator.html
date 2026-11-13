@@ -1715,19 +1715,35 @@ function ensureRouteLayers() {
                 }
             });
         }
-        // Пунктир: путь предыдущей точки. line-dasharray не data-driven
-        // в 4.7.1, поэтому вынесен отдельным слоем с фильтром по свойству.
-        if (!APP.map.getLayer('nav-routes-passed')) {
+        // Путь предыдущей точки — точками. Круглый line-cap превращает
+        // почти нулевой штрих в круг диаметром line-width. Шаблон пунктира
+        // задан в толщинах линии, поэтому шаг 12 px держится на любом зуме.
+        // Контур — второй слой точек шириной 7 px под основными 5 px.
+        if (!APP.map.getLayer('nav-routes-passed-dots-casing')) {
             APP.map.addLayer({
-                id: 'nav-routes-passed',
+                id: 'nav-routes-passed-dots-casing',
                 type: 'line',
                 source: ROUTE_SOURCE_ID,
                 filter: ['==', ['get', 'dashed'], true],
-                layout: { 'line-join': 'round', 'line-cap': 'butt' },
+                layout: { 'line-join': 'round', 'line-cap': 'round' },
+                paint: {
+                    'line-color': ['get', 'casingColor'],
+                    'line-width': 7,
+                    'line-dasharray': [0.007142857, 1.707142857]
+                }
+            });
+        }
+        if (!APP.map.getLayer('nav-routes-passed-dots')) {
+            APP.map.addLayer({
+                id: 'nav-routes-passed-dots',
+                type: 'line',
+                source: ROUTE_SOURCE_ID,
+                filter: ['==', ['get', 'dashed'], true],
+                layout: { 'line-join': 'round', 'line-cap': 'round' },
                 paint: {
                     'line-color': ['get', 'color'],
-                    'line-width': ['get', 'width'],
-                    'line-dasharray': [2, 2]
+                    'line-width': 5,
+                    'line-dasharray': [0.01, 2.39]
                 }
             });
         }
