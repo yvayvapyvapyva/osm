@@ -1571,7 +1571,7 @@ function getNavIconSvgSized(col, txt, isCurr = false, hasComm = false, sizeOverr
     const commDotGap = commR * 0.48;
     const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${s}" height="${s}">
         <rect width="${s}" height="${s}" fill="transparent"/>
-        ${isCurr ? `<circle cx="${c}" cy="${c}" r="${r + 3}" fill="none" stroke="#00FF00" stroke-width="2.5" opacity="0.9"/>` : ''}
+        ${isCurr ? `<circle cx="${c}" cy="${c}" r="${r + 3}" fill="none" stroke="#00FF00" stroke-width="1.5" opacity="0.9"/>` : ''}
         <circle cx="${c}" cy="${c}" r="${r}" fill="rgba(0,0,0,0.7)"/>
         <circle cx="${c}" cy="${c}" r="${r}" fill="${safeCol}" opacity="0.3"/>
         <circle cx="${c}" cy="${c}" r="${r}" fill="none" stroke="${safeCol}" stroke-width="1.5"/>
