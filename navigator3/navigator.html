@@ -1596,58 +1596,6 @@ function ensureRouteArrowImage() {
     );
 }
 
-function ensureRouteCurrentArrowImage(color) {
-    if (!APP.map) return '';
-    const hex = /^#[0-9a-f]{6}$/i.test(color) ? color : '#2FA8E0';
-    const key = 'nav-arrow-' + hex.slice(1);
-    if (APP.map.hasImage(key)) return key;
-
-    // Длинная стрелка: тонкий хвост и широкое острие. Рисуем тёмную
-    // обводку, затем заливку цветом маршрута.
-    const width = 64;
-    const height = 24;
-    const canvas = document.createElement('canvas');
-    canvas.width = width;
-    canvas.height = height;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return key;
-
-    const shape = () => {
-        ctx.beginPath();
-        ctx.moveTo(2, 7);
-        ctx.lineTo(40, 7);
-        ctx.lineTo(40, 2);
-        ctx.lineTo(62, 12);
-        ctx.lineTo(40, 22);
-        ctx.lineTo(40, 17);
-        ctx.lineTo(2, 17);
-        ctx.closePath();
-    };
-    ctx.lineJoin = 'round';
-    ctx.lineCap = 'round';
-
-    shape();
-    ctx.fillStyle = '#121A28';
-    ctx.strokeStyle = '#121A28';
-    ctx.lineWidth = 6;
-    ctx.fill();
-    ctx.stroke();
-
-    shape();
-    ctx.fillStyle = hex;
-    ctx.strokeStyle = hex;
-    ctx.lineWidth = 2;
-    ctx.fill();
-    ctx.stroke();
-
-    APP.map.addImage(
-        key,
-        ctx.getImageData(0, 0, width, height),
-        { pixelRatio: 2 }
-    );
-    return key;
-}
-
 function ensureRouteLayers() {
     if (!APP.map) return;
     try {
@@ -1665,7 +1613,6 @@ function ensureRouteLayers() {
                 id: 'nav-routes-main',
                 type: 'line',
                 source: ROUTE_SOURCE_ID,
-                filter: ['!=', ['get', 'current'], true],
                 layout: {
                     'line-join': 'round',
                     'line-cap': 'round',
@@ -1684,25 +1631,19 @@ function ensureRouteLayers() {
                 }
             });
         }
-        // По пути текущей цели — длинные стрелки цвета маршрута.
-        // Сплошная линия для него скрыта, поэтому путь читается как
-        // цепочка стрел с настоящим острием, как в Яндекс.Картах.
-        ensureRouteCurrentArrowImage(APP._currentArrowColor || '#2FA8E0');
-        if (!APP.map.getLayer('nav-routes-current-arrows')) {
+        // По пути текущей цели — маленькие чёрные точки. Круглый line-cap
+        // превращает почти нулевой штрих в точку.
+        if (!APP.map.getLayer('nav-routes-current-dots')) {
             APP.map.addLayer({
-                id: 'nav-routes-current-arrows',
-                type: 'symbol',
+                id: 'nav-routes-current-dots',
+                type: 'line',
                 source: ROUTE_SOURCE_ID,
                 filter: ['all', ['==', ['get', 'kind'], 'main'], ['==', ['get', 'current'], true]],
-                layout: {
-                    'symbol-placement': 'line',
-                    'symbol-spacing': 26,
-                    'icon-image': ['get', 'arrowImage'],
-                    'icon-size': 1,
-                    'icon-rotation-alignment': 'map',
-                    'icon-keep-upright': false,
-                    'icon-allow-overlap': true,
-                    'icon-ignore-placement': true
+                layout: { 'line-join': 'round', 'line-cap': 'round' },
+                paint: {
+                    'line-color': '#000000',
+                    'line-width': 1.5,
+                    'line-dasharray': [0.1, 6.5667]
                 }
             });
         }
@@ -1850,8 +1791,6 @@ function renderRoutePoints() {
 
         if (showPath && p.pts && p.pts.length >= 2) {
             const coords = p.pts.map(pt => [pt[1], pt[0]]);
-            const arrowImage = isCurrent ? ensureRouteCurrentArrowImage(p.hex) : '';
-            if (isCurrent) APP._currentArrowColor = p.hex;
             const mainKey = 2 * (APP.navPoints.length - i) + 1;
             features.push({
                 type: 'Feature',
@@ -1863,8 +1802,7 @@ function renderRoutePoints() {
                     sortKey: mainKey,
                     index: i,
                     previous: isPrevious,
-                    current: isCurrent,
-                    arrowImage: arrowImage
+                    current: isCurrent
                 }
             });
             features.push({
@@ -1874,8 +1812,7 @@ function renderRoutePoints() {
                     kind: 'casing',
                     color: '#121A28',
                     width: 5,
-                    sortKey: mainKey - 1,
-                    current: isCurrent
+                    sortKey: mainKey - 1
                 }
             });
         }
