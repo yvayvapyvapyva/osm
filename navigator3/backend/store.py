@@ -421,7 +421,7 @@ def _payment_dict(row):
         "amount_kopecks": int(getattr(row, "amount_kopecks", 0) or 0),
         "currency": _text(getattr(row, "currency", "RUB")),
         "status": _text(getattr(row, "status", "")),
-        "provider": _text(getattr(row, "provider", "yookassa")),
+        "provider": _text(getattr(row, "provider", "robokassa")),
         "payment_url": _text(getattr(row, "payment_url", "")),
         "created_at": _as_utc(getattr(row, "created_at", None)),
         "paid_at": _as_utc(getattr(row, "paid_at", None)),
@@ -429,7 +429,7 @@ def _payment_dict(row):
 
 
 def create_payment(inv_id, user_id, yandex_id, amount_kopecks, currency,
-                   payment_url, provider="yookassa", status="pending"):
+                   payment_url, provider="robokassa", status="pending"):
     now = _now()
     query = """
         DECLARE $inv_id AS Utf8;

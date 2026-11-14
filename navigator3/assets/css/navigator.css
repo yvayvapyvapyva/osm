@@ -1469,7 +1469,7 @@ button, input, select, textarea {
     padding: 12px;
     border: none;
     border-radius: 12px;
-    background: var(--green);
+    background: var(--violet);
     color: #FFFFFF;
     font: inherit;
     font-size: 15px;
@@ -1485,42 +1485,6 @@ button, input, select, textarea {
 }
 
 .premium-buy-btn:disabled {
-    opacity: 0.6;
-    cursor: default;
-    transform: none;
-}
-
-.premium-alt-btn {
-    width: 100%;
-    padding: 12px;
-    border: none;
-    border-radius: 12px;
-    background: var(--violet);
-    color: #FFFFFF;
-    font: inherit;
-    font-size: 15px;
-    font-weight: 700;
-    cursor: pointer;
-    touch-action: manipulation;
-    -webkit-tap-highlight-color: transparent;
-    transition: transform 0.12s ease, opacity 0.15s ease;
-}
-
-/* Если Робокасса станет основным провайдером, основная кнопка тоже
-   окрашивается в фиолетовый. */
-.premium-buy-btn.is-robokassa {
-    background: var(--violet);
-}
-
-.premium-alt-btn[hidden] {
-    display: none;
-}
-
-.premium-alt-btn:active {
-    transform: scale(0.98);
-}
-
-.premium-alt-btn:disabled {
     opacity: 0.6;
     cursor: default;
     transform: none;

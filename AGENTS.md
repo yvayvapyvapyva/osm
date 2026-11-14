@@ -28,29 +28,20 @@
 - `pad/deploy.sh` — функция `pad-osm` (ID `d4esfoiand5dinv3mfth`).
 - `tts/navigator/deploy.sh` — функция TTS (ID `d4e3cj3q3ff36qlrhbg8`).
 
-## Оплата (ЮKassa)
-- Разовый платёж на `PREMIUM_DAYS` дней (по умолчанию 30), цена `PREMIUM_PRICE_RUB` (по умолчанию 299 ₽).
-- Переменные функции: `YOOKASSA_SHOP_ID`, `YOOKASSA_SECRET_KEY`, `PREMIUM_PRICE_RUB`, `PREMIUM_DAYS`.
-- `GET /api/premium/checkout` создаёт платёж через API ЮKassa (`POST /v3/payments`) и возвращает `confirmation_url`. GET, потому что CDN на apex не пропускает POST.
-- В кабинете ЮKassa указать HTTP-уведомления (POST, только домен шлюза): `https://d5dsd5u1tsc8fm9dbsg5.s183zexc.apigw.yandexcloud.net/api/premium/yookassa/webhook`. События: `payment.succeeded`, `payment.canceled`.
-- `POST /api/premium/yookassa/webhook` не доверяет телу уведомления: перепроверяет платёж через `GET /v3/payments/{id}`, сверяет сумму и идемпотентно продлевает `users.premium_until`.
-- После оплаты ЮKassa возвращает браузер на `https://ainstruktor.ru/navigator.html?payment=success`.
-- `GET /api/premium/status` — цена, срок, активность подписки, `payments_available` и список `providers`.
-- Тестовый режим: тестовые `YOOKASSA_SHOP_ID` и `YOOKASSA_SECRET_KEY`.
-- Миграция: `migrations/add_premium_subscriptions.py` (добавляет `users.premium_until` и таблицу `payments`).
-- Страница `/legal.html` генерируется при сборке из `legal.template.html` и переменных `LEGAL_NAME`, `LEGAL_INN`, `LEGAL_EMAIL`, `LEGAL_PHONE`, `LEGAL_TELEGRAM`. Без них будут заглушки «Не указано».
-
 ## Оплата (Робокасса)
-- Второй провайдер рядом с ЮKassa. Если настроены оба, в профиле и в окне предложения под основной кнопкой показывается «Оплатить через Робокассу».
+- Разовый платёж на `PREMIUM_DAYS` дней (по умолчанию 30), цена `PREMIUM_PRICE_RUB` (по умолчанию 299 ₽).
 - Переменные функции: `ROBOKASSA_LOGIN`, `ROBOKASSA_PASSWORD1`, `ROBOKASSA_PASSWORD2`, `ROBOKASSA_TEST`, а также `ROBOKASSA_PASSWORD_TEST1`/`ROBOKASSA_PASSWORD_TEST2`.
 - `ROBOKASSA_TEST=1` переключает на тестовую пару паролей (если задана) и добавляет в ссылку `IsTest=1`; боевые пароли при этом остаются в `.env` рядом.
-- `GET /api/premium/checkout?provider=robokassa` создаёт числовой `InvId`, пишет платёж в `payments` с `provider=robokassa` и отдаёт ссылку на `https://auth.robokassa.ru/Merchant/Index.aspx`.
+- `GET /api/premium/checkout` создаёт числовой `InvId`, пишет платёж в `payments` с `provider=robokassa` и отдаёт ссылку на `https://auth.robokassa.ru/Merchant/Index.aspx`. GET, потому что CDN на apex не пропускает POST.
 - Подпись ссылки: MD5 `MerchantLogin:OutSum:InvId:Пароль#1`.
 - URL в кабинете Робокассы должны быть без параметров, иначе GET не примет.
 - Схема у нас GET, поэтому все три адреса — на основном домене через CDN: `https://ainstruktor.ru/api/premium/robokassa/{result,success,fail}`. Домен шлюза нужен только для POST.
 - ResultURL: подпись MD5 `OutSum:InvId:Пароль#2`, ответ `OK<InvId>`. Обработчик принимает и GET, и POST.
 - SuccessURL → редирект на `https://ainstruktor.ru/navigator.html?payment=success`.
 - FailURL → помечает платёж отменённым и редиректит на `...?payment=fail`.
+- `GET /api/premium/status` — цена, срок, активность подписки, `payments_available` и список `providers`.
+- Миграция: `migrations/add_premium_subscriptions.py` (добавляет `users.premium_until` и таблицу `payments`).
+- Страница `/legal.html` генерируется при сборке из `legal.template.html` и переменных `LEGAL_NAME`, `LEGAL_INN`, `LEGAL_EMAIL`, `LEGAL_PHONE`, `LEGAL_TELEGRAM`. Без них будут заглушки «Не указано».
 
 ## Команда YC
 - `yc` установлен: `/Users/mb/yandex-cloud/bin/yc`

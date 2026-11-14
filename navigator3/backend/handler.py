@@ -26,9 +26,7 @@ import json
 import math
 import os
 import secrets
-import urllib.error
 import urllib.parse
-import urllib.request
 
 import auth
 import store
@@ -534,73 +532,7 @@ def _premium_price_text():
     return f"{value:.2f}"
 
 
-def _yookassa_config():
-    shop_id = _text(os.getenv("YOOKASSA_SHOP_ID")).strip()
-    secret_key = _text(os.getenv("YOOKASSA_SECRET_KEY")).strip()
-    return shop_id, secret_key
-
-
-def _yookassa_ready():
-    shop_id, secret_key = _yookassa_config()
-    return bool(shop_id and secret_key)
-
-
-def _yookassa_request(method, path, payload=None):
-    shop_id, secret_key = _yookassa_config()
-    if not shop_id or not secret_key:
-        raise RuntimeError("YooKassa is not configured")
-    url = "https://api.yookassa.ru/v3" + path
-    headers = {
-        "Authorization": "Basic " + base64.b64encode(
-            f"{shop_id}:{secret_key}".encode("utf-8")
-        ).decode("ascii"),
-        "Accept": "application/json",
-    }
-    data = None
-    if payload is not None:
-        data = json.dumps(payload, ensure_ascii=False).encode("utf-8")
-        headers["Content-Type"] = "application/json"
-        headers["Idempotence-Key"] = secrets.token_hex(16)
-
-    request = urllib.request.Request(url, data=data, headers=headers, method=method)
-    try:
-        with urllib.request.urlopen(request, timeout=15) as response:
-            raw = response.read().decode("utf-8")
-            return json.loads(raw) if raw else {}
-    except urllib.error.HTTPError as exc:
-        try:
-            details = exc.read().decode("utf-8")
-        except Exception:  # noqa: BLE001
-            details = ""
-        raise RuntimeError(f"YooKassa HTTP {exc.code}: {details[:500]}") from exc
-    except urllib.error.URLError as exc:
-        raise RuntimeError(f"YooKassa network error: {exc.reason}") from exc
-
-
-def _yookassa_create_payment(amount, description, return_url, user):
-    return _yookassa_request(
-        "POST",
-        "/payments",
-        {
-            "amount": {"value": amount, "currency": "RUB"},
-            "capture": True,
-            "confirmation": {"type": "redirect", "return_url": return_url},
-            "description": description,
-            "metadata": {
-                "user_id": _text(user.get("user_id")),
-                "yandex_id": _text(user.get("yandex_id")),
-            },
-        },
-    )
-
-
-def _yookassa_get_payment(payment_id):
-    return _yookassa_request("GET", f"/payments/{payment_id}")
-
-
 # --- Робокасса -------------------------------------------------------------
-# Второй платёжный провайдер рядом с ЮKassa: тот же сценарий (редирект на
-# оплату + Result URL), но подпись MD5 и числовой InvId вместо UUID.
 
 
 ROBOKASSA_PAYMENT_URL = "https://auth.robokassa.ru/Merchant/Index.aspx"
@@ -638,12 +570,7 @@ def _robokassa_signature(*parts):
 
 
 def _premium_providers():
-    providers = []
-    if _yookassa_ready():
-        providers.append("yookassa")
-    if _robokassa_ready():
-        providers.append("robokassa")
-    return providers
+    return ["robokassa"] if _robokassa_ready() else []
 
 
 def _robokassa_new_inv_id():
@@ -1185,7 +1112,7 @@ def _api_profile_update(event):
 
 
 # ---------------------------------------------------------------------------
-# Премиум-подписка и ЮKassa
+# Премиум-подписка
 # ---------------------------------------------------------------------------
 
 
@@ -1211,174 +1138,54 @@ def _api_premium_status(event):
 
 
 def _api_premium_checkout(event):
-    """Создаёт платёж у выбранного провайдера и возвращает ссылку на оплату.
+    """Создаёт платёж в Робокассе и возвращает ссылку на оплату.
 
     GET вместо POST: CDN на публичном домене пропускает только GET/HEAD/OPTIONS.
-    Провайдер выбирается параметром ?provider=yookassa|robokassa.
     """
     user = _current_user(event)
     if not user:
         return auth.json_response(401, {"error": "unauthorized"})
-
-    providers = _premium_providers()
-    if not providers:
+    if not _robokassa_ready():
         return auth.json_response(503, {"error": "payments_not_configured"})
-
-    provider = _text(_query(event).get("provider")).strip().lower()
-    if not provider:
-        body = _body_json(event)
-        if isinstance(body, dict):
-            provider = _text(body.get("provider")).strip().lower()
-    if not provider:
-        provider = providers[0]
-    if provider not in providers:
-        return auth.json_response(503, {"error": "provider_not_configured"})
 
     amount_kopecks = _premium_amount_kopecks()
     amount = f"{amount_kopecks / 100:.2f}"
     days = _premium_days()
     description = f"Премиум-подписка на {days} дней"
-    base = _text(os.getenv("PUBLIC_BASE_URL", "")).rstrip("/") or "https://ainstruktor.ru"
-    return_url = f"{base}/navigator.html?payment=success"
-
-    if provider == "robokassa":
-        try:
-            inv_id = _robokassa_new_inv_id()
-            payment_url = _robokassa_payment_url(inv_id, amount, description, user)
-        except Exception as exc:  # noqa: BLE001
-            print(f"[premium] Robokassa create failed: {exc}")
-            return auth.json_response(502, {"error": "payment_provider_failed"})
-
-        try:
-            store.create_payment(
-                inv_id=str(inv_id),
-                user_id=_text(user.get("user_id")),
-                yandex_id=_text(user.get("yandex_id")),
-                amount_kopecks=amount_kopecks,
-                currency="RUB",
-                payment_url=payment_url,
-                provider="robokassa",
-                status="pending",
-            )
-        except Exception as exc:  # noqa: BLE001
-            print(f"[premium] failed to store Robokassa payment {inv_id}: {exc}")
-            return auth.json_response(500, {"error": "payment_create_failed"})
-
-        return auth.json_response(
-            200,
-            {
-                "payment_url": payment_url,
-                "payment_id": str(inv_id),
-                "provider": "robokassa",
-                "amount": _premium_price_text(),
-                "currency": "RUB",
-                "days": days,
-            },
-        )
 
     try:
-        provider_payment = _yookassa_create_payment(
-            amount, description, return_url, user
-        )
+        inv_id = _robokassa_new_inv_id()
+        payment_url = _robokassa_payment_url(inv_id, amount, description, user)
     except Exception as exc:  # noqa: BLE001
-        print(f"[premium] YooKassa create failed: {exc}")
-        return auth.json_response(502, {"error": "payment_provider_failed"})
-
-    payment_id = _text(provider_payment.get("id"))
-    confirmation = provider_payment.get("confirmation") or {}
-    payment_url = _text(confirmation.get("confirmation_url"))
-    if not payment_id or not payment_url:
-        print(f"[premium] bad YooKassa response: {provider_payment}")
+        print(f"[premium] Robokassa create failed: {exc}")
         return auth.json_response(502, {"error": "payment_provider_failed"})
 
     try:
         store.create_payment(
-            inv_id=payment_id,
+            inv_id=str(inv_id),
             user_id=_text(user.get("user_id")),
             yandex_id=_text(user.get("yandex_id")),
             amount_kopecks=amount_kopecks,
             currency="RUB",
             payment_url=payment_url,
-            provider="yookassa",
-            status=_text(provider_payment.get("status")) or "pending",
+            provider="robokassa",
+            status="pending",
         )
     except Exception as exc:  # noqa: BLE001
-        print(f"[premium] failed to store YooKassa payment {payment_id}: {exc}")
+        print(f"[premium] failed to store Robokassa payment {inv_id}: {exc}")
         return auth.json_response(500, {"error": "payment_create_failed"})
 
     return auth.json_response(
         200,
         {
             "payment_url": payment_url,
-            "payment_id": payment_id,
-            "provider": "yookassa",
+            "payment_id": str(inv_id),
+            "provider": "robokassa",
             "amount": _premium_price_text(),
             "currency": "RUB",
             "days": days,
         },
     )
-
-
-def _api_premium_yookassa_webhook(event):
-    """Уведомление ЮKassa. Статус обязательно перепроверяем через API."""
-    body = _body_json(event)
-    if body is None:
-        return auth.json_response(400, {"error": "invalid_json_body"})
-
-    event_type = _text(body.get("event"))
-    obj = body.get("object") or {}
-    payment_id = _text(obj.get("id"))
-    if not payment_id:
-        return auth.json_response(400, {"error": "missing_payment_id"})
-
-    payment = store.get_payment(payment_id)
-    if not payment:
-        print(f"[premium] YooKassa webhook for unknown payment {payment_id}")
-        return auth.json_response(404, {"error": "payment_not_found"})
-    if payment.get("provider") not in ("yookassa", ""):
-        return auth.json_response(400, {"error": "unknown_provider"})
-
-    if event_type == "payment.canceled":
-        if payment["status"] != "succeeded":
-            store.mark_payment_canceled(payment_id)
-        return auth.json_response(200, {"status": "ok"})
-
-    if event_type != "payment.succeeded":
-        return auth.json_response(200, {"status": "ignored"})
-
-    try:
-        verified = _yookassa_get_payment(payment_id)
-    except Exception as exc:  # noqa: BLE001
-        print(f"[premium] YooKassa verify failed for {payment_id}: {exc}")
-        return auth.json_response(502, {"error": "verification_failed"})
-
-    if _text(verified.get("status")) != "succeeded":
-        return auth.json_response(200, {"status": "not_succeeded"})
-
-    amount = verified.get("amount") or {}
-    try:
-        paid_kopecks = int(
-            round(float(_text(amount.get("value", "0")).replace(",", ".")) * 100)
-        )
-    except (TypeError, ValueError):
-        return auth.json_response(400, {"error": "bad_amount"})
-    if paid_kopecks < payment["amount_kopecks"]:
-        print(
-            f"[premium] amount mismatch {payment_id}: "
-            f"{paid_kopecks} < {payment['amount_kopecks']}"
-        )
-        return auth.json_response(400, {"error": "amount_mismatch"})
-
-    if payment["status"] != "succeeded":
-        try:
-            store.mark_payment_succeeded(payment_id)
-            until = store.extend_premium(payment["yandex_id"], _premium_days())
-            print(f"[premium] payment {payment_id} paid, premium until {until}")
-        except Exception as exc:  # noqa: BLE001
-            print(f"[premium] failed to apply payment {payment_id}: {exc}")
-            return auth.json_response(500, {"error": "storage_failed"})
-
-    return auth.json_response(200, {"status": "ok"})
 
 
 def _api_premium_robokassa_result(event):
@@ -1851,9 +1658,6 @@ def _handle_api(event, path, method):
 
     if normalized == "/api/premium/checkout" and method in ("GET", "POST"):
         return _api_premium_checkout(event)
-
-    if normalized == "/api/premium/yookassa/webhook" and method == "POST":
-        return _api_premium_yookassa_webhook(event)
 
     if normalized == "/api/premium/robokassa/result" and method in ("GET", "POST"):
         return _api_premium_robokassa_result(event)
