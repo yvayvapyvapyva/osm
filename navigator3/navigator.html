@@ -445,7 +445,7 @@ function followCamera(lat, lon, duration) {
 
     const camera = {
         center: [lon, lat],
-        zoom: Math.max(APP.lastZoom, 16),
+        zoom: APP.lastZoom,
         pitch: APP.lastTilt,
         duration,
         easing: t => t
