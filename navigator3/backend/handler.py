@@ -701,84 +701,6 @@ def _text_response(status_code, text):
     }
 
 
-def _html_response(status_code, html):
-    return {
-        "statusCode": int(status_code),
-        "headers": {
-            "Content-Type": "text/html; charset=utf-8",
-            "Cache-Control": "no-store",
-            "X-Robots-Tag": "noindex, nofollow",
-        },
-        "body": html,
-        "isBase64Encoded": False,
-    }
-
-
-# --- Временный доступ для проверки (например, менеджером ЮKassa) ------------
-
-DEMO_YANDEX_ID = "demo-review"
-
-
-def _demo_access_config():
-    token = _text(os.getenv("DEMO_ACCESS_TOKEN")).strip()
-    until_raw = _text(os.getenv("DEMO_ACCESS_UNTIL")).strip()
-    until = None
-    if until_raw:
-        try:
-            parsed = dt.datetime.fromisoformat(until_raw.replace("Z", "+00:00"))
-            until = (
-                parsed if parsed.tzinfo else parsed.replace(tzinfo=dt.timezone.utc)
-            )
-        except ValueError:
-            until = None
-    return token, until
-
-
-def _auth_demo(event):
-    """Вход без Яндекс ID по ссылке с токеном.
-
-    Нужен для проверки кабинета покупателя сторонними сервисами. Работает,
-    пока заданы DEMO_ACCESS_TOKEN и DEMO_ACCESS_UNTIL и срок не истёк.
-    Отключается удалением переменных и передеплоем.
-    """
-    token, until = _demo_access_config()
-    provided = _text(_query(event).get("t")).strip()
-    valid = bool(
-        token
-        and until
-        and until > store.now()
-        and provided
-        and hmac.compare_digest(provided, token)
-    )
-    if not valid:
-        return _html_response(
-            403,
-            "<!doctype html><html lang=\"ru\"><head><meta charset=\"utf-8\">"
-            "<meta name=\"robots\" content=\"noindex\">"
-            "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">"
-            "<title>Доступ закрыт</title></head><body style=\"font-family:"
-            "-apple-system,system-ui,sans-serif;max-width:420px;margin:64px auto;"
-            "padding:0 20px;color:#12203a\"><h1 style=\"font-size:20px\">"
-            "Доступ закрыт</h1><p style=\"font-size:15px;line-height:1.5\">"
-            "Ссылка недействительна или срок её действия истёк.</p></body></html>",
-        )
-
-    email = (
-        _text(os.getenv("DEMO_ACCESS_EMAIL", "")).strip()
-        or "review@ainstruktor.ru"
-    )
-    user = store.upsert_user(
-        DEMO_YANDEX_ID, "demo-review", email, "Проверка ЮKassa"
-    )
-    ip, user_agent = _client_meta(event)
-    sid = store.create_session(
-        DEMO_YANDEX_ID, _text(user.get("user_id")), user_agent, ip
-    )
-    print(f"[auth] demo login from {ip or 'unknown'}")
-    return auth.redirect_response("/navigator.html", [auth.session_cookie(sid)])
-
-
-
 def _route_locked(row, user):
     """Премиум-маршрут закрыт для всех, кроме владельца и активной подписки."""
     if not _is_premium(row):
@@ -1954,9 +1876,6 @@ def _handle_api(event, path, method):
 
     if normalized == "/auth/yandex/start" and method == "GET":
         return _auth_start(event)
-
-    if normalized == "/auth/demo" and method == "GET":
-        return _auth_demo(event)
 
     if normalized == "/auth/yandex/callback" and method == "GET":
         return _auth_callback(event)
