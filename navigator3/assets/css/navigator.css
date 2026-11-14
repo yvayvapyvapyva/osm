@@ -35,16 +35,16 @@
     --line-surface: rgba(18, 28, 46, 0.16);
 
     /* Акценты */
-    --green: #2FA8E0;
-    --green-dark: #1E90D0;
-    --green-soft: #E7F4FC;
-    --green-tint: rgba(47, 168, 224, 0.10);
-    --green-tint-strong: rgba(47, 168, 224, 0.16);
-    --green-line: rgba(47, 168, 224, 0.42);
-    --green-line-soft: rgba(47, 168, 224, 0.26);
-    --green-focus: rgba(47, 168, 224, 0.55);
-    --green-glow: rgba(47, 168, 224, 0.18);
-    --success-solid: #2FA8E0;
+    --green: #0F9D8A;
+    --green-dark: #0C8575;
+    --green-soft: #E3F6F2;
+    --green-tint: rgba(15, 157, 138, 0.10);
+    --green-tint-strong: rgba(15, 157, 138, 0.16);
+    --green-line: rgba(15, 157, 138, 0.42);
+    --green-line-soft: rgba(15, 157, 138, 0.26);
+    --green-focus: rgba(15, 157, 138, 0.55);
+    --green-glow: rgba(15, 157, 138, 0.18);
+    --success-solid: #0F9D8A;
     --violet: #7C4DFF;
     --violet-dark: #6A3DE8;
     --danger: #DC2626;
@@ -102,16 +102,16 @@
     --line-strong: rgba(232, 237, 245, 0.20);
     --line-surface: var(--line);
 
-    --green: #2FA8E0;
-    --green-dark: #60A5FA;
-    --green-soft: #0A4A6B;
-    --green-tint: rgba(47, 168, 224, 0.14);
-    --green-tint-strong: rgba(47, 168, 224, 0.22);
-    --green-line: rgba(47, 168, 224, 0.55);
-    --green-line-soft: rgba(47, 168, 224, 0.32);
-    --green-focus: rgba(47, 168, 224, 0.70);
-    --green-glow: rgba(47, 168, 224, 0.22);
-    --success-solid: #2FA8E0;
+    --green: #2DD4BF;
+    --green-dark: #5EEAD4;
+    --green-soft: #0B3B36;
+    --green-tint: rgba(45, 212, 191, 0.14);
+    --green-tint-strong: rgba(45, 212, 191, 0.22);
+    --green-line: rgba(45, 212, 191, 0.55);
+    --green-line-soft: rgba(45, 212, 191, 0.32);
+    --green-focus: rgba(45, 212, 191, 0.70);
+    --green-glow: rgba(45, 212, 191, 0.22);
+    --success-solid: #2DD4BF;
     --violet: #8B6BFF;
     --violet-dark: #7A55F5;
     --danger: #F87171;
@@ -536,7 +536,7 @@ button, input, select, textarea {
     opacity: 0.7;
 }
 #hudPrevCmdNum.playing {
-    border-color: #2FA8E0;
+    border-color: var(--green);
     background: rgba(22,163,74,0.10);
 }
 
@@ -621,7 +621,7 @@ button, input, select, textarea {
     opacity: 0.7;
 }
 #hudCmdNum.playing {
-    border-color: #2FA8E0;
+    border-color: var(--green);
     background: rgba(22,163,74,0.10);
 }
 
@@ -1905,7 +1905,7 @@ button, input, select, textarea {
     opacity: 0.7;
 }
 .pl-item-icon.playing {
-    border-color: #2FA8E0;
+    border-color: var(--green);
     background: rgba(22,163,74,0.10);
 }
 
