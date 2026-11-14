@@ -681,7 +681,7 @@ const MenuModule = {
         };
 
         previews.forEach(element => {
-            const key = `route-preview-v16\0${this._previewTheme()}\0${element.dataset.routeKey}`;
+            const key = `route-preview-v17\0${this._previewTheme()}\0${element.dataset.routeKey}`;
             element.dataset.previewKey = key;
             const image = this._previewImages.get(key);
             if (image) showPreviewImage(element, key, image);
@@ -796,10 +796,12 @@ const MenuModule = {
                     context.fillStyle = point.color;
                     context.fill();
                     context.beginPath();
-                    context.arc(position.x, position.y, dotRadius + 0.8, 0, Math.PI * 2);
-                    context.lineWidth = 1.8;
+                    context.arc(position.x, position.y, dotRadius + 0.6, 0, Math.PI * 2);
+                    context.lineWidth = 1;
                     context.strokeStyle = palette.dotStroke;
+                    context.globalAlpha = 0.75;
                     context.stroke();
+                    context.globalAlpha = 1;
                 }
 
                 if (projected.length && projected[0].path.length) {
