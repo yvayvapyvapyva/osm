@@ -35,16 +35,16 @@
     --line-surface: rgba(18, 28, 46, 0.16);
 
     /* Акценты */
-    --green: #0F9D8A;
-    --green-dark: #0C8575;
-    --green-soft: #E3F6F2;
-    --green-tint: rgba(15, 157, 138, 0.10);
-    --green-tint-strong: rgba(15, 157, 138, 0.16);
-    --green-line: rgba(15, 157, 138, 0.42);
-    --green-line-soft: rgba(15, 157, 138, 0.26);
-    --green-focus: rgba(15, 157, 138, 0.55);
-    --green-glow: rgba(15, 157, 138, 0.18);
-    --success-solid: #0F9D8A;
+    --green: #1876B5;
+    --green-dark: #12608F;
+    --green-soft: #E4F1FA;
+    --green-tint: rgba(24, 118, 181, 0.10);
+    --green-tint-strong: rgba(24, 118, 181, 0.16);
+    --green-line: rgba(24, 118, 181, 0.42);
+    --green-line-soft: rgba(24, 118, 181, 0.26);
+    --green-focus: rgba(24, 118, 181, 0.55);
+    --green-glow: rgba(24, 118, 181, 0.18);
+    --success-solid: #1876B5;
     --violet: #7C4DFF;
     --violet-dark: #6A3DE8;
     --danger: #DC2626;
@@ -102,16 +102,16 @@
     --line-strong: rgba(232, 237, 245, 0.20);
     --line-surface: var(--line);
 
-    --green: #2DD4BF;
-    --green-dark: #5EEAD4;
-    --green-soft: #0B3B36;
-    --green-tint: rgba(45, 212, 191, 0.14);
-    --green-tint-strong: rgba(45, 212, 191, 0.22);
-    --green-line: rgba(45, 212, 191, 0.55);
-    --green-line-soft: rgba(45, 212, 191, 0.32);
-    --green-focus: rgba(45, 212, 191, 0.70);
-    --green-glow: rgba(45, 212, 191, 0.22);
-    --success-solid: #2DD4BF;
+    --green: #4FB0E6;
+    --green-dark: #7FCBF2;
+    --green-soft: #0A3550;
+    --green-tint: rgba(79, 176, 230, 0.14);
+    --green-tint-strong: rgba(79, 176, 230, 0.22);
+    --green-line: rgba(79, 176, 230, 0.55);
+    --green-line-soft: rgba(79, 176, 230, 0.32);
+    --green-focus: rgba(79, 176, 230, 0.70);
+    --green-glow: rgba(79, 176, 230, 0.22);
+    --success-solid: #4FB0E6;
     --violet: #8B6BFF;
     --violet-dark: #7A55F5;
     --danger: #F87171;
