@@ -1596,6 +1596,37 @@ function ensureRouteArrowImage() {
     );
 }
 
+function ensureRouteChevronImage() {
+    if (!APP.map || APP.map.hasImage('nav-route-chevron')) return;
+
+    const size = 32;
+    const canvas = document.createElement('canvas');
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const draw = (width, stroke) => {
+        ctx.strokeStyle = stroke;
+        ctx.lineWidth = width;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        ctx.beginPath();
+        ctx.moveTo(9, 9);
+        ctx.lineTo(25, 16);
+        ctx.lineTo(9, 23);
+        ctx.stroke();
+    };
+    draw(9, '#121A28');
+    draw(4.5, '#FFFFFF');
+
+    APP.map.addImage(
+        'nav-route-chevron',
+        ctx.getImageData(0, 0, size, size),
+        { pixelRatio: 2 }
+    );
+}
+
 function ensureRouteLayers() {
     if (!APP.map) return;
     try {
@@ -1631,19 +1662,24 @@ function ensureRouteLayers() {
                 }
             });
         }
-        // По пути текущей цели — маленькие чёрные точки. Круглый line-cap
-        // превращает почти нулевой штрих в точку диаметром 1 px.
-        if (!APP.map.getLayer('nav-routes-current-dots')) {
+        // По пути текущей цели — белые шевроны с тёмной обводкой,
+        // как стрелки плотности движения в Яндекс.Картах.
+        ensureRouteChevronImage();
+        if (!APP.map.getLayer('nav-routes-current-arrows')) {
             APP.map.addLayer({
-                id: 'nav-routes-current-dots',
-                type: 'line',
+                id: 'nav-routes-current-arrows',
+                type: 'symbol',
                 source: ROUTE_SOURCE_ID,
                 filter: ['all', ['==', ['get', 'kind'], 'main'], ['==', ['get', 'current'], true]],
-                layout: { 'line-join': 'round', 'line-cap': 'round' },
-                paint: {
-                    'line-color': '#000000',
-                    'line-width': 1.5,
-                    'line-dasharray': [0.1, 6.5667]
+                layout: {
+                    'symbol-placement': 'line',
+                    'symbol-spacing': 28,
+                    'icon-image': 'nav-route-chevron',
+                    'icon-size': 0.8,
+                    'icon-rotation-alignment': 'map',
+                    'icon-keep-upright': false,
+                    'icon-allow-overlap': true,
+                    'icon-ignore-placement': true
                 }
             });
         }
