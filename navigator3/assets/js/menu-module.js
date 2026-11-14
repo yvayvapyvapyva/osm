@@ -642,7 +642,8 @@ const MenuModule = {
         return {
             from: read('--preview-bg-from', '#F8FAFC'),
             to: read('--preview-bg-to', '#E8EEF6'),
-            shadow: read('--preview-shadow', 'rgba(18, 28, 46, 0.20)')
+            shadow: read('--preview-shadow', 'rgba(18, 28, 46, 0.20)'),
+            dotStroke: read('--text', '#12203A')
         };
     },
 
@@ -680,7 +681,7 @@ const MenuModule = {
         };
 
         previews.forEach(element => {
-            const key = `route-preview-v14\0${this._previewTheme()}\0${element.dataset.routeKey}`;
+            const key = `route-preview-v16\0${this._previewTheme()}\0${element.dataset.routeKey}`;
             element.dataset.previewKey = key;
             const image = this._previewImages.get(key);
             if (image) showPreviewImage(element, key, image);
@@ -794,15 +795,17 @@ const MenuModule = {
                     context.arc(position.x, position.y, dotRadius, 0, Math.PI * 2);
                     context.fillStyle = point.color;
                     context.fill();
-                    context.lineWidth = 2;
-                    context.strokeStyle = palette.shadow;
+                    context.beginPath();
+                    context.arc(position.x, position.y, dotRadius + 0.8, 0, Math.PI * 2);
+                    context.lineWidth = 1.8;
+                    context.strokeStyle = palette.dotStroke;
                     context.stroke();
                 }
 
                 if (projected.length && projected[0].path.length) {
                     const position = toCanvas(projected[0].path[0]);
                     context.beginPath();
-                    context.arc(position.x, position.y, dotRadius + 1.8, 0, Math.PI * 2);
+                    context.arc(position.x, position.y, dotRadius + 2.8, 0, Math.PI * 2);
                     context.lineWidth = 1.5;
                     context.strokeStyle = '#34C759';
                     context.stroke();
