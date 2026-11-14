@@ -680,7 +680,7 @@ const MenuModule = {
         };
 
         previews.forEach(element => {
-            const key = `route-preview-v13\0${this._previewTheme()}\0${element.dataset.routeKey}`;
+            const key = `route-preview-v14\0${this._previewTheme()}\0${element.dataset.routeKey}`;
             element.dataset.previewKey = key;
             const image = this._previewImages.get(key);
             if (image) showPreviewImage(element, key, image);
@@ -717,7 +717,6 @@ const MenuModule = {
                         color: this._ROUTE_COLORS[segment.color] || '#FFD700'
                     });
                 }
-                if (points.length) points[points.length - 1].isFinish = true;
 
                 if (!points.length) {
                     element.classList.remove('is-loading');
@@ -795,19 +794,17 @@ const MenuModule = {
                     context.arc(position.x, position.y, dotRadius, 0, Math.PI * 2);
                     context.fillStyle = point.color;
                     context.fill();
-                    context.lineWidth = 1;
+                    context.lineWidth = 2;
                     context.strokeStyle = palette.shadow;
                     context.stroke();
                 }
 
-                for (const [index, point] of projected.entries()) {
-                    if (!point.path.length) continue;
-                    if (index !== 0 && !point.isFinish) continue;
-                    const position = toCanvas(point.path[0]);
+                if (projected.length && projected[0].path.length) {
+                    const position = toCanvas(projected[0].path[0]);
                     context.beginPath();
                     context.arc(position.x, position.y, dotRadius + 1.8, 0, Math.PI * 2);
                     context.lineWidth = 1.5;
-                    context.strokeStyle = index === 0 ? '#34C759' : '#121A28';
+                    context.strokeStyle = '#34C759';
                     context.stroke();
                 }
 
