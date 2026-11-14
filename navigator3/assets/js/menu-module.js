@@ -681,7 +681,7 @@ const MenuModule = {
         };
 
         previews.forEach(element => {
-            const key = `route-preview-v19\0${this._previewTheme()}\0${element.dataset.routeKey}`;
+            const key = `route-preview-v20\0${this._previewTheme()}\0${element.dataset.routeKey}`;
             element.dataset.previewKey = key;
             const image = this._previewImages.get(key);
             if (image) showPreviewImage(element, key, image);
@@ -807,7 +807,7 @@ const MenuModule = {
                 if (projected.length && projected[0].path.length) {
                     const position = toCanvas(projected[0].path[0]);
                     context.beginPath();
-                    context.arc(position.x, position.y, dotRadius + 2.8, 0, Math.PI * 2);
+                    context.arc(position.x, position.y, dotRadius + 1.6, 0, Math.PI * 2);
                     context.lineWidth = 1.5;
                     context.strokeStyle = '#34C759';
                     context.stroke();
