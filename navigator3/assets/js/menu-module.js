@@ -680,7 +680,7 @@ const MenuModule = {
         };
 
         previews.forEach(element => {
-            const key = `route-preview-v12\0${this._previewTheme()}\0${element.dataset.routeKey}`;
+            const key = `route-preview-v13\0${this._previewTheme()}\0${element.dataset.routeKey}`;
             element.dataset.previewKey = key;
             const image = this._previewImages.get(key);
             if (image) showPreviewImage(element, key, image);
@@ -714,30 +714,16 @@ const MenuModule = {
                     pointNumber++;
                     points.push({
                         coordinates,
-                        color: this._ROUTE_COLORS[segment.color] || '#FFD700',
-                        number: String(segment.id || pointNumber),
-                        current: pointNumber === 1,
-                        hasComment: typeof segment.comm === 'string' && segment.comm.trim() !== ''
+                        color: this._ROUTE_COLORS[segment.color] || '#FFD700'
                     });
                 }
+                if (points.length) points[points.length - 1].isFinish = true;
 
                 if (!points.length) {
                     element.classList.remove('is-loading');
                     element.classList.add('is-empty');
                     return;
                 }
-
-                const icons = await Promise.all(points.map(point => new Promise((resolve, reject) => {
-                    const icon = new Image();
-                    icon.onload = () => resolve(icon);
-                    icon.onerror = () => reject(new Error('Could not load route point icon'));
-                    icon.src = window.getNavigatorPointIcon(
-                        point.color,
-                        point.number,
-                        point.current,
-                        point.hasComment
-                    );
-                })));
 
                 const width = Math.max(1, element.clientWidth);
                 const height = Math.max(1, element.clientHeight);
@@ -771,8 +757,7 @@ const MenuModule = {
                         maxY = Math.max(maxY, coordinate.y);
                     }
                 }
-                const markerSize = Math.min(40, Math.max(20, Math.min(width, height) * 0.2));
-                const padding = markerSize / 2 + 2;
+                const padding = 6;
                 const scale = Math.min(
                     (width - padding * 2) / Math.max(maxX - minX, 1e-9),
                     (height - padding * 2) / Math.max(maxY - minY, 1e-9)
@@ -795,22 +780,35 @@ const MenuModule = {
                     context.lineCap = 'round';
                     context.lineJoin = 'round';
                     context.strokeStyle = palette.shadow;
-                    context.lineWidth = markerSize * 0.2;
+                    context.lineWidth = 4;
                     context.stroke();
                     context.strokeStyle = point.color;
-                    context.lineWidth = markerSize * 0.1;
+                    context.lineWidth = 2;
                     context.stroke();
                 }
 
-                for (let index = projected.length - 1; index >= 0; index--) {
-                    const position = toCanvas(projected[index].path[0]);
-                    context.drawImage(
-                        icons[index],
-                        position.x - markerSize / 2,
-                        position.y - markerSize / 2,
-                        markerSize,
-                        markerSize
-                    );
+                const dotRadius = 2.4;
+                for (const point of projected) {
+                    if (!point.path.length) continue;
+                    const position = toCanvas(point.path[0]);
+                    context.beginPath();
+                    context.arc(position.x, position.y, dotRadius, 0, Math.PI * 2);
+                    context.fillStyle = point.color;
+                    context.fill();
+                    context.lineWidth = 1;
+                    context.strokeStyle = palette.shadow;
+                    context.stroke();
+                }
+
+                for (const [index, point] of projected.entries()) {
+                    if (!point.path.length) continue;
+                    if (index !== 0 && !point.isFinish) continue;
+                    const position = toCanvas(point.path[0]);
+                    context.beginPath();
+                    context.arc(position.x, position.y, dotRadius + 1.8, 0, Math.PI * 2);
+                    context.lineWidth = 1.5;
+                    context.strokeStyle = index === 0 ? '#34C759' : '#121A28';
+                    context.stroke();
                 }
 
                 const imageUrl = canvas.toDataURL('image/jpeg', 0.92);
