@@ -680,7 +680,7 @@ const MenuModule = {
         };
 
         previews.forEach(element => {
-            const key = `route-preview-v15\0${this._previewTheme()}\0${element.dataset.routeKey}`;
+            const key = `route-preview-v14\0${this._previewTheme()}\0${element.dataset.routeKey}`;
             element.dataset.previewKey = key;
             const image = this._previewImages.get(key);
             if (image) showPreviewImage(element, key, image);
@@ -786,7 +786,7 @@ const MenuModule = {
                     context.stroke();
                 }
 
-                const dotRadius = 3.0;
+                const dotRadius = 2.4;
                 for (const point of projected) {
                     if (!point.path.length) continue;
                     const position = toCanvas(point.path[0]);
@@ -797,11 +797,6 @@ const MenuModule = {
                     context.lineWidth = 2;
                     context.strokeStyle = palette.shadow;
                     context.stroke();
-                    // Тёмная середина — как у меток на карте.
-                    context.beginPath();
-                    context.arc(position.x, position.y, dotRadius * 0.37, 0, Math.PI * 2);
-                    context.fillStyle = '#121A28';
-                    context.fill();
                 }
 
                 if (projected.length && projected[0].path.length) {
