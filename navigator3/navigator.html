@@ -1666,6 +1666,22 @@ function ensureRouteLayers() {
                 }
             });
         }
+        // По пути текущей цели — маленькие чёрные точки. Круглый line-cap
+        // превращает почти нулевой штрих в точку диаметром 1 px.
+        if (!APP.map.getLayer('nav-routes-current-dots')) {
+            APP.map.addLayer({
+                id: 'nav-routes-current-dots',
+                type: 'line',
+                source: ROUTE_SOURCE_ID,
+                filter: ['==', ['get', 'current'], true],
+                layout: { 'line-join': 'round', 'line-cap': 'round' },
+                paint: {
+                    'line-color': '#000000',
+                    'line-width': 1,
+                    'line-dasharray': [0.1, 10]
+                }
+            });
+        }
         // Поверх линии предыдущего отрезка — чёрные стрелки по направлению
         // движения. Линия под ними остаётся обычной сплошной.
         ensureRouteArrowImage();
@@ -1818,9 +1834,10 @@ function renderRoutePoints() {
                 properties: {
                     color: p.hex,
                     casingColor: '#121A28',
-                    width: 4,
+                    width: 5,
                     index: i,
-                    previous: isPrevious
+                    previous: isPrevious,
+                    current: isCurrent
                 }
             });
         }
