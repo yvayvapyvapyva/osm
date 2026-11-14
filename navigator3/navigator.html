@@ -1630,26 +1630,9 @@ function ensureRouteLayers() {
                 data: { type: 'FeatureCollection', features: [] }
             });
         }
-        // Порядок отрисовки задаётся номером точки: чем меньше номер,
-        // тем выше её путь. line-sort-key работает внутри слоя, поэтому
-        // все сегменты лежат в общих слоях без отдельных групп.
-        if (!APP.map.getLayer('nav-routes-casing')) {
-            APP.map.addLayer({
-                id: 'nav-routes-casing',
-                type: 'line',
-                source: ROUTE_SOURCE_ID,
-                layout: {
-                    'line-join': 'round',
-                    'line-cap': 'round',
-                    'line-sort-key': ['-', 1000, ['get', 'index']]
-                },
-                paint: {
-                    'line-color': ['get', 'casingColor'],
-                    'line-width': 1,
-                    'line-gap-width': ['get', 'width']
-                }
-            });
-        }
+        // Контур и линия каждого сегмента лежат в одном слое и чередуются
+        // по sortKey: сначала контур сегмента, затем его линия. Поэтому на
+        // пересечении контур верхней линии виден, а не уходит под нижнюю.
         if (!APP.map.getLayer('nav-routes-main')) {
             APP.map.addLayer({
                 id: 'nav-routes-main',
@@ -1658,11 +1641,18 @@ function ensureRouteLayers() {
                 layout: {
                     'line-join': 'round',
                     'line-cap': 'round',
-                    'line-sort-key': ['-', 1000, ['get', 'index']]
+                    'line-sort-key': ['get', 'sortKey']
                 },
                 paint: {
                     'line-color': ['get', 'color'],
-                    'line-width': ['get', 'width']
+                    'line-width': ['case',
+                        ['==', ['get', 'kind'], 'casing'], 1,
+                        ['get', 'width']
+                    ],
+                    'line-gap-width': ['case',
+                        ['==', ['get', 'kind'], 'casing'], ['get', 'width'],
+                        0
+                    ]
                 }
             });
         }
@@ -1673,7 +1663,7 @@ function ensureRouteLayers() {
                 id: 'nav-routes-current-dots',
                 type: 'line',
                 source: ROUTE_SOURCE_ID,
-                filter: ['==', ['get', 'current'], true],
+                filter: ['all', ['==', ['get', 'kind'], 'main'], ['==', ['get', 'current'], true]],
                 layout: { 'line-join': 'round', 'line-cap': 'round' },
                 paint: {
                     'line-color': '#000000',
@@ -1690,7 +1680,7 @@ function ensureRouteLayers() {
                 id: 'nav-routes-previous-arrows',
                 type: 'symbol',
                 source: ROUTE_SOURCE_ID,
-                filter: ['==', ['get', 'previous'], true],
+                filter: ['all', ['==', ['get', 'kind'], 'main'], ['==', ['get', 'previous'], true]],
                 layout: {
                     'symbol-placement': 'line',
                     'symbol-spacing': 32,
@@ -1825,19 +1815,29 @@ function renderRoutePoints() {
         }
 
         if (showPath && p.pts && p.pts.length >= 2) {
+            const coords = p.pts.map(pt => [pt[1], pt[0]]);
+            const mainKey = 2 * (APP.navPoints.length - i) + 1;
             features.push({
                 type: 'Feature',
-                geometry: {
-                    type: 'LineString',
-                    coordinates: p.pts.map(pt => [pt[1], pt[0]])
-                },
+                geometry: { type: 'LineString', coordinates: coords },
                 properties: {
+                    kind: 'main',
                     color: p.hex,
-                    casingColor: '#121A28',
                     width: 5,
+                    sortKey: mainKey,
                     index: i,
                     previous: isPrevious,
                     current: isCurrent
+                }
+            });
+            features.push({
+                type: 'Feature',
+                geometry: { type: 'LineString', coordinates: coords },
+                properties: {
+                    kind: 'casing',
+                    color: '#121A28',
+                    width: 5,
+                    sortKey: mainKey - 1
                 }
             });
         }
