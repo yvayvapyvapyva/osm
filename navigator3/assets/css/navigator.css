@@ -491,11 +491,7 @@ button, input, select, textarea {
 
 .hud-cmd.hud-prev {
     width: 100%;
-    background: var(--surface-muted);
-    border-color: var(--line);
-    box-shadow: none;
-    color: var(--text-muted);
-    font-size: 16px;
+    opacity: 0.75;
 }
 
 #hudPrevCmdNum {
@@ -541,7 +537,7 @@ button, input, select, textarea {
 }
 #hudPrevCmdNum.playing {
     border-color: var(--green);
-    background: var(--green-tint);
+    background: rgba(22,163,74,0.10);
 }
 
 #hudPrevCmdText {
