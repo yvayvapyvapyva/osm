@@ -643,7 +643,7 @@ const MenuModule = {
             from: read('--preview-bg-from', '#F8FAFC'),
             to: read('--preview-bg-to', '#E8EEF6'),
             shadow: read('--preview-shadow', 'rgba(18, 28, 46, 0.20)'),
-            dotStroke: read('--text', '#12203A')
+            dotStroke: '#121A28'
         };
     },
 
@@ -681,7 +681,7 @@ const MenuModule = {
         };
 
         previews.forEach(element => {
-            const key = `route-preview-v18\0${this._previewTheme()}\0${element.dataset.routeKey}`;
+            const key = `route-preview-v19\0${this._previewTheme()}\0${element.dataset.routeKey}`;
             element.dataset.previewKey = key;
             const image = this._previewImages.get(key);
             if (image) showPreviewImage(element, key, image);
