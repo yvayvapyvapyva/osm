@@ -1000,6 +1000,8 @@ input, textarea, select {
 }
 
 .btn-action {
+    box-sizing: border-box;
+    max-width: 100%;
     background: var(--glass-bg);
     color: #ffffff;
     border: 0.5px solid var(--glass-border);
