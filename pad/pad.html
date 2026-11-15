@@ -191,13 +191,34 @@
         #picPanel.visible { display:block; }
         #znakPanel {
             position:fixed; bottom:calc(76px + env(safe-area-inset-bottom)); left:12px;
-            z-index:9005; width:max-content; max-width:calc(100vw - 24px);
-            background:rgba(15,15,15,0.82); border:0.5px solid rgba(255,255,255,0.12); border-radius:16px;
-            padding:10px 4px 10px 10px; height:180px; overflow:hidden;
-            display:none; flex-direction:row; align-items:stretch;
+            z-index:9005; width:min(380px, calc(100vw - 24px)); max-width:calc(100vw - 24px);
+            background:rgba(15,15,15,0.88); border:0.5px solid rgba(255,255,255,0.12); border-radius:16px;
+            padding:8px; height:300px; overflow:hidden;
+            display:none; flex-direction:column; align-items:stretch; gap:6px;
             box-shadow:0 20px 60px rgba(0,0,0,0.4); transition:bottom .25s ease;
         }
         #znakPanel.visible { display:flex; }
+        #znakPanelHead { display:flex; align-items:center; gap:6px; flex-shrink:0; }
+        #znakPanelTitle { color:#fff; font-size:13px; font-weight:700; white-space:nowrap; }
+        #znakSearch {
+            flex:1; min-width:0; box-sizing:border-box; padding:7px 9px; border-radius:9px;
+            border:1px solid rgba(255,255,255,0.16); background:rgba(255,255,255,0.08);
+            color:#fff; font:inherit; font-size:13px; outline:none;
+        }
+        #znakSearch::placeholder { color:rgba(255,255,255,0.45); }
+        #znakPanelClose {
+            flex-shrink:0; width:28px; height:28px; border-radius:50%; border:1px solid rgba(255,255,255,0.16);
+            background:rgba(255,255,255,0.08); color:#fff; font-size:14px; cursor:pointer; padding:0;
+        }
+        #znakTabs { display:flex; gap:4px; overflow-x:auto; flex-shrink:0; scrollbar-width:none; padding-bottom:2px; }
+        #znakTabs::-webkit-scrollbar { display:none; }
+        .znak-tab {
+            flex-shrink:0; border:1px solid rgba(255,255,255,0.14); border-radius:999px;
+            background:rgba(255,255,255,0.06); color:rgba(255,255,255,0.75);
+            padding:5px 9px; font:inherit; font-size:11px; font-weight:600; cursor:pointer; white-space:nowrap;
+        }
+        .znak-tab.active { background:rgba(48,209,88,0.22); border-color:#30D158; color:#fff; }
+        #znakBody { display:flex; flex:1; min-height:0; gap:2px; }
         #znakScroll { flex:1; overflow-y:scroll; overflow-x:hidden; -webkit-overflow-scrolling:touch; scrollbar-width:none; overscroll-behavior:contain; }
         #znakScroll::-webkit-scrollbar { display:none; }
         #znakScrollbar { position:relative; flex-shrink:0; width:24px; margin-left:2px; }
@@ -332,6 +353,7 @@
         .pic-item img { max-width:80px; max-height:60px; object-fit:contain; display:block; }
         .pic-item.active { border-color:#30D158; background:rgba(48,209,88,0.2); }
         .pic-item.hidden { display:none; }
+        .znak-empty { width:100%; padding:22px 10px; text-align:center; color:rgba(255,255,255,0.55); font-size:13px; }
         #loading {
             position:fixed; inset:0; background:rgba(0,0,0,0.75); z-index:9999; display:flex; align-items:center; justify-content:center;
         }
@@ -389,6 +411,8 @@
         .pic-marker .rot-wrap.marker-drag img { outline:2px solid #30D158; outline-offset:2px; border-radius:4px; }
         .pic-marker .rot-wrap.marker-drag .tl { outline:2px solid #30D158; outline-offset:2px; border-radius:6px; }
 
+        .sign-stack { display:flex; flex-direction:column; align-items:center; }
+        .sign-plate { display:block; margin-top:2px; pointer-events:none; }
         .sign-leg {
             position:absolute; left:50%; transform:translateX(-50%);
             background:#8E8E93; border-radius:2px; pointer-events:none;
@@ -506,10 +530,18 @@
     <div id="picGrid"></div>
 </div>
 <div id="znakPanel">
-    <div id="znakScroll">
-        <div id="znakGrid"></div>
+    <div id="znakPanelHead">
+        <div id="znakPanelTitle">Знаки</div>
+        <input id="znakSearch" type="search" placeholder="Поиск по номеру или названию" autocomplete="off">
+        <button id="znakPanelClose" type="button" aria-label="Закрыть">✕</button>
     </div>
-    <div id="znakScrollbar"><div id="znakScrollThumb"></div></div>
+    <div id="znakTabs"></div>
+    <div id="znakBody">
+        <div id="znakScroll">
+            <div id="znakGrid"></div>
+        </div>
+        <div id="znakScrollbar"><div id="znakScrollThumb"></div></div>
+    </div>
 </div>
 <div id="colorPanel">
     <div id="colorRow">
@@ -526,6 +558,7 @@
     <div class="sig-fab" id="sigHazBtn"><svg viewBox="0 0 22 10" width="30" height="13.6" fill="currentColor"><g><polygon points="6,0.5 0,5 6,9.5"/><rect x="6" y="3" width="5" height="4" rx="1.2"/></g><g><polygon points="16,0.5 22,5 16,9.5"/><rect x="11" y="3" width="5" height="4" rx="1.2"/></g></svg></div>
     <div class="sig-fab" id="sigRightBtn"><svg viewBox="0 0 22 10" width="30" height="13.6" fill="currentColor"><rect x="3" y="2.5" width="8" height="5" rx="1.2"/><polygon points="11,0.5 19,5 11,9.5"/></svg></div>
     <div class="sig-fab" id="signLegBtn" style="display:none"><svg viewBox="0 0 24 24" width="20" height="20"><rect x="9" y="2" width="6" height="20" rx="3" fill="#8E8E93" stroke="#fff" stroke-width="1"/></svg></div>
+    <div class="sig-fab" id="signPlatesBtn" style="display:none" title="Таблички"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h10"/><path d="M19 15v6M16 18h6"/></svg></div>
     <div class="sig-fab" id="signDragBtn" style="display:none"><svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M13 24C9.74 24 6.81 22 5.6 19L2.57 11.37C2.26 10.58 3 9.79 3.81 10.05L4.6 10.31C5.16 10.5 5.62 10.92 5.84 11.47L7.25 15H8V3.25C8 2.56 8.56 2 9.25 2S10.5 2.56 10.5 3.25V12H11.5V1.25C11.5 .56 12.06 0 12.75 0S14 .56 14 1.25V12H15V2.75C15 2.06 15.56 1.5 16.25 1.5C16.94 1.5 17.5 2.06 17.5 2.75V12H18.5V5.75C18.5 5.06 19.06 4.5 19.75 4.5S21 5.06 21 5.75V16C21 20.42 17.42 24 13 24Z"/></svg></div>
     <div class="sig-fab danger" id="sigDelBtn"><svg viewBox="0 0 24 24" width="20" height="20"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg></div>
     <div class="sig-fab play" id="sigPlayBtn" style="display:none">
@@ -572,14 +605,33 @@ let eraserLongPressFired = false;
 // Список изображений из папки pic/ — при добавлении новых файлов добавьте их сюда
 const PIC_FILES = ['1.png', '2.png', '3.png', '4.png'];
 
-// Список знаков из папки znaki/
-const ZNAKI_FILES = ['2.1.svg', '2.2.svg', '2.4.svg', '2.5.svg', '2.6.svg', '3.1.svg', '3.2.svg', '3.24.20.svg', '3.24.30.svg', '3.24.40.svg', '3.24.50.svg', '3.25.40.svg', '3.27.svg', '3.31.svg', '4.1.1.svg', '4.1.2.svg', '4.1.3.svg', '4.3.svg', '5.5.svg', '5.15.2.svg', '5.15.2_2.svg', '5.15.2_3.svg', '5.15.2_5.svg', '5.15.2_7.svg', '5.15.2_8.svg', '5.20.svg', '5.21.svg', '6.3.1.svg', '6.4.svg', '6.16.svg', '8.2.3.svg', '8.2.4.svg', '8.5.1.svg', '8.5.2.svg', '8.5.7.svg', '8.5.7.2.png', 'zona20.png', 'konec_zona20.png', 'пешеход.png'];
+// Старые знаки нужны для сцен, сохранённых до каталога.
+const LEGACY_ZNAKI_FILES = ['2.1.svg', '2.2.svg', '2.4.svg', '2.5.svg', '2.6.svg', '3.1.svg', '3.2.svg', '3.24.20.svg', '3.24.30.svg', '3.24.40.svg', '3.24.50.svg', '3.25.40.svg', '3.27.svg', '3.31.svg', '4.1.1.svg', '4.1.2.svg', '4.1.3.svg', '4.3.svg', '5.5.svg', '5.15.2.svg', '5.15.2_2.svg', '5.15.2_3.svg', '5.15.2_5.svg', '5.15.2_7.svg', '5.15.2_8.svg', '5.20.svg', '5.21.svg', '6.3.1.svg', '6.4.svg', '6.16.svg', '8.2.3.svg', '8.2.4.svg', '8.5.1.svg', '8.5.2.svg', '8.5.7.svg', '8.5.7.2.png', 'zona20.png', 'konec_zona20.png', 'пешеход.png'];
 
 // Реальный размер изображения на карте в метрах (по высоте)
 const PIC_SIZE_M = 5;
 
-// Реальный размер знака на карте в метрах (видимая часть по большей стороне)
-const ZNAK_WIDTH_M = 3;
+// Максимальный видимый размер знака на карте в метрах (по большей стороне)
+const ZNAK_MAX_M = 3;
+
+// Каталог знаков: code, group, title, file (webp), w/h для сохранения пропорций.
+let ZNAKI_CATALOG = [];
+let ZNAKI_BY_CODE = new Map();
+let znakCatalogPromise = null;
+let znakGroup = 'all';
+let znakSearchQuery = '';
+let znakPanelMode = 'place';
+const ZNAK_GROUPS = [
+    { id: 'all', title: 'Все' },
+    { id: 'warning', title: 'Предупреждающие' },
+    { id: 'priority', title: 'Приоритет' },
+    { id: 'prohibitory', title: 'Запрещающие' },
+    { id: 'mandatory', title: 'Предписывающие' },
+    { id: 'special', title: 'Особые' },
+    { id: 'information', title: 'Информационные' },
+    { id: 'service', title: 'Сервис' },
+    { id: 'additional', title: 'Таблички' }
+];
 
 // Долгое нажатие по маркеру: длительность и допуск смещения (стилус/палец дрожит)
 const LP_DURATION_MS = 500;
@@ -628,23 +680,197 @@ function buildPicGrid() {
     });
 }
 
+function loadZnakCatalog() {
+    if (znakCatalogPromise) return znakCatalogPromise;
+    znakCatalogPromise = fetch('znaki/catalog.json', { cache: 'force-cache' })
+        .then(response => {
+            if (!response.ok) throw new Error('HTTP ' + response.status);
+            return response.json();
+        })
+        .then(list => {
+            if (!Array.isArray(list) || !list.length) throw new Error('empty catalog');
+            ZNAKI_CATALOG = list.map(item => ({
+                ...item,
+                code: String(item.code || ''),
+                title: String(item.title || item.code || ''),
+                file: String(item.file || ''),
+                w: Number(item.w) || 1,
+                h: Number(item.h) || 1,
+            }));
+            ZNAKI_BY_CODE = new Map(ZNAKI_CATALOG.map(item => [item.code, item]));
+            placedMarkers.forEach(marker => {
+                if (!marker._isZnak || !marker._code) return;
+                marker._catalogItem = znakItem(marker._code);
+                if (marker._catalogItem) {
+                    marker._aspect = marker._catalogItem.w / marker._catalogItem.h;
+                }
+                if (marker._plateCodes && marker._plateCodes.length) {
+                    marker._plates = marker._plateCodes.map(znakItem).filter(Boolean);
+                }
+                renderSignPlates(marker);
+            });
+            buildZnakTabs();
+            buildZnakGrid();
+            const thumb = document.getElementById('addZnakThumb');
+            if (thumb && ZNAKI_CATALOG[0]) thumb.src = 'znaki/' + encodeURIComponent(ZNAKI_CATALOG[0].file);
+            return ZNAKI_CATALOG;
+        })
+        .catch(error => {
+            console.warn('Не удалось загрузить каталог знаков:', error);
+            ZNAKI_CATALOG = LEGACY_ZNAKI_FILES.map(file => ({
+                code: file.replace(/\.(svg|png)$/i, ''),
+                group: 'legacy',
+                groupTitle: 'Старые знаки',
+                title: file,
+                file,
+                w: 1,
+                h: 1,
+            }));
+            ZNAKI_BY_CODE = new Map(ZNAKI_CATALOG.map(item => [item.code, item]));
+            buildZnakTabs();
+            buildZnakGrid();
+            return ZNAKI_CATALOG;
+        });
+    return znakCatalogPromise;
+}
+
+function znakItem(code) {
+    return ZNAKI_BY_CODE.get(String(code || '')) || null;
+}
+
+function buildZnakTabs() {
+    const tabs = document.getElementById('znakTabs');
+    if (!tabs) return;
+    tabs.innerHTML = '';
+    if (znakPanelMode === 'attach') {
+        tabs.style.display = 'none';
+        return;
+    }
+    tabs.style.display = 'flex';
+    ZNAK_GROUPS.forEach(group => {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'znak-tab' + (znakGroup === group.id ? ' active' : '');
+        button.textContent = group.title;
+        button.addEventListener('click', () => {
+            znakGroup = group.id;
+            buildZnakTabs();
+            buildZnakGrid();
+        });
+        tabs.appendChild(button);
+    });
+}
+
+function filteredZnakItems() {
+    let items = ZNAKI_CATALOG;
+    if (znakPanelMode === 'attach') {
+        items = items.filter(item => item.group === 'additional');
+    } else if (znakGroup !== 'all') {
+        items = items.filter(item => item.group === znakGroup);
+    }
+    const query = znakSearchQuery.toLocaleLowerCase('ru-RU');
+    if (query) {
+        items = items.filter(item => {
+            const haystack = (item.code + ' ' + item.title).toLocaleLowerCase('ru-RU');
+            return haystack.includes(query);
+        });
+    }
+    return items;
+}
+
 function buildZnakGrid() {
     const grid = document.getElementById('znakGrid');
+    if (!grid) return;
+    if (!ZNAKI_CATALOG.length) {
+        loadZnakCatalog();
+        return;
+    }
     grid.innerHTML = '';
-    ZNAKI_FILES.forEach(file => {
+    const items = filteredZnakItems();
+    if (!items.length) {
+        const empty = document.createElement('div');
+        empty.className = 'znak-empty';
+        empty.textContent = 'Ничего не найдено';
+        grid.appendChild(empty);
+        return;
+    }
+    items.forEach(item => {
         const cell = document.createElement('div');
         cell.className = 'pic-item';
-        cell.dataset.file = file;
+        cell.dataset.file = item.file;
+        cell.dataset.code = item.code;
         cell.dataset.type = 'znak';
+        cell.title = item.code + ' — ' + item.title;
         const img = document.createElement('img');
-        img.src = 'znaki/' + encodeURIComponent(file);
+        img.src = 'znaki/' + encodeURIComponent(item.file);
+        img.loading = 'lazy';
         img.draggable = false;
         img.onerror = () => cell.classList.add('hidden');
         cell.appendChild(img);
-        cell.addEventListener('pointerdown', e => startPicDrag(cell, e));
+        if (znakPanelMode === 'attach') {
+            const attached = activeCar && activeCar._isZnak &&
+                (activeCar._plates || []).some(plate => plate.code === item.code);
+            cell.classList.toggle('active', !!attached);
+            cell.addEventListener('click', event => {
+                event.preventDefault();
+                event.stopPropagation();
+                togglePlateForActive(item);
+            });
+        } else {
+            cell.addEventListener('pointerdown', event => startPicDrag(cell, event));
+        }
         grid.appendChild(cell);
     });
-    if (window.updateZnakScrollbar) window.updateZnakScrollbar();
+    if (window.updateZnakScrollbar) setTimeout(window.updateZnakScrollbar, 30);
+}
+
+function openZnakPanel(mode) {
+    const panel = document.getElementById('znakPanel');
+    if (!panel) return;
+    znakPanelMode = mode === 'attach' ? 'attach' : 'place';
+    if (znakPanelMode === 'attach' && (!activeCar || !activeCar._isZnak)) {
+        console.warn('Сначала выберите знак');
+        return;
+    }
+    znakGroup = znakPanelMode === 'attach' ? 'additional' : 'all';
+    znakSearchQuery = '';
+    const search = document.getElementById('znakSearch');
+    if (search) search.value = '';
+    const title = document.getElementById('znakPanelTitle');
+    if (title) title.textContent = znakPanelMode === 'attach' ? 'Таблички к знаку' : 'Знаки';
+    buildZnakTabs();
+    panel.classList.add('visible');
+    document.getElementById('addZnakBtn').classList.add('open');
+    const picPanel = document.getElementById('picPanel');
+    if (picPanel) picPanel.classList.remove('visible');
+    document.getElementById('addPicBtn').classList.remove('open');
+    const tlPanel = document.getElementById('tlPanel');
+    if (tlPanel) tlPanel.classList.remove('visible');
+    const tlBtn = document.getElementById('addTlBtn');
+    if (tlBtn) tlBtn.classList.remove('open');
+    if (!ZNAKI_CATALOG.length) loadZnakCatalog();
+    buildZnakGrid();
+    if (window.updateZnakScrollbar) setTimeout(window.updateZnakScrollbar, 50);
+    updateSignalBtns();
+}
+
+function closeZnakPanel() {
+    const panel = document.getElementById('znakPanel');
+    if (panel) panel.classList.remove('visible');
+    document.getElementById('addZnakBtn').classList.remove('open');
+    znakPanelMode = 'place';
+    updateSignalBtns();
+}
+
+function togglePlateForActive(item) {
+    if (!activeCar || !activeCar._isZnak || !item) return;
+    const index = (activeCar._plates || []).findIndex(plate => plate.code === item.code);
+    if (index >= 0) activeCar._plates.splice(index, 1);
+    else activeCar._plates.push(item);
+    activeCar._plateCodes = activeCar._plates.map(plate => plate.code);
+    renderSignPlates(activeCar);
+    buildZnakGrid();
+    commit();
 }
 
 // ---- Кастомный постоянно видимый ползунок прокрутки галереи знаков ----
@@ -697,7 +923,7 @@ let picGhost = null;
 function startPicDrag(cell, e) {
     e.preventDefault();
     const t = cell.dataset.type;
-    picDrag = { id: e.pointerId, item: cell, type: t, startX: e.clientX, startY: e.clientY, active: false, angle: null, cx: 0, cy: 0, h: 0, sizeM: t === 'pic' ? PIC_SIZE_M : (t === 'znak' ? ZNAK_WIDTH_M : 0), scaleK: 1, pxH: t === 'tl' ? Math.min(100, Math.max(20, 10 / metersPerPixel(map.center[1]))) : 0 };
+    picDrag = { id: e.pointerId, item: cell, type: t, startX: e.clientX, startY: e.clientY, active: false, angle: null, cx: 0, cy: 0, h: 0, sizeM: t === 'pic' ? PIC_SIZE_M : (t === 'znak' ? ZNAK_MAX_M : 0), scaleK: 1, pxH: t === 'tl' ? Math.min(100, Math.max(20, 10 / metersPerPixel(map.center[1]))) : 0 };
 }
 
 window.addEventListener('pointermove', e => {
@@ -706,7 +932,7 @@ window.addEventListener('pointermove', e => {
         const dx = e.clientX - picDrag.startX, dy = e.clientY - picDrag.startY;
         if (dx * dx + dy * dy < 49) return;
         picDrag.active = true;
-        selectedPic = { file: picDrag.item.dataset.file, type: picDrag.type };
+        selectedPic = { file: picDrag.item.dataset.file, type: picDrag.type, code: picDrag.item.dataset.code || null };
         picGhost = document.createElement('img');
         if (picDrag.type === 'tl') {
             picGhost.src = (window.tlGhostSrc ? window.tlGhostSrc(selectedPic.file) : '');
@@ -937,6 +1163,9 @@ function serializeScene() {
         markers: placedMarkers.map(m => ({
             kind: m._isTl ? 'tl' : (m._isZnak ? 'znak' : 'pic'),
             file: m._isTl ? m._tlType : m._file,
+            code: m._isZnak ? (m._code || null) : undefined,
+            value: m._isZnak ? (m._value || '') : undefined,
+            plates: m._isZnak ? ((m._plates && m._plates.length) ? m._plates.map(plate => plate.code) : (m._plateCodes || [])) : undefined,
             lat: m._lat, lon: m._lon,
             heading: m._heading,
             leg: !!m._leg,
@@ -982,9 +1211,14 @@ function restoreScene(snap) {
             window.placeTlMarker(d.lat, d.lon, ang, d.file);
             m = placedMarkers[placedMarkers.length - 1];
         } else {
-            m = buildPicMarker(d.kind === 'znak', d.file, d.lat, d.lon, d.heading);
+            m = buildPicMarker(d.kind === 'znak', d.file, d.lat, d.lon, d.heading, d.code || null);
             map.addChild(m);
             placedMarkers.push(m);
+            if (m._isZnak && Array.isArray(d.plates) && d.plates.length) {
+                m._plateCodes = d.plates.slice();
+                m._plates = d.plates.map(znakItem).filter(Boolean);
+                renderSignPlates(m);
+            }
             if (d.leg && m._isZnak) {
                 const leg = document.createElement('div');
                 leg.className = 'sign-leg';
@@ -1131,6 +1365,15 @@ function updateSignalBtns() {
         signDrag.style.display = isZnak ? '' : 'none';
         signDrag.classList.toggle('active', isZnak && !!activeCar._dragEnabled);
     }
+    const platesBtn = document.getElementById('signPlatesBtn');
+    if (platesBtn) {
+        platesBtn.style.display = isZnak ? '' : 'none';
+        platesBtn.classList.toggle('active', isZnak && znakPanelMode === 'attach');
+    }
+    if (isZnak && znakPanelMode === 'attach' &&
+        document.getElementById('znakPanel').classList.contains('visible')) {
+        buildZnakGrid();
+    }
     const l = document.getElementById('sigLeftBtn');
     const r = document.getElementById('sigRightBtn');
     l.classList.toggle('active', !!activeCar && activeCar._blinkSide === 'left');
@@ -1173,19 +1416,35 @@ function addDrawPoint(coords, screen) {
 }
 
 // Фабрика маркера (машинка/знак): используется placePic и restoreScene
-function buildPicMarker(isZnak, file, lat, lon, headingDeg) {
+function buildPicMarker(isZnak, file, lat, lon, headingDeg, code) {
     const el = document.createElement('div');
     el.className = 'pic-marker';
     el.style.cssText = 'transform:translate(-50%,-50%);cursor:grab;';
     const wrap = document.createElement('div');
     wrap.className = 'rot-wrap';
     wrap.style.transform = 'translate(-50%,-50%)';
-    const img = document.createElement('img');
-    img.src = (isZnak ? 'znaki/' : 'pic/') + encodeURIComponent(file);
-    img.draggable = false; // десктоп: не даём нативному HTML5-drag изображения ломать pointer-драг
-    img.style.cssText = 'height:auto;display:block;pointer-events:none;';
-    img.onerror = () => el.remove();
-    wrap.appendChild(img);
+    let img, stack = null, platesEl = null;
+    if (isZnak) {
+        stack = document.createElement('div');
+        stack.className = 'sign-stack';
+        img = document.createElement('img');
+        img.src = 'znaki/' + encodeURIComponent(file);
+        img.draggable = false;
+        img.style.cssText = 'height:auto;display:block;pointer-events:none;';
+        img.onerror = () => el.remove();
+        stack.appendChild(img);
+        platesEl = document.createElement('div');
+        platesEl.className = 'sign-plates';
+        stack.appendChild(platesEl);
+        wrap.appendChild(stack);
+    } else {
+        img = document.createElement('img');
+        img.src = (isZnak ? 'znaki/' : 'pic/') + encodeURIComponent(file);
+        img.draggable = false;
+        img.style.cssText = 'height:auto;display:block;pointer-events:none;';
+        img.onerror = () => el.remove();
+        wrap.appendChild(img);
+    }
     el.appendChild(wrap);
     const marker = new ymaps3.YMapMarker({
         coordinates: [lon, lat],
@@ -1200,9 +1459,18 @@ function buildPicMarker(isZnak, file, lat, lon, headingDeg) {
     }, el);
     marker._img = img;
     marker._rotWrap = wrap;
-    marker._sizeM = isZnak ? ZNAK_WIDTH_M : PIC_SIZE_M;
+    marker._sizeM = isZnak ? ZNAK_MAX_M : PIC_SIZE_M;
     marker._file = file;
     marker._isZnak = isZnak;
+    marker._code = code || null;
+    marker._catalogItem = code ? znakItem(code) : null;
+    marker._aspect = marker._catalogItem
+        ? (marker._catalogItem.w / marker._catalogItem.h)
+        : 1;
+    marker._plates = [];
+    marker._plateCodes = [];
+    marker._platesEl = platesEl;
+    marker._stack = stack;
     img.onload = () => updatePicMarker(marker);
     marker._heading = headingDeg;
     marker._lat = lat;
@@ -1237,7 +1505,7 @@ function placePic(lat, lon, moveAngle) {
     const headingDeg = (moveAngle != null)
         ? moveAngle * 180 / Math.PI + 90 - mapRot
         : -mapRot;
-    const marker = buildPicMarker(isZnak, file, lat, lon, headingDeg);
+    const marker = buildPicMarker(isZnak, file, lat, lon, headingDeg, selectedPic.code || null);
     map.addChild(marker);
     placedMarkers.push(marker);
     setActiveCar(marker);
@@ -1532,25 +1800,33 @@ function updatePicSize(marker) {
     if (!marker._img) return;
     const mpp = metersPerPixel(marker._lat);
     if (!mpp) return;
-    let imgH;
     if (marker._isZnak) {
-        const realH = (marker._sizeM || ZNAK_WIDTH_M) / mpp;
-        imgH = Math.max(15, realH);
-        marker._img.style.width = imgH + 'px';
+        const aspect = marker._aspect || 1;
+        const maxPx = Math.max(15, (marker._sizeM || ZNAK_MAX_M) / mpp);
+        let imgW = aspect >= 1 ? maxPx : maxPx * aspect;
+        let imgH = aspect >= 1 ? maxPx / aspect : maxPx;
+        imgW = Math.max(10, imgW);
+        imgH = Math.max(10, imgH);
+        marker._img.style.width = imgW + 'px';
         marker._img.style.height = imgH + 'px';
+        if (marker._platesEl) {
+            const plateW = Math.max(14, imgW * 0.92);
+            Array.from(marker._platesEl.children).forEach(plate => {
+                plate.style.width = plateW + 'px';
+                plate.style.height = 'auto';
+            });
+        }
         if (marker._leg) {
             // Ножка длиннее знака: верхние 35% прячутся под знак (ножка на слое позади).
-            // Ножка считается от РЕАЛЬНОГО размера знака (не ограниченного минимумом 10px),
-            // чтобы она всегда уменьшалась вместе с масштабом карты.
-            const legH = realH || imgH;
+            const legH = imgH;
             const overlap = legH * 0.35;
             marker._leg.style.top = (legH - overlap) + 'px';
             marker._leg.style.height = (legH + overlap) + 'px';
-            marker._leg.style.width = (legH * 0.09) + 'px';
+            marker._leg.style.width = Math.max(2, legH * 0.09) + 'px';
         }
     } else {
         // Машинка: минимальная длина 15px по аналогии с минимумом светофора.
-        imgH = Math.max(15, (marker._sizeM || PIC_SIZE_M) / mpp);
+        const imgH = Math.max(15, (marker._sizeM || PIC_SIZE_M) / mpp);
         marker._img.style.height = imgH + 'px';
     }
     if (marker._indicators) {
@@ -1561,6 +1837,21 @@ function updatePicSize(marker) {
         });
     }
     updatePicTransform(marker);
+}
+
+function renderSignPlates(marker) {
+    if (!marker || !marker._isZnak || !marker._platesEl) return;
+    marker._platesEl.innerHTML = '';
+    (marker._plates || []).forEach(item => {
+        if (!item || !item.file) return;
+        const plate = document.createElement('img');
+        plate.className = 'sign-plate';
+        plate.src = 'znaki/' + encodeURIComponent(item.file);
+        plate.alt = '';
+        plate.draggable = false;
+        marker._platesEl.appendChild(plate);
+    });
+    updatePicSize(marker);
 }
 
 // Лёгкое обновление: только поворот (transform), без пересчёта размера.
@@ -1902,6 +2193,11 @@ function updateAllPicMarkers(event) {
             setMarkerDragEnabled(activeCar, !activeCar._dragEnabled);
             updateSignalBtns();
         }
+    });
+    document.getElementById('signPlatesBtn').addEventListener('click', e => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (activeCar && activeCar._isZnak) openZnakPanel('attach');
     });
     // Мини-светофор: нажатие лампочки/стрелки переключает сигнал активного светофора
     document.querySelectorAll('#tlMini .tlm-lamp, #tlMini .tlm-side').forEach(el => {
@@ -2297,19 +2593,11 @@ function updateAllPicMarkers(event) {
         if (eraserMode) stopEraser();
         if (textMode) stopTextMode();
         const panel = document.getElementById('znakPanel');
-        panel.classList.toggle('visible');
-        document.getElementById('addZnakBtn').classList.toggle('open', panel.classList.contains('visible'));
-        if (panel.classList.contains('visible')) {
-            if (!document.getElementById('znakGrid').children.length) buildZnakGrid();
-            if (window.updateZnakScrollbar) setTimeout(window.updateZnakScrollbar, 50);
-            const picPanel = document.getElementById('picPanel');
-            picPanel.classList.remove('visible');
-            document.getElementById('addPicBtn').classList.remove('open');
-            const tlPanel = document.getElementById('tlPanel');
-            if (tlPanel) { tlPanel.classList.remove('visible'); }
-            const tlBtn = document.getElementById('addTlBtn');
-            if (tlBtn) tlBtn.classList.remove('open');
+        if (panel.classList.contains('visible') && znakPanelMode === 'place') {
+            closeZnakPanel();
+            return;
         }
+        openZnakPanel('place');
     });
 
     const tlToggleBtn = document.getElementById('addTlBtn');
@@ -2329,8 +2617,18 @@ function updateAllPicMarkers(event) {
         }
     });
 
+    const znakSearch = document.getElementById('znakSearch');
+    if (znakSearch) {
+        znakSearch.addEventListener('input', () => {
+            znakSearchQuery = znakSearch.value.trim();
+            buildZnakGrid();
+        });
+    }
+    const znakPanelClose = document.getElementById('znakPanelClose');
+    if (znakPanelClose) znakPanelClose.addEventListener('click', closeZnakPanel);
+
     buildPicGrid();
-    buildZnakGrid();
+    loadZnakCatalog();
     initZnakScrollbar();
     // iOS: гасим нативный скролл на элементах галерей, иначе он обгоняет drag
     // и приходит pointercancel — вместо перетаскивания листается панель
@@ -2341,7 +2639,7 @@ function updateAllPicMarkers(event) {
         }, { passive: false });
     });
     document.getElementById('addPicThumb').src = 'pic/' + encodeURIComponent(PIC_FILES[0]);
-    document.getElementById('addZnakThumb').src = 'znaki/' + encodeURIComponent(ZNAKI_FILES[0]);
+    document.getElementById('addZnakThumb').src = 'znaki/' + encodeURIComponent('2.1.svg');
     document.querySelector('.color-btn[data-color="#000000"]').classList.add('active');
     commit();
     document.getElementById('loading').classList.add('hidden');

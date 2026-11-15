@@ -231,6 +231,9 @@
             markers: markers.map(m => ({
                 kind: m.kind || 'pic',
                 file: m.file,
+                code: m.code || null,
+                value: m.value || '',
+                plates: Array.isArray(m.plates) ? m.plates.slice() : [],
                 lat: m.lat,
                 lon: m.lon,
                 heading: m.heading || 0,
