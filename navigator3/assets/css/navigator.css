@@ -1205,13 +1205,19 @@ button, input, select, textarea {
     line-height: 1.4;
 }
 
-.route-row-badge-viewed {
+.route-row-viewed {
+    align-self: flex-start;
+    margin-top: 2px;
+    padding: 1px 7px;
+    border-radius: 999px;
     background: #EDF1F6;
     color: var(--text-soft);
+    font-size: 10px;
     font-weight: 600;
+    line-height: 1.5;
 }
 
-[data-theme="dark"] .route-row-badge-viewed {
+[data-theme="dark"] .route-row-viewed {
     background: rgba(232, 237, 245, 0.10);
     color: var(--text-muted);
 }

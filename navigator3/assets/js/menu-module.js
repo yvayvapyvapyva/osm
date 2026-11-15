@@ -548,15 +548,16 @@ const MenuModule = {
         );
         if (!row) return;
         const title = row.querySelector('.route-row-title');
-        if (!title) return;
-        if (title.querySelector('.route-row-badge-viewed')) return;
+        const details = row.querySelector('.route-row-details');
+        if (!title || !details) return;
+        if (details.querySelector('.route-row-viewed')) return;
         const active = Array.from(title.querySelectorAll('.route-row-badge'))
             .some(badge => badge.textContent === 'Загружен');
         if (active) return;
-        const badge = document.createElement('span');
-        badge.className = 'route-row-badge route-row-badge-viewed';
-        badge.textContent = 'Просмотрен';
-        title.appendChild(badge);
+        const viewed = document.createElement('span');
+        viewed.className = 'route-row-viewed';
+        viewed.textContent = 'Просмотрен';
+        details.appendChild(viewed);
     },
 
     _createRouteRow(route) {
@@ -599,11 +600,6 @@ const MenuModule = {
             badge.className = 'route-row-badge';
             badge.textContent = 'Загружен';
             title.appendChild(badge);
-        } else if (route.viewed) {
-            const badge = document.createElement('span');
-            badge.className = 'route-row-badge route-row-badge-viewed';
-            badge.textContent = 'Просмотрен';
-            title.appendChild(badge);
         }
 
         const meta = document.createElement('span');
@@ -629,6 +625,12 @@ const MenuModule = {
             statsEl.className = 'route-row-stats';
             statsEl.textContent = stats.join(' · ');
             details.appendChild(statsEl);
+        }
+        if (route.viewed && !isActive) {
+            const viewed = document.createElement('span');
+            viewed.className = 'route-row-viewed';
+            viewed.textContent = 'Просмотрен';
+            details.appendChild(viewed);
         }
         main.append(title, details);
 
