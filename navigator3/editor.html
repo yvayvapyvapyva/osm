@@ -59,8 +59,8 @@
             <span>Настройки</span>
         </button>
     </div>
-    <div id="routeNameDisplay"></div>
 </div>
+<div id="routeNameDisplay"></div>
 <button id="listPointsBtn" class="circle-btn hidden-vis" onclick="openPointsOrderModal()">
     <svg viewBox="0 0 24 24"><path d="M3 13h2v-2H3v2zm0 4h2v-2H3v2zm0-8h2V7H3v2zm4 4h14v-2H7v2zm0 4h14v-2H7v2zM7 7v2h14V7H7z"/></svg>
 </button>
@@ -852,6 +852,7 @@ function openMapSettingsModal() {
         themeToggle.checked = document.documentElement.getAttribute('data-theme') === 'dark';
     }
     $('mapSettingsModal').style.display = 'flex';
+    updateRouteNameVisibility();
 }
 
 const EDITOR_THEME_KEY = 'osm_editor_theme_v1';
@@ -1770,13 +1771,12 @@ const updateVisibility = () => {
         if ($('fileActions')) $('fileActions').style.display = 'block';
         const label = currentRouteMeta.title || curRoute;
         const rnd = $('routeNameDisplay');
-        if (rnd) { rnd.textContent = label; rnd.style.display = 'block'; }
+        if (rnd) rnd.textContent = label;
     }
     else {
         if ($('fileActions')) $('fileActions').style.display = 'none';
-        const rnd = $('routeNameDisplay');
-        if (rnd) rnd.style.display = 'none';
     }
+    updateRouteNameVisibility();
     renderSettingsFileList();
     updateSaveState();
 };
@@ -2033,7 +2033,22 @@ const openInNavigator = () => {
     window.location.href = `navigator.html#m=${encodeURIComponent(routeKey)}`;
 };
 const openSettingsModal = () => { refreshFileList(); toggleM('settingsModal'); };
-const toggleM = id => { const m = $(id); m.style.display = (m.style.display === 'none' || !m.style.display) ? 'flex' : 'none'; };
+const EDITOR_MODAL_IDS = [
+    'mapSettingsModal', 'pointsOrderModal', 'settingsModal',
+    'folderSettingsModal', 'settingsRouteModal', 'createRouteModal',
+    'createFolderModal', 'shareModal', 'confirmDeleteModal',
+    'confirmDeletePointModal', 'instructionModal'
+];
+function updateRouteNameVisibility() {
+    const rnd = $('routeNameDisplay');
+    if (!rnd) return;
+    const modalOpen = EDITOR_MODAL_IDS.some(id => {
+        const modal = document.getElementById(id);
+        return modal && getComputedStyle(modal).display !== 'none';
+    });
+    rnd.style.display = modalOpen || !curRoute ? 'none' : 'block';
+}
+const toggleM = id => { const m = $(id); m.style.display = (m.style.display === 'none' || !m.style.display) ? 'flex' : 'none'; updateRouteNameVisibility(); };
 const closeD = () => { document.querySelectorAll('.color-dropdown').forEach(dr => dr.style.display = 'none'); $('dropdownOverlay').style.display = 'none'; };
 const toggleD = id => { const d = $(id), vis = d.style.display === 'flex'; closeD(); if(!vis) { d.style.display = 'flex'; $('dropdownOverlay').style.display = 'block'; } };
 const initColorDropdown = (id, cb) => Object.entries(COLORS).forEach(([n, d]) => { const r = Object.assign(document.createElement('div'), { className: 'color-row', onclick: (e) => { e.stopPropagation(); cb(d.hex, n); closeD(); }, innerHTML: `<div class="swatch" style="background:${d.hex}"></div><div style="font-weight:600;">${d.label}</div>` }); $(id).appendChild(r); });
