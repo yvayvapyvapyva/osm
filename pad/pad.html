@@ -712,7 +712,9 @@ function loadZnakCatalog() {
                 renderSignPlates(marker);
             });
             buildZnakTabs();
-            buildZnakGrid();
+            if (document.getElementById('znakPanel').classList.contains('visible')) {
+                buildZnakGrid();
+            }
             const thumb = document.getElementById('addZnakThumb');
             if (thumb && ZNAKI_CATALOG[0]) thumb.src = 'znaki/' + encodeURIComponent(ZNAKI_CATALOG[0].file);
             return ZNAKI_CATALOG;
@@ -1812,7 +1814,7 @@ function updatePicSize(marker) {
         marker._img.style.width = imgW + 'px';
         marker._img.style.height = imgH + 'px';
         if (marker._platesEl) {
-            const plateW = Math.max(14, imgW * 0.92);
+            const plateW = Math.max(14, imgW);
             Array.from(marker._platesEl.children).forEach(plate => {
                 plate.style.width = plateW + 'px';
                 plate.style.height = 'auto';
@@ -1851,6 +1853,7 @@ function renderSignPlates(marker) {
         plate.src = 'znaki/' + encodeURIComponent(item.file);
         plate.alt = '';
         plate.draggable = false;
+        plate.onload = () => updatePicSize(marker);
         marker._platesEl.appendChild(plate);
     });
     updatePicSize(marker);
