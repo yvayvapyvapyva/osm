@@ -199,10 +199,14 @@
             box-shadow:0 20px 60px rgba(0,0,0,0.4); transition:bottom .25s ease;
         }
         #znakPanel.visible { display:flex; }
-        #znakPanelHead { display:flex; align-items:center; gap:6px; flex-shrink:0; }
-        #znakPanelTitle { color:#fff; font-size:13px; font-weight:700; white-space:nowrap; }
+        #znakPanelHead { display:flex; align-items:center; gap:8px; flex-shrink:0; }
+        #znakPanelTitle {
+            flex:1; min-width:0; color:#fff; font-size:14px; font-weight:700;
+            line-height:1.2; white-space:normal;
+        }
+        #znakSearchRow { display:flex; flex-shrink:0; }
         #znakSearch {
-            flex:1; min-width:0; box-sizing:border-box; padding:7px 9px; border-radius:9px;
+            flex:1; min-width:0; box-sizing:border-box; padding:8px 10px; border-radius:9px;
             border:1px solid rgba(255,255,255,0.16); background:rgba(255,255,255,0.08);
             color:#fff; font:inherit; font-size:13px; outline:none;
         }
@@ -225,7 +229,7 @@
             display:flex; flex-direction:column; align-items:center; justify-content:flex-start; gap:4px;
             padding:10px 8px; border-radius:12px; border:1px solid rgba(255,255,255,0.12);
             background:rgba(255,255,255,0.06); color:#fff; font:inherit; cursor:pointer;
-            min-height:126px; box-sizing:border-box;
+            min-height:142px; box-sizing:border-box;
         }
         .znak-group-card:active { background:rgba(48,209,88,0.18); border-color:#30D158; }
         .znak-group-card img { display:block; max-width:96px; max-height:72px; object-fit:contain; pointer-events:none; }
@@ -556,6 +560,8 @@
     <div id="znakPanelHead">
         <button id="znakBackBtn" type="button" aria-label="Назад" hidden onclick="znakBackToGroups()">←</button>
         <div id="znakPanelTitle">Группы знаков</div>
+    </div>
+    <div id="znakSearchRow">
         <input id="znakSearch" type="search" placeholder="Поиск по номеру или названию" autocomplete="off">
     </div>
     <div id="znakTabs"></div>
@@ -647,14 +653,14 @@ let znakView = 'groups';
 let znakPanelMode = 'place';
 const ZNAK_GROUPS = [
     { id: 'all', title: 'Все' },
-    { id: 'warning', title: 'Предупреждающие' },
-    { id: 'priority', title: 'Приоритет' },
-    { id: 'prohibitory', title: 'Запрещающие' },
-    { id: 'mandatory', title: 'Предписывающие' },
-    { id: 'special', title: 'Особые' },
-    { id: 'information', title: 'Информационные' },
-    { id: 'service', title: 'Сервис' },
-    { id: 'additional', title: 'Таблички' }
+    { id: 'warning', title: 'Предупреждающие знаки' },
+    { id: 'priority', title: 'Знаки приоритета' },
+    { id: 'prohibitory', title: 'Запрещающие знаки' },
+    { id: 'mandatory', title: 'Предписывающие знаки' },
+    { id: 'special', title: 'Знаки особых предписаний' },
+    { id: 'information', title: 'Информационные знаки' },
+    { id: 'service', title: 'Знаки сервиса' },
+    { id: 'additional', title: 'Знаки дополнительной информации (таблички)' }
 ];
 
 // Долгое нажатие по маркеру: длительность и допуск смещения (стилус/палец дрожит)
