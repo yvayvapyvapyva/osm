@@ -26,6 +26,7 @@
 - OAuth: `PUBLIC_BASE_URL=https://ainstruktor.ru`, `PUBLIC_ALTERNATE_URLS=https://d5dsd5u1tsc8fm9dbsg5.s183zexc.apigw.yandexcloud.net`. Редактор логинится с origin служебного домена шлюза.
 - Статика: `node navigator3/scripts/build-static-deploy.js`, затем `yc storage s3 cp --recursive navigator3/deploy-2files/ s3://osmn-nav/`. Внешние `maplibre-gl.js`, `maplibre-gl.css`, `pmtiles.js`, `sortable.min.js` лежат в бакете отдельно и в `deploy-2files/` не попадают — при их обновлении загружать вручную.
 - `pad/deploy.sh` — функция `pad-osm` (ID `d4esfoiand5dinv3mfth`).
+- Статика PAD: бакет `pad2`, сайт `https://pad2.website.yandexcloud.net/`.
 - `tts/navigator/deploy.sh` — функция TTS (ID `d4e3cj3q3ff36qlrhbg8`).
 
 ## Оплата (Робокасса)

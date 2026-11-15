@@ -57,6 +57,14 @@ export SCENE_ADMIN_PASSWORD='задайте-свой-длинный-случай
 - Старые файлы `znaki/*.svg|png` оставлены для сцен, сохранённых до каталога.
 - Источники и лицензии каждого файла указаны в `catalog.json`.
 
+## Статика
+
+- Бакет: `pad2`
+- Сайт: https://pad2.website.yandexcloud.net/
+- Хранилище: https://storage.yandexcloud.net/pad2/
+- Публикация: `node pad/build-minified.js`, затем
+  `yc storage s3 cp --recursive pad/deploy-2files/ s3://pad2/`.
+
 ## Frontend
 
 URL функции задан в `pad/saveState.js` (`API_URL`). При изменении URL или
