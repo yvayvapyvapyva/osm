@@ -13,7 +13,7 @@
   POST /auth/logout                            — выход для прямых вызовов
 
 Редактор (нужна сессия Яндекс ID; данные ограничены владельцем):
-  POST /api/admin?action=list|get|get_meta|save|save_meta|delete
+  POST /api/admin?action=list|get|get_meta|phrases|save|save_meta|delete
   POST /api/admin?action=folder_save|folder_delete
 База — serverless-YDB (dbosm).
 """
@@ -67,6 +67,19 @@ def execute_list_editor_routes(session, owner_user_id):
         FROM roads
         WHERE owner_user_id = $owner_user_id
         ORDER BY title, m;
+    """
+    prepared = session.prepare(query)
+    return session.transaction().execute(
+        prepared, {"$owner_user_id": str(owner_user_id)}, commit_tx=True
+    )
+
+
+def execute_list_editor_route_payloads(session, owner_user_id):
+    query = """
+        DECLARE $owner_user_id AS Utf8;
+        SELECT json
+        FROM roads
+        WHERE owner_user_id = $owner_user_id;
     """
     prepared = session.prepare(query)
     return session.transaction().execute(
@@ -1376,6 +1389,56 @@ def _api_route(event):
 # ---------------------------------------------------------------------------
 
 
+def _phrase_book(rows):
+    """Собирает уникальные команды и комментарии из маршрутов владельца.
+
+    Возвращает текст в исходном написании, отсортированный по частоте:
+    самые используемые подсказки должны быть первыми.
+    """
+    books = {"commands": {}, "comments": {}}
+    for row in rows:
+        data = _json_value(_row_value(row, "json"))
+        if not isinstance(data, list):
+            continue
+        for point in data:
+            if not isinstance(point, dict):
+                continue
+            for field, key in (("cmd", "commands"), ("comm", "comments")):
+                value = _text(point.get(field)).strip()
+                if not value or len(value) > 500:
+                    continue
+                normalized = " ".join(
+                    value.casefold().replace("ё", "е").split()
+                )
+                if not normalized:
+                    continue
+                entry = books[key].get(normalized)
+                if entry:
+                    entry["count"] += 1
+                else:
+                    books[key][normalized] = {"text": value, "count": 1}
+
+    result = {}
+    for key, entries in books.items():
+        ordered = sorted(
+            entries.values(),
+            key=lambda item: (-item["count"], item["text"].casefold()),
+        )
+        result[key] = [item["text"] for item in ordered[:500]]
+    return result
+
+
+def _admin_phrases(user):
+    owner_user_id = _text(user.get("user_id"))
+    rows = _rows(
+        store.get_pool().retry_operation_sync(
+            execute_list_editor_route_payloads,
+            owner_user_id=owner_user_id,
+        )
+    )
+    return auth.json_response(200, _phrase_book(rows))
+
+
 def _admin_list(user):
     owner_user_id = _text(user.get("user_id"))
     folders, route_rows, by_id = _editor_data(owner_user_id)
@@ -1661,6 +1724,8 @@ def _handle_admin(event, user):
             return _admin_list(user)
         if action == "get":
             return _admin_get(event, user)
+        if action == "phrases":
+            return _admin_phrases(user)
         if action == "get_meta":
             return _admin_get_meta(event, user)
         if action == "save":
