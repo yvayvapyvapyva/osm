@@ -207,15 +207,15 @@
             color:#fff; font:inherit; font-size:13px; outline:none;
         }
         #znakSearch::placeholder { color:rgba(255,255,255,0.45); }
-        #znakPanelClose {
-            flex-shrink:0; width:28px; height:28px; border-radius:50%; border:1px solid rgba(255,255,255,0.16);
-            background:rgba(255,255,255,0.08); color:#fff; font-size:14px; cursor:pointer; padding:0;
-        }
         #znakTabs { display:none !important; }
         #znakBackBtn {
-            flex-shrink:0; width:28px; height:28px; border-radius:50%; border:1px solid rgba(255,255,255,0.16);
-            background:rgba(255,255,255,0.08); color:#fff; font-size:17px; line-height:1; cursor:pointer; padding:0;
+            flex-shrink:0; width:44px; height:44px; min-width:44px; border-radius:12px;
+            border:1px solid rgba(255,255,255,0.16); background:rgba(255,255,255,0.08);
+            color:#fff; font-size:22px; line-height:1; cursor:pointer; padding:0;
+            display:flex; align-items:center; justify-content:center;
+            -webkit-tap-highlight-color:transparent;
         }
+        #znakBackBtn:active { background:rgba(48,209,88,0.2); border-color:#30D158; }
         #znakBackBtn[hidden] { display:none; }
         #znakGrid.znak-groups {
             display:grid; grid-template-columns:repeat(2, minmax(0, 1fr));
@@ -557,7 +557,6 @@
         <button id="znakBackBtn" type="button" aria-label="Назад" hidden onclick="znakBackToGroups()">←</button>
         <div id="znakPanelTitle">Группы знаков</div>
         <input id="znakSearch" type="search" placeholder="Поиск по номеру или названию" autocomplete="off">
-        <button id="znakPanelClose" type="button" aria-label="Закрыть">✕</button>
     </div>
     <div id="znakTabs"></div>
     <div id="znakBody">
@@ -2703,7 +2702,7 @@ function updateAllPicMarkers(event) {
         if (eraserMode) stopEraser();
         if (textMode) stopTextMode();
         const panel = document.getElementById('znakPanel');
-        if (panel.classList.contains('visible') && znakPanelMode === 'place') {
+        if (panel.classList.contains('visible')) {
             closeZnakPanel();
             return;
         }
@@ -2738,8 +2737,6 @@ function updateAllPicMarkers(event) {
             buildZnakGrid();
         });
     }
-    const znakPanelClose = document.getElementById('znakPanelClose');
-    if (znakPanelClose) znakPanelClose.addEventListener('click', closeZnakPanel);
 
     buildPicGrid();
     loadZnakCatalog();
