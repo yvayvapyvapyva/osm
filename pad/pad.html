@@ -211,8 +211,29 @@
             flex-shrink:0; width:28px; height:28px; border-radius:50%; border:1px solid rgba(255,255,255,0.16);
             background:rgba(255,255,255,0.08); color:#fff; font-size:14px; cursor:pointer; padding:0;
         }
-        #znakTabs { display:flex; gap:4px; overflow-x:auto; flex-shrink:0; scrollbar-width:none; padding-bottom:2px; }
-        #znakTabs::-webkit-scrollbar { display:none; }
+        #znakTabs { display:none !important; }
+        #znakBackBtn {
+            flex-shrink:0; width:28px; height:28px; border-radius:50%; border:1px solid rgba(255,255,255,0.16);
+            background:rgba(255,255,255,0.08); color:#fff; font-size:17px; line-height:1; cursor:pointer; padding:0;
+        }
+        #znakBackBtn[hidden] { display:none; }
+        #znakGrid.znak-groups {
+            display:grid; grid-template-columns:repeat(2, minmax(0, 1fr));
+            gap:8px; width:100%; align-content:start;
+        }
+        .znak-group-card {
+            display:flex; flex-direction:column; align-items:center; justify-content:flex-start; gap:4px;
+            padding:10px 8px; border-radius:12px; border:1px solid rgba(255,255,255,0.12);
+            background:rgba(255,255,255,0.06); color:#fff; font:inherit; cursor:pointer;
+            min-height:126px; box-sizing:border-box;
+        }
+        .znak-group-card:active { background:rgba(48,209,88,0.18); border-color:#30D158; }
+        .znak-group-card img { display:block; max-width:96px; max-height:72px; object-fit:contain; pointer-events:none; }
+        .znak-group-name { font-size:12px; font-weight:700; line-height:1.2; text-align:center; }
+        .znak-group-count { font-size:10px; color:rgba(255,255,255,0.55); }
+        @media (min-width:700px) {
+            #znakGrid.znak-groups { grid-template-columns:repeat(4, minmax(0, 1fr)); }
+        }
         .znak-tab {
             flex-shrink:0; border:1px solid rgba(255,255,255,0.14); border-radius:999px;
             background:rgba(255,255,255,0.06); color:rgba(255,255,255,0.75);
@@ -533,7 +554,8 @@
 </div>
 <div id="znakPanel">
     <div id="znakPanelHead">
-        <div id="znakPanelTitle">Знаки</div>
+        <button id="znakBackBtn" type="button" aria-label="Назад" hidden onclick="znakBackToGroups()">←</button>
+        <div id="znakPanelTitle">Группы знаков</div>
         <input id="znakSearch" type="search" placeholder="Поиск по номеру или названию" autocomplete="off">
         <button id="znakPanelClose" type="button" aria-label="Закрыть">✕</button>
     </div>
@@ -622,6 +644,7 @@ let ZNAKI_BY_CODE = new Map();
 let znakCatalogPromise = null;
 let znakGroup = 'all';
 let znakSearchQuery = '';
+let znakView = 'groups';
 let znakPanelMode = 'place';
 const ZNAK_GROUPS = [
     { id: 'all', title: 'Все' },
@@ -782,6 +805,59 @@ function filteredZnakItems() {
     return items;
 }
 
+function updateZnakPanelHeader() {
+    const title = document.getElementById('znakPanelTitle');
+    const back = document.getElementById('znakBackBtn');
+    if (znakPanelMode === 'attach') {
+        if (title) title.textContent = 'Таблички к знаку';
+        if (back) back.hidden = true;
+        return;
+    }
+    if (znakSearchQuery) {
+        if (title) title.textContent = 'Поиск';
+        if (back) back.hidden = false;
+        return;
+    }
+    if (znakView === 'groups') {
+        if (title) title.textContent = 'Группы знаков';
+        if (back) back.hidden = true;
+        return;
+    }
+    const group = ZNAK_GROUPS.find(item => item.id === znakGroup);
+    if (title) title.textContent = group ? group.title : 'Знаки';
+    if (back) back.hidden = false;
+}
+
+function buildZnakGroups(grid) {
+    grid.classList.add('znak-groups');
+    ZNAK_GROUPS.filter(group => group.id !== 'all').forEach(group => {
+        const items = ZNAKI_CATALOG.filter(item => item.group === group.id);
+        if (!items.length) return;
+        const first = items[0];
+        const card = document.createElement('button');
+        card.type = 'button';
+        card.className = 'znak-group-card';
+        card.dataset.group = group.id;
+        const img = document.createElement('img');
+        img.src = 'znaki/' + encodeURIComponent(first.file);
+        img.alt = '';
+        img.draggable = false;
+        const name = document.createElement('span');
+        name.className = 'znak-group-name';
+        name.textContent = group.title;
+        const count = document.createElement('span');
+        count.className = 'znak-group-count';
+        count.textContent = items.length + ' знаков';
+        card.append(img, name, count);
+        card.addEventListener('click', () => {
+            znakView = 'list';
+            znakGroup = group.id;
+            buildZnakGrid();
+        });
+        grid.appendChild(card);
+    });
+}
+
 function buildZnakGrid() {
     const grid = document.getElementById('znakGrid');
     if (!grid) return;
@@ -789,7 +865,13 @@ function buildZnakGrid() {
         loadZnakCatalog();
         return;
     }
+    updateZnakPanelHeader();
     grid.innerHTML = '';
+    grid.classList.remove('znak-groups');
+    if (znakPanelMode === 'place' && !znakSearchQuery && znakView === 'groups') {
+        buildZnakGroups(grid);
+        return;
+    }
     const items = filteredZnakItems();
     if (!items.length) {
         const empty = document.createElement('div');
@@ -836,12 +918,13 @@ function openZnakPanel(mode) {
         console.warn('Сначала выберите знак');
         return;
     }
+    znakView = znakPanelMode === 'attach' ? 'list' : 'groups';
     znakGroup = znakPanelMode === 'attach' ? 'additional' : 'all';
     znakSearchQuery = '';
     const search = document.getElementById('znakSearch');
     if (search) search.value = '';
     const title = document.getElementById('znakPanelTitle');
-    if (title) title.textContent = znakPanelMode === 'attach' ? 'Таблички к знаку' : 'Знаки';
+    if (title) title.textContent = znakPanelMode === 'attach' ? 'Таблички к знаку' : 'Группы знаков';
     buildZnakTabs();
     panel.classList.add('visible');
     document.getElementById('addZnakBtn').classList.add('open');
@@ -856,6 +939,17 @@ function openZnakPanel(mode) {
     buildZnakGrid();
     if (window.updateZnakScrollbar) setTimeout(window.updateZnakScrollbar, 50);
     updateSignalBtns();
+}
+
+function znakBackToGroups() {
+    if (znakSearchQuery) {
+        znakSearchQuery = '';
+        const search = document.getElementById('znakSearch');
+        if (search) search.value = '';
+    }
+    znakView = 'groups';
+    znakGroup = 'all';
+    buildZnakGrid();
 }
 
 function closeZnakPanel() {
@@ -2637,6 +2731,10 @@ function updateAllPicMarkers(event) {
     if (znakSearch) {
         znakSearch.addEventListener('input', () => {
             znakSearchQuery = znakSearch.value.trim();
+            if (znakPanelMode !== 'attach') {
+                znakView = znakSearchQuery ? 'list' : 'groups';
+                if (!znakSearchQuery) znakGroup = 'all';
+            }
             buildZnakGrid();
         });
     }
