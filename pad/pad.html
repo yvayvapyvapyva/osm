@@ -199,12 +199,7 @@
             box-shadow:0 20px 60px rgba(0,0,0,0.4); transition:bottom .25s ease;
         }
         #znakPanel.visible { display:flex; }
-        #znakPanelHead { display:flex; align-items:center; gap:8px; flex-shrink:0; }
-        #znakPanelTitle {
-            flex:1; min-width:0; color:#fff; font-size:14px; font-weight:700;
-            line-height:1.2; white-space:normal;
-        }
-        #znakSearchRow { display:flex; flex-shrink:0; }
+        #znakPanelHead { display:flex; align-items:center; gap:6px; flex-shrink:0; }
         #znakSearch {
             flex:1; min-width:0; box-sizing:border-box; padding:8px 10px; border-radius:9px;
             border:1px solid rgba(255,255,255,0.16); background:rgba(255,255,255,0.08);
@@ -559,10 +554,7 @@
 <div id="znakPanel">
     <div id="znakPanelHead">
         <button id="znakBackBtn" type="button" aria-label="Назад" hidden onclick="znakBackToGroups()">←</button>
-        <div id="znakPanelTitle">Группы знаков</div>
-    </div>
-    <div id="znakSearchRow">
-        <input id="znakSearch" type="search" placeholder="Поиск по номеру или названию" autocomplete="off">
+        <input id="znakSearch" type="search" placeholder="Поиск по всем знакам" autocomplete="off" oninput="znakSearchChanged(this.value)">
     </div>
     <div id="znakTabs"></div>
     <div id="znakBody">
@@ -797,37 +789,24 @@ function filteredZnakItems() {
     let items = ZNAKI_CATALOG;
     if (znakPanelMode === 'attach') {
         items = items.filter(item => item.group === 'additional');
-    } else if (znakGroup !== 'all') {
-        items = items.filter(item => item.group === znakGroup);
     }
     const query = znakSearchQuery.toLocaleLowerCase('ru-RU');
     if (query) {
+        // Поиск всегда по всем знакам, независимо от открытой группы.
         items = items.filter(item => {
             const haystack = (item.code + ' ' + item.title).toLocaleLowerCase('ru-RU');
             return haystack.includes(query);
         });
+    } else if (znakPanelMode !== 'attach' && znakGroup !== 'all') {
+        items = items.filter(item => item.group === znakGroup);
     }
     return items;
 }
 
 function updateZnakPanelHeader() {
-    const title = document.getElementById('znakPanelTitle');
     const back = document.getElementById('znakBackBtn');
-    if (znakPanelMode === 'attach') {
-        if (title) {
-            title.hidden = false;
-            title.textContent = 'Таблички к знаку';
-        }
-        if (back) back.hidden = true;
-        return;
-    }
-    // В обычном выборе знаков название группы не дублируем:
-    // она и так понятна по содержимому.
-    if (title) {
-        title.hidden = true;
-        title.textContent = '';
-    }
-    if (back) back.hidden = znakView === 'groups' && !znakSearchQuery;
+    if (back) back.hidden = znakPanelMode === 'attach' ||
+        (znakView === 'groups' && !znakSearchQuery);
 }
 
 function buildZnakGroups(grid) {
@@ -925,11 +904,6 @@ function openZnakPanel(mode) {
     znakSearchQuery = '';
     const search = document.getElementById('znakSearch');
     if (search) search.value = '';
-    const title = document.getElementById('znakPanelTitle');
-    if (title) {
-        title.hidden = znakPanelMode !== 'attach';
-        title.textContent = znakPanelMode === 'attach' ? 'Таблички к знаку' : '';
-    }
     buildZnakTabs();
     panel.classList.add('visible');
     document.getElementById('addZnakBtn').classList.add('open');
@@ -944,6 +918,15 @@ function openZnakPanel(mode) {
     buildZnakGrid();
     if (window.updateZnakScrollbar) setTimeout(window.updateZnakScrollbar, 50);
     updateSignalBtns();
+}
+
+function znakSearchChanged(value) {
+    znakSearchQuery = String(value || '').trim();
+    if (znakPanelMode !== 'attach') {
+        znakView = znakSearchQuery ? 'list' : 'groups';
+        if (!znakSearchQuery) znakGroup = 'all';
+    }
+    buildZnakGrid();
 }
 
 function znakBackToGroups() {
@@ -2734,14 +2717,6 @@ function updateAllPicMarkers(event) {
 
     const znakSearch = document.getElementById('znakSearch');
     if (znakSearch) {
-        znakSearch.addEventListener('input', () => {
-            znakSearchQuery = znakSearch.value.trim();
-            if (znakPanelMode !== 'attach') {
-                znakView = znakSearchQuery ? 'list' : 'groups';
-                if (!znakSearchQuery) znakGroup = 'all';
-            }
-            buildZnakGrid();
-        });
     }
 
     buildPicGrid();
