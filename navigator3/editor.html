@@ -2358,77 +2358,17 @@ function filterEditorPhrases(list, query) {
 function attachPhraseAutocomplete(field, kind) {
     if (!field) return;
     const sourceKey = phraseKindKey(kind);
-    // На телефоне клавиатура меняет видимую область, и плавающее меню
-    // начинает «уезжать». Там показываем подсказки прямо в карточке.
-    const inlineMenu = window.matchMedia('(pointer: coarse)').matches;
     let menu = null;
     let items = [];
     let activeIndex = -1;
     let requestId = 0;
     let skipNextUpdate = 0;
-    let listening = false;
-
-    const positionMenu = () => {
-        if (!menu) return;
-        const rect = field.getBoundingClientRect();
-        const viewportWidth = document.documentElement.clientWidth || window.innerWidth;
-        const viewportHeight = window.innerHeight;
-        const width = Math.max(
-            200,
-            Math.min(rect.width, 360, viewportWidth - 16)
-        );
-        menu.style.width = width + 'px';
-        const menuWidth = menu.offsetWidth || width;
-        const left = Math.min(
-            Math.max(8, rect.left),
-            Math.max(8, viewportWidth - menuWidth - 8)
-        );
-        menu.style.left = left + 'px';
-        const menuHeight = menu.offsetHeight || 0;
-        const below = rect.bottom + 6;
-        const above = rect.top - menuHeight - 6;
-        menu.style.top =
-            below + menuHeight > viewportHeight - 8 && above > 8
-                ? above + 'px'
-                : below + 'px';
-    };
-
-    const onDocumentPointerDown = event => {
-        if (!menu) return;
-        if (menu.contains(event.target) || event.target === field) return;
-        closeMenu();
-    };
-
-    const onViewportScroll = event => {
-        // Прокрутка внутри самого меню не должна двигать его.
-        if (menu && event.target instanceof Node && menu.contains(event.target)) {
-            return;
-        }
-        positionMenu();
-    };
-
-    const startListening = () => {
-        if (listening) return;
-        window.addEventListener('resize', positionMenu);
-        document.addEventListener('scroll', onViewportScroll, true);
-        document.addEventListener('pointerdown', onDocumentPointerDown, true);
-        listening = true;
-    };
-
-    const stopListening = () => {
-        if (!listening) return;
-        window.removeEventListener('resize', positionMenu);
-        document.removeEventListener('scroll', onViewportScroll, true);
-        document.removeEventListener('pointerdown', onDocumentPointerDown, true);
-        listening = false;
-    };
 
     const closeMenu = () => {
         if (menu) menu.remove();
         menu = null;
         items = [];
         activeIndex = -1;
-        stopListening();
     };
 
     const applyValue = text => {
@@ -2473,18 +2413,11 @@ function attachPhraseAutocomplete(field, kind) {
         });
         box.addEventListener('pointerdown', event => event.stopPropagation());
         box.addEventListener('click', event => event.stopPropagation());
-        if (inlineMenu) {
-            box.classList.add('phrase-menu-inline');
-            const row = field.parentElement;
-            if (row && row.parentElement) {
-                row.insertAdjacentElement('afterend', box);
-            } else {
-                document.body.appendChild(box);
-            }
+        const row = field.parentElement;
+        if (row && row.parentElement) {
+            row.insertAdjacentElement('afterend', box);
         } else {
             document.body.appendChild(box);
-            positionMenu();
-            startListening();
         }
         menu = box;
         items = matches;
