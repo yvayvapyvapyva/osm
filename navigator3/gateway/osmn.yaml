@@ -30,6 +30,15 @@ paths:
         object: navigator.html
         service_account_id: ajec0sf19r17r3tv6vrg
 
+  /editor:
+    get:
+      summary: Редактор маршрутов
+      x-yc-apigateway-integration:
+        type: object_storage
+        bucket: osmn-nav
+        object: editor.html
+        service_account_id: ajec0sf19r17r3tv6vrg
+
   /api/{proxy+}:
     x-yc-apigateway-any-method:
       summary: API навигатора и аккаунта
