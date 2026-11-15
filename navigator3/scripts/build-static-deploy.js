@@ -176,6 +176,8 @@ function buildContactsPage() {
         ? `<a href="https://t.me/${escapeHtml(telegram)}" target="_blank" rel="noopener">@${escapeHtml(telegram)}</a>`
         : 'Не указан';
 
+    const price = (env.PREMIUM_PRICE_RUB || '299').trim() || '299';
+    const days = (env.PREMIUM_DAYS || '30').trim() || '30';
     const replacements = {
         '{{LEGAL_NAME}}': escapeHtml(name),
         '{{LEGAL_STATUS}}': escapeHtml('Самозанятый (налог на профессиональный доход)'),
@@ -183,6 +185,8 @@ function buildContactsPage() {
         '{{LEGAL_CONTACT_EMAIL}}': emailHtml,
         '{{LEGAL_CONTACT_PHONE}}': phoneHtml,
         '{{LEGAL_CONTACT_TELEGRAM}}': telegramHtml,
+        '{{PREMIUM_PRICE_RUB}}': escapeHtml(price),
+        '{{PREMIUM_DAYS}}': escapeHtml(days),
     };
 
     let html = fs.readFileSync(path.join(root, 'contacts.template.html'), 'utf8');

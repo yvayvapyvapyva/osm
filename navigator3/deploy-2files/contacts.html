@@ -73,6 +73,49 @@
         font-variant-numeric: tabular-nums;
     }
     .requisites-status { margin-top: 8px; color: var(--text-muted); font-size: 14px; }
+    .services-card {
+        border: 1px solid var(--line);
+        border-radius: 16px;
+        padding: 18px;
+        margin-bottom: 22px;
+    }
+    .services-card h2 {
+        margin: 0 0 14px;
+        font-size: 19px;
+        letter-spacing: -0.2px;
+    }
+    .service-row {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 18px;
+    }
+    .service-title { font-size: 16px; font-weight: 700; }
+    .service-note { margin-top: 4px; color: var(--text-muted); font-size: 13px; }
+    .service-price {
+        flex-shrink: 0;
+        font-size: 22px;
+        font-weight: 800;
+        line-height: 1.15;
+        white-space: nowrap;
+        font-variant-numeric: tabular-nums;
+    }
+    .service-price span {
+        display: block;
+        margin-top: 2px;
+        color: var(--text-muted);
+        font-size: 12px;
+        font-weight: 600;
+        text-align: right;
+    }
+    .service-terms {
+        margin: 14px 0 0;
+        padding-left: 18px;
+        color: var(--text-muted);
+        font-size: 14px;
+    }
+    .service-terms li { margin: 4px 0; }
+
     .contacts { display: grid; gap: 10px; margin: 0; }
     .contact-row { display: grid; grid-template-columns: 140px 1fr; gap: 10px; font-size: 15px; }
     .contact-row dt { color: var(--text-muted); margin: 0; }
@@ -92,6 +135,9 @@
     @media (max-width: 520px) {
         .doc { padding: 18px; }
         .contact-row { grid-template-columns: 1fr; gap: 2px; }
+        .service-row { flex-direction: column; gap: 10px; }
+        .service-price { text-align: left; }
+        .service-price span { text-align: left; }
     }
 </style>
 </head>
@@ -110,6 +156,22 @@
             <div class="requisites-name">Елисеев Иван Алексеевич</div>
             <div class="requisites-inn">ИНН 525102167004</div>
             <div class="requisites-status">Самозанятый (налог на профессиональный доход)</div>
+        </section>
+
+        <section class="services-card" aria-label="Услуги и стоимость">
+            <h2>Услуги и стоимость</h2>
+            <div class="service-row">
+                <div>
+                    <div class="service-title">Премиум-доступ к маршрутам навигатора</div>
+                    <div class="service-note">Все премиум-маршруты каталога, включая новые, на срок подписки. Услуга цифровая, без физической доставки.</div>
+                </div>
+                <div class="service-price">299 ₽<span>/ 30 дней</span></div>
+            </div>
+            <ul class="service-terms">
+                <li>Оплата разовая, без автопродления.</li>
+                <li>Доступ активируется автоматически после подтверждения оплаты.</li>
+                <li>Обычные маршруты и функции навигатора доступны бесплатно.</li>
+            </ul>
         </section>
 
         <dl class="contacts">
