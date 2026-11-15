@@ -627,9 +627,6 @@ let eraserLongPressFired = false;
 // Список изображений из папки pic/ — при добавлении новых файлов добавьте их сюда
 const PIC_FILES = ['1.png', '2.png', '3.png', '4.png'];
 
-// Старые знаки нужны для сцен, сохранённых до каталога.
-const LEGACY_ZNAKI_FILES = ['2.1.svg', '2.2.svg', '2.4.svg', '2.5.svg', '2.6.svg', '3.1.svg', '3.2.svg', '3.24.20.svg', '3.24.30.svg', '3.24.40.svg', '3.24.50.svg', '3.25.40.svg', '3.27.svg', '3.31.svg', '4.1.1.svg', '4.1.2.svg', '4.1.3.svg', '4.3.svg', '5.5.svg', '5.15.2.svg', '5.15.2_2.svg', '5.15.2_3.svg', '5.15.2_5.svg', '5.15.2_7.svg', '5.15.2_8.svg', '5.20.svg', '5.21.svg', '6.3.1.svg', '6.4.svg', '6.16.svg', '8.2.3.svg', '8.2.4.svg', '8.5.1.svg', '8.5.2.svg', '8.5.7.svg', '8.5.7.2.png', 'zona20.png', 'konec_zona20.png', 'пешеход.png'];
-
 // Реальный размер изображения на карте в метрах (по высоте)
 const PIC_SIZE_M = 5;
 
@@ -742,16 +739,8 @@ function loadZnakCatalog() {
         })
         .catch(error => {
             console.warn('Не удалось загрузить каталог знаков:', error);
-            ZNAKI_CATALOG = LEGACY_ZNAKI_FILES.map(file => ({
-                code: file.replace(/\.(svg|png)$/i, ''),
-                group: 'legacy',
-                groupTitle: 'Старые знаки',
-                title: file,
-                file,
-                w: 1,
-                h: 1,
-            }));
-            ZNAKI_BY_CODE = new Map(ZNAKI_CATALOG.map(item => [item.code, item]));
+            ZNAKI_CATALOG = [];
+            ZNAKI_BY_CODE = new Map();
             buildZnakTabs();
             buildZnakGrid();
             return ZNAKI_CATALOG;
@@ -1298,6 +1287,7 @@ function restoreScene(snap) {
             window.placeTlMarker(d.lat, d.lon, ang, d.file);
             m = placedMarkers[placedMarkers.length - 1];
         } else {
+            if (d.kind === 'znak' && !d.code) return;
             m = buildPicMarker(d.kind === 'znak', d.file, d.lat, d.lon, d.heading, d.code || null);
             map.addChild(m);
             placedMarkers.push(m);
@@ -2732,7 +2722,7 @@ function updateAllPicMarkers(event) {
         }, { passive: false });
     });
     document.getElementById('addPicThumb').src = 'pic/' + encodeURIComponent(PIC_FILES[0]);
-    document.getElementById('addZnakThumb').src = 'znaki/' + encodeURIComponent('2.1.svg');
+    document.getElementById('addZnakThumb').src = 'znaki/webp/1.1.webp';
     document.querySelector('.color-btn[data-color="#000000"]').classList.add('active');
     commit();
     document.getElementById('loading').classList.add('hidden');
