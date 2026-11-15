@@ -55,15 +55,9 @@ def public_base_url():
 
 
 def alternate_base_urls():
-    """Дополнительные origin'ы через запятую, точку с запятой или пробел.
-
-    В Yandex Cloud переменные функции перечисляются через запятую, поэтому
-    значение с запятыми внутри ломает `yc --environment`. Используем пробел:
-    он безопасен и для shell, и для CLI.
-    """
+    """Дополнительные origin'ы (через запятую), например старый адрес шлюза."""
     raw = _env("PUBLIC_ALTERNATE_URLS")
-    normalized = raw.replace(";", " ").replace(",", " ")
-    return [item.strip().rstrip("/") for item in normalized.split() if item.strip()]
+    return [item.strip().rstrip("/") for item in raw.split(",") if item.strip()]
 
 
 def base_url_for_event(event=None):
