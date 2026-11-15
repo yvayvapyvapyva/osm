@@ -1403,6 +1403,40 @@ button, input, select, textarea {
     line-height: 1.35;
 }
 
+.auth-account-name-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    min-width: 0;
+}
+
+.account-premium-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: rgba(255, 176, 32, 0.18);
+    color: #B7791F;
+    font-size: 10px;
+    font-weight: 700;
+    line-height: 1.4;
+    white-space: nowrap;
+}
+
+.account-premium-badge[hidden] {
+    display: none;
+}
+
+[data-theme="dark"] .account-premium-badge {
+    background: rgba(255, 176, 32, 0.22);
+    color: #FFC65C;
+}
+
+#accountUserGroup.is-premium {
+    border-color: rgba(255, 176, 32, 0.38);
+}
+
 .auth-account-name {
     color: var(--text);
     font-size: 15px;

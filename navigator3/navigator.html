@@ -1337,6 +1337,12 @@ function formatPremiumDate(value) {
 function updatePremiumBadge(active) {
     const badge = document.getElementById('profilePremiumBadge');
     if (badge) badge.hidden = !active;
+
+    const accountBadge = document.getElementById('accountPremiumBadge');
+    if (accountBadge) accountBadge.hidden = !active;
+
+    const accountGroup = document.getElementById('accountUserGroup');
+    if (accountGroup) accountGroup.classList.toggle('is-premium', !!active);
 }
 
 function renderPremiumUi() {
@@ -2761,7 +2767,10 @@ if (typeof maplibregl === 'undefined') {
                 <div class="settings-label">Аккаунт</div>
                 <div class="auth-account-row">
                     <div class="auth-account-text">
-                        <div class="auth-account-name" id="accountName"></div>
+                        <div class="auth-account-name-row">
+                            <span class="auth-account-name" id="accountName"></span>
+                            <span class="account-premium-badge" id="accountPremiumBadge" hidden>★ Премиум</span>
+                        </div>
                         <div class="auth-account-email" id="accountEmail"></div>
                     </div>
                     <button type="button" class="auth-account-btn" id="accountLogout">
