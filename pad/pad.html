@@ -1814,6 +1814,9 @@ function updatePicSize(marker) {
         marker._img.style.width = imgW + 'px';
         marker._img.style.height = imgH + 'px';
         if (marker._platesEl) {
+            // Табличка всегда того же размера, как если бы её поставили
+            // отдельно: масштаб по большей стороне ZNAK_MAX_M.
+            const maxPx = Math.max(15, (ZNAK_MAX_M) / mpp);
             Array.from(marker._platesEl.children).forEach(plate => {
                 const item = znakItem(plate.dataset.code);
                 const aspect = item
@@ -1821,16 +1824,10 @@ function updatePicSize(marker) {
                     : (plate.naturalWidth && plate.naturalHeight
                         ? plate.naturalWidth / plate.naturalHeight
                         : 1);
-                // Табличка масштабируется по высоте, а не по ширине знака:
-                // узкие вертикальные таблички не растягиваются.
-                let plateH = Math.max(6, imgH * 0.5);
-                let plateW = plateH * aspect;
-                if (plateW > imgW) {
-                    plateW = imgW;
-                    plateH = plateW / aspect;
-                }
-                plate.style.width = Math.max(4, plateW) + 'px';
-                plate.style.height = Math.max(4, plateH) + 'px';
+                let plateW = aspect >= 1 ? maxPx : maxPx * aspect;
+                let plateH = aspect >= 1 ? maxPx / aspect : maxPx;
+                plate.style.width = Math.max(10, plateW) + 'px';
+                plate.style.height = Math.max(10, plateH) + 'px';
             });
         }
         if (marker._leg) {
