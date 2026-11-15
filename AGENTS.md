@@ -41,7 +41,6 @@
 - FailURL → помечает платёж отменённым и редиректит на `...?payment=fail`.
 - `GET /api/premium/status` — цена, срок, активность подписки, `payments_available` и список `providers`.
 - Миграция: `migrations/add_premium_subscriptions.py` (добавляет `users.premium_until` и таблицу `payments`).
-- Страница `/contacts.html` генерируется из `contacts.template.html`; в ней ФИО, ИНН и контакты для проверки платёжных сервисов.
 - Страница `/legal.html` генерируется при сборке из `legal.template.html` и переменных `LEGAL_NAME`, `LEGAL_INN`, `LEGAL_EMAIL`, `LEGAL_PHONE`, `LEGAL_TELEGRAM`. Без них будут заглушки «Не указано».
 
 ## Админка
