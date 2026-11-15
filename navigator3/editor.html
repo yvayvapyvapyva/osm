@@ -1104,6 +1104,7 @@ const handleInitialLoad = async () => {
     seedHistory();
     updateSaveState();
     await refreshFileList();
+    loadEditorPhrases();
     const routeCount = settingsRouteFiles.length;
     $('settingsTitle').textContent = `Маршруты: ${routeCount}`;
 };
@@ -2261,6 +2262,281 @@ async function executeDeletePoint() {
     pendingDeletePoint = null;
 }
 
+/* ---------- Подсказки команд и комментариев ---------- */
+
+// Манифест озвучки: в нём лежат ровно те фразы, для которых уже есть
+// аудиофайл. Редактор ничего не досочиняет — только показывает готовое.
+const TTS_MANIFEST_URL =
+    'https://storage.yandexcloud.net/eia-tts/v1/manifest.json';
+
+// Служебные записи старого манифеста: это не команды, в подсказки не берём.
+const IGNORED_MANIFEST_TEXTS = new Set(['неизвестный аудиофайл']);
+
+const editorPhrases = { commands: [], comments: [] };
+let editorPhrasesLoaded = false;
+let editorPhrasesRequest = null;
+let editorPhrasesFailedAt = 0;
+
+function normalizePhrase(value) {
+    return String(value || '')
+        .toLocaleLowerCase('ru-RU')
+        .replace(/ё/g, 'е')
+        .replace(/\s+/g, ' ')
+        .trim();
+}
+
+function phraseKindKey(kind) {
+    return kind === 'comment' ? 'comments' : 'commands';
+}
+
+function collectManifestPhrases(manifest) {
+    const commands = new Map();
+    const comments = new Map();
+    const entries = manifest && typeof manifest === 'object'
+        ? Object.values(manifest)
+        : [];
+    entries.forEach(entry => {
+        if (!entry || typeof entry !== 'object') return;
+        const text = String(entry.text || '').trim();
+        if (!text) return;
+        const key = entry.voice_type === 'comment' ? comments : commands;
+        const normalized = normalizePhrase(text);
+        if (!normalized || IGNORED_MANIFEST_TEXTS.has(normalized)) return;
+        if (!key.has(normalized)) key.set(normalized, text);
+    });
+    const sorted = values => Array.from(values.values())
+        .sort((a, b) => a.localeCompare(b, 'ru'));
+    return { commands: sorted(commands), comments: sorted(comments) };
+}
+
+async function loadEditorPhrases() {
+    if (editorPhrasesLoaded) return editorPhrases;
+    if (editorPhrasesFailedAt && Date.now() - editorPhrasesFailedAt < 60000) {
+        return editorPhrases;
+    }
+    if (editorPhrasesRequest) return editorPhrasesRequest;
+    editorPhrasesRequest = fetch(TTS_MANIFEST_URL, {
+        headers: { Accept: 'application/json' },
+        cache: 'no-cache'
+    })
+        .then(response => {
+            if (!response.ok) throw new Error('HTTP ' + response.status);
+            return response.json();
+        })
+        .then(manifest => {
+            const phrases = collectManifestPhrases(manifest);
+            editorPhrases.commands = phrases.commands;
+            editorPhrases.comments = phrases.comments;
+            editorPhrasesLoaded = true;
+            return editorPhrases;
+        })
+        .catch(error => {
+            console.warn('Не удалось загрузить манифест озвучки:', error);
+            editorPhrasesFailedAt = Date.now();
+            return editorPhrases;
+        })
+        .finally(() => {
+            editorPhrasesRequest = null;
+        });
+    return editorPhrasesRequest;
+}
+
+function filterEditorPhrases(list, query) {
+    const normalizedQuery = normalizePhrase(query);
+    if (!normalizedQuery) return [];
+    const tokens = normalizedQuery.split(' ');
+    const starts = [];
+    const contains = [];
+    (Array.isArray(list) ? list : []).forEach(item => {
+        const text = normalizePhrase(item);
+        if (!text) return;
+        if (text.startsWith(normalizedQuery)) {
+            starts.push(item);
+            return;
+        }
+        const words = text.split(' ');
+        const matches = tokens.every(token =>
+            words.some(word => word.startsWith(token))
+        );
+        if (matches) contains.push(item);
+    });
+    return starts.concat(contains);
+}
+
+function attachPhraseAutocomplete(field, kind) {
+    if (!field) return;
+    const sourceKey = phraseKindKey(kind);
+    let menu = null;
+    let items = [];
+    let activeIndex = -1;
+    let requestId = 0;
+    let skipNextUpdate = 0;
+    let listening = false;
+
+    const positionMenu = () => {
+        if (!menu) return;
+        const rect = field.getBoundingClientRect();
+        const viewportWidth = document.documentElement.clientWidth || window.innerWidth;
+        const viewportHeight = window.innerHeight;
+        const width = Math.max(
+            200,
+            Math.min(rect.width, 360, viewportWidth - 16)
+        );
+        menu.style.width = width + 'px';
+        const menuWidth = menu.offsetWidth || width;
+        const left = Math.min(
+            Math.max(8, rect.left),
+            Math.max(8, viewportWidth - menuWidth - 8)
+        );
+        menu.style.left = left + 'px';
+        const menuHeight = menu.offsetHeight || 0;
+        const below = rect.bottom + 6;
+        const above = rect.top - menuHeight - 6;
+        menu.style.top =
+            below + menuHeight > viewportHeight - 8 && above > 8
+                ? above + 'px'
+                : below + 'px';
+    };
+
+    const onDocumentPointerDown = event => {
+        if (!menu) return;
+        if (menu.contains(event.target) || event.target === field) return;
+        closeMenu();
+    };
+
+    const startListening = () => {
+        if (listening) return;
+        window.addEventListener('resize', positionMenu);
+        document.addEventListener('scroll', positionMenu, true);
+        document.addEventListener('pointerdown', onDocumentPointerDown, true);
+        listening = true;
+    };
+
+    const stopListening = () => {
+        if (!listening) return;
+        window.removeEventListener('resize', positionMenu);
+        document.removeEventListener('scroll', positionMenu, true);
+        document.removeEventListener('pointerdown', onDocumentPointerDown, true);
+        listening = false;
+    };
+
+    const closeMenu = () => {
+        if (menu) menu.remove();
+        menu = null;
+        items = [];
+        activeIndex = -1;
+        stopListening();
+    };
+
+    const applyValue = text => {
+        // Подставляем текст и обновляем модель через input, но не открываем
+        // меню заново на уже выбранной фразе.
+        skipNextUpdate = 1;
+        field.value = text;
+        field.dispatchEvent(new Event('input', { bubbles: true }));
+        closeMenu();
+        field.focus();
+    };
+
+    const markActive = () => {
+        if (!menu) return;
+        const nodes = menu.querySelectorAll('.phrase-menu-item');
+        nodes.forEach((node, index) => {
+            node.classList.toggle('is-active', index === activeIndex);
+        });
+        const current = nodes[activeIndex];
+        if (current && current.scrollIntoView) {
+            current.scrollIntoView({ block: 'nearest' });
+        }
+    };
+
+    const renderMenu = matches => {
+        closeMenu();
+        if (!matches.length) return;
+        const box = document.createElement('div');
+        box.className = 'phrase-menu';
+        matches.forEach(text => {
+            const item = document.createElement('button');
+            item.type = 'button';
+            item.className = 'phrase-menu-item';
+            item.textContent = text;
+            item.addEventListener('pointerdown', event => event.preventDefault());
+            item.addEventListener('click', event => {
+                event.preventDefault();
+                event.stopPropagation();
+                applyValue(text);
+            });
+            box.appendChild(item);
+        });
+        document.body.appendChild(box);
+        menu = box;
+        items = matches;
+        activeIndex = -1;
+        positionMenu();
+        startListening();
+    };
+
+    const updateSuggestions = async () => {
+        if (skipNextUpdate > 0) {
+            skipNextUpdate -= 1;
+            return;
+        }
+        const query = field.value.trim();
+        if (!query) {
+            closeMenu();
+            return;
+        }
+        const id = ++requestId;
+        const book = await loadEditorPhrases();
+        if (id !== requestId) return;
+        if (document.activeElement !== field) return;
+        renderMenu(
+            filterEditorPhrases(book[sourceKey], query).slice(0, 8)
+        );
+    };
+
+    field.addEventListener('focus', updateSuggestions);
+    field.addEventListener('input', updateSuggestions);
+    field.addEventListener('blur', () => {
+        setTimeout(() => {
+            if (document.activeElement !== field) closeMenu();
+        }, 120);
+    });
+    field.addEventListener('keydown', event => {
+        if (!menu) return;
+        if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+            if (!items.length) return;
+            event.preventDefault();
+            const delta = event.key === 'ArrowDown' ? 1 : -1;
+            activeIndex =
+                (activeIndex + delta + items.length) % items.length;
+            markActive();
+            return;
+        }
+        if (event.key === 'Escape') {
+            event.preventDefault();
+            closeMenu();
+            return;
+        }
+        if (event.key === 'Enter') {
+            if (activeIndex >= 0 && items[activeIndex]) {
+                event.preventDefault();
+                applyValue(items[activeIndex]);
+                return;
+            }
+            if (field.tagName !== 'TEXTAREA' && items.length) {
+                event.preventDefault();
+                applyValue(items[0]);
+            }
+            return;
+        }
+        if (event.key === 'Tab' && activeIndex >= 0 && items[activeIndex]) {
+            event.preventDefault();
+            applyValue(items[activeIndex]);
+        }
+    });
+}
+
 function createPointCard(p, single = false) {
     const item = document.createElement('div'); item.className = 'sortable-point-item'; item.dataset.id = p.id;
     const cat = COLORS[p.color] || { hex: '#FFD700', label: 'Маневры на перекрестке' };
@@ -2269,12 +2545,14 @@ function createPointCard(p, single = false) {
     const cmdInput = item.querySelector('.cmd-input');
     cmdInput.addEventListener('input', () => { p.cmd = cmdInput.value; updateSaveState(); });
     cmdInput.addEventListener('blur', () => { pushHistorySnapshot(); updateSaveState(); });
+    attachPhraseAutocomplete(cmdInput, 'command');
     item.querySelector('.play-cmd-btn').onclick = (e) => { e.stopPropagation(); playText(cmdInput.value || p.cmd, 'command', e.currentTarget); };
     const comm = item.querySelector('.comm-input');
     const autoHeight = () => { comm.style.height = 'auto'; comm.style.height = comm.scrollHeight + 'px'; };
     comm.addEventListener('input', () => { p.comm = comm.value; autoHeight(); updateSaveState(); });
     comm.addEventListener('blur', () => { pushHistorySnapshot(); updateSaveState(); });
     setTimeout(autoHeight, 0);
+    attachPhraseAutocomplete(comm, 'comment');
     item.querySelector('.play-comm-btn').onclick = e => { e.stopPropagation(); pushHistorySnapshot(); playText(comm.value || p.comm, 'comment', e.currentTarget); };
     item.querySelector('.color-indicator-btn').onclick = e => { e.stopPropagation(); activeListPoint = { point: p, card: item }; toggleD('listColorDropdown'); };
     item.onclick = e => {
