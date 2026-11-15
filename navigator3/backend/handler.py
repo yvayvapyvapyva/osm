@@ -1034,6 +1034,7 @@ def _api_catalog(event):
     отдаются без data.
     """
     user = _current_user(event)
+    views = store.route_views_for_user(user["user_id"]) if user else {}
     try:
         folders, route_rows, by_id = _catalog_data(include_geometry=True)
         routes = []
@@ -1052,6 +1053,7 @@ def _api_catalog(event):
             )
             if not route["locked"]:
                 route["data"] = data if isinstance(data, list) else []
+            route["viewed"] = route["m"] in views
             routes.append(route)
         return auth.json_response(
             200,
@@ -1272,6 +1274,27 @@ def _api_premium_robokassa_fail(event):
 
     base = _text(os.getenv("PUBLIC_BASE_URL", "")).rstrip("/") or "https://ainstruktor.ru"
     return auth.redirect_response(f"{base}/navigator.html?payment=fail")
+
+
+def _api_route_view(event):
+    """Отмечает маршрут как загруженный текущим пользователем.
+
+    GET, потому что CDN на публичном домене пропускает только GET.
+    """
+    user = _current_user(event)
+    if not user:
+        return auth.json_response(401, {"error": "unauthorized"})
+
+    m_param = _text(_query(event).get("m")).strip()
+    if not m_param:
+        return auth.json_response(400, {"error": "missing_route_name"})
+
+    meta = store.get_road_meta(m_param)
+    if not meta or not meta["visible"]:
+        return auth.json_response(404, {"error": "route_not_found"})
+
+    store.record_route_view(_text(user.get("user_id")), m_param)
+    return auth.json_response(200, {"status": "ok", "viewed": True})
 
 
 def _api_route(event):
@@ -1759,6 +1782,24 @@ def _api_superadmin_user(event):
         )
 
     roads, folders = store.owned_counts(user_id)
+    views = []
+    roads_meta = store.list_roads_meta()
+    for m_param, view in store.route_views_for_user(user_id).items():
+        meta = roads_meta.get(m_param) or {}
+        views.append(
+            {
+                "m": m_param,
+                "title": meta.get("title") or "",
+                "premium": bool(meta.get("premium")),
+                "visible": bool(meta.get("visible")),
+                "deleted": not meta,
+                "first_viewed_at": _date_iso(view.get("first_viewed_at")),
+                "last_viewed_at": _date_iso(view.get("last_viewed_at")),
+                "view_count": view.get("view_count") or 0,
+            }
+        )
+    views.sort(key=lambda item: item.get("last_viewed_at") or "", reverse=True)
+
     return auth.json_response(
         200,
         {
@@ -1767,6 +1808,7 @@ def _api_superadmin_user(event):
             "sessions": sessions,
             "routes": roads,
             "folders": folders,
+            "views": views,
         },
     )
 
@@ -1927,6 +1969,9 @@ def _handle_api(event, path, method):
 
     if normalized == "/api/catalog" and method == "GET":
         return _api_catalog(event)
+
+    if normalized == "/api/route/view" and method == "GET":
+        return _api_route_view(event)
 
     if normalized == "/api/route" and method == "GET":
         return _api_route(event)

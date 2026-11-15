@@ -51,6 +51,12 @@
 - Аудит: таблица `admin_audit`, миграция `migrations/add_admin_audit.py`. Пишутся админ, действие, пользователь и параметры.
 - `admin.html` собирается копированием из `navigator3/admin.html` в `deploy-2files` (без бандла).
 
+## История загрузок маршрутов
+- Таблица `route_views` (`user_id`, `m`, `first_viewed_at`, `last_viewed_at`, `view_count`), миграция `migrations/add_route_views.py`.
+- `GET /api/route/view?m=<маршрут>` отмечает загрузку; GET, потому что CDN на apex не пропускает POST.
+- `/api/catalog` возвращает `viewed` для каждого маршрута; в меню показывается бейдж «Просмотрен».
+- В карточке пользователя админки отдаётся список `views` с датами и количеством загрузок.
+
 ## Команда YC
 - `yc` установлен: `/Users/mb/yandex-cloud/bin/yc`
 - cloud-id: `b1gtnlal9r2s3rvqadjn`, folder-id: `b1gepvq09nl4oobiemtr`

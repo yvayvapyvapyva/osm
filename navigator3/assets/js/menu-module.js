@@ -253,6 +253,7 @@ const MenuModule = {
                 description: typeof route.description === 'string' ? route.description.trim() : '',
                 premium: !!route.premium,
                 locked: !!route.locked,
+                viewed: !!route.viewed,
                 ...this._routeStats(route)
             });
 
@@ -534,6 +535,29 @@ const MenuModule = {
         }
     },
 
+    markRouteViewed(routeKey) {
+        const key = String(routeKey || '');
+        if (!key) return;
+        if (this.routesDescriptions[key]) this.routesDescriptions[key].viewed = true;
+        const item = this._catalog.find(entry => entry.key === key);
+        if (item) item.viewed = true;
+
+        const row = document.querySelector(
+            '.route-row[data-route-key="' + (window.CSS && CSS.escape ? CSS.escape(key) : key) + '"]'
+        );
+        if (!row) return;
+        const title = row.querySelector('.route-row-title');
+        if (!title) return;
+        if (title.querySelector('.route-row-badge-viewed')) return;
+        const active = Array.from(title.querySelectorAll('.route-row-badge'))
+            .some(badge => badge.textContent === 'Загружен');
+        if (active) return;
+        const badge = document.createElement('span');
+        badge.className = 'route-row-badge route-row-badge-viewed';
+        badge.textContent = 'Просмотрен';
+        title.appendChild(badge);
+    },
+
     _createRouteRow(route) {
         const isActive = route.key === this.currentRoute;
         const btn = document.createElement('button');
@@ -573,6 +597,11 @@ const MenuModule = {
             const badge = document.createElement('span');
             badge.className = 'route-row-badge';
             badge.textContent = 'Загружен';
+            title.appendChild(badge);
+        } else if (route.viewed) {
+            const badge = document.createElement('span');
+            badge.className = 'route-row-badge route-row-badge-viewed';
+            badge.textContent = 'Просмотрен';
             title.appendChild(badge);
         }
 

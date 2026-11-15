@@ -158,6 +158,7 @@ owner_user_id Utf8         -- users.user_id владельца маршрута
 | GET | `/api/me` | `{"user":{...},"logout_token":"..."}` или 401 |
 | GET | `/api/catalog` | `{"folders":[...],"routes":[...],"user":...}`; у открытых маршрутов есть `data` |
 | GET | `/api/route?m=<m>` | маршрут с `data` |
+| GET | `/api/route/view?m=...` | отметка загрузки маршрута |
 | POST | `/api/admin?action=...` | операции редактора |
 | GET | `/auth/yandex/start?return=/...&base=https://...` | 302 на Яндекс + state-cookie |
 | GET | `/auth/yandex/callback` | 302 обратно + sid-cookie |

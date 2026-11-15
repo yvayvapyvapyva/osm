@@ -450,6 +450,18 @@ tbody tr:last-child td { border-bottom: 0; }
             '<div class="muted">' + escapeHtml(p.status) + ' · ' + escapeHtml(fmtDate(p.paid_at || p.created_at)) + '</div></div>'
         ).join('') || '<div class="list-empty">Платежей нет</div>';
 
+        const views = (data.views || []).map(v => {
+            const title = v.title || v.m;
+            const flags = [];
+            if (v.premium) flags.push('премиум');
+            if (v.deleted) flags.push('удалён');
+            else if (!v.visible) flags.push('скрыт');
+            return '<div class="list-item"><div class="row"><span>' + escapeHtml(title) + '</span>' +
+                '<span class="muted">' + escapeHtml(v.view_count) + '×</span></div>' +
+                '<div class="muted mono">' + escapeHtml(v.m) + (flags.length ? ' · ' + escapeHtml(flags.join(' · ')) : '') + '</div>' +
+                '<div class="muted">последний: ' + escapeHtml(fmtDate(v.last_viewed_at)) + ' · первый: ' + escapeHtml(fmtDate(v.first_viewed_at)) + '</div></div>';
+        }).join('') || '<div class="list-empty">Маршруты ещё не загружал</div>';
+
         const sessions = (data.sessions || []).map(s =>
             '<div class="list-item"><div class="row"><span class="mono">' + escapeHtml(s.ip || 'IP нет') + '</span>' +
             '<span class="muted">' + escapeHtml(fmtDate(s.last_seen_at)) + '</span></div>' +
@@ -477,6 +489,7 @@ tbody tr:last-child td { border-bottom: 0; }
             (user.blocked ? 'Разблокировать' : 'Заблокировать') + '</button>' +
             '<button class="btn" data-action="sessions">Завершить все сессии</button>' +
             '</div></div>' +
+            '<div class="section"><h3>Просмотренные маршруты</h3><div class="list">' + views + '</div></div>' +
             '<div class="section"><h3>Платежи</h3><div class="list">' + payments + '</div></div>' +
             '<div class="section"><h3>Сессии</h3><div class="list">' + sessions + '</div></div>';
     }

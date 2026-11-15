@@ -806,3 +806,154 @@ def owned_counts(user_id):
         return len(get_pool().retry_operation_sync(operation)[0].rows)
 
     return count(roads_query), count(folders_query)
+
+
+# ---------------------------------------------------------------------------
+# История загрузок маршрутов
+# ---------------------------------------------------------------------------
+
+
+def record_route_view(user_id, m_param):
+    """Отмечает загрузку маршрута. Повтор увеличивает счётчик."""
+    now = _now()
+    select_query = """
+        DECLARE $user_id AS Utf8;
+        DECLARE $m AS Utf8;
+        SELECT view_count FROM route_views
+        WHERE user_id = $user_id AND m = $m;
+    """
+
+    def select(session):
+        prepared = session.prepare(select_query)
+        return session.transaction().execute(
+            prepared, {"$user_id": str(user_id), "$m": str(m_param)}, commit_tx=True
+        )
+
+    rows = get_pool().retry_operation_sync(select)[0].rows
+    if rows:
+        count = int(getattr(rows[0], "view_count", 1) or 1) + 1
+        update_query = """
+            DECLARE $user_id AS Utf8;
+            DECLARE $m AS Utf8;
+            DECLARE $last_viewed_at AS Timestamp;
+            DECLARE $view_count AS Uint32;
+            UPDATE route_views
+            SET last_viewed_at = $last_viewed_at, view_count = $view_count
+            WHERE user_id = $user_id AND m = $m;
+        """
+
+        def update(session):
+            prepared = session.prepare(update_query)
+            return session.transaction().execute(
+                prepared,
+                {
+                    "$user_id": str(user_id),
+                    "$m": str(m_param),
+                    "$last_viewed_at": now,
+                    "$view_count": count,
+                },
+                commit_tx=True,
+            )
+
+        get_pool().retry_operation_sync(update)
+        return
+
+    insert_query = """
+        DECLARE $user_id AS Utf8;
+        DECLARE $m AS Utf8;
+        DECLARE $now AS Timestamp;
+        INSERT INTO route_views
+            (user_id, m, first_viewed_at, last_viewed_at, view_count)
+        VALUES
+            ($user_id, $m, $now, $now, 1);
+    """
+
+    def insert(session):
+        prepared = session.prepare(insert_query)
+        return session.transaction().execute(
+            prepared,
+            {"$user_id": str(user_id), "$m": str(m_param), "$now": now},
+            commit_tx=True,
+        )
+
+    get_pool().retry_operation_sync(insert)
+
+
+def route_views_for_user(user_id):
+    query = """
+        DECLARE $user_id AS Utf8;
+        SELECT m, first_viewed_at, last_viewed_at, view_count
+        FROM route_views
+        WHERE user_id = $user_id;
+    """
+
+    def operation(session):
+        prepared = session.prepare(query)
+        return session.transaction().execute(
+            prepared, {"$user_id": str(user_id)}, commit_tx=True
+        )
+
+    rows = get_pool().retry_operation_sync(operation)[0].rows
+    result = {}
+    for row in rows:
+        key = _text(getattr(row, "m", ""))
+        if not key:
+            continue
+        result[key] = {
+            "first_viewed_at": _as_utc(getattr(row, "first_viewed_at", None)),
+            "last_viewed_at": _as_utc(getattr(row, "last_viewed_at", None)),
+            "view_count": int(getattr(row, "view_count", 0) or 0),
+        }
+    return result
+
+
+def list_roads_meta():
+    query = """
+        SELECT m, title, premium, visible, owner_user_id FROM roads;
+    """
+
+    def operation(session):
+        prepared = session.prepare(query)
+        return session.transaction().execute(prepared, {}, commit_tx=True)
+
+    rows = get_pool().retry_operation_sync(operation)[0].rows
+    meta = {}
+    for row in rows:
+        key = _text(getattr(row, "m", ""))
+        if not key:
+            continue
+        meta[key] = {
+            "m": key,
+            "title": _text(getattr(row, "title", "")),
+            "premium": bool(getattr(row, "premium", False)),
+            "visible": bool(getattr(row, "visible", False)),
+            "owner_user_id": _text(getattr(row, "owner_user_id", "")),
+        }
+    return meta
+
+
+def get_road_meta(m_param):
+    query = """
+        DECLARE $m AS Utf8;
+        SELECT m, title, premium, visible, owner_user_id
+        FROM roads
+        WHERE m = $m;
+    """
+
+    def operation(session):
+        prepared = session.prepare(query)
+        return session.transaction().execute(
+            prepared, {"$m": str(m_param)}, commit_tx=True
+        )
+
+    rows = get_pool().retry_operation_sync(operation)[0].rows
+    if not rows:
+        return None
+    row = rows[0]
+    return {
+        "m": _text(getattr(row, "m", "")),
+        "title": _text(getattr(row, "title", "")),
+        "premium": bool(getattr(row, "premium", False)),
+        "visible": bool(getattr(row, "visible", False)),
+        "owner_user_id": _text(getattr(row, "owner_user_id", "")),
+    }

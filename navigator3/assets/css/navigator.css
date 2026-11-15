@@ -1205,6 +1205,17 @@ button, input, select, textarea {
     line-height: 1.4;
 }
 
+.route-row-badge-viewed {
+    background: #EDF1F6;
+    color: var(--text-soft);
+    font-weight: 600;
+}
+
+[data-theme="dark"] .route-row-badge-viewed {
+    background: rgba(232, 237, 245, 0.10);
+    color: var(--text-muted);
+}
+
 .route-row-badge-premium {
     background: rgba(255, 176, 32, 0.2);
     color: #B7791F;
