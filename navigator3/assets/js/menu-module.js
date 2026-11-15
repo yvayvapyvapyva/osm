@@ -169,7 +169,8 @@ const MenuModule = {
                 point_count: Number.isFinite(route.point_count) ? route.point_count : null,
                 distance_meters: Number.isFinite(route.distance_meters) ? route.distance_meters : null,
                 premium: !!route.premium,
-                locked: !!route.locked
+                locked: !!route.locked,
+                viewed: !!route.viewed
             };
         }
 
