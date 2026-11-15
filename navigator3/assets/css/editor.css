@@ -711,6 +711,12 @@ html, body {
     border-color: var(--accent-green);
 }
 
+.settings-name-hint {
+    color: var(--text-tertiary);
+    font-size: 12px;
+    line-height: 1.35;
+}
+
 .settings-name-save {
     flex-shrink: 0;
     padding: 0 14px;
