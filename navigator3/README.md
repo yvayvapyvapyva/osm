@@ -49,6 +49,7 @@ return-адреса строятся от того хоста, с которог
 https://<домен-шлюза>/
   /                       → бакет osmn-nav: navigator.html
   /editor.html            → бакет osmn-nav: editor.html
+  /admin                  → бакет osmn-nav: admin.html
   /api/health             → функция osmn3
   /api/me                 → функция osmn3
   /api/catalog            → функция osmn3
@@ -99,7 +100,8 @@ navigator3/
 ├── deploy.sh                   # деплой функции osmn3
 └── deploy-2files/
     ├── navigator.html          # собранный бандл
-    └── editor.html             # собранный бандл
+    ├── editor.html             # собранный бандл
+    └── admin.html              # админка (копируется как есть)
 ```
 
 ## Модель данных

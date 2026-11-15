@@ -43,6 +43,14 @@
 - Миграция: `migrations/add_premium_subscriptions.py` (добавляет `users.premium_until` и таблицу `payments`).
 - Страница `/legal.html` генерируется при сборке из `legal.template.html` и переменных `LEGAL_NAME`, `LEGAL_INN`, `LEGAL_EMAIL`, `LEGAL_PHONE`, `LEGAL_TELEGRAM`. Без них будут заглушки «Не указано».
 
+## Админка
+- Страница: `/admin` на служебном домене шлюза (`https://d5dsd5u1tsc8fm9dbsg5.s183zexc.apigw.yandexcloud.net/admin`). Через apex/CDN не работает: CDN пропускает только GET, а действиям нужен POST.
+- Доступ: обычная сессия Яндекс ID, чей `yandex_id` перечислен в `ADMIN_YANDEX_IDS` (через пробел). Отзыв доступа — убрать ID и передеплоить функцию.
+- API: `GET /api/superadmin/users`, `GET /api/superadmin/user`, `POST /api/superadmin/premium`, `POST /api/superadmin/block`, `POST /api/superadmin/sessions/revoke`, `GET /api/superadmin/audit`.
+- Действия: выдать/продлить/снять премиум, блокировка (с завершением сессий), завершение всех сессий.
+- Аудит: таблица `admin_audit`, миграция `migrations/add_admin_audit.py`. Пишутся админ, действие, пользователь и параметры.
+- `admin.html` собирается копированием из `navigator3/admin.html` в `deploy-2files` (без бандла).
+
 ## Команда YC
 - `yc` установлен: `/Users/mb/yandex-cloud/bin/yc`
 - cloud-id: `b1gtnlal9r2s3rvqadjn`, folder-id: `b1gepvq09nl4oobiemtr`

@@ -1629,6 +1629,284 @@ def _handle_admin(event, user):
 
 
 # ---------------------------------------------------------------------------
+# Админка
+# ---------------------------------------------------------------------------
+
+
+def _superadmin_ids():
+    raw = _text(os.getenv("ADMIN_YANDEX_IDS", ""))
+    normalized = raw.replace(",", " ").replace(";", " ")
+    return {item.strip() for item in normalized.split() if item.strip()}
+
+
+def _current_superadmin(event):
+    user = _current_user(event)
+    if not user:
+        return None
+    if _text(user.get("yandex_id")) not in _superadmin_ids():
+        return None
+    return user
+
+
+def _superadmin_guard(event):
+    user = _current_superadmin(event)
+    if user:
+        return user, None
+    if not _current_user(event):
+        return None, auth.json_response(401, {"error": "unauthorized"})
+    return None, auth.json_response(403, {"error": "forbidden"})
+
+
+def _date_iso(value):
+    if not value:
+        return None
+    if isinstance(value, (int, float)):
+        value = dt.datetime.fromtimestamp(value / 1_000_000, tz=dt.timezone.utc)
+    if isinstance(value, dt.datetime):
+        if value.tzinfo is None:
+            value = value.replace(tzinfo=dt.timezone.utc)
+        return value.astimezone(dt.timezone.utc).isoformat()
+    return None
+
+
+def _superadmin_user_dict(user):
+    return {
+        "yandex_id": _text(user.get("yandex_id")),
+        "user_id": _text(user.get("user_id")),
+        "login": _text(user.get("login")),
+        "email": _text(user.get("email")),
+        "display_name": _text(user.get("display_name")),
+        "created_at": _date_iso(user.get("created_at")),
+        "last_login_at": _date_iso(user.get("last_login_at")),
+        "blocked": bool(user.get("blocked")),
+        "premium_until": _date_iso(_premium_until(user)),
+        "premium_active": _premium_active(user),
+    }
+
+
+def _api_superadmin_users(event):
+    admin, error = _superadmin_guard(event)
+    if error:
+        return error
+
+    query = _text(_query(event).get("q")).strip().lower()
+    try:
+        limit = max(1, min(int(_query(event).get("limit") or 100), 200))
+        offset = max(0, int(_query(event).get("offset") or 0))
+    except (TypeError, ValueError):
+        return auth.json_response(400, {"error": "invalid_pagination"})
+
+    users = store.list_users()
+    if query:
+        def matches(user):
+            fields = (
+                user.get("yandex_id"), user.get("user_id"), user.get("login"),
+                user.get("email"), user.get("display_name"),
+            )
+            return any(query in _text(field).lower() for field in fields)
+
+        users = [user for user in users if matches(user)]
+
+    total = len(users)
+    page = users[offset:offset + limit]
+    return auth.json_response(
+        200,
+        {
+            "users": [_superadmin_user_dict(user) for user in page],
+            "total": total,
+            "limit": limit,
+            "offset": offset,
+        },
+    )
+
+
+def _api_superadmin_user(event):
+    admin, error = _superadmin_guard(event)
+    if error:
+        return error
+
+    user_id = _text(_query(event).get("user_id")).strip()
+    if not user_id:
+        return auth.json_response(400, {"error": "missing_user_id"})
+    user = store.get_user_by_user_id(user_id)
+    if not user:
+        return auth.json_response(404, {"error": "user_not_found"})
+
+    payments = []
+    for payment in store.payments_for_user(user_id):
+        payments.append(
+            {
+                "inv_id": payment.get("inv_id"),
+                "amount_kopecks": payment.get("amount_kopecks"),
+                "currency": payment.get("currency"),
+                "status": payment.get("status"),
+                "provider": payment.get("provider"),
+                "created_at": _date_iso(payment.get("created_at")),
+                "paid_at": _date_iso(payment.get("paid_at")),
+            }
+        )
+
+    sessions = []
+    for session in store.sessions_for_user(_text(user.get("yandex_id"))):
+        sessions.append(
+            {
+                "created_at": _date_iso(session.get("created_at")),
+                "expires_at": _date_iso(session.get("expires_at")),
+                "last_seen_at": _date_iso(session.get("last_seen_at")),
+                "user_agent": session.get("user_agent"),
+                "ip": session.get("ip"),
+            }
+        )
+
+    roads, folders = store.owned_counts(user_id)
+    return auth.json_response(
+        200,
+        {
+            "user": _superadmin_user_dict(user),
+            "payments": payments,
+            "sessions": sessions,
+            "routes": roads,
+            "folders": folders,
+        },
+    )
+
+
+def _api_superadmin_premium(event):
+    admin, error = _superadmin_guard(event)
+    if error:
+        return error
+    if not auth.origin_allowed(event):
+        return auth.json_response(403, {"error": "forbidden_origin"})
+
+    body = _body_json(event)
+    if body is None:
+        return auth.json_response(400, {"error": "invalid_json_body"})
+
+    yandex_id = _text(body.get("yandex_id")).strip()
+    if not yandex_id:
+        return auth.json_response(400, {"error": "missing_yandex_id"})
+    user = store.get_user_by_yandex_id(yandex_id)
+    if not user:
+        return auth.json_response(404, {"error": "user_not_found"})
+
+    revoke = bool(body.get("revoke"))
+    until_raw = _text(body.get("until")).strip()
+    try:
+        days = int(body.get("days") or 0)
+    except (TypeError, ValueError):
+        return auth.json_response(400, {"error": "invalid_days"})
+
+    if revoke or days <= 0 and not until_raw:
+        until = None
+    elif until_raw:
+        try:
+            until = dt.datetime.fromisoformat(until_raw.replace("Z", "+00:00"))
+        except ValueError:
+            return auth.json_response(400, {"error": "invalid_until"})
+        if until.tzinfo is None:
+            until = until.replace(tzinfo=dt.timezone.utc)
+    else:
+        if days > 3650:
+            return auth.json_response(400, {"error": "days_too_large"})
+        base = max(store.now(), _premium_until(user) or store.now())
+        until = base + dt.timedelta(days=days)
+
+    updated = store.set_premium_until(yandex_id, until)
+    store.add_admin_audit(
+        _text(admin.get("yandex_id")),
+        "premium",
+        _text(user.get("user_id")),
+        yandex_id,
+        json.dumps(
+            {
+                "until": until.isoformat() if until else None,
+                "days": days,
+            },
+            ensure_ascii=False,
+        ),
+    )
+    return auth.json_response(
+        200, {"user": _superadmin_user_dict(updated or user)}
+    )
+
+
+def _api_superadmin_block(event):
+    admin, error = _superadmin_guard(event)
+    if error:
+        return error
+    if not auth.origin_allowed(event):
+        return auth.json_response(403, {"error": "forbidden_origin"})
+
+    body = _body_json(event)
+    if body is None:
+        return auth.json_response(400, {"error": "invalid_json_body"})
+    yandex_id = _text(body.get("yandex_id")).strip()
+    if not yandex_id:
+        return auth.json_response(400, {"error": "missing_yandex_id"})
+    user = store.get_user_by_yandex_id(yandex_id)
+    if not user:
+        return auth.json_response(404, {"error": "user_not_found"})
+
+    blocked = bool(body.get("blocked"))
+    updated = store.set_blocked(yandex_id, blocked)
+    if blocked:
+        store.delete_user_sessions(yandex_id)
+
+    store.add_admin_audit(
+        _text(admin.get("yandex_id")),
+        "block",
+        _text(user.get("user_id")),
+        yandex_id,
+        json.dumps({"blocked": blocked}, ensure_ascii=False),
+    )
+    return auth.json_response(
+        200, {"user": _superadmin_user_dict(updated or user)}
+    )
+
+
+def _api_superadmin_sessions_revoke(event):
+    admin, error = _superadmin_guard(event)
+    if error:
+        return error
+    if not auth.origin_allowed(event):
+        return auth.json_response(403, {"error": "forbidden_origin"})
+
+    body = _body_json(event)
+    if body is None:
+        return auth.json_response(400, {"error": "invalid_json_body"})
+    yandex_id = _text(body.get("yandex_id")).strip()
+    if not yandex_id:
+        return auth.json_response(400, {"error": "missing_yandex_id"})
+    user = store.get_user_by_yandex_id(yandex_id)
+    if not user:
+        return auth.json_response(404, {"error": "user_not_found"})
+
+    store.delete_user_sessions(yandex_id)
+    store.add_admin_audit(
+        _text(admin.get("yandex_id")),
+        "sessions_revoke",
+        _text(user.get("user_id")),
+        yandex_id,
+        "",
+    )
+    return auth.json_response(200, {"status": "ok"})
+
+
+def _api_superadmin_audit(event):
+    admin, error = _superadmin_guard(event)
+    if error:
+        return error
+    try:
+        limit = max(1, min(int(_query(event).get("limit") or 100), 500))
+    except (TypeError, ValueError):
+        return auth.json_response(400, {"error": "invalid_limit"})
+    items = store.list_admin_audit(limit)
+    for item in items:
+        item["created_at"] = _date_iso(item.get("created_at"))
+    return auth.json_response(200, {"items": items})
+
+
+# ---------------------------------------------------------------------------
 # Маршрутизация
 # ---------------------------------------------------------------------------
 
@@ -1652,6 +1930,24 @@ def _handle_api(event, path, method):
 
     if normalized == "/api/route" and method == "GET":
         return _api_route(event)
+
+    if normalized == "/api/superadmin/users" and method == "GET":
+        return _api_superadmin_users(event)
+
+    if normalized == "/api/superadmin/user" and method == "GET":
+        return _api_superadmin_user(event)
+
+    if normalized == "/api/superadmin/premium" and method == "POST":
+        return _api_superadmin_premium(event)
+
+    if normalized == "/api/superadmin/block" and method == "POST":
+        return _api_superadmin_block(event)
+
+    if normalized == "/api/superadmin/sessions/revoke" and method == "POST":
+        return _api_superadmin_sessions_revoke(event)
+
+    if normalized == "/api/superadmin/audit" and method == "GET":
+        return _api_superadmin_audit(event)
 
     if normalized == "/api/premium/status" and method == "GET":
         return _api_premium_status(event)

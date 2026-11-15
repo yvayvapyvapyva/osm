@@ -30,6 +30,15 @@ paths:
         object: navigator.html
         service_account_id: ajec0sf19r17r3tv6vrg
 
+  /admin:
+    get:
+      summary: Веб-админка
+      x-yc-apigateway-integration:
+        type: object_storage
+        bucket: osmn-nav
+        object: admin.html
+        service_account_id: ajec0sf19r17r3tv6vrg
+
   /api/{proxy+}:
     x-yc-apigateway-any-method:
       summary: API навигатора и аккаунта

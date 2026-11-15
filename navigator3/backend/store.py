@@ -573,3 +573,236 @@ def latest_payment_for_user(user_id):
     if not rows:
         return None
     return _payment_dict(rows[0])
+
+
+# ---------------------------------------------------------------------------
+# Админка: чтение пользователей, платежи, сессии, аудит
+# ---------------------------------------------------------------------------
+
+
+def list_users():
+    query = """
+        SELECT yandex_id, user_id, login, email, display_name,
+               created_at, last_login_at, blocked, premium_until
+        FROM users;
+    """
+
+    def operation(session):
+        prepared = session.prepare(query)
+        return session.transaction().execute(prepared, {}, commit_tx=True)
+
+    rows = get_pool().retry_operation_sync(operation)[0].rows
+    users = [_user_dict(row) for row in rows]
+    users.sort(key=lambda item: item.get("created_at") or _now(), reverse=True)
+    return users
+
+
+def get_user_by_user_id(user_id):
+    query = """
+        DECLARE $user_id AS Utf8;
+        SELECT yandex_id, user_id, login, email, display_name,
+               created_at, last_login_at, blocked, premium_until
+        FROM users
+        WHERE user_id = $user_id;
+    """
+
+    def operation(session):
+        prepared = session.prepare(query)
+        return session.transaction().execute(
+            prepared, {"$user_id": str(user_id)}, commit_tx=True
+        )
+
+    rows = get_pool().retry_operation_sync(operation)[0].rows
+    return _user_dict(rows[0]) if rows else None
+
+
+def payments_for_user(user_id, limit=100):
+    query = """
+        DECLARE $user_id AS Utf8;
+        DECLARE $limit AS Uint64;
+        SELECT inv_id, user_id, yandex_id, amount_kopecks, currency,
+               status, provider, payment_url, created_at, paid_at
+        FROM payments
+        WHERE user_id = $user_id
+        ORDER BY created_at DESC
+        LIMIT $limit;
+    """
+
+    def operation(session):
+        prepared = session.prepare(query)
+        return session.transaction().execute(
+            prepared,
+            {"$user_id": str(user_id), "$limit": int(limit)},
+            commit_tx=True,
+        )
+
+    rows = get_pool().retry_operation_sync(operation)[0].rows
+    return [_payment_dict(row) for row in rows]
+
+
+def sessions_for_user(yandex_id):
+    query = """
+        DECLARE $yandex_id AS Utf8;
+        SELECT sid_hash, yandex_id, user_id, created_at, expires_at,
+               last_seen_at, user_agent, ip
+        FROM sessions
+        WHERE yandex_id = $yandex_id;
+    """
+
+    def operation(session):
+        prepared = session.prepare(query)
+        return session.transaction().execute(
+            prepared, {"$yandex_id": str(yandex_id)}, commit_tx=True
+        )
+
+    result = get_pool().retry_operation_sync(operation)[0].rows
+    items = []
+    for row in result:
+        items.append(
+            {
+                "sid_hash": _text(getattr(row, "sid_hash", "")),
+                "yandex_id": _text(getattr(row, "yandex_id", "")),
+                "user_id": _text(getattr(row, "user_id", "")),
+                "created_at": _as_utc(getattr(row, "created_at", None)),
+                "expires_at": _as_utc(getattr(row, "expires_at", None)),
+                "last_seen_at": _as_utc(getattr(row, "last_seen_at", None)),
+                "user_agent": _text(getattr(row, "user_agent", "")),
+                "ip": _text(getattr(row, "ip", "")),
+            }
+        )
+    items.sort(key=lambda item: item.get("last_seen_at") or _now(), reverse=True)
+    return items
+
+
+def set_premium_until(yandex_id, until):
+    """until — datetime или None, чтобы снять премиум."""
+    query = """
+        DECLARE $yandex_id AS Utf8;
+        DECLARE $premium_until AS Timestamp?;
+        UPDATE users
+        SET premium_until = $premium_until
+        WHERE yandex_id = $yandex_id;
+    """
+
+    def operation(session):
+        prepared = session.prepare(query)
+        return session.transaction().execute(
+            prepared,
+            {"$yandex_id": str(yandex_id), "$premium_until": until},
+            commit_tx=True,
+        )
+
+    get_pool().retry_operation_sync(operation)
+    return get_user_by_yandex_id(yandex_id)
+
+
+def set_blocked(yandex_id, blocked):
+    query = """
+        DECLARE $yandex_id AS Utf8;
+        DECLARE $blocked AS Bool;
+        UPDATE users SET blocked = $blocked WHERE yandex_id = $yandex_id;
+    """
+
+    def operation(session):
+        prepared = session.prepare(query)
+        return session.transaction().execute(
+            prepared,
+            {"$yandex_id": str(yandex_id), "$blocked": bool(blocked)},
+            commit_tx=True,
+        )
+
+    get_pool().retry_operation_sync(operation)
+    return get_user_by_yandex_id(yandex_id)
+
+
+def add_admin_audit(admin_yandex_id, action, target_user_id, target_yandex_id,
+                    payload=""):
+    query = """
+        DECLARE $id AS Utf8;
+        DECLARE $admin_yandex_id AS Utf8;
+        DECLARE $action AS Utf8;
+        DECLARE $target_user_id AS Utf8;
+        DECLARE $target_yandex_id AS Utf8;
+        DECLARE $payload AS Utf8;
+        DECLARE $created_at AS Timestamp;
+
+        INSERT INTO admin_audit
+            (id, admin_yandex_id, action, target_user_id, target_yandex_id,
+             payload, created_at)
+        VALUES
+            ($id, $admin_yandex_id, $action, $target_user_id, $target_yandex_id,
+             $payload, $created_at);
+    """
+    now = _now()
+    audit_id = uuid.uuid4().hex
+
+    def operation(session):
+        prepared = session.prepare(query)
+        return session.transaction().execute(
+            prepared,
+            {
+                "$id": audit_id,
+                "$admin_yandex_id": str(admin_yandex_id),
+                "$action": str(action),
+                "$target_user_id": str(target_user_id),
+                "$target_yandex_id": str(target_yandex_id),
+                "$payload": str(payload or ""),
+                "$created_at": now,
+            },
+            commit_tx=True,
+        )
+
+    get_pool().retry_operation_sync(operation)
+    return audit_id
+
+
+def list_admin_audit(limit=200):
+    query = """
+        SELECT id, admin_yandex_id, action, target_user_id, target_yandex_id,
+               payload, created_at
+        FROM admin_audit;
+    """
+
+    def operation(session):
+        prepared = session.prepare(query)
+        return session.transaction().execute(prepared, {}, commit_tx=True)
+
+    rows = get_pool().retry_operation_sync(operation)[0].rows
+    items = []
+    for row in rows:
+        items.append(
+            {
+                "id": _text(getattr(row, "id", "")),
+                "admin_yandex_id": _text(getattr(row, "admin_yandex_id", "")),
+                "action": _text(getattr(row, "action", "")),
+                "target_user_id": _text(getattr(row, "target_user_id", "")),
+                "target_yandex_id": _text(getattr(row, "target_yandex_id", "")),
+                "payload": _text(getattr(row, "payload", "")),
+                "created_at": _as_utc(getattr(row, "created_at", None)),
+            }
+        )
+    items.sort(key=lambda item: item.get("created_at") or _now(), reverse=True)
+    return items[: int(limit)]
+
+
+def owned_counts(user_id):
+    """Количество маршрутов и папок, принадлежащих пользователю."""
+    roads_query = """
+        DECLARE $user_id AS Utf8;
+        SELECT m FROM roads WHERE owner_user_id = $user_id;
+    """
+    folders_query = """
+        DECLARE $user_id AS Utf8;
+        SELECT folder_id FROM folders WHERE owner_user_id = $user_id;
+    """
+
+    def count(query):
+        def operation(session):
+            prepared = session.prepare(query)
+            return session.transaction().execute(
+                prepared, {"$user_id": str(user_id)}, commit_tx=True
+            )
+
+        return len(get_pool().retry_operation_sync(operation)[0].rows)
+
+    return count(roads_query), count(folders_query)

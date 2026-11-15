@@ -237,4 +237,9 @@ function embedPage(file, bundle) {
 fs.mkdirSync(output, { recursive: true });
 for (const [file, bundle] of Object.entries(pageBundles)) embedPage(file, bundle);
 buildLegalPage();
+
+// Админка — самостоятельная страница без сборки бандла.
+fs.copyFileSync(path.join(root, 'admin.html'), path.join(output, 'admin.html'));
+console.log(`  admin.html: ${formatKb(fs.statSync(path.join(output, 'admin.html')).size)}`);
+
 console.log(`Static deploy bundle created: ${output}`);

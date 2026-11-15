@@ -1,0 +1,557 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Админка · ainstruktor.ru</title>
+<link rel="icon" href="assets/favicon-128.png" type="image/png">
+<style>
+:root {
+    --accent: #1876B5;
+    --accent-dark: #12608F;
+    --accent-soft: #E4F1FA;
+    --bg: #EEF3F8;
+    --surface: #FFFFFF;
+    --text: #12203A;
+    --muted: #5B6B80;
+    --line: rgba(18, 28, 46, 0.12);
+    --danger: #C0392B;
+    --danger-soft: #FBE9E7;
+    --success: #1E8E5A;
+    --success-soft: #E4F5EC;
+    --radius: 14px;
+    --shadow: 0 10px 30px rgba(18, 28, 46, 0.10);
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; min-height: 100%; }
+body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    color: var(--text);
+    background: var(--bg);
+    font-size: 14px;
+}
+button, input, a { font: inherit; }
+a { color: var(--accent); }
+.hidden { display: none !important; }
+
+.gate {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    background: var(--bg);
+    z-index: 50;
+}
+.gate-card {
+    width: min(100%, 380px);
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 20px;
+    padding: 28px 24px;
+    box-shadow: var(--shadow);
+    text-align: center;
+}
+.gate-card h1 { margin: 0 0 8px; font-size: 20px; }
+.gate-card p { margin: 0 0 20px; color: var(--muted); line-height: 1.45; }
+.gate-btn {
+    display: inline-block;
+    width: 100%;
+    padding: 12px 16px;
+    border: 0;
+    border-radius: 12px;
+    background: var(--accent);
+    color: #fff;
+    font-weight: 700;
+    text-decoration: none;
+    cursor: pointer;
+}
+.gate-btn:active { background: var(--accent-dark); }
+
+.page { max-width: 1180px; margin: 0 auto; padding: 20px 16px 48px; }
+.top {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-bottom: 18px;
+}
+.top h1 { margin: 0; font-size: 22px; letter-spacing: -0.3px; }
+.top .spacer { flex: 1; }
+.chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 10px;
+    border-radius: 999px;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    color: var(--muted);
+    font-size: 12px;
+}
+.link-btn {
+    border: 1px solid var(--line);
+    background: var(--surface);
+    color: var(--text);
+    padding: 8px 12px;
+    border-radius: 10px;
+    cursor: pointer;
+    text-decoration: none;
+    font-size: 13px;
+    font-weight: 600;
+}
+.link-btn:active { background: var(--bg); }
+
+.toolbar {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    margin-bottom: 12px;
+    flex-wrap: wrap;
+}
+.search {
+    flex: 1 1 260px;
+    min-width: 200px;
+    padding: 11px 14px;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: var(--surface);
+    color: var(--text);
+    outline: none;
+}
+.search:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.count { color: var(--muted); font-size: 12px; }
+
+.panel {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    overflow: hidden;
+}
+.table-wrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; min-width: 720px; }
+th, td { text-align: left; padding: 12px 14px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { font-size: 11px; text-transform: uppercase; letter-spacing: 0.4px; color: var(--muted); font-weight: 700; background: #F7FAFD; }
+tbody tr { cursor: pointer; }
+tbody tr:hover { background: #F5F9FD; }
+tbody tr:last-child td { border-bottom: 0; }
+.user-name { font-weight: 650; }
+.user-sub { color: var(--muted); font-size: 12px; margin-top: 2px; }
+.badge {
+    display: inline-block;
+    padding: 3px 8px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 700;
+    white-space: nowrap;
+}
+.badge-premium { background: var(--success-soft); color: var(--success); }
+.badge-danger { background: var(--danger-soft); color: var(--danger); }
+.badge-off { background: #F1F4F8; color: var(--muted); }
+.mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; }
+.empty { padding: 28px 16px; text-align: center; color: var(--muted); }
+
+/* Drawer */
+.drawer {
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: min(100%, 460px);
+    background: var(--surface);
+    border-left: 1px solid var(--line);
+    box-shadow: -12px 0 40px rgba(18, 28, 46, 0.16);
+    transform: translateX(100%);
+    transition: transform 0.2s ease;
+    display: flex;
+    flex-direction: column;
+    z-index: 40;
+}
+.drawer.open { transform: translateX(0); }
+.drawer-head {
+    padding: 16px;
+    border-bottom: 1px solid var(--line);
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+}
+.drawer-head h2 { margin: 0; font-size: 18px; }
+.drawer-head .user-sub { margin-top: 4px; }
+.icon-btn {
+    margin-left: auto;
+    width: 36px;
+    height: 36px;
+    border: 0;
+    border-radius: 50%;
+    background: var(--bg);
+    color: var(--muted);
+    cursor: pointer;
+    font-size: 20px;
+    line-height: 1;
+}
+.drawer-body { padding: 16px; overflow-y: auto; }
+.section { margin-bottom: 22px; }
+.section h3 {
+    margin: 0 0 8px;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--muted);
+}
+.kv { display: grid; grid-template-columns: 130px 1fr; gap: 6px 10px; font-size: 13px; }
+.kv dt { color: var(--muted); }
+.kv dd { margin: 0; overflow-wrap: anywhere; }
+.actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.btn {
+    padding: 9px 12px;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: var(--surface);
+    color: var(--text);
+    font-weight: 650;
+    font-size: 13px;
+    cursor: pointer;
+}
+.btn:active { background: var(--bg); }
+.btn-primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+.btn-primary:active { background: var(--accent-dark); }
+.btn-danger { color: var(--danger); border-color: rgba(192, 57, 43, 0.35); }
+.btn:disabled { opacity: 0.55; cursor: default; }
+.list { display: flex; flex-direction: column; gap: 8px; }
+.list-item {
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 10px 12px;
+    font-size: 13px;
+    background: #FBFCFE;
+}
+.list-item .row { display: flex; justify-content: space-between; gap: 10px; }
+.list-item .muted { color: var(--muted); font-size: 12px; }
+.list-empty { color: var(--muted); font-size: 13px; }
+
+.toast {
+    position: fixed;
+    left: 50%;
+    bottom: 24px;
+    transform: translateX(-50%) translateY(20px);
+    background: #12203A;
+    color: #fff;
+    padding: 10px 16px;
+    border-radius: 10px;
+    font-size: 13px;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease, transform 0.2s ease;
+    z-index: 60;
+    max-width: min(90vw, 420px);
+    text-align: center;
+}
+.toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+.toast.error { background: #8E2A20; }
+@media (max-width: 640px) {
+    .top h1 { font-size: 19px; }
+    .kv { grid-template-columns: 100px 1fr; }
+}
+</style>
+</head>
+<body>
+
+<div id="gate" class="gate hidden">
+    <div class="gate-card">
+        <h1>Админка</h1>
+        <p id="gateText">Войдите через Яндекс, чтобы открыть панель управления.</p>
+        <a id="gateLogin" class="gate-btn" href="/auth/yandex/start?return=%2Fadmin.html&force_confirm=1">Войти через Яндекс</a>
+    </div>
+</div>
+
+<div id="page" class="page hidden">
+    <div class="top">
+        <h1>Админка</h1>
+        <span id="meChip" class="chip"></span>
+        <span class="spacer"></span>
+        <button type="button" class="link-btn" id="refreshBtn">Обновить</button>
+        <a class="link-btn" id="logoutLink" href="/auth/logout">Выйти</a>
+    </div>
+
+    <div class="toolbar">
+        <input id="search" class="search" type="search" placeholder="Поиск по имени, логину, email, ID" autocomplete="off">
+        <span id="count" class="count"></span>
+    </div>
+
+    <div class="panel">
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Пользователь</th>
+                        <th>Премиум</th>
+                        <th>Статус</th>
+                        <th>Последний вход</th>
+                        <th>Регистрация</th>
+                    </tr>
+                </thead>
+                <tbody id="usersBody"></tbody>
+            </table>
+        </div>
+        <div id="usersEmpty" class="empty hidden">Пользователи не найдены</div>
+    </div>
+</div>
+
+<aside id="drawer" class="drawer" aria-hidden="true">
+    <div class="drawer-head">
+        <div>
+            <h2 id="drawerName">Пользователь</h2>
+            <div id="drawerSub" class="user-sub"></div>
+        </div>
+        <button type="button" class="icon-btn" id="drawerClose" aria-label="Закрыть">×</button>
+    </div>
+    <div class="drawer-body" id="drawerBody"></div>
+</aside>
+
+<div id="toast" class="toast"></div>
+
+<script>
+(function () {
+    const state = { me: null, users: [], selected: null, loading: false };
+    const $ = id => document.getElementById(id);
+
+    function toast(text, kind) {
+        const el = $('toast');
+        el.textContent = text;
+        el.className = 'toast show' + (kind === 'error' ? ' error' : '');
+        clearTimeout(toast._t);
+        toast._t = setTimeout(() => { el.className = 'toast'; }, 3200);
+    }
+
+    function fmtDate(value) {
+        if (!value) return '—';
+        const d = new Date(value);
+        if (Number.isNaN(d.getTime())) return '—';
+        return d.toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+    }
+    function fmtDay(value) {
+        if (!value) return '—';
+        const d = new Date(value);
+        if (Number.isNaN(d.getTime())) return '—';
+        return d.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric' });
+    }
+    function escapeHtml(value) {
+        return String(value == null ? '' : value)
+            .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    }
+
+    async function api(path, options) {
+        const opts = Object.assign({ credentials: 'same-origin', cache: 'no-store' }, options || {});
+        opts.headers = Object.assign({ Accept: 'application/json' }, opts.headers || {});
+        if (opts.body) opts.headers['Content-Type'] = 'application/json';
+        const response = await fetch(path, opts);
+        const data = await response.json().catch(() => ({}));
+        if (response.status === 401) {
+            showGate('Сессия истекла. Войдите снова.');
+            throw new Error('unauthorized');
+        }
+        if (response.status === 403) {
+            showGate('У этого аккаунта нет доступа к админке.');
+            throw new Error('forbidden');
+        }
+        if (!response.ok) {
+            throw new Error(data.error || ('HTTP ' + response.status));
+        }
+        return data;
+    }
+
+    function showGate(message) {
+        $('page').classList.add('hidden');
+        $('gate').classList.remove('hidden');
+        if (message) $('gateText').textContent = message;
+    }
+
+    function showPage() {
+        $('gate').classList.add('hidden');
+        $('page').classList.remove('hidden');
+    }
+
+    function premiumCell(user) {
+        if (user.premium_active) {
+            return '<span class="badge badge-premium">до ' + escapeHtml(fmtDay(user.premium_until)) + '</span>';
+        }
+        if (user.premium_until) {
+            return '<span class="badge badge-off">истёк ' + escapeHtml(fmtDay(user.premium_until)) + '</span>';
+        }
+        return '<span class="badge badge-off">нет</span>';
+    }
+
+    function renderUsers() {
+        const body = $('usersBody');
+        body.innerHTML = state.users.map(user => {
+            const name = user.display_name || user.login || user.user_id;
+            const sub = [user.login, user.email].filter(Boolean).join(' · ');
+            const status = user.blocked
+                ? '<span class="badge badge-danger">Заблокирован</span>'
+                : '<span class="badge badge-off">Активен</span>';
+            return '<tr data-user-id="' + escapeHtml(user.user_id) + '">' +
+                '<td><div class="user-name">' + escapeHtml(name) + '</div>' +
+                '<div class="user-sub">' + escapeHtml(sub) + '</div>' +
+                '<div class="user-sub mono">YC ' + escapeHtml(user.yandex_id) + '</div></td>' +
+                '<td>' + premiumCell(user) + '</td>' +
+                '<td>' + status + '</td>' +
+                '<td>' + escapeHtml(fmtDate(user.last_login_at)) + '</td>' +
+                '<td>' + escapeHtml(fmtDay(user.created_at)) + '</td>' +
+                '</tr>';
+        }).join('');
+        $('usersEmpty').classList.toggle('hidden', state.users.length > 0);
+        $('count').textContent = state.users.length + ' из ' + (state.total || state.users.length);
+    }
+
+    async function loadUsers() {
+        const q = $('search').value.trim();
+        const data = await api('/api/superadmin/users?limit=200&q=' + encodeURIComponent(q));
+        state.users = data.users || [];
+        state.total = data.total || state.users.length;
+        renderUsers();
+    }
+
+    async function loadMe() {
+        const response = await fetch('/api/me', { credentials: 'same-origin', cache: 'no-store', headers: { Accept: 'application/json' } });
+        if (response.status === 401) { showGate('Войдите через Яндекс, чтобы открыть панель управления.'); return false; }
+        if (!response.ok) throw new Error('HTTP ' + response.status);
+        const data = await response.json();
+        state.me = data.user || null;
+        if (!state.me) { showGate(); return false; }
+        $('meChip').textContent = state.me.display_name || state.me.login || 'админ';
+        if (data.logout_token) {
+            $('logoutLink').href = '/auth/logout?t=' + encodeURIComponent(data.logout_token) + '&return=' + encodeURIComponent('/admin.html');
+        }
+        return true;
+    }
+
+    async function openUser(userId) {
+        const data = await api('/api/superadmin/user?user_id=' + encodeURIComponent(userId));
+        state.selected = data;
+        renderDrawer();
+        $('drawer').classList.add('open');
+        $('drawer').setAttribute('aria-hidden', 'false');
+    }
+
+    function renderDrawer() {
+        const data = state.selected;
+        if (!data) return;
+        const user = data.user;
+        $('drawerName').textContent = user.display_name || user.login || user.user_id;
+        $('drawerSub').textContent = [user.login, user.email].filter(Boolean).join(' · ');
+
+        const payments = (data.payments || []).map(p =>
+            '<div class="list-item"><div class="row"><span>' + escapeHtml((p.amount_kopecks / 100).toFixed(2)) + ' ' + escapeHtml(p.currency || 'RUB') + '</span>' +
+            '<span class="muted">' + escapeHtml(p.provider || '') + '</span></div>' +
+            '<div class="muted">' + escapeHtml(p.status) + ' · ' + escapeHtml(fmtDate(p.paid_at || p.created_at)) + '</div></div>'
+        ).join('') || '<div class="list-empty">Платежей нет</div>';
+
+        const sessions = (data.sessions || []).map(s =>
+            '<div class="list-item"><div class="row"><span class="mono">' + escapeHtml(s.ip || 'IP нет') + '</span>' +
+            '<span class="muted">' + escapeHtml(fmtDate(s.last_seen_at)) + '</span></div>' +
+            '<div class="muted">' + escapeHtml((s.user_agent || '').slice(0, 80) || 'user-agent нет') + '</div></div>'
+        ).join('') || '<div class="list-empty">Сессий нет</div>';
+
+        $('drawerBody').innerHTML =
+            '<div class="section"><h3>Профиль</h3><dl class="kv">' +
+            '<dt>User ID</dt><dd class="mono">' + escapeHtml(user.user_id) + '</dd>' +
+            '<dt>Yandex ID</dt><dd class="mono">' + escapeHtml(user.yandex_id) + '</dd>' +
+            '<dt>Регистрация</dt><dd>' + escapeHtml(fmtDate(user.created_at)) + '</dd>' +
+            '<dt>Последний вход</dt><dd>' + escapeHtml(fmtDate(user.last_login_at)) + '</dd>' +
+            '<dt>Маршруты</dt><dd>' + escapeHtml(data.routes) + '</dd>' +
+            '<dt>Папки</dt><dd>' + escapeHtml(data.folders) + '</dd>' +
+            '<dt>Премиум</dt><dd>' + (user.premium_active ? 'активен до ' + escapeHtml(fmtDate(user.premium_until)) : 'нет') + '</dd>' +
+            '<dt>Статус</dt><dd>' + (user.blocked ? 'заблокирован' : 'активен') + '</dd>' +
+            '</dl></div>' +
+            '<div class="section"><h3>Премиум</h3><div class="actions">' +
+            '<button class="btn btn-primary" data-action="premium" data-days="30">+30 дней</button>' +
+            '<button class="btn" data-action="premium" data-days="90">+90 дней</button>' +
+            '<button class="btn btn-danger" data-action="premium" data-revoke="1">Снять</button>' +
+            '</div></div>' +
+            '<div class="section"><h3>Доступ</h3><div class="actions">' +
+            '<button class="btn ' + (user.blocked ? '' : 'btn-danger') + '" data-action="block" data-blocked="' + (user.blocked ? '0' : '1') + '">' +
+            (user.blocked ? 'Разблокировать' : 'Заблокировать') + '</button>' +
+            '<button class="btn" data-action="sessions">Завершить все сессии</button>' +
+            '</div></div>' +
+            '<div class="section"><h3>Платежи</h3><div class="list">' + payments + '</div></div>' +
+            '<div class="section"><h3>Сессии</h3><div class="list">' + sessions + '</div></div>';
+    }
+
+    async function runAction(button) {
+        const data = state.selected;
+        if (!data) return;
+        const yandexId = data.user.yandex_id;
+        const action = button.dataset.action;
+        button.disabled = true;
+        try {
+            if (action === 'premium') {
+                const body = { yandex_id: yandexId };
+                if (button.dataset.revoke) body.revoke = true;
+                else body.days = Number(button.dataset.days || 30);
+                await api('/api/superadmin/premium', { method: 'POST', body: JSON.stringify(body) });
+                toast(body.revoke ? 'Премиум снят' : 'Премиум продлён');
+            } else if (action === 'block') {
+                const blocked = button.dataset.blocked === '1';
+                await api('/api/superadmin/block', { method: 'POST', body: JSON.stringify({ yandex_id: yandexId, blocked: blocked }) });
+                toast(blocked ? 'Пользователь заблокирован' : 'Пользователь разблокирован');
+            } else if (action === 'sessions') {
+                await api('/api/superadmin/sessions/revoke', { method: 'POST', body: JSON.stringify({ yandex_id: yandexId }) });
+                toast('Сессии завершены');
+            }
+            await Promise.all([loadUsers(), openUser(data.user.user_id)]);
+        } catch (error) {
+            if (error && (error.message === 'unauthorized' || error.message === 'forbidden')) return;
+            toast('Ошибка: ' + (error.message || 'не удалось выполнить'), 'error');
+        } finally {
+            button.disabled = false;
+        }
+    }
+
+    function closeDrawer() {
+        $('drawer').classList.remove('open');
+        $('drawer').setAttribute('aria-hidden', 'true');
+    }
+
+    $('usersBody').addEventListener('click', event => {
+        const row = event.target.closest('tr[data-user-id]');
+        if (row) openUser(row.dataset.userId);
+    });
+    $('drawerBody').addEventListener('click', event => {
+        const button = event.target.closest('button[data-action]');
+        if (button) runAction(button);
+    });
+    $('drawerClose').addEventListener('click', closeDrawer);
+    $('drawer').addEventListener('click', event => {
+        if (event.target === $('drawer')) closeDrawer();
+    });
+    $('refreshBtn').addEventListener('click', () => {
+        loadUsers().then(() => toast('Обновлено')).catch(() => {});
+    });
+    let searchTimer = null;
+    $('search').addEventListener('input', () => {
+        clearTimeout(searchTimer);
+        searchTimer = setTimeout(() => { loadUsers().catch(() => {}); }, 250);
+    });
+
+    (async function init() {
+        try {
+            const ok = await loadMe();
+            if (!ok) return;
+            const data = await api('/api/superadmin/users?limit=200');
+            state.users = data.users || [];
+            state.total = data.total || state.users.length;
+            showPage();
+            renderUsers();
+        } catch (error) {
+            if (error && (error.message === 'unauthorized' || error.message === 'forbidden')) return;
+            showGate('Не удалось загрузить админку. Попробуйте обновить страницу.');
+        }
+    })();
+})();
+</script>
+</body>
+</html>
