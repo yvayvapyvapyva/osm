@@ -15,9 +15,12 @@ const AuthModule = {
         if (this._initialized) return;
         this._initialized = true;
         this._bind();
+        // Сначала проверяем сессию: если вход уже состоялся, ошибку из URL
+        // не показываем, а просто чистим адрес. Иначе после успешного
+        // OAuth можно увидеть «сессия истекла», хотя пользователь вошёл.
+        await this._load();
         this._showUrlError();
         this._showLoggedOut();
-        await this._load();
     },
 
     _bind() {
@@ -156,6 +159,11 @@ const AuthModule = {
         const params = new URLSearchParams(window.location.search);
         const code = params.get('auth_error');
         if (!code) return;
+
+        if (this.user) {
+            this._cleanUrl(params, 'auth_error');
+            return;
+        }
 
         const messages = {
             access_denied: 'Вход отменён на стороне Яндекса',

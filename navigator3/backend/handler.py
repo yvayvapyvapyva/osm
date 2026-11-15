@@ -891,6 +891,21 @@ def _auth_start(event):
     )
 
 
+def _strip_auth_params(path):
+    """Убирает служебные параметры входа из адреса возврата."""
+    if not isinstance(path, str):
+        return "/"
+    parsed = urllib.parse.urlsplit(path)
+    query = [
+        (key, value)
+        for key, value in urllib.parse.parse_qsl(parsed.query, keep_blank_values=True)
+        if key not in ("auth_error", "logged_out")
+    ]
+    return urllib.parse.urlunsplit(
+        ("", "", parsed.path or "/", urllib.parse.urlencode(query), parsed.fragment)
+    )
+
+
 def _auth_callback(event):
     params = _query(event)
     cookies = auth.parse_cookies(event)
@@ -909,6 +924,15 @@ def _auth_callback(event):
         or not expected_state
         or not hmac.compare_digest(str(state), str(expected_state))
     ):
+        # Повторный callback после успешного входа: сессия уже есть, cookie
+        # состояния погашена. Не пугаем пользователя ошибкой.
+        if _current_user(event):
+            print("[auth] state mismatch with active session, ignoring")
+            return_to = _strip_auth_params(
+                auth.return_from_cookie(cookies.get(auth.RETURN_COOKIE))
+            )
+            return auth.redirect_response(return_to, auth.clear_oauth_cookies())
+        print("[auth] state mismatch without session")
         return auth.redirect_response(
             "/?auth_error=state_mismatch", auth.clear_oauth_cookies()
         )
@@ -960,7 +984,9 @@ def _auth_callback(event):
             "/?auth_error=storage_failed", auth.clear_oauth_cookies()
         )
 
-    return_to = auth.return_from_cookie(cookies.get(auth.RETURN_COOKIE))
+    return_to = _strip_auth_params(
+        auth.return_from_cookie(cookies.get(auth.RETURN_COOKIE))
+    )
     return auth.redirect_response(
         return_to,
         [auth.session_cookie(sid)] + auth.clear_oauth_cookies(),
