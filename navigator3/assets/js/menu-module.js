@@ -551,8 +551,9 @@ const MenuModule = {
         const details = row.querySelector('.route-row-details');
         if (!title || !details) return;
         if (details.querySelector('.route-row-viewed')) return;
-        const active = Array.from(title.querySelectorAll('.route-row-badge'))
-            .some(badge => badge.textContent === 'Загружен');
+        const active = row.classList.contains('is-active') ||
+            Array.from(details.querySelectorAll('.route-row-badge'))
+                .some(badge => badge.textContent === 'Загружен');
         if (active) return;
         let flagRow = details.querySelector('.route-row-flags');
         if (!flagRow) {
@@ -594,13 +595,6 @@ const MenuModule = {
         name.textContent = route.name || route.m;
         title.appendChild(name);
 
-        if (isActive) {
-            const badge = document.createElement('span');
-            badge.className = 'route-row-badge';
-            badge.textContent = 'Загружен';
-            title.appendChild(badge);
-        }
-
         const meta = document.createElement('span');
         meta.className = 'route-row-meta';
         meta.textContent = route.folderNames.length ? route.folderNames.join(' · ') : 'Без папки';
@@ -626,6 +620,12 @@ const MenuModule = {
             details.appendChild(statsEl);
         }
         const flags = [];
+        if (isActive) {
+            const activeBadge = document.createElement('span');
+            activeBadge.className = 'route-row-badge';
+            activeBadge.textContent = 'Загружен';
+            flags.push(activeBadge);
+        }
         if (route.premium) {
             const premiumBadge = document.createElement('span');
             premiumBadge.className = 'route-row-badge route-row-badge-premium';
