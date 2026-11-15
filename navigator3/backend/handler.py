@@ -120,7 +120,7 @@ def execute_list_public_routes_geometry(session):
 
 def execute_list_owner_names(session):
     query = """
-        SELECT user_id, login, display_name
+        SELECT user_id, login, display_name, routes_folder_name
         FROM users;
     """
     prepared = session.prepare(query)
@@ -695,6 +695,7 @@ def _public_user(user):
         "user_id": _text(user.get("user_id")),
         "login": _text(user.get("login")),
         "display_name": _text(user.get("display_name")),
+        "routes_folder_name": _text(user.get("routes_folder_name")),
         "email": _text(user.get("email")),
         "premium_until": until.isoformat() if until else None,
         "premium_active": _premium_active(user),
@@ -775,7 +776,8 @@ def _catalog_data(include_geometry=False):
     owner_rows = _rows(pool.retry_operation_sync(execute_list_owner_names))
     owner_names = {
         _text(_row_value(row, "user_id")): (
-            _text(_row_value(row, "display_name")).strip()
+            _text(_row_value(row, "routes_folder_name")).strip()
+            or _text(_row_value(row, "display_name")).strip()
             or _text(_row_value(row, "login")).strip()
             or "Владелец"
         )
@@ -1126,14 +1128,21 @@ def _api_profile_update(event):
     if body is None:
         return auth.json_response(400, {"error": "invalid_json_body"})
 
-    display_name = _text(body.get("display_name")).strip()
-    if len(display_name) > 60:
-        return auth.json_response(400, {"error": "display_name_too_long"})
+    raw_name = body.get("folder_name")
+    if raw_name is None:
+        # Совместимость со старыми сборками редактора, которые присылали
+        # display_name. Теперь это название папки, а не имя аккаунта.
+        raw_name = body.get("display_name")
+    folder_name = _text(raw_name).strip()
+    if len(folder_name) > 60:
+        return auth.json_response(400, {"error": "folder_name_too_long"})
 
     try:
-        updated = store.update_display_name(user.get("yandex_id"), display_name)
+        updated = store.update_routes_folder_name(
+            user.get("yandex_id"), folder_name
+        )
     except Exception as exc:  # noqa: BLE001
-        print(f"[profile] display_name update failed: {exc}")
+        print(f"[profile] routes_folder_name update failed: {exc}")
         return auth.json_response(500, {"error": "storage_failed"})
 
     return auth.json_response(200, {"user": _public_user(updated or user)})
@@ -1725,6 +1734,7 @@ def _superadmin_user_dict(user):
         "login": _text(user.get("login")),
         "email": _text(user.get("email")),
         "display_name": _text(user.get("display_name")),
+        "routes_folder_name": _text(user.get("routes_folder_name")),
         "created_at": _date_iso(user.get("created_at")),
         "last_login_at": _date_iso(user.get("last_login_at")),
         "blocked": bool(user.get("blocked")),

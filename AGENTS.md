@@ -57,6 +57,12 @@
 - `/api/catalog` возвращает `viewed` для каждого маршрута; в меню показывается бейдж «Просмотрен».
 - В карточке пользователя админки отдаётся список `views` с датами и количеством загрузок.
 
+## Имя аккаунта и папка маршрутов
+- `users.display_name` — имя из Яндекс-профиля, в редакторе не меняется.
+- `users.routes_folder_name` — отдельное название корневой папки владельца в каталоге; пустое значение означает fallback на `display_name`/`login`.
+- `POST /api/profile` с `{folder_name}` меняет только название папки. Для совместимости старое поле `display_name` тоже трактуется как название папки.
+- Миграция: `migrations/add_routes_folder_name.py`.
+
 ## Команда YC
 - `yc` установлен: `/Users/mb/yandex-cloud/bin/yc`
 - cloud-id: `b1gtnlal9r2s3rvqadjn`, folder-id: `b1gepvq09nl4oobiemtr`

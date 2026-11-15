@@ -471,6 +471,7 @@ tbody tr:last-child td { border-bottom: 0; }
         $('drawerBody').innerHTML =
             '<div class="section"><h3>Профиль</h3><dl class="kv">' +
             '<dt>User ID</dt><dd class="mono">' + escapeHtml(user.user_id) + '</dd>' +
+            '<dt>Папка</dt><dd>' + escapeHtml(user.routes_folder_name || '—') + '</dd>' +
             '<dt>Yandex ID</dt><dd class="mono">' + escapeHtml(user.yandex_id) + '</dd>' +
             '<dt>Регистрация</dt><dd>' + escapeHtml(fmtDate(user.created_at)) + '</dd>' +
             '<dt>Последний вход</dt><dd>' + escapeHtml(fmtDate(user.last_login_at)) + '</dd>' +

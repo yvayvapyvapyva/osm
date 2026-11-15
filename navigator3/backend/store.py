@@ -82,6 +82,7 @@ def _user_dict(row):
         "login": _text(row.login),
         "email": _text(row.email),
         "display_name": _text(row.display_name),
+        "routes_folder_name": _text(getattr(row, "routes_folder_name", "")),
         "created_at": row.created_at,
         "last_login_at": row.last_login_at,
         "blocked": bool(row.blocked) if row.blocked is not None else False,
@@ -93,7 +94,8 @@ def get_user_by_yandex_id(yandex_id):
     query = """
         DECLARE $yandex_id AS Utf8;
         SELECT yandex_id, user_id, login, email, display_name,
-               created_at, last_login_at, blocked, premium_until
+               routes_folder_name, created_at, last_login_at, blocked,
+               premium_until
         FROM users
         WHERE yandex_id = $yandex_id;
     """
@@ -222,6 +224,31 @@ def update_display_name(yandex_id, display_name):
             {
                 "$yandex_id": str(yandex_id),
                 "$display_name": str(display_name or ""),
+            },
+            commit_tx=True,
+        )
+
+    get_pool().retry_operation_sync(update)
+    return get_user_by_yandex_id(yandex_id)
+
+
+def update_routes_folder_name(yandex_id, folder_name):
+    """Меняет название корневой папки с маршрутами, не трогая имя аккаунта."""
+    query = """
+        DECLARE $yandex_id AS Utf8;
+        DECLARE $folder_name AS Utf8;
+        UPDATE users
+        SET routes_folder_name = $folder_name
+        WHERE yandex_id = $yandex_id;
+    """
+
+    def update(session):
+        prepared = session.prepare(query)
+        return session.transaction().execute(
+            prepared,
+            {
+                "$yandex_id": str(yandex_id),
+                "$folder_name": str(folder_name or ""),
             },
             commit_tx=True,
         )
@@ -583,7 +610,8 @@ def latest_payment_for_user(user_id):
 def list_users():
     query = """
         SELECT yandex_id, user_id, login, email, display_name,
-               created_at, last_login_at, blocked, premium_until
+               routes_folder_name, created_at, last_login_at, blocked,
+               premium_until
         FROM users;
     """
 
@@ -601,7 +629,8 @@ def get_user_by_user_id(user_id):
     query = """
         DECLARE $user_id AS Utf8;
         SELECT yandex_id, user_id, login, email, display_name,
-               created_at, last_login_at, blocked, premium_until
+               routes_folder_name, created_at, last_login_at, blocked,
+               premium_until
         FROM users
         WHERE user_id = $user_id;
     """
