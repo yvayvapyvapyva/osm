@@ -2221,15 +2221,15 @@ async function loadRouteFromJSON(data) {
 // Отмечает маршрут как загруженный. GET, потому что CDN на apex
 // пропускает только GET; ошибку игнорируем, загрузка уже состоялась.
 function recordRouteView() {
-    const m = window.MenuModule && MenuModule.currentRoute;
-    if (!m) return;
+    if (typeof MenuModule === 'undefined' || !MenuModule.currentRoute) return;
+    const m = MenuModule.currentRoute;
     fetch('/api/route/view?m=' + encodeURIComponent(m), {
         credentials: 'same-origin',
         headers: { Accept: 'application/json' },
         cache: 'no-store'
     }).then(response => {
         if (!response.ok) return;
-        if (window.MenuModule && typeof MenuModule.markRouteViewed === 'function') {
+        if (typeof MenuModule.markRouteViewed === 'function') {
             MenuModule.markRouteViewed(m);
         }
     }).catch(() => {});
