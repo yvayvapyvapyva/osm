@@ -1666,6 +1666,13 @@ input, textarea, select {
     border-color: #0A84FF;
 }
 
+/* iOS Safari не должен зумить страницу при фокусе на поле команды. */
+@media (pointer: coarse) {
+    .cmd-input {
+        font-size: 16px;
+    }
+}
+
 .play-cmd-btn {
     flex-shrink: 0;
     width: 32px;
@@ -1738,12 +1745,23 @@ input, textarea, select {
     gap: 2px;
     max-height: 264px;
     overflow-y: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
     padding: 6px;
     border-radius: 12px;
     border: 1px solid var(--line);
     background: var(--surface);
     box-shadow: var(--shadow-raised);
     -webkit-overflow-scrolling: touch;
+}
+
+.phrase-menu-inline {
+    position: static;
+    width: 100%;
+    max-height: 220px;
+    margin-top: 6px;
+    box-sizing: border-box;
+    z-index: auto;
 }
 
 .phrase-menu-item {

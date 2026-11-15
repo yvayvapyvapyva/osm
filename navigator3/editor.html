@@ -2358,6 +2358,9 @@ function filterEditorPhrases(list, query) {
 function attachPhraseAutocomplete(field, kind) {
     if (!field) return;
     const sourceKey = phraseKindKey(kind);
+    // На телефоне клавиатура меняет видимую область, и плавающее меню
+    // начинает «уезжать». Там показываем подсказки прямо в карточке.
+    const inlineMenu = window.matchMedia('(pointer: coarse)').matches;
     let menu = null;
     let items = [];
     let activeIndex = -1;
@@ -2396,10 +2399,18 @@ function attachPhraseAutocomplete(field, kind) {
         closeMenu();
     };
 
+    const onViewportScroll = event => {
+        // Прокрутка внутри самого меню не должна двигать его.
+        if (menu && event.target instanceof Node && menu.contains(event.target)) {
+            return;
+        }
+        positionMenu();
+    };
+
     const startListening = () => {
         if (listening) return;
         window.addEventListener('resize', positionMenu);
-        document.addEventListener('scroll', positionMenu, true);
+        document.addEventListener('scroll', onViewportScroll, true);
         document.addEventListener('pointerdown', onDocumentPointerDown, true);
         listening = true;
     };
@@ -2407,7 +2418,7 @@ function attachPhraseAutocomplete(field, kind) {
     const stopListening = () => {
         if (!listening) return;
         window.removeEventListener('resize', positionMenu);
-        document.removeEventListener('scroll', positionMenu, true);
+        document.removeEventListener('scroll', onViewportScroll, true);
         document.removeEventListener('pointerdown', onDocumentPointerDown, true);
         listening = false;
     };
@@ -2460,12 +2471,24 @@ function attachPhraseAutocomplete(field, kind) {
             });
             box.appendChild(item);
         });
-        document.body.appendChild(box);
+        box.addEventListener('pointerdown', event => event.stopPropagation());
+        box.addEventListener('click', event => event.stopPropagation());
+        if (inlineMenu) {
+            box.classList.add('phrase-menu-inline');
+            const row = field.parentElement;
+            if (row && row.parentElement) {
+                row.insertAdjacentElement('afterend', box);
+            } else {
+                document.body.appendChild(box);
+            }
+        } else {
+            document.body.appendChild(box);
+            positionMenu();
+            startListening();
+        }
         menu = box;
         items = matches;
         activeIndex = -1;
-        positionMenu();
-        startListening();
     };
 
     const updateSuggestions = async () => {
