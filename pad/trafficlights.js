@@ -368,9 +368,11 @@
         if (marker._leg) {
             const legH = Math.min(100, realH || pxH);
             const overlap = legH * 0.35;
+            const legW = legH * 0.09;
             marker._leg.style.top = ((TL_BASE_H - legH) / 2 + legH * 0.65) + 'px';
             marker._leg.style.height = (legH * 1.35 / 2) + 'px';
-            marker._leg.style.width = (legH * 0.09) + 'px';
+            marker._leg.style.width = legW + 'px';
+            marker._leg.style.boxShadow = '0 0 0 ' + (legW * 0.28) + 'px #fff';
         }
         // Панель управления привязана к низу видимого корпуса
         if (marker._ctrl) marker._ctrl.style.top = 'calc(100% + ' + ((pxH - TL_BASE_H) / 2 + 8) + 'px)';
