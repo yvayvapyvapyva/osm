@@ -439,7 +439,6 @@
         .sign-leg {
             position:absolute; left:50%; transform:translateX(-50%);
             background:#8E8E93; border-radius:2px; pointer-events:none;
-            box-shadow:0 0 0 1px #fff;
             z-index:-1;
         }
 
@@ -1904,12 +1903,13 @@ function updatePicSize(marker) {
             });
         }
         if (marker._leg) {
-            // Ножка длиннее знака: верхние 35% прячутся под знак (ножка на слое позади).
-            const legH = imgH;
-            const overlap = legH * 0.35;
-            marker._leg.style.top = (legH - overlap) + 'px';
-            marker._leg.style.height = (legH + overlap) + 'px';
-            marker._leg.style.width = Math.max(2, legH * 0.09) + 'px';
+            // Ножка считается от реального размера знака, без минимума:
+            // при отдалении она уменьшается вместе с картой.
+            const realH = (marker._sizeM || ZNAK_MAX_M) / mpp;
+            const overlap = realH * 0.35;
+            marker._leg.style.top = (realH - overlap) + 'px';
+            marker._leg.style.height = (realH + overlap) + 'px';
+            marker._leg.style.width = (realH * 0.09) + 'px';
         }
     } else {
         // Машинка: минимальная длина 15px по аналогии с минимумом светофора.
