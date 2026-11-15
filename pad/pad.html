@@ -814,23 +814,20 @@ function updateZnakPanelHeader() {
     const title = document.getElementById('znakPanelTitle');
     const back = document.getElementById('znakBackBtn');
     if (znakPanelMode === 'attach') {
-        if (title) title.textContent = 'Таблички к знаку';
+        if (title) {
+            title.hidden = false;
+            title.textContent = 'Таблички к знаку';
+        }
         if (back) back.hidden = true;
         return;
     }
-    if (znakSearchQuery) {
-        if (title) title.textContent = 'Поиск';
-        if (back) back.hidden = false;
-        return;
+    // В обычном выборе знаков название группы не дублируем:
+    // она и так понятна по содержимому.
+    if (title) {
+        title.hidden = true;
+        title.textContent = '';
     }
-    if (znakView === 'groups') {
-        if (title) title.textContent = 'Группы знаков';
-        if (back) back.hidden = true;
-        return;
-    }
-    const group = ZNAK_GROUPS.find(item => item.id === znakGroup);
-    if (title) title.textContent = group ? group.title : 'Знаки';
-    if (back) back.hidden = false;
+    if (back) back.hidden = znakView === 'groups' && !znakSearchQuery;
 }
 
 function buildZnakGroups(grid) {
@@ -929,7 +926,10 @@ function openZnakPanel(mode) {
     const search = document.getElementById('znakSearch');
     if (search) search.value = '';
     const title = document.getElementById('znakPanelTitle');
-    if (title) title.textContent = znakPanelMode === 'attach' ? 'Таблички к знаку' : 'Группы знаков';
+    if (title) {
+        title.hidden = znakPanelMode !== 'attach';
+        title.textContent = znakPanelMode === 'attach' ? 'Таблички к знаку' : '';
+    }
     buildZnakTabs();
     panel.classList.add('visible');
     document.getElementById('addZnakBtn').classList.add('open');
