@@ -1224,6 +1224,7 @@ function drawRoutePreview(data) {
     const previewFrom = readVar('--preview-bg-from', '#F8FAFC');
     const previewTo = readVar('--preview-bg-to', '#E8EEF6');
     const previewShadow = readVar('--preview-shadow', 'rgba(18, 28, 46, 0.20)');
+    const dotStroke = '#121A28';
 
     const background = context.createLinearGradient(0, 0, width, height);
     background.addColorStop(0, previewFrom);
@@ -1254,13 +1255,13 @@ function drawRoutePreview(data) {
         points.push({
             coordinates,
             path: coordinates.map(project),
-            color: routePreviewColors[segment.color] || '#FFD700',
-            number: String(segment.id || points.length + 1),
-            hasComment: typeof segment.comm === 'string' && segment.comm.trim() !== ''
+            color: routePreviewColors[segment.color] || '#FFD700'
         });
     }
 
-    if (!points.length) return { image: canvas.toDataURL('image/jpeg', 0.92), pointCount: 0, distanceMeters: 0 };
+    if (!points.length) {
+        return { image: canvas.toDataURL('image/jpeg', 0.92), pointCount: 0, distanceMeters: 0 };
+    }
 
     let minX = Infinity;
     let maxX = -Infinity;
@@ -1290,8 +1291,7 @@ function drawRoutePreview(data) {
         }
     }
 
-    const markerSize = 20;
-    const padding = markerSize / 2 + 2;
+    const padding = 6;
     const scale = Math.min(
         (width - padding * 2) / Math.max(maxX - minX, 1e-9),
         (height - padding * 2) / Math.max(maxY - minY, 1e-9)
@@ -1314,51 +1314,37 @@ function drawRoutePreview(data) {
         context.lineCap = 'round';
         context.lineJoin = 'round';
         context.strokeStyle = previewShadow;
-        context.lineWidth = markerSize * 0.2;
+        context.lineWidth = 4;
         context.stroke();
         context.strokeStyle = point.color;
-        context.lineWidth = markerSize * 0.1;
+        context.lineWidth = 2;
         context.stroke();
     }
 
-    for (let index = points.length - 1; index >= 0; index--) {
-        const point = points[index];
+    const dotRadius = 2.4;
+    for (const point of points) {
+        if (!point.path.length) continue;
         const position = toCanvas(point.path[0]);
-        const radius = markerSize * 9 / 40;
         context.beginPath();
-        context.arc(position.x, position.y, radius, 0, Math.PI * 2);
-        context.fillStyle = '#fff';
-        context.fill();
-        context.beginPath();
-        context.arc(position.x, position.y, radius, 0, Math.PI * 2);
+        context.arc(position.x, position.y, dotRadius, 0, Math.PI * 2);
         context.fillStyle = point.color;
-        context.globalAlpha = 0.18;
         context.fill();
+        context.beginPath();
+        context.arc(position.x, position.y, dotRadius + 0.3, 0, Math.PI * 2);
+        context.lineWidth = 0.5;
+        context.strokeStyle = dotStroke;
+        context.globalAlpha = 0.75;
+        context.stroke();
         context.globalAlpha = 1;
+    }
+
+    if (points[0].path.length) {
+        const position = toCanvas(points[0].path[0]);
         context.beginPath();
-        context.arc(position.x, position.y, radius, 0, Math.PI * 2);
-        context.strokeStyle = point.color;
-        context.lineWidth = 1;
+        context.arc(position.x, position.y, dotRadius + 1.6, 0, Math.PI * 2);
+        context.lineWidth = 1.5;
+        context.strokeStyle = '#34C759';
         context.stroke();
-        context.beginPath();
-        context.arc(position.x, position.y, radius + 1, 0, Math.PI * 2);
-        context.strokeStyle = previewShadow;
-        context.lineWidth = 0.75;
-        context.stroke();
-        if (point.hasComment) {
-            context.beginPath();
-            context.arc(position.x + 5, position.y - 5, 2, 0, Math.PI * 2);
-            context.fillStyle = '#EF4444';
-            context.fill();
-            context.strokeStyle = '#fff';
-            context.lineWidth = 0.75;
-            context.stroke();
-        }
-        context.fillStyle = '#121A28';
-        context.font = '900 7px Arial';
-        context.textAlign = 'center';
-        context.textBaseline = 'middle';
-        context.fillText(point.number, position.x, position.y + 0.5, markerSize - 3);
     }
 
     return {
