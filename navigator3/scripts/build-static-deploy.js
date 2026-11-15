@@ -107,7 +107,6 @@ function buildLegalPage() {
     const name = (env.LEGAL_NAME || '').trim() || 'Не указано';
     const inn = (env.LEGAL_INN || '').trim() || 'Не указан';
     const email = (env.LEGAL_EMAIL || '').trim();
-    const phone = (env.LEGAL_PHONE || '').trim();
     const telegramRaw = (env.LEGAL_TELEGRAM || '').trim();
     const telegram = telegramRaw
         .replace(/^https?:\/\/t\.me\//i, '')
@@ -115,9 +114,6 @@ function buildLegalPage() {
 
     const emailHtml = email
         ? `<a href="mailto:${escapeHtml(email)}">${escapeHtml(email)}</a>`
-        : 'Не указан';
-    const phoneHtml = phone
-        ? `<a href="tel:${escapeHtml(phone.replace(/[^\d+]/g, ''))}">${escapeHtml(phone)}</a>`
         : 'Не указан';
     const telegramHtml = telegram
         ? `<a href="https://t.me/${escapeHtml(telegram)}" target="_blank" rel="noopener">@${escapeHtml(telegram)}</a>`
@@ -138,7 +134,6 @@ function buildLegalPage() {
         '{{LEGAL_STATUS}}': escapeHtml('Самозанятый (налог на профессиональный доход)'),
         '{{LEGAL_INN}}': escapeHtml(inn),
         '{{LEGAL_CONTACT_EMAIL}}': emailHtml,
-        '{{LEGAL_CONTACT_PHONE}}': phoneHtml,
         '{{LEGAL_CONTACT_TELEGRAM}}': telegramHtml,
         '{{LEGAL_REFUND_TERMS}}': escapeHtml(refund).replace(/\n/g, '<br>'),
         '{{PREMIUM_PRICE_RUB}}': escapeHtml(price),
@@ -160,7 +155,6 @@ function buildContactsPage() {
     const name = (env.LEGAL_NAME || '').trim() || 'Не указано';
     const inn = (env.LEGAL_INN || '').trim() || 'Не указан';
     const email = (env.LEGAL_EMAIL || '').trim();
-    const phone = (env.LEGAL_PHONE || '').trim();
     const telegramRaw = (env.LEGAL_TELEGRAM || '').trim();
     const telegram = telegramRaw
         .replace(/^https?:\/\/t\.me\//i, '')
@@ -168,9 +162,6 @@ function buildContactsPage() {
 
     const emailHtml = email
         ? `<a href="mailto:${escapeHtml(email)}">${escapeHtml(email)}</a>`
-        : 'Не указан';
-    const phoneHtml = phone
-        ? `<a href="tel:${escapeHtml(phone.replace(/[^\d+]/g, ''))}">${escapeHtml(phone)}</a>`
         : 'Не указан';
     const telegramHtml = telegram
         ? `<a href="https://t.me/${escapeHtml(telegram)}" target="_blank" rel="noopener">@${escapeHtml(telegram)}</a>`
@@ -183,7 +174,6 @@ function buildContactsPage() {
         '{{LEGAL_STATUS}}': escapeHtml('Самозанятый (налог на профессиональный доход)'),
         '{{LEGAL_INN}}': escapeHtml(inn),
         '{{LEGAL_CONTACT_EMAIL}}': emailHtml,
-        '{{LEGAL_CONTACT_PHONE}}': phoneHtml,
         '{{LEGAL_CONTACT_TELEGRAM}}': telegramHtml,
         '{{PREMIUM_PRICE_RUB}}': escapeHtml(price),
         '{{PREMIUM_DAYS}}': escapeHtml(days),
