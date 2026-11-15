@@ -155,6 +155,44 @@ function buildLegalPage() {
     console.log(`  legal.html: ${formatKb(Buffer.byteLength(html))}`);
 }
 
+function buildContactsPage() {
+    const env = readDotEnv(path.join(root, '.env'));
+    const name = (env.LEGAL_NAME || '').trim() || 'Не указано';
+    const inn = (env.LEGAL_INN || '').trim() || 'Не указан';
+    const email = (env.LEGAL_EMAIL || '').trim();
+    const phone = (env.LEGAL_PHONE || '').trim();
+    const telegramRaw = (env.LEGAL_TELEGRAM || '').trim();
+    const telegram = telegramRaw
+        .replace(/^https?:\/\/t\.me\//i, '')
+        .replace(/^@/, '');
+
+    const emailHtml = email
+        ? `<a href="mailto:${escapeHtml(email)}">${escapeHtml(email)}</a>`
+        : 'Не указан';
+    const phoneHtml = phone
+        ? `<a href="tel:${escapeHtml(phone.replace(/[^\d+]/g, ''))}">${escapeHtml(phone)}</a>`
+        : 'Не указан';
+    const telegramHtml = telegram
+        ? `<a href="https://t.me/${escapeHtml(telegram)}" target="_blank" rel="noopener">@${escapeHtml(telegram)}</a>`
+        : 'Не указан';
+
+    const replacements = {
+        '{{LEGAL_NAME}}': escapeHtml(name),
+        '{{LEGAL_STATUS}}': escapeHtml('Самозанятый (налог на профессиональный доход)'),
+        '{{LEGAL_INN}}': escapeHtml(inn),
+        '{{LEGAL_CONTACT_EMAIL}}': emailHtml,
+        '{{LEGAL_CONTACT_PHONE}}': phoneHtml,
+        '{{LEGAL_CONTACT_TELEGRAM}}': telegramHtml,
+    };
+
+    let html = fs.readFileSync(path.join(root, 'contacts.template.html'), 'utf8');
+    for (const [key, value] of Object.entries(replacements)) {
+        html = html.split(key).join(value);
+    }
+    fs.writeFileSync(path.join(output, 'contacts.html'), html);
+    console.log(`  contacts.html: ${formatKb(Buffer.byteLength(html))}`);
+}
+
 function formatKb(bytes) {
     return `${(bytes / 1024).toFixed(1)} KB`;
 }
@@ -237,6 +275,7 @@ function embedPage(file, bundle) {
 fs.mkdirSync(output, { recursive: true });
 for (const [file, bundle] of Object.entries(pageBundles)) embedPage(file, bundle);
 buildLegalPage();
+buildContactsPage();
 
 // Админка — самостоятельная страница без сборки бандла.
 fs.copyFileSync(path.join(root, 'admin.html'), path.join(output, 'admin.html'));

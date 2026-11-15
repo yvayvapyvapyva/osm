@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Контакты и реквизиты — ainstruktor.ru</title>
+<meta name="robots" content="index, follow">
+<style>
+    :root {
+        color-scheme: light;
+        --bg: #F4F6FA;
+        --surface: #FFFFFF;
+        --surface-muted: #F1F4F8;
+        --text: #121A28;
+        --text-muted: rgba(18, 28, 46, 0.66);
+        --line: rgba(18, 28, 46, 0.12);
+        --accent: #1876B5;
+        --accent-soft: #E7F4FC;
+    }
+    @media (prefers-color-scheme: dark) {
+        :root {
+            color-scheme: dark;
+            --bg: #0F141C;
+            --surface: #161D27;
+            --surface-muted: #1E2733;
+            --text: #E8EDF5;
+            --text-muted: rgba(232, 237, 245, 0.66);
+            --line: rgba(232, 237, 245, 0.14);
+            --accent: #4FB0E6;
+            --accent-soft: #0A3550;
+        }
+    }
+    * { box-sizing: border-box; }
+    body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+        line-height: 1.6;
+    }
+    .wrap { max-width: 760px; margin: 0 auto; padding: 20px 16px 48px; }
+    .top {
+        display: flex; align-items: center; justify-content: space-between;
+        gap: 12px; margin-bottom: 20px;
+    }
+    .back {
+        display: inline-flex; align-items: center; gap: 6px;
+        color: var(--text-muted); text-decoration: none;
+        font-size: 14px; font-weight: 600;
+    }
+    .back:hover { color: var(--text); }
+    .doc {
+        background: var(--surface);
+        border: 1px solid var(--line);
+        border-radius: 20px;
+        padding: 24px;
+        box-shadow: 0 8px 24px rgba(18, 28, 46, 0.08);
+    }
+    h1 { margin: 0 0 6px; font-size: 26px; letter-spacing: -0.4px; }
+    .lead { color: var(--text-muted); font-size: 14px; margin: 0 0 24px; }
+    .requisites-card {
+        background: var(--surface-muted);
+        border: 1px solid var(--line);
+        border-radius: 16px;
+        padding: 18px;
+        margin-bottom: 22px;
+    }
+    .requisites-name { font-size: 20px; font-weight: 700; line-height: 1.3; }
+    .requisites-inn {
+        margin-top: 4px;
+        font-size: 17px;
+        font-weight: 600;
+        font-variant-numeric: tabular-nums;
+    }
+    .requisites-status { margin-top: 8px; color: var(--text-muted); font-size: 14px; }
+    .contacts { display: grid; gap: 10px; margin: 0; }
+    .contact-row { display: grid; grid-template-columns: 140px 1fr; gap: 10px; font-size: 15px; }
+    .contact-row dt { color: var(--text-muted); margin: 0; }
+    .contact-row dd { margin: 0; overflow-wrap: anywhere; }
+    a { color: var(--accent); }
+    .links {
+        display: flex; flex-wrap: wrap; gap: 8px 14px;
+        margin-top: 22px; padding-top: 18px;
+        border-top: 1px solid var(--line);
+        font-size: 14px; font-weight: 600;
+    }
+    .footer {
+        margin-top: 20px; text-align: center;
+        color: var(--text-muted); font-size: 13px;
+    }
+    .footer a { color: var(--text-muted); }
+    @media (max-width: 520px) {
+        .doc { padding: 18px; }
+        .contact-row { grid-template-columns: 1fr; gap: 2px; }
+    }
+</style>
+</head>
+<body>
+<div class="wrap">
+    <div class="top">
+        <a class="back" href="/">← Навигатор</a>
+        <a class="back" href="/legal.html">Правовая информация</a>
+    </div>
+
+    <main class="doc">
+        <h1>Контакты и реквизиты</h1>
+        <p class="lead">Сервис навигатора по маршрутам автоинструктора ainstruktor.ru.</p>
+
+        <section class="requisites-card" aria-label="Реквизиты исполнителя">
+            <div class="requisites-name">{{LEGAL_NAME}}</div>
+            <div class="requisites-inn">ИНН {{LEGAL_INN}}</div>
+            <div class="requisites-status">{{LEGAL_STATUS}}</div>
+        </section>
+
+        <dl class="contacts">
+            <div class="contact-row"><dt>Email</dt><dd>{{LEGAL_CONTACT_EMAIL}}</dd></div>
+            <div class="contact-row"><dt>Телефон</dt><dd>{{LEGAL_CONTACT_PHONE}}</dd></div>
+            <div class="contact-row"><dt>Telegram</dt><dd>{{LEGAL_CONTACT_TELEGRAM}}</dd></div>
+            <div class="contact-row"><dt>Сайт</dt><dd><a href="https://ainstruktor.ru">ainstruktor.ru</a></dd></div>
+        </dl>
+
+        <div class="links">
+            <a href="/legal.html#offer">Публичная оферта</a>
+            <a href="/legal.html#privacy">Политика конфиденциальности</a>
+            <a href="/legal.html#payment">Оплата и возврат</a>
+        </div>
+    </main>
+
+    <div class="footer">
+        © ainstruktor.ru · {{LEGAL_NAME}} · ИНН {{LEGAL_INN}}
+    </div>
+</div>
+</body>
+</html>
