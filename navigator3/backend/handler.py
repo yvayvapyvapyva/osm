@@ -1128,12 +1128,9 @@ def _api_profile_update(event):
     if body is None:
         return auth.json_response(400, {"error": "invalid_json_body"})
 
-    raw_name = body.get("folder_name")
-    if raw_name is None:
-        # Совместимость со старыми сборками редактора, которые присылали
-        # display_name. Теперь это название папки, а не имя аккаунта.
-        raw_name = body.get("display_name")
-    folder_name = _text(raw_name).strip()
+    if "folder_name" not in body:
+        return auth.json_response(400, {"error": "missing_folder_name"})
+    folder_name = _text(body.get("folder_name")).strip()
     if len(folder_name) > 60:
         return auth.json_response(400, {"error": "folder_name_too_long"})
 

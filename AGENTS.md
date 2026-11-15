@@ -60,7 +60,7 @@
 ## Имя аккаунта и папка маршрутов
 - `users.display_name` — имя из Яндекс-профиля, в редакторе не меняется.
 - `users.routes_folder_name` — отдельное название корневой папки владельца в каталоге; пустое значение означает fallback на `display_name`/`login`.
-- `POST /api/profile` с `{folder_name}` меняет только название папки. Для совместимости старое поле `display_name` тоже трактуется как название папки.
+- `POST /api/profile` с `{folder_name}` меняет только название папки; без поля `folder_name` запрос отклоняется.
 - Миграция: `migrations/add_routes_folder_name.py`.
 
 ## Команда YC
