@@ -1814,10 +1814,23 @@ function updatePicSize(marker) {
         marker._img.style.width = imgW + 'px';
         marker._img.style.height = imgH + 'px';
         if (marker._platesEl) {
-            const plateW = Math.max(14, imgW);
             Array.from(marker._platesEl.children).forEach(plate => {
-                plate.style.width = plateW + 'px';
-                plate.style.height = 'auto';
+                const item = znakItem(plate.dataset.code);
+                const aspect = item
+                    ? item.w / item.h
+                    : (plate.naturalWidth && plate.naturalHeight
+                        ? plate.naturalWidth / plate.naturalHeight
+                        : 1);
+                // Табличка масштабируется по высоте, а не по ширине знака:
+                // узкие вертикальные таблички не растягиваются.
+                let plateH = Math.max(6, imgH * 0.5);
+                let plateW = plateH * aspect;
+                if (plateW > imgW) {
+                    plateW = imgW;
+                    plateH = plateW / aspect;
+                }
+                plate.style.width = Math.max(4, plateW) + 'px';
+                plate.style.height = Math.max(4, plateH) + 'px';
             });
         }
         if (marker._leg) {
@@ -1850,6 +1863,7 @@ function renderSignPlates(marker) {
         if (!item || !item.file) return;
         const plate = document.createElement('img');
         plate.className = 'sign-plate';
+        plate.dataset.code = item.code;
         plate.src = 'znaki/' + encodeURIComponent(item.file);
         plate.alt = '';
         plate.draggable = false;
