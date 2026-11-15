@@ -1907,9 +1907,12 @@ function updatePicSize(marker) {
             // при отдалении она уменьшается вместе с картой.
             const realH = (marker._sizeM || ZNAK_MAX_M) / mpp;
             const overlap = realH * 0.35;
+            const legW = realH * 0.09;
             marker._leg.style.top = (realH - overlap) + 'px';
             marker._leg.style.height = (realH + overlap) + 'px';
-            marker._leg.style.width = (realH * 0.09) + 'px';
+            marker._leg.style.width = legW + 'px';
+            // Белая обводка тоже масштабируется вместе с ножкой.
+            marker._leg.style.boxShadow = '0 0 0 ' + (legW * 0.28) + 'px #fff';
         }
     } else {
         // Машинка: минимальная длина 15px по аналогии с минимумом светофора.
