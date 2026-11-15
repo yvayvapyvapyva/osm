@@ -377,6 +377,16 @@ button, input, select, textarea {
     fill: var(--danger);
 }
 
+#playBtn.is-paused {
+    background: var(--green-soft);
+    border-color: var(--green-line);
+    color: var(--green-dark);
+}
+
+#playBtn.is-paused svg {
+    fill: var(--green-dark);
+}
+
 #routeNameDisplay {
     color: #FFFFFF;
     font-size: 12px;

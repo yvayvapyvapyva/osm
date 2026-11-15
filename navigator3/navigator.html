@@ -275,12 +275,19 @@ const NAV_PLAY_ICONS = {
     pause: '<svg viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>'
 };
 
-function setPlayBtnState(isPlaying) {
+function setPlayBtnState(state) {
     const pb = $('playBtn');
     if (!pb) return;
-    pb.classList.toggle('active', !!isPlaying);
-    pb.title = isPlaying ? 'Остановить симуляцию' : 'Симуляция проезда';
-    pb.innerHTML = `${isPlaying ? NAV_PLAY_ICONS.pause : NAV_PLAY_ICONS.play}<span>${isPlaying ? 'Стоп' : 'Симуляция'}</span>`;
+    const value = state === true ? 'running' : state === false ? 'idle' : state;
+    const running = value === 'running';
+    const paused = value === 'paused';
+    const label = running ? 'Пауза' : paused ? 'Продолжить' : 'Симуляция';
+    const title = running ? 'Пауза' : paused ? 'Продолжить симуляцию' : 'Симуляция проезда';
+    pb.classList.toggle('active', running);
+    pb.classList.toggle('is-paused', paused);
+    pb.title = title;
+    pb.setAttribute('aria-label', title);
+    pb.innerHTML = `${running ? NAV_PLAY_ICONS.pause : NAV_PLAY_ICONS.play}<span>${label}</span>`;
 }
 
 /* ---------- MapLibre: адаптер объектов карты ---------- */
@@ -522,12 +529,12 @@ function haltDrive() {
     APP.navAudio.onended = null;
     APP._commentAudio.onended = null;
     document.querySelectorAll('.playing').forEach(e => e.classList.remove('playing'));
-    setPlayBtnState(false);
     $('telSpeed').textContent = Math.round(APP.currentSpeed);
 }
 
 function stopDrive() {
     haltDrive();
+    setPlayBtnState('idle');
     APP._driveShowFrom = -1;
     APP._driveState = null;
     APP._driveResume = null;
@@ -540,6 +547,7 @@ function pauseDrive() {
     haltDrive();
     APP._driveResume = state;
     APP._driveState = null;
+    setPlayBtnState('paused');
     // Маркер и _simCurPos не сбрасываем: на паузе расстояние в панели
     // продолжает считаться от маркера, а не от реального GPS.
 }
@@ -685,7 +693,7 @@ function driveAlongPath(fromIdx) {
             // Приехали в точку nextIdx: она становится текущей целью и
             // озвучивается — как при срабатывании триггера в навигации.
             setSimTarget(nextIdx);
-            setPlayBtnState(true);
+            setPlayBtnState('running');
 
             // stopDrive() выше уже увеличил _simSeq — запоминаем его, чтобы
             // отменённая симуляция не продолжилась после озвучки.
@@ -753,7 +761,7 @@ function driveAlongPath(fromIdx) {
 
     $('telSpeed').textContent = Math.round(APP._driveSpeed);
     APP._driveRaf = requestAnimationFrame(frame);
-    setPlayBtnState(true);
+    setPlayBtnState('running');
 }
 
 
@@ -2656,7 +2664,7 @@ if (typeof maplibregl === 'undefined') {
         }
         APP._simCurPos = [p.pts[0][0], p.pts[0][1]];
         setSimTarget(idx);
-        setPlayBtnState(true);
+        setPlayBtnState('running');
         // Озвучка идёт асинхронно: запоминаем запуск, чтобы отмена (стоп,
         // клик по карте) не воскресила симуляцию после окончания аудио.
         const simSeq = APP._simSeq;
