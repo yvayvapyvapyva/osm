@@ -554,10 +554,16 @@ const MenuModule = {
         const active = Array.from(title.querySelectorAll('.route-row-badge'))
             .some(badge => badge.textContent === 'Загружен');
         if (active) return;
+        let flagRow = details.querySelector('.route-row-flags');
+        if (!flagRow) {
+            flagRow = document.createElement('span');
+            flagRow.className = 'route-row-flags';
+            details.appendChild(flagRow);
+        }
         const viewed = document.createElement('span');
         viewed.className = 'route-row-viewed';
         viewed.textContent = 'Просмотрен';
-        details.appendChild(viewed);
+        flagRow.appendChild(viewed);
     },
 
     _createRouteRow(route) {
@@ -587,13 +593,6 @@ const MenuModule = {
         name.className = 'route-row-name';
         name.textContent = route.name || route.m;
         title.appendChild(name);
-
-        if (route.premium) {
-            const premiumBadge = document.createElement('span');
-            premiumBadge.className = 'route-row-badge route-row-badge-premium';
-            premiumBadge.textContent = '★ Премиум';
-            title.appendChild(premiumBadge);
-        }
 
         if (isActive) {
             const badge = document.createElement('span');
@@ -626,11 +625,24 @@ const MenuModule = {
             statsEl.textContent = stats.join(' · ');
             details.appendChild(statsEl);
         }
+        const flags = [];
+        if (route.premium) {
+            const premiumBadge = document.createElement('span');
+            premiumBadge.className = 'route-row-badge route-row-badge-premium';
+            premiumBadge.textContent = '★ Премиум';
+            flags.push(premiumBadge);
+        }
         if (route.viewed && !isActive) {
             const viewed = document.createElement('span');
             viewed.className = 'route-row-viewed';
             viewed.textContent = 'Просмотрен';
-            details.appendChild(viewed);
+            flags.push(viewed);
+        }
+        if (flags.length) {
+            const flagRow = document.createElement('span');
+            flagRow.className = 'route-row-flags';
+            flags.forEach(flag => flagRow.appendChild(flag));
+            details.appendChild(flagRow);
         }
         main.append(title, details);
 

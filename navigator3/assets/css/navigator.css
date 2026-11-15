@@ -1205,9 +1205,16 @@ button, input, select, textarea {
     line-height: 1.4;
 }
 
+.route-row-flags {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    margin-top: 2px;
+}
+
 .route-row-viewed {
     align-self: flex-start;
-    margin-top: 2px;
     padding: 1px 7px;
     border-radius: 999px;
     background: #EDF1F6;
