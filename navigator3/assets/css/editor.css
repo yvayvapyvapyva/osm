@@ -4,6 +4,9 @@
 :root {
     color-scheme: light;
 
+    /* Нижняя граница верхней панели: шторки не должны заходить на неё. */
+    --editor-top-clearance: calc(70px + max(10px, env(safe-area-inset-top)));
+
     /* Поверхности */
     --bg: #F4F6FA;
     --surface: #FFFFFF;
@@ -2010,6 +2013,36 @@ select,
 
 #settingsRouteModal .modal-sheet {
     height: auto;
+}
+
+/* Шторки не должны наползать на верхнюю панель на низких экранах. */
+#mapSettingsModal .modal-sheet,
+#pointsOrderModal .modal-sheet,
+#pointsOrderModal.compact .modal-sheet,
+#settingsModal .modal-sheet,
+#folderSettingsModal .modal-sheet,
+#settingsRouteModal .modal-sheet,
+#createRouteModal .modal-sheet,
+#createFolderModal .modal-sheet,
+#shareModal .modal-sheet,
+#confirmDeleteModal .modal-sheet,
+#confirmDeletePointModal .modal-sheet,
+.instruction-sheet {
+    max-height: calc(100vh - var(--editor-top-clearance) - 8px);
+    max-height: calc(100dvh - var(--editor-top-clearance) - 8px);
+}
+
+#mapSettingsModal,
+#pointsOrderModal,
+#settingsModal,
+#folderSettingsModal,
+#settingsRouteModal,
+#createRouteModal,
+#createFolderModal,
+#shareModal,
+#confirmDeleteModal,
+#confirmDeletePointModal {
+    padding-top: var(--editor-top-clearance);
 }
 
 #settingsRouteModal .modal-body-scroll {
