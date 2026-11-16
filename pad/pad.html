@@ -635,6 +635,8 @@ const ZNAK_MAX_M = 3;
 // Каталог знаков: code, group, title, file (webp), w/h для сохранения пропорций.
 let ZNAKI_CATALOG = [];
 let ZNAKI_BY_CODE = new Map();
+let SIGN_SPRITE = null;
+const SIGN_SPRITE_URL = 'znaki/sprite.webp?v=3';
 let znakCatalogPromise = null;
 let znakGroup = 'all';
 let znakSearchQuery = '';
@@ -701,13 +703,21 @@ function buildPicGrid() {
 
 function loadZnakCatalog() {
     if (znakCatalogPromise) return znakCatalogPromise;
-    znakCatalogPromise = fetch('znaki/catalog.json?v=2', { cache: 'no-cache' })
-        .then(response => {
-            if (!response.ok) throw new Error('HTTP ' + response.status);
+    znakCatalogPromise = Promise.all([
+        fetch('znaki/catalog.json?v=3', { cache: 'no-cache' }).then(response => {
+            if (!response.ok) throw new Error('catalog HTTP ' + response.status);
             return response.json();
-        })
-        .then(list => {
+        }),
+        fetch('znaki/sprite.json?v=3', { cache: 'no-cache' })
+            .then(response => {
+                if (!response.ok) throw new Error('sprite HTTP ' + response.status);
+                return response.json();
+            })
+            .catch(() => null)
+    ])
+        .then(([list, sprite]) => {
             if (!Array.isArray(list) || !list.length) throw new Error('empty catalog');
+            SIGN_SPRITE = sprite && sprite.frames ? sprite : null;
             ZNAKI_CATALOG = list.map(item => ({
                 ...item,
                 code: String(item.code || ''),
@@ -715,6 +725,7 @@ function loadZnakCatalog() {
                 file: String(item.file || ''),
                 w: Number(item.w) || 1,
                 h: Number(item.h) || 1,
+                sprite: SIGN_SPRITE ? SIGN_SPRITE.frames[item.code] : null,
             }));
             ZNAKI_BY_CODE = new Map(ZNAKI_CATALOG.map(item => [item.code, item]));
             placedMarkers.forEach(marker => {
@@ -749,6 +760,41 @@ function loadZnakCatalog() {
 
 function znakItem(code) {
     return ZNAKI_BY_CODE.get(String(code || '')) || null;
+}
+
+function applySignSprite(el, item, width, height) {
+    if (!el || !item) return;
+    const frame = item.sprite;
+    if (SIGN_SPRITE && frame) {
+        const scale = width / frame.w;
+        el.style.backgroundImage = 'url("' + SIGN_SPRITE_URL + '")';
+        el.style.backgroundRepeat = 'no-repeat';
+        el.style.backgroundSize = (SIGN_SPRITE.width * scale) + 'px ' + (SIGN_SPRITE.height * scale) + 'px';
+        el.style.backgroundPosition = '-' + (frame.x * scale) + 'px -' + (frame.y * scale) + 'px';
+    } else {
+        // Резерв, если спрайт не загрузился.
+        el.style.backgroundImage = 'url("znaki/' + encodeURI(item.file) + '")';
+        el.style.backgroundRepeat = 'no-repeat';
+        el.style.backgroundSize = '100% 100%';
+        el.style.backgroundPosition = '0 0';
+    }
+    el.style.width = width + 'px';
+    el.style.height = height + 'px';
+}
+
+function signThumbElement(item, maxWidth, maxHeight) {
+    const el = document.createElement('div');
+    el.className = 'sign-sprite';
+    if (!item) return el;
+    const aspect = (item.w || 1) / (item.h || 1);
+    let w = maxWidth;
+    let h = w / aspect;
+    if (h > maxHeight) {
+        h = maxHeight;
+        w = h * aspect;
+    }
+    applySignSprite(el, item, w, h);
+    return el;
 }
 
 function buildZnakTabs() {
@@ -808,10 +854,7 @@ function buildZnakGroups(grid) {
         card.type = 'button';
         card.className = 'znak-group-card';
         card.dataset.group = group.id;
-        const img = document.createElement('img');
-        img.src = 'znaki/' + encodeURIComponent(first.file);
-        img.alt = '';
-        img.draggable = false;
+        const img = signThumbElement(first, 96, 72);
         const name = document.createElement('span');
         name.className = 'znak-group-name';
         name.textContent = group.title;
@@ -857,12 +900,7 @@ function buildZnakGrid() {
         cell.dataset.code = item.code;
         cell.dataset.type = 'znak';
         cell.title = item.code + ' — ' + item.title;
-        const img = document.createElement('img');
-        img.src = 'znaki/' + encodeURIComponent(item.file);
-        img.loading = 'lazy';
-        img.draggable = false;
-        img.onerror = () => cell.classList.add('hidden');
-        cell.appendChild(img);
+        cell.appendChild(signThumbElement(item, 80, 60));
         if (znakPanelMode === 'attach') {
             const attached = activeCar && activeCar._isZnak &&
                 (activeCar._plates || []).some(plate => plate.code === item.code);
@@ -1503,11 +1541,9 @@ function buildPicMarker(isZnak, file, lat, lon, headingDeg, code) {
     if (isZnak) {
         stack = document.createElement('div');
         stack.className = 'sign-stack';
-        img = document.createElement('img');
-        img.src = 'znaki/' + encodeURIComponent(file);
-        img.draggable = false;
-        img.style.cssText = 'height:auto;display:block;pointer-events:none;';
-        img.onerror = () => el.remove();
+        img = document.createElement('div');
+        img.className = 'sign-body sign-sprite';
+        img.style.cssText = 'display:block;pointer-events:none;';
         stack.appendChild(img);
         platesEl = document.createElement('div');
         platesEl.className = 'sign-plates';
@@ -1547,7 +1583,7 @@ function buildPicMarker(isZnak, file, lat, lon, headingDeg, code) {
     marker._plateCodes = [];
     marker._platesEl = platesEl;
     marker._stack = stack;
-    img.onload = () => updatePicMarker(marker);
+    if (img.tagName === 'IMG') img.onload = () => updatePicMarker(marker);
     marker._heading = headingDeg;
     marker._lat = lat;
     marker._lon = lon;
@@ -1883,23 +1919,24 @@ function updatePicSize(marker) {
         let imgH = aspect >= 1 ? maxPx / aspect : maxPx;
         imgW = Math.max(10, imgW);
         imgH = Math.max(10, imgH);
-        marker._img.style.width = imgW + 'px';
-        marker._img.style.height = imgH + 'px';
+        const bodyItem = marker._catalogItem || {
+            file: marker._file,
+            w: aspect,
+            h: 1,
+            sprite: null
+        };
+        applySignSprite(marker._img, bodyItem, imgW, imgH);
         if (marker._platesEl) {
             // Табличка всегда того же размера, как если бы её поставили
             // отдельно: масштаб по большей стороне ZNAK_MAX_M.
             const maxPx = Math.max(15, (ZNAK_MAX_M) / mpp);
             Array.from(marker._platesEl.children).forEach(plate => {
                 const item = znakItem(plate.dataset.code);
-                const aspect = item
-                    ? item.w / item.h
-                    : (plate.naturalWidth && plate.naturalHeight
-                        ? plate.naturalWidth / plate.naturalHeight
-                        : 1);
-                let plateW = aspect >= 1 ? maxPx : maxPx * aspect;
-                let plateH = aspect >= 1 ? maxPx / aspect : maxPx;
-                plate.style.width = Math.max(10, plateW) + 'px';
-                plate.style.height = Math.max(10, plateH) + 'px';
+                if (!item) return;
+                const aspect = item.w / item.h;
+                const plateW = aspect >= 1 ? maxPx : maxPx * aspect;
+                const plateH = aspect >= 1 ? maxPx / aspect : maxPx;
+                applySignSprite(plate, item, Math.max(10, plateW), Math.max(10, plateH));
             });
         }
         if (marker._leg) {
@@ -1934,13 +1971,9 @@ function renderSignPlates(marker) {
     marker._platesEl.innerHTML = '';
     (marker._plates || []).forEach(item => {
         if (!item || !item.file) return;
-        const plate = document.createElement('img');
-        plate.className = 'sign-plate';
+        const plate = document.createElement('div');
+        plate.className = 'sign-plate sign-sprite';
         plate.dataset.code = item.code;
-        plate.src = 'znaki/' + encodeURIComponent(item.file);
-        plate.alt = '';
-        plate.draggable = false;
-        plate.onload = () => updatePicSize(marker);
         marker._platesEl.appendChild(plate);
     });
     updatePicSize(marker);
