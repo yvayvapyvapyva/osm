@@ -579,7 +579,7 @@
     <div class="sig-fab" id="sigHazBtn"><svg viewBox="0 0 22 10" width="30" height="13.6" fill="currentColor"><g><polygon points="6,0.5 0,5 6,9.5"/><rect x="6" y="3" width="5" height="4" rx="1.2"/></g><g><polygon points="16,0.5 22,5 16,9.5"/><rect x="11" y="3" width="5" height="4" rx="1.2"/></g></svg></div>
     <div class="sig-fab" id="sigRightBtn"><svg viewBox="0 0 22 10" width="30" height="13.6" fill="currentColor"><rect x="3" y="2.5" width="8" height="5" rx="1.2"/><polygon points="11,0.5 19,5 11,9.5"/></svg></div>
     <div class="sig-fab" id="signLegBtn" style="display:none"><svg viewBox="0 0 24 24" width="20" height="20"><rect x="9" y="2" width="6" height="20" rx="3" fill="#8E8E93" stroke="#fff" stroke-width="1"/></svg></div>
-    <div class="sig-fab" id="signPlatesBtn" style="display:none" title="Таблички"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h10"/><path d="M19 15v6M16 18h6"/></svg></div>
+    <div class="sig-fab" id="signPlatesBtn" style="display:none" title="Знаки на столбе"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h10"/><path d="M19 15v6M16 18h6"/></svg></div>
     <div class="sig-fab" id="signDragBtn" style="display:none"><svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M13 24C9.74 24 6.81 22 5.6 19L2.57 11.37C2.26 10.58 3 9.79 3.81 10.05L4.6 10.31C5.16 10.5 5.62 10.92 5.84 11.47L7.25 15H8V3.25C8 2.56 8.56 2 9.25 2S10.5 2.56 10.5 3.25V12H11.5V1.25C11.5 .56 12.06 0 12.75 0S14 .56 14 1.25V12H15V2.75C15 2.06 15.56 1.5 16.25 1.5C16.94 1.5 17.5 2.06 17.5 2.75V12H18.5V5.75C18.5 5.06 19.06 4.5 19.75 4.5S21 5.06 21 5.75V16C21 20.42 17.42 24 13 24Z"/></svg></div>
     <div class="sig-fab danger" id="sigDelBtn"><svg viewBox="0 0 24 24" width="20" height="20"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg></div>
     <div class="sig-fab play" id="sigPlayBtn" style="display:none">
@@ -822,9 +822,6 @@ function buildZnakTabs() {
 
 function filteredZnakItems() {
     let items = ZNAKI_CATALOG;
-    if (znakPanelMode === 'attach') {
-        items = items.filter(item => item.group === 'additional');
-    }
     const query = znakSearchQuery.toLocaleLowerCase('ru-RU');
     if (query) {
         // Поиск всегда по всем знакам, независимо от открытой группы.
@@ -832,7 +829,7 @@ function filteredZnakItems() {
             const haystack = (item.code + ' ' + item.title).toLocaleLowerCase('ru-RU');
             return haystack.includes(query);
         });
-    } else if (znakPanelMode !== 'attach' && znakGroup !== 'all') {
+    } else if (znakGroup !== 'all') {
         items = items.filter(item => item.group === znakGroup);
     }
     return items;
@@ -840,8 +837,7 @@ function filteredZnakItems() {
 
 function updateZnakPanelHeader() {
     const back = document.getElementById('znakBackBtn');
-    if (back) back.hidden = znakPanelMode === 'attach' ||
-        (znakView === 'groups' && !znakSearchQuery);
+    if (back) back.hidden = znakView === 'groups' && !znakSearchQuery;
 }
 
 function buildZnakGroups(grid) {
@@ -881,7 +877,7 @@ function buildZnakGrid() {
     updateZnakPanelHeader();
     grid.innerHTML = '';
     grid.classList.remove('znak-groups');
-    if (znakPanelMode === 'place' && !znakSearchQuery && znakView === 'groups') {
+    if (!znakSearchQuery && znakView === 'groups') {
         buildZnakGroups(grid);
         return;
     }
@@ -926,8 +922,8 @@ function openZnakPanel(mode) {
         console.warn('Сначала выберите знак');
         return;
     }
-    znakView = znakPanelMode === 'attach' ? 'list' : 'groups';
-    znakGroup = znakPanelMode === 'attach' ? 'additional' : 'all';
+    znakView = 'groups';
+    znakGroup = 'all';
     znakSearchQuery = '';
     const search = document.getElementById('znakSearch');
     if (search) search.value = '';
@@ -949,10 +945,8 @@ function openZnakPanel(mode) {
 
 function znakSearchChanged(value) {
     znakSearchQuery = String(value || '').trim();
-    if (znakPanelMode !== 'attach') {
-        znakView = znakSearchQuery ? 'list' : 'groups';
-        if (!znakSearchQuery) znakGroup = 'all';
-    }
+    znakView = znakSearchQuery ? 'list' : 'groups';
+    if (!znakSearchQuery) znakGroup = 'all';
     buildZnakGrid();
 }
 
