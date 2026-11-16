@@ -438,7 +438,8 @@
         .sign-plate { display:block; margin-top:2px; pointer-events:none; }
         .sign-leg {
             position:absolute; left:50%; transform:translateX(-50%);
-            background:#8E8E93; border-radius:2px; pointer-events:none;
+            background:linear-gradient(90deg, #6F7378 0%, #B8BCC2 35%, #8E9298 60%, #6F7378 100%);
+            border-radius:2px; pointer-events:none;
             z-index:-1;
         }
 
@@ -1920,6 +1921,7 @@ function updatePicSize(marker) {
             sprite: null
         };
         applySignSprite(marker._img, bodyItem, imgW, imgH);
+        let stackH = imgH;
         if (marker._platesEl) {
             // Табличка всегда того же размера, как если бы её поставили
             // отдельно: масштаб по большей стороне ZNAK_MAX_M.
@@ -1930,17 +1932,20 @@ function updatePicSize(marker) {
                 const aspect = item.w / item.h;
                 const plateW = aspect >= 1 ? maxPx : maxPx * aspect;
                 const plateH = aspect >= 1 ? maxPx / aspect : maxPx;
-                applySignSprite(plate, item, Math.max(10, plateW), Math.max(10, plateH));
+                const shownH = Math.max(10, plateH);
+                applySignSprite(plate, item, Math.max(10, plateW), shownH);
+                stackH += shownH + 2;
             });
         }
         if (marker._leg) {
-            // Ножка считается от реального размера знака, без минимума:
-            // при отдалении она уменьшается вместе с картой.
+            // Одна ножка на всю стопку: считаем от реального размера
+            // основного знака, но тянем до низа прикреплённых знаков.
             const realH = (marker._sizeM || ZNAK_MAX_M) / mpp;
-            const overlap = realH * 0.35;
             const legW = realH * 0.09;
-            marker._leg.style.top = (realH - overlap) + 'px';
-            marker._leg.style.height = (realH + overlap) + 'px';
+            const top = realH * 0.65;
+            const bottom = stackH + realH;
+            marker._leg.style.top = top + 'px';
+            marker._leg.style.height = (bottom - top) + 'px';
             marker._leg.style.width = legW + 'px';
             // Белая обводка тоже масштабируется вместе с ножкой.
             marker._leg.style.boxShadow = '0 0 0 ' + (legW * 0.28) + 'px #fff';
