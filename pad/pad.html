@@ -753,8 +753,7 @@ function buildPicGrid() {
             event.stopPropagation();
             selectedPic = { file: file, type: 'pic', code: null };
             placePic(map.center[1], map.center[0], null);
-            document.getElementById('picPanel').classList.remove('visible');
-            document.getElementById('addPicBtn').classList.remove('open');
+            // Панель остаётся открытой: можно сразу поставить несколько машинок.
         });
         grid.appendChild(cell);
     });

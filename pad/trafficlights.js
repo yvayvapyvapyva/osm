@@ -169,10 +169,7 @@
                 event.stopPropagation();
                 selectedPic = { file: file, type: 'tl', code: null };
                 placePic(map.center[1], map.center[0], null);
-                const panel = document.getElementById('tlPanel');
-                if (panel) panel.classList.remove('visible');
-                const btn = document.getElementById('addTlBtn');
-                if (btn) btn.classList.remove('open');
+                // Панель остаётся открытой: можно сразу поставить несколько светофоров.
             });
             grid.appendChild(cell);
         });
