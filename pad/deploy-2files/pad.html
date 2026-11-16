@@ -24,6 +24,11 @@
         }
         .fab:active { transform:scale(0.92); }
         .fab.active { background:rgba(48,209,88,0.5); border-color:#30D158; }
+        /* Открытая панель: кнопка подсвечена, повторное нажатие закрывает панель */
+        .fab.open {
+            background:rgba(48,209,88,0.35); border-color:#30D158;
+            box-shadow:0 0 0 2px rgba(48,209,88,0.55), 0 8px 28px rgba(48,209,88,0.35);
+        }
         #eraserBtn.active { background:rgba(255,59,48,0.55); border-color:#FF453A; }
         #drawBtn { bottom:calc(12px + env(safe-area-inset-bottom)); left:332px; border-radius:12px; transition:bottom .25s ease; }
         #eraserBtn { bottom:calc(12px + env(safe-area-inset-bottom)); left:268px; border-radius:12px; transition:bottom .25s ease; }
