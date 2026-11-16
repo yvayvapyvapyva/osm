@@ -674,11 +674,25 @@ let eraserPointerId = null;
 let eraserLongPress = null;
 let eraserLongPressFired = false;
 
-// Список изображений из папки pic/ — при добавлении новых файлов добавьте их сюда
-const PIC_FILES = ['1.png', '2.png', '3.png', '4.png'];
+// Участники движения из папки pic/. sizeM — длина по большой стороне в метрах.
+const PIC_ITEMS = [
+    { file: '1.png', sizeM: 5 },
+    { file: '2.png', sizeM: 5 },
+    { file: '3.png', sizeM: 5 },
+    { file: '4.png', sizeM: 5 },
+    { file: 'pedestrian.png', sizeM: 1.6 },
+    { file: 'cyclist.png', sizeM: 2.4 },
+    { file: 'bus.png', sizeM: 12 }
+];
+const PIC_FILES = PIC_ITEMS.map(item => item.file);
 
 // Реальный размер изображения на карте в метрах (по высоте)
 const PIC_SIZE_M = 5;
+
+function picSizeM(file) {
+    const item = PIC_ITEMS.find(entry => entry.file === file);
+    return item ? item.sizeM : PIC_SIZE_M;
+}
 
 // Максимальный видимый размер знака на карте в метрах (по большей стороне)
 const ZNAK_MAX_M = 3;
@@ -1607,7 +1621,7 @@ function buildPicMarker(isZnak, file, lat, lon, headingDeg, code) {
     }, el);
     marker._img = img;
     marker._rotWrap = wrap;
-    marker._sizeM = isZnak ? ZNAK_MAX_M : PIC_SIZE_M;
+    marker._sizeM = isZnak ? ZNAK_MAX_M : picSizeM(file);
     marker._file = file;
     marker._isZnak = isZnak;
     marker._code = code || null;
