@@ -1012,6 +1012,7 @@ function togglePlateForActive(item) {
     renderSignPlates(activeCar);
     buildZnakGrid();
     commit();
+    if (index < 0) closeZnakPanel();
 }
 
 // ---- Кастомный постоянно видимый ползунок прокрутки галереи знаков ----
