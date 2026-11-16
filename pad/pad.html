@@ -1965,10 +1965,11 @@ function updatePicSize(marker) {
     if (marker._isZnak) {
         const aspect = marker._aspect || 1;
         const maxPx = Math.max(15, (marker._sizeM || ZNAK_MAX_M) / mpp);
-        let imgW = aspect >= 1 ? maxPx : maxPx * aspect;
-        let imgH = aspect >= 1 ? maxPx / aspect : maxPx;
-        imgW = Math.max(10, imgW);
-        imgH = Math.max(10, imgH);
+        // Не ограничиваем короткую сторону отдельно: иначе у вытянутых
+        // знаков (например, 8.2.4) нарушаются пропорции и картинка обрезается.
+        // Минимальный размер задаётся только по большой стороне (maxPx).
+        const imgW = aspect >= 1 ? maxPx : maxPx * aspect;
+        const imgH = aspect >= 1 ? maxPx / aspect : maxPx;
         const bodyItem = marker._catalogItem || {
             file: marker._file,
             w: aspect,
@@ -1987,9 +1988,8 @@ function updatePicSize(marker) {
                 const aspect = item.w / item.h;
                 const plateW = aspect >= 1 ? maxPx : maxPx * aspect;
                 const plateH = aspect >= 1 ? maxPx / aspect : maxPx;
-                const shownH = Math.max(10, plateH);
-                applySignSprite(plate, item, Math.max(10, plateW), shownH);
-                stackH += shownH + 2;
+                applySignSprite(plate, item, plateW, plateH);
+                stackH += plateH + 2;
             });
         }
         if (marker._leg) {
