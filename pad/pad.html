@@ -129,7 +129,7 @@
         body.controls-hidden #signalBtns,
         body.controls-hidden #tlMini,
         body.controls-hidden #picPanel,
-        body.controls-hidden #znakPanel,
+        body.controls-hidden #znakPanel, body.controls-hidden .znak-modal,
         body.controls-hidden #tlPanel,
         body.controls-hidden #colorPanel,
         body.controls-hidden #widthSlider,
@@ -189,16 +189,25 @@
             box-shadow:0 20px 60px rgba(0,0,0,0.4); transition:bottom .25s ease;
         }
         #picPanel.visible { display:block; }
-        #znakPanel {
-            position:fixed; bottom:calc(76px + env(safe-area-inset-bottom)); left:0; right:0;
-            z-index:9005; width:100vw; max-width:100vw; box-sizing:border-box;
-            background:rgba(15,15,15,0.92); border:0.5px solid rgba(255,255,255,0.12);
-            border-bottom:none; border-radius:18px 18px 0 0;
-            padding:10px 12px; height:min(44vh, 360px); overflow:hidden;
-            display:none; flex-direction:column; align-items:stretch; gap:6px;
-            box-shadow:0 20px 60px rgba(0,0,0,0.4); transition:bottom .25s ease;
+        .znak-modal {
+            position:fixed; inset:0; z-index:9400; display:none;
+            align-items:center; justify-content:center; padding:16px;
+            background:rgba(0,0,0,0.58); backdrop-filter:blur(4px); -webkit-backdrop-filter:blur(4px);
+            box-sizing:border-box;
         }
-        #znakPanel.visible { display:flex; }
+        .znak-modal.visible { display:flex; }
+        #znakPanel {
+            position:relative; width:min(760px, 100%); height:min(70vh, 620px);
+            max-width:100%; box-sizing:border-box;
+            background:rgba(15,15,15,0.96); border:0.5px solid rgba(255,255,255,0.14);
+            border-radius:18px; padding:14px; overflow:hidden;
+            display:flex; flex-direction:column; align-items:stretch; gap:8px;
+            box-shadow:0 24px 80px rgba(0,0,0,0.55);
+        }
+        #znakModalTitle {
+            flex-shrink:0; color:#fff; font-size:16px; font-weight:700;
+            letter-spacing:-0.2px; text-align:center;
+        }
         #znakPanelHead { display:flex; align-items:center; gap:6px; flex-shrink:0; }
         #znakSearch {
             flex:1; min-width:0; box-sizing:border-box; padding:8px 10px; border-radius:9px;
@@ -247,7 +256,7 @@
             position:absolute; left:1px; right:1px; top:0; height:40px; min-height:30px;
             background:rgba(255,255,255,0.45); border-radius:7px; cursor:pointer; touch-action:none;
         }
-        .pdd-open #addPicBtn, .pdd-open #picPanel, .pdd-open #addZnakBtn, .pdd-open #znakPanel,
+        .pdd-open #addPicBtn, .pdd-open #picPanel, .pdd-open #addZnakBtn, .pdd-open #znakPanel, .pdd-open .znak-modal,
         .pdd-open #addTlBtn, .pdd-open #tlPanel, .pdd-open #textBtn, .pdd-open #eraserBtn,
         .pdd-open #drawBtn, .pdd-open #historyBtn, .pdd-open #saveBtn { z-index:9200; }
         body.pdd-drag #addPicBtn, body.pdd-drag #picPanel, body.pdd-drag #addZnakBtn, body.pdd-drag #znakPanel,
@@ -552,17 +561,20 @@
 <div id="picPanel" class="visible">
     <div id="picGrid"></div>
 </div>
-<div id="znakPanel">
-    <div id="znakPanelHead">
-        <button id="znakBackBtn" type="button" aria-label="Назад" hidden onclick="znakBackToGroups()">←</button>
-        <input id="znakSearch" type="search" placeholder="Поиск по всем знакам" autocomplete="off" oninput="znakSearchChanged(this.value)">
-    </div>
-    <div id="znakTabs"></div>
-    <div id="znakBody">
-        <div id="znakScroll">
-            <div id="znakGrid"></div>
+<div id="znakModal" class="znak-modal" onclick="if(event.target===this) closeZnakPanel()">
+    <div id="znakPanel" role="dialog" aria-modal="true" aria-labelledby="znakModalTitle">
+        <div id="znakModalTitle">Добавить знак</div>
+        <div id="znakPanelHead">
+            <button id="znakBackBtn" type="button" aria-label="Назад" hidden onclick="znakBackToGroups()">←</button>
+            <input id="znakSearch" type="search" placeholder="Поиск по всем знакам" autocomplete="off" oninput="znakSearchChanged(this.value)">
         </div>
-        <div id="znakScrollbar"><div id="znakScrollThumb"></div></div>
+        <div id="znakTabs"></div>
+        <div id="znakBody">
+            <div id="znakScroll">
+                <div id="znakGrid"></div>
+            </div>
+            <div id="znakScrollbar"><div id="znakScrollThumb"></div></div>
+        </div>
     </div>
 </div>
 <div id="colorPanel">
@@ -741,7 +753,7 @@ function loadZnakCatalog() {
                 renderSignPlates(marker);
             });
             buildZnakTabs();
-            if (document.getElementById('znakPanel').classList.contains('visible')) {
+            if (document.getElementById('znakModal').classList.contains('visible')) {
                 buildZnakGrid();
             }
             const thumb = document.getElementById('addZnakThumb');
@@ -839,6 +851,12 @@ function filteredZnakItems() {
 function updateZnakPanelHeader() {
     const back = document.getElementById('znakBackBtn');
     if (back) back.hidden = znakView === 'groups' && !znakSearchQuery;
+    const title = document.getElementById('znakModalTitle');
+    if (title) {
+        title.textContent = znakPanelMode === 'attach'
+            ? 'Добавить знак на столб'
+            : 'Добавить знак';
+    }
 }
 
 function buildZnakGroups(grid) {
@@ -929,7 +947,7 @@ function openZnakPanel(mode) {
     const search = document.getElementById('znakSearch');
     if (search) search.value = '';
     buildZnakTabs();
-    panel.classList.add('visible');
+    document.getElementById('znakModal').classList.add('visible');
     document.getElementById('addZnakBtn').classList.add('open');
     const picPanel = document.getElementById('picPanel');
     if (picPanel) picPanel.classList.remove('visible');
@@ -963,8 +981,8 @@ function znakBackToGroups() {
 }
 
 function closeZnakPanel() {
-    const panel = document.getElementById('znakPanel');
-    if (panel) panel.classList.remove('visible');
+    const modal = document.getElementById('znakModal');
+    if (modal) modal.classList.remove('visible');
     document.getElementById('addZnakBtn').classList.remove('open');
     znakPanelMode = 'place';
     updateSignalBtns();
@@ -1480,7 +1498,7 @@ function updateSignalBtns() {
         platesBtn.classList.toggle('active', isZnak && znakPanelMode === 'attach');
     }
     if (isZnak && znakPanelMode === 'attach' &&
-        document.getElementById('znakPanel').classList.contains('visible')) {
+        document.getElementById('znakModal').classList.contains('visible')) {
         buildZnakGrid();
     }
     const l = document.getElementById('sigLeftBtn');
@@ -1832,7 +1850,7 @@ function clearEverything() {
     textItems.slice().forEach(m => removeTextItem(m));
     document.getElementById('picPanel').classList.remove('visible');
     document.getElementById('addPicBtn').classList.remove('open');
-    document.getElementById('znakPanel').classList.remove('visible');
+    document.getElementById('znakModal').classList.remove('visible');
     document.getElementById('addZnakBtn').classList.remove('open');
     const tlPanel = document.getElementById('tlPanel');
     const tlBtn = document.getElementById('addTlBtn');
@@ -2141,7 +2159,7 @@ function updateAllPicMarkers(event) {
             if (eraserMode) stopEraser();
             document.getElementById('picPanel').classList.remove('visible');
             document.getElementById('addPicBtn').classList.remove('open');
-            document.getElementById('znakPanel').classList.remove('visible');
+            document.getElementById('znakModal').classList.remove('visible');
             document.getElementById('addZnakBtn').classList.remove('open');
             const dlTlP = document.getElementById('tlPanel');
             const dlTlB = document.getElementById('addTlBtn');
@@ -2175,7 +2193,7 @@ function updateAllPicMarkers(event) {
             if (drawMode) stopDraw();
             document.getElementById('picPanel').classList.remove('visible');
             document.getElementById('addPicBtn').classList.remove('open');
-            document.getElementById('znakPanel').classList.remove('visible');
+            document.getElementById('znakModal').classList.remove('visible');
             document.getElementById('addZnakBtn').classList.remove('open');
             const elTlP = document.getElementById('tlPanel');
             const elTlB = document.getElementById('addTlBtn');
@@ -2194,7 +2212,7 @@ function updateAllPicMarkers(event) {
             if (eraserMode) stopEraser();
             document.getElementById('picPanel').classList.remove('visible');
             document.getElementById('addPicBtn').classList.remove('open');
-            document.getElementById('znakPanel').classList.remove('visible');
+            document.getElementById('znakModal').classList.remove('visible');
             document.getElementById('addZnakBtn').classList.remove('open');
             const txTlP = document.getElementById('tlPanel');
             const txTlB = document.getElementById('addTlBtn');
@@ -2702,8 +2720,7 @@ function updateAllPicMarkers(event) {
         if (panel.classList.contains('visible')) {
             // Сетка строится один раз при старте; пересоздание заставляет картинки мигать
             if (!document.getElementById('picGrid').children.length) buildPicGrid();
-            const znakPanel = document.getElementById('znakPanel');
-            znakPanel.classList.remove('visible');
+            document.getElementById('znakModal').classList.remove('visible');
             document.getElementById('addZnakBtn').classList.remove('open');
             const tlPanel = document.getElementById('tlPanel');
             if (tlPanel) { tlPanel.classList.remove('visible'); }
@@ -2716,8 +2733,8 @@ function updateAllPicMarkers(event) {
         if (drawMode) stopDraw();
         if (eraserMode) stopEraser();
         if (textMode) stopTextMode();
-        const panel = document.getElementById('znakPanel');
-        if (panel.classList.contains('visible')) {
+        const modal = document.getElementById('znakModal');
+        if (modal.classList.contains('visible')) {
             closeZnakPanel();
             return;
         }
@@ -2736,7 +2753,7 @@ function updateAllPicMarkers(event) {
             if (window.buildTlGrid) window.buildTlGrid();
             document.getElementById('picPanel').classList.remove('visible');
             document.getElementById('addPicBtn').classList.remove('open');
-            document.getElementById('znakPanel').classList.remove('visible');
+            document.getElementById('znakModal').classList.remove('visible');
             document.getElementById('addZnakBtn').classList.remove('open');
         }
     });
