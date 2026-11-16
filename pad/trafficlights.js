@@ -3,7 +3,7 @@
 // секциями стрелками влево/вправо), размещение на карте и управление сигналами
 // по долгому нажатию. Лампочки изначально не горят; боковую секцию можно включать
 // одновременно с любым основным сигналом.
-// Использует глобальные функции/переменные pad.html: startPicDrag, placePic,
+// Использует глобальные функции/переменные pad.html: placePic,
 // updatePicMarker, removeMarker, setPanel, anyPanelOpen, map, placedMarkers,
 // mapRot, appBehaviors, drawMode, eraserMode.
 
@@ -164,8 +164,16 @@
             cell.appendChild(createTlDom(file));
             // в галерее светофор показан с включённым зелёным
             cell.querySelector('.tl-lamp.tl-green').classList.add('on');
-            cell.addEventListener('pointerdown', e => startPicDrag(cell, e));
-            cell.addEventListener('touchstart', e => e.preventDefault(), { passive: false });
+            cell.addEventListener('click', event => {
+                event.preventDefault();
+                event.stopPropagation();
+                selectedPic = { file: file, type: 'tl', code: null };
+                placePic(map.center[1], map.center[0], null);
+                const panel = document.getElementById('tlPanel');
+                if (panel) panel.classList.remove('visible');
+                const btn = document.getElementById('addTlBtn');
+                if (btn) btn.classList.remove('open');
+            });
             grid.appendChild(cell);
         });
     };

@@ -390,13 +390,12 @@
         #znakGrid { justify-content:flex-start; align-content:flex-start; }
         .pic-item {
             display:flex; align-items:center; justify-content:center; padding:6px; border-radius:10px;
-            background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.1); cursor:pointer; touch-action:none;
+            background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.1); cursor:pointer; touch-action:pan-y;
             flex:0 0 auto;
         }
         .pic-item img { max-width:80px; max-height:60px; object-fit:contain; display:block; }
         .pic-item.active { border-color:#30D158; background:rgba(48,209,88,0.2); }
         .pic-item.hidden { display:none; }
-        #znakGrid .pic-item { touch-action:pan-y; }
         .znak-empty { width:100%; padding:22px 10px; text-align:center; color:rgba(255,255,255,0.55); font-size:13px; }
         #loading {
             position:fixed; inset:0; background:rgba(0,0,0,0.75); z-index:9999; display:flex; align-items:center; justify-content:center;
@@ -721,7 +720,14 @@ function buildPicGrid() {
         img.draggable = false;
         img.onerror = () => cell.classList.add('hidden');
         cell.appendChild(img);
-        cell.addEventListener('pointerdown', e => startPicDrag(cell, e));
+        cell.addEventListener('click', event => {
+            event.preventDefault();
+            event.stopPropagation();
+            selectedPic = { file: file, type: 'pic', code: null };
+            placePic(map.center[1], map.center[0], null);
+            document.getElementById('picPanel').classList.remove('visible');
+            document.getElementById('addPicBtn').classList.remove('open');
+        });
         grid.appendChild(cell);
     });
 }
@@ -1076,72 +1082,6 @@ function initZnakScrollbar() {
     window.updateZnakScrollbar = update;
     update();
 }
-
-let picDrag = null;
-let picGhost = null;
-
-function startPicDrag(cell, e) {
-    e.preventDefault();
-    const t = cell.dataset.type;
-    picDrag = { id: e.pointerId, item: cell, type: t, startX: e.clientX, startY: e.clientY, active: false, angle: null, cx: 0, cy: 0, h: 0, sizeM: t === 'pic' ? PIC_SIZE_M : (t === 'znak' ? ZNAK_MAX_M : 0), scaleK: 1, pxH: t === 'tl' ? Math.min(100, Math.max(20, 10 / metersPerPixel(map.center[1]))) : 0 };
-}
-
-window.addEventListener('pointermove', e => {
-    if (!picDrag || e.pointerId !== picDrag.id) return;
-    if (!picDrag.active) {
-        const dx = e.clientX - picDrag.startX, dy = e.clientY - picDrag.startY;
-        if (dx * dx + dy * dy < 49) return;
-        picDrag.active = true;
-        selectedPic = { file: picDrag.item.dataset.file, type: picDrag.type, code: picDrag.item.dataset.code || null };
-        picGhost = document.createElement('img');
-        if (picDrag.type === 'tl') {
-            picGhost.src = (window.tlGhostSrc ? window.tlGhostSrc(selectedPic.file) : '');
-        } else {
-            picGhost.src = (picDrag.type === 'znak' ? 'znaki/' : 'pic/') + encodeURIComponent(selectedPic.file);
-        }
-        picGhost.style.cssText = 'position:fixed;left:0;top:0;width:auto;height:auto;pointer-events:none;z-index:9999;opacity:0.9;transform:translate(-50%,-50%);';
-        document.body.appendChild(picGhost);
-        const geo = screenToGeo(e.clientX, e.clientY);
-        picDrag.h = Math.max(10, (picDrag.pxH ? picDrag.pxH : picDrag.sizeM / metersPerPixel(geo.lat) / picDrag.scaleK)) / 2;
-        picDrag.cx = e.clientX;
-        picDrag.cy = e.clientY + picDrag.h;
-        picDrag.angle = Math.atan2(e.clientY - picDrag.cy, e.clientX - picDrag.cx);
-    } else if (picGhost) {
-        const cGeo = screenToGeo(picDrag.cx, picDrag.cy);
-        picDrag.h = Math.max(10, (picDrag.pxH ? picDrag.pxH : picDrag.sizeM / metersPerPixel(cGeo.lat) / picDrag.scaleK)) / 2;
-        const ang = Math.atan2(e.clientY - picDrag.cy, e.clientX - picDrag.cx);
-        picDrag.angle = ang;
-        picDrag.cx = e.clientX - Math.cos(ang) * picDrag.h;
-        picDrag.cy = e.clientY - Math.sin(ang) * picDrag.h;
-    }
-    if (picGhost) {
-        picGhost.style.height = (2 * picDrag.h) + 'px';
-        picGhost.style.left = picDrag.cx + 'px';
-        picGhost.style.top = picDrag.cy + 'px';
-        picGhost.style.transform = 'translate(-50%,-50%)' + (picDrag.angle != null ? ' rotate(' + (picDrag.angle * 180 / Math.PI + 90) + 'deg)' : '');
-    }
-}, true);
-
-function endPicDrag(e) {
-    if (!picDrag || e.pointerId !== picDrag.id) return;
-    const active = picDrag.active;
-    let angle = picDrag.angle;
-    const cx = picDrag.cx, cy = picDrag.cy;
-    if (angle == null) angle = Math.atan2(e.clientY - picDrag.startY, e.clientX - picDrag.startX);
-    picDrag = null;
-    if (picGhost) { picGhost.remove(); picGhost = null; }
-    if (!active) return;
-    const mapEl = document.getElementById('map');
-    const rect = mapEl.getBoundingClientRect();
-    if (e.clientX >= rect.left && e.clientX <= rect.right && e.clientY >= rect.top && e.clientY <= rect.bottom) {
-        const geo = screenToGeo(cx, cy);
-        placePic(geo.lat, geo.lon, angle);
-    } else {
-        selectedPic = null;
-    }
-}
-window.addEventListener('pointerup', endPicDrag, true);
-window.addEventListener('pointercancel', endPicDrag, true);
 
 function screenToGeo(clientX, clientY) {
     const mapEl = document.getElementById('map');
@@ -2241,6 +2181,9 @@ function updateAllPicMarkers(event) {
     document.getElementById('textBtn').addEventListener('click', () => {
         if (textMode) {
             stopTextMode();
+        } else if (textEditing) {
+            // Повторное нажатие завершает текущую надпись, не создавая новую.
+            commitTextEditing();
         } else {
             if (drawMode) stopDraw();
             if (eraserMode) stopEraser();
@@ -2253,6 +2196,12 @@ function updateAllPicMarkers(event) {
             if (txTlP) txTlP.classList.remove('visible');
             if (txTlB) txTlB.classList.remove('open');
             startTextMode();
+            if (map && map.center) {
+                // Сразу ставим поле в центр карты и возвращаем карте обычное управление.
+                // Фокус остаётся в поле — клавиатура открывается в этом же жесте.
+                if (typeof window.exitTextPlacementMode === 'function') window.exitTextPlacementMode();
+                placeTextField(map.center[1], map.center[0]);
+            }
         }
     });
 
@@ -2798,14 +2747,6 @@ function updateAllPicMarkers(event) {
 
     buildPicGrid();
     loadZnakCatalog();
-    // iOS: гасим нативный скролл на элементах галерей, иначе он обгоняет drag
-    // и приходит pointercancel — вместо перетаскивания листается панель
-    ['picGrid'].forEach(id => {
-        const g = document.getElementById(id);
-        g.addEventListener('touchstart', e => {
-            if (e.target.closest && e.target.closest('.pic-item')) e.preventDefault();
-        }, { passive: false });
-    });
     document.getElementById('addPicThumb').src = 'pic/' + encodeURIComponent(PIC_FILES[0]);
     document.getElementById('addZnakThumb').src = 'znaki/webp/1.1.webp';
     document.querySelector('.color-btn[data-color="#000000"]').classList.add('active');

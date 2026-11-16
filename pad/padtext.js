@@ -21,6 +21,18 @@ document.addEventListener('pointerdown', (e) => {
     window._textTapPointer = !!(e.target && e.target.closest && e.target.closest('.text-item'));
 }, true);
 
+// Тап вне редактируемого поля фиксирует текст. Кнопка «Текст» исключена:
+// её обработчик сам решает — завершить текущую надпись или начать новую.
+document.addEventListener('pointerdown', (e) => {
+    if (!textEditing) return;
+    const t = e.target;
+    if (!t || !t.closest) return;
+    if (t.closest('#textBtn')) return;
+    const item = t.closest('.text-item');
+    if (item && item === textEditing.marker._select) return;
+    commitTextEditing();
+}, true);
+
 // Размер текста фиксирован в пикселях экрана — не зависит от масштаба карты.
 const TEXT_FONT_SIZE_PX = 16;
 // Ширина свёрнутой иконки «T» в метрах — одинакова на карте при любом масштабе.
@@ -47,6 +59,17 @@ function stopTextMode() {
     document.getElementById('textBtn').classList.remove('active');
     map.update({ behaviors: appBehaviors });
 }
+
+// Выход из режима постановки текста, но только что созданное поле остаётся
+// открытым для ввода. Карта снова получает обычное управление.
+function exitTextPlacementMode() {
+    textMode = false;
+    setMarkersDraggable(true);
+    setHandlesVisible(true);
+    document.getElementById('textBtn').classList.remove('active');
+    map.update({ behaviors: appBehaviors });
+}
+window.exitTextPlacementMode = exitTextPlacementMode;
 
 // Создание YMapMarker-маркера с полем ввода внутри
 function makeTextMarker(lat, lon, ta, opts) {
