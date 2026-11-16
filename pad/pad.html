@@ -1937,7 +1937,7 @@ function updatePicSize(marker) {
             // основного знака, но тянем до низа прикреплённых знаков.
             const realH = (marker._sizeM || ZNAK_MAX_M) / mpp;
             const legW = realH * 0.09;
-            const top = 0; // ножка начинается от верха знака
+            const top = realH * 0.5; // ножка начинается от центра верхнего знака
             const bottom = stackH + realH * 0.6;
             marker._leg.style.top = top + 'px';
             marker._leg.style.height = (bottom - top) + 'px';
