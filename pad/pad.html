@@ -1942,7 +1942,7 @@ function updatePicSize(marker) {
             // основного знака, но тянем до низа прикреплённых знаков.
             const realH = (marker._sizeM || ZNAK_MAX_M) / mpp;
             const legW = realH * 0.09;
-            const top = realH * 0.65;
+            const top = realH * 0.5;
             const bottom = stackH + realH;
             marker._leg.style.top = top + 'px';
             marker._leg.style.height = (bottom - top) + 'px';
