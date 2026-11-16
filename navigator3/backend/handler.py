@@ -1067,9 +1067,11 @@ def _api_signs(event):
     навигатора без деплоя и синхронизации.
     """
     try:
-        scene = store.get_scene_by_name(PAD_SIGNS_SCENE_NAME)
-        if not scene or scene.get("id") != PAD_SIGNS_SCENE_ID:
-            scene = store.get_scene_by_id(PAD_SIGNS_SCENE_ID)
+        # Сначала стабильный ID: сцену можно переименовать. Если ID не найден
+        # (сцену пересоздали), берём её по имени ``full``.
+        scene = store.get_scene_by_id(PAD_SIGNS_SCENE_ID)
+        if not scene:
+            scene = store.get_scene_by_name(PAD_SIGNS_SCENE_NAME)
     except Exception as exc:  # noqa: BLE001
         print(f"[signs] scene read failed: {exc}")
         return auth.json_response(500, {"error": "storage_failed"})
