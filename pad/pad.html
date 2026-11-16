@@ -261,7 +261,7 @@
         }
         .znak-tab.active { background:rgba(48,209,88,0.22); border-color:#30D158; color:#fff; }
         #znakBody { display:flex; flex:1; min-height:0; gap:2px; }
-        #znakScroll { flex:1; overflow-y:scroll; overflow-x:hidden; -webkit-overflow-scrolling:touch; scrollbar-width:none; overscroll-behavior:contain; }
+        #znakScroll { flex:1; overflow-y:auto; overflow-x:hidden; -webkit-overflow-scrolling:touch; scrollbar-width:none; overscroll-behavior:contain; }
         #znakScroll::-webkit-scrollbar { display:none; }
         #znakScrollbar { position:relative; flex-shrink:0; width:24px; margin-left:2px; }
         #znakScrollThumb {
@@ -396,6 +396,7 @@
         .pic-item img { max-width:80px; max-height:60px; object-fit:contain; display:block; }
         .pic-item.active { border-color:#30D158; background:rgba(48,209,88,0.2); }
         .pic-item.hidden { display:none; }
+        #znakGrid .pic-item { touch-action:pan-y; }
         .znak-empty { width:100%; padding:22px 10px; text-align:center; color:rgba(255,255,255,0.55); font-size:13px; }
         #loading {
             position:fixed; inset:0; background:rgba(0,0,0,0.75); z-index:9999; display:flex; align-items:center; justify-content:center;
@@ -585,7 +586,6 @@
             <div id="znakScroll">
                 <div id="znakGrid"></div>
             </div>
-            <div id="znakScrollbar"><div id="znakScrollThumb"></div></div>
         </div>
     </div>
 </div>
@@ -939,11 +939,29 @@ function buildZnakGrid() {
                 togglePlateForActive(item);
             });
         } else {
-            cell.addEventListener('pointerdown', event => startPicDrag(cell, event));
+            cell.addEventListener('click', event => {
+                event.preventDefault();
+                event.stopPropagation();
+                placeSignAtCenter(item);
+            });
         }
         grid.appendChild(cell);
     });
     if (window.updateZnakScrollbar) setTimeout(window.updateZnakScrollbar, 30);
+}
+
+function placeSignAtCenter(item) {
+    if (!item || !map || !map.center) return;
+    const lon = map.center[0];
+    const lat = map.center[1];
+    closeZnakPanel();
+    const marker = buildPicMarker(true, item.file, lat, lon, -mapRot, item.code);
+    map.addChild(marker);
+    placedMarkers.push(marker);
+    setActiveCar(marker);
+    setMarkerDragEnabled(marker, true);
+    updateSignalBtns();
+    commit();
 }
 
 function openZnakPanel(mode) {
@@ -2780,10 +2798,9 @@ function updateAllPicMarkers(event) {
 
     buildPicGrid();
     loadZnakCatalog();
-    initZnakScrollbar();
     // iOS: гасим нативный скролл на элементах галерей, иначе он обгоняет drag
     // и приходит pointercancel — вместо перетаскивания листается панель
-    ['picGrid', 'znakGrid'].forEach(id => {
+    ['picGrid'].forEach(id => {
         const g = document.getElementById(id);
         g.addEventListener('touchstart', e => {
             if (e.target.closest && e.target.closest('.pic-item')) e.preventDefault();
