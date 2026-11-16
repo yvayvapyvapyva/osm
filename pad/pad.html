@@ -691,6 +691,8 @@ const SIGN_SPRITE_URL = 'znaki/sprite.webp?v=3';
 let znakCatalogPromise = null;
 let znakGroup = 'all';
 let znakSearchQuery = '';
+let znakSearchVisible = false;
+let znakScrollTop = 0;
 let znakPanelMode = 'place';
 const ZNAK_GROUPS = [
     { id: 'all', title: 'Все' },
@@ -799,6 +801,7 @@ function loadZnakCatalog() {
             buildZnakTabs();
             if (document.getElementById('znakModal').classList.contains('visible')) {
                 buildZnakGrid();
+                restoreZnakScroll();
             }
             const thumb = document.getElementById('addZnakThumb');
             if (thumb && ZNAKI_CATALOG[0]) thumb.src = 'znaki/' + encodeURIComponent(ZNAKI_CATALOG[0].file);
@@ -888,26 +891,31 @@ function buildZnakTabs() {
                 if (input) input.value = '';
             }
             syncZnakTabActive();
-            buildZnakGrid();
+            buildZnakGrid(true);
         });
         tabs.appendChild(button);
     });
 }
 
-function setZnakSearchVisible(visible) {
+function applyZnakSearchVisibility(visible) {
+    znakSearchVisible = !!visible;
     const row = document.getElementById('znakSearchRow');
     const button = document.getElementById('znakSearchToggle');
-    const input = document.getElementById('znakSearch');
     if (row) row.hidden = !visible;
     if (button) {
         button.classList.toggle('active', !!visible);
         button.setAttribute('aria-expanded', visible ? 'true' : 'false');
     }
+}
+
+function setZnakSearchVisible(visible) {
+    const input = document.getElementById('znakSearch');
+    applyZnakSearchVisibility(visible);
     if (!visible) {
         if (znakSearchQuery) {
             znakSearchQuery = '';
             if (input) input.value = '';
-            buildZnakGrid();
+            buildZnakGrid(true);
         }
         if (input) input.blur();
     } else if (input) {
@@ -942,13 +950,15 @@ function updateZnakPanelHeader() {
     }
 }
 
-function buildZnakGrid() {
+function buildZnakGrid(resetScroll) {
     const grid = document.getElementById('znakGrid');
     if (!grid) return;
     if (!ZNAKI_CATALOG.length) {
         loadZnakCatalog();
         return;
     }
+    const scrollEl = document.getElementById('znakScroll');
+    const prevTop = scrollEl ? scrollEl.scrollTop : 0;
     updateZnakPanelHeader();
     grid.innerHTML = '';
     const items = filteredZnakItems();
@@ -957,6 +967,7 @@ function buildZnakGrid() {
         empty.className = 'znak-empty';
         empty.textContent = 'Ничего не найдено';
         grid.appendChild(empty);
+        if (scrollEl) scrollEl.scrollTop = resetScroll ? 0 : prevTop;
         return;
     }
     items.forEach(item => {
@@ -985,7 +996,22 @@ function buildZnakGrid() {
         }
         grid.appendChild(cell);
     });
+    // Обычная перестройка сохраняет позицию списка, смена вкладки/поиска — сбрасывает.
+    if (scrollEl) scrollEl.scrollTop = resetScroll ? 0 : prevTop;
     if (window.updateZnakScrollbar) setTimeout(window.updateZnakScrollbar, 30);
+}
+
+function captureZnakScroll() {
+    const scroll = document.getElementById('znakScroll');
+    if (scroll) znakScrollTop = scroll.scrollTop;
+}
+
+function restoreZnakScroll() {
+    const scroll = document.getElementById('znakScroll');
+    if (!scroll) return;
+    const apply = () => { scroll.scrollTop = znakScrollTop; };
+    apply();
+    requestAnimationFrame(apply);
 }
 
 function placeSignAtCenter(item) {
@@ -1010,11 +1036,9 @@ function openZnakPanel(mode) {
         console.warn('Сначала выберите знак');
         return;
     }
-    znakGroup = 'all';
-    znakSearchQuery = '';
     const search = document.getElementById('znakSearch');
-    if (search) search.value = '';
-    setZnakSearchVisible(false);
+    if (search) search.value = znakSearchQuery;
+    applyZnakSearchVisibility(znakSearchVisible);
     buildZnakTabs();
     const modal = document.getElementById('znakModal');
     modal.classList.toggle('is-sheet', znakPanelMode === 'place');
@@ -1029,6 +1053,7 @@ function openZnakPanel(mode) {
     if (tlBtn) tlBtn.classList.remove('open');
     if (!ZNAKI_CATALOG.length) loadZnakCatalog();
     buildZnakGrid();
+    restoreZnakScroll();
     if (window.updateZnakScrollbar) setTimeout(window.updateZnakScrollbar, 50);
     updateSignalBtns();
 }
@@ -1040,10 +1065,11 @@ function znakSearchChanged(value) {
         znakGroup = 'all';
         syncZnakTabActive();
     }
-    buildZnakGrid();
+    buildZnakGrid(true);
 }
 
 function closeZnakPanel() {
+    captureZnakScroll();
     const modal = document.getElementById('znakModal');
     if (modal) modal.classList.remove('visible');
     document.getElementById('addZnakBtn').classList.remove('open');
