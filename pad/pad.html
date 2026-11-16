@@ -196,6 +196,18 @@
             box-sizing:border-box;
         }
         .znak-modal.visible { display:flex; }
+        .znak-modal.is-sheet {
+            align-items:flex-end; justify-content:center;
+            padding:0 0 calc(76px + env(safe-area-inset-bottom));
+            background:transparent; backdrop-filter:none; -webkit-backdrop-filter:none;
+            pointer-events:none;
+        }
+        .znak-modal.is-sheet #znakPanel {
+            pointer-events:auto; width:100vw; max-width:100vw;
+            height:min(44vh, 360px); border-radius:18px 18px 0 0;
+            border-bottom:none; padding:10px 12px;
+        }
+        .znak-modal.is-sheet #znakModalTitle { display:none; }
         #znakPanel {
             position:relative; width:min(760px, 100%); height:min(70vh, 620px);
             max-width:100%; box-sizing:border-box;
@@ -853,6 +865,7 @@ function updateZnakPanelHeader() {
     if (back) back.hidden = znakView === 'groups' && !znakSearchQuery;
     const title = document.getElementById('znakModalTitle');
     if (title) {
+        title.hidden = znakPanelMode !== 'attach';
         title.textContent = znakPanelMode === 'attach'
             ? 'Добавить знак на столб'
             : 'Добавить знак';
@@ -947,7 +960,9 @@ function openZnakPanel(mode) {
     const search = document.getElementById('znakSearch');
     if (search) search.value = '';
     buildZnakTabs();
-    document.getElementById('znakModal').classList.add('visible');
+    const modal = document.getElementById('znakModal');
+    modal.classList.toggle('is-sheet', znakPanelMode === 'place');
+    modal.classList.add('visible');
     document.getElementById('addZnakBtn').classList.add('open');
     const picPanel = document.getElementById('picPanel');
     if (picPanel) picPanel.classList.remove('visible');
