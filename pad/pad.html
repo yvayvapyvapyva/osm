@@ -1360,13 +1360,12 @@ function restoreScene(snap) {
             const mpp = metersPerPixel(wLat);
             if (mpp > 0) width = Math.max(1, widthM / mpp);
         }
-        const coords = smoothDrawCoords(l.coords || []);
         const feature = new ymaps3.YMapFeature({
-            geometry: { type: 'LineString', coordinates: coords },
+            geometry: { type: 'LineString', coordinates: l.coords },
             style: { stroke: [{ width: width, color: hexToRgba(color, 0.7) }] }
         });
         map.addChild(feature);
-        drawnLines.push({ feature, coords: coords, color: color, width: width, widthM: widthM });
+        drawnLines.push({ feature, coords: l.coords, color: color, width: width, widthM: widthM });
     });
     snap.markers.forEach(d => {
         let m;
@@ -1561,66 +1560,22 @@ function updateSignalBtns() {
     }
 }
 
-// Сглаживание линии: два прохождения Chaikin. Каждое прохождение срезает
-// углы, поэтому линия получается округлой и плавной. Точки остаются в
-// географических координатах и не выходят за пределы исходной ломаной.
-function smoothDrawCoords(coords) {
-    if (!coords || coords.length < 3) return coords ? coords.slice() : [];
-    let pts = coords;
-    for (let pass = 0; pass < 2; pass++) {
-        const out = [pts[0]];
-        for (let i = 0; i < pts.length - 1; i++) {
-            const a = pts[i], b = pts[i + 1];
-            out.push([a[0] * 0.75 + b[0] * 0.25, a[1] * 0.75 + b[1] * 0.25]);
-            out.push([a[0] * 0.25 + b[0] * 0.75, a[1] * 0.25 + b[1] * 0.75]);
-        }
-        out.push(pts[pts.length - 1]);
-        pts = out;
-    }
-    return pts;
-}
-
-let drawFrame = 0;
-
-function updateDrawFeature() {
-    if (!drawFeature || lineCoords.length < 2) return;
-    drawFeature.update({ geometry: { type: 'LineString', coordinates: smoothDrawCoords(lineCoords) } });
-}
-
-function scheduleDrawFeature() {
-    if (drawFrame) return;
-    drawFrame = requestAnimationFrame(() => {
-        drawFrame = 0;
-        updateDrawFeature();
-    });
-}
-
-function flushDrawFeature() {
-    if (drawFrame) {
-        cancelAnimationFrame(drawFrame);
-        drawFrame = 0;
-    }
-    updateDrawFeature();
-}
-
 function addDrawPoint(coords, screen) {
     if (screen && lastDrawScreen) {
         const dx = screen[0] - lastDrawScreen[0], dy = screen[1] - lastDrawScreen[1];
-        // 2 px между точками: линия точнее следует за пальцем, а сглаживание
-        // убирает угловатость на быстрых движениях.
-        if (dx * dx + dy * dy < 4) return;
+        if (dx * dx + dy * dy < 16) return;
     }
     lastDrawScreen = screen || null;
     lineCoords.push(coords);
+    const smooth = lineCoords.slice();
     if (!drawFeature) {
         drawFeature = new ymaps3.YMapFeature({
-            geometry: { type: 'LineString', coordinates: smoothDrawCoords(lineCoords) },
+            geometry: { type: 'LineString', coordinates: smooth },
             style: { stroke: [{ width: drawWidth, color: hexToRgba(drawColor, 0.7) }] }
         });
         map.addChild(drawFeature);
     } else {
-        // Перерисовываем не чаще кадра, даже если pointermove приходит чаще.
-        scheduleDrawFeature();
+        drawFeature.update({ geometry: { type: 'LineString', coordinates: smooth } });
     }
 }
 
@@ -2206,10 +2161,8 @@ function updateAllPicMarkers(event) {
         },
         onPointerUp: () => {
             if (drawing && drawFeature) {
-                flushDrawFeature();
-                const coords = lineCoords.slice();
-                const wLat = coords[0] ? coords[0][1] : map.center[1];
-                drawnLines.push({ feature: drawFeature, coords: coords, color: drawColor, width: drawWidth, widthM: drawWidth * metersPerPixel(wLat) });
+                const wLat = lineCoords[0] ? lineCoords[0][1] : map.center[1];
+                drawnLines.push({ feature: drawFeature, coords: lineCoords.slice(), color: drawColor, width: drawWidth, widthM: drawWidth * metersPerPixel(wLat) });
                 commit();
             }
             if (eraserMode && eraserDrag) commit();
@@ -2222,10 +2175,8 @@ function updateAllPicMarkers(event) {
         },
         onPointerCancel: () => {
             if (drawing && drawFeature) {
-                flushDrawFeature();
-                const coords = lineCoords.slice();
-                const wLat = coords[0] ? coords[0][1] : map.center[1];
-                drawnLines.push({ feature: drawFeature, coords: coords, color: drawColor, width: drawWidth, widthM: drawWidth * metersPerPixel(wLat) });
+                const wLat = lineCoords[0] ? lineCoords[0][1] : map.center[1];
+                drawnLines.push({ feature: drawFeature, coords: lineCoords.slice(), color: drawColor, width: drawWidth, widthM: drawWidth * metersPerPixel(wLat) });
                 commit();
             }
             if (eraserMode && eraserDrag) commit();
