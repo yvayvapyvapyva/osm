@@ -1561,19 +1561,23 @@ function updateSignalBtns() {
     }
 }
 
-// Сглаживание линии: одно прохождение Chaikin (срезание углов).
-// Точки остаются в географических координатах, поэтому результат не зависит
-// от масштаба и поворота карты. Кривая не выходит за пределы исходной ломаной.
+// Сглаживание линии: два прохождения Chaikin. Каждое прохождение срезает
+// углы, поэтому линия получается округлой и плавной. Точки остаются в
+// географических координатах и не выходят за пределы исходной ломаной.
 function smoothDrawCoords(coords) {
     if (!coords || coords.length < 3) return coords ? coords.slice() : [];
-    const out = [coords[0]];
-    for (let i = 0; i < coords.length - 1; i++) {
-        const a = coords[i], b = coords[i + 1];
-        out.push([a[0] * 0.75 + b[0] * 0.25, a[1] * 0.75 + b[1] * 0.25]);
-        out.push([a[0] * 0.25 + b[0] * 0.75, a[1] * 0.25 + b[1] * 0.75]);
+    let pts = coords;
+    for (let pass = 0; pass < 2; pass++) {
+        const out = [pts[0]];
+        for (let i = 0; i < pts.length - 1; i++) {
+            const a = pts[i], b = pts[i + 1];
+            out.push([a[0] * 0.75 + b[0] * 0.25, a[1] * 0.75 + b[1] * 0.25]);
+            out.push([a[0] * 0.25 + b[0] * 0.75, a[1] * 0.25 + b[1] * 0.75]);
+        }
+        out.push(pts[pts.length - 1]);
+        pts = out;
     }
-    out.push(coords[coords.length - 1]);
-    return out;
+    return pts;
 }
 
 let drawFrame = 0;
@@ -2203,7 +2207,7 @@ function updateAllPicMarkers(event) {
         onPointerUp: () => {
             if (drawing && drawFeature) {
                 flushDrawFeature();
-                const coords = smoothDrawCoords(lineCoords);
+                const coords = lineCoords.slice();
                 const wLat = coords[0] ? coords[0][1] : map.center[1];
                 drawnLines.push({ feature: drawFeature, coords: coords, color: drawColor, width: drawWidth, widthM: drawWidth * metersPerPixel(wLat) });
                 commit();
@@ -2219,7 +2223,7 @@ function updateAllPicMarkers(event) {
         onPointerCancel: () => {
             if (drawing && drawFeature) {
                 flushDrawFeature();
-                const coords = smoothDrawCoords(lineCoords);
+                const coords = lineCoords.slice();
                 const wLat = coords[0] ? coords[0][1] : map.center[1];
                 drawnLines.push({ feature: drawFeature, coords: coords, color: drawColor, width: drawWidth, widthM: drawWidth * metersPerPixel(wLat) });
                 commit();
