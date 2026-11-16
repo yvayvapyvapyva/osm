@@ -1,11 +1,13 @@
 # Источники изображений
 
-Все изображения — Openclipart, лицензия CC0 (общественное достояние).
-Файлы обрезаны, масштабированы и очищены от лишних эффектов.
+Фотографии — Pexels, лицензия Pexels (бесплатно для коммерческого использования,
+атрибуция не требуется): https://www.pexels.com/license/
 
-- `pedestrian.png` — «Seven walking pedestrians», enolynn:
-  https://openclipart.org/detail/278359/Seven-walking-pedestrians
-- `cyclist.png` — «Two-wheeler seen from above», enolynn:
-  https://openclipart.org/detail/278367/Two-wheeler-seen-from-above
-- `bus.png` — «Bus», Openclipart:
-  https://openclipart.org/detail/153169/bus
+Фон удалён, изображения обрезаны и масштабированы.
+
+- `pedestrian.png` — «Casual Urban Walk from Above Perspective»:
+  https://www.pexels.com/photo/casual-urban-walk-from-above-perspective-32118080/
+- `cyclist.png` — «Bird's-eye View of Cyclist on Wet Road»:
+  https://www.pexels.com/photo/bird-s-eye-view-of-cyclist-on-wet-road-35539018/
+- `bus.png` — «Aerial View of Bus on Countryside Road in Germany»:
+  https://www.pexels.com/photo/aerial-view-of-bus-on-countryside-road-in-germany-40040340/
