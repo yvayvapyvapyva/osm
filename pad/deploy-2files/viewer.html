@@ -405,6 +405,9 @@
            (img у знака, .tl у светофора), т.к. .rot-wrap имеет схлопнутый/немасштабный layout */
         .pic-marker .rot-wrap.marker-drag img { outline:2px solid #30D158; outline-offset:2px; border-radius:4px; }
         .pic-marker .rot-wrap.marker-drag .tl { outline:2px solid #30D158; outline-offset:2px; border-radius:6px; }
+        /* Знак — это div со спрайтом (не img), поэтому рамка нужна отдельно.
+           Обводим всю стопку: основной знак + дополнительные. */
+        .pic-marker .rot-wrap.marker-drag .sign-stack { outline:2px solid #30D158; outline-offset:2px; border-radius:4px; }
 
         .sign-stack { display:flex; flex-direction:column; align-items:center; }
         .sign-plates { display:flex; flex-direction:column; align-items:center; }
