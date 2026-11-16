@@ -198,7 +198,7 @@
         .znak-modal.visible { display:flex; }
         .znak-modal.is-sheet {
             align-items:flex-end; justify-content:center;
-            padding:0 0 calc(76px + env(safe-area-inset-bottom));
+            padding:0 0 var(--pad-sheet-bottom, calc(76px + env(safe-area-inset-bottom)));
             background:transparent; backdrop-filter:none; -webkit-backdrop-filter:none;
             pointer-events:none;
         }
@@ -206,6 +206,7 @@
             pointer-events:auto; width:100vw; max-width:100vw;
             height:min(44vh, 360px); border-radius:18px 18px 0 0;
             border-bottom:none; padding:10px 12px;
+            max-height:calc(100vh - var(--pad-sheet-bottom, calc(76px + env(safe-area-inset-bottom))) - 12px);
         }
         .znak-modal.is-sheet #znakModalTitle { display:none; }
         #znakPanel {
@@ -2663,12 +2664,17 @@ function updateAllPicMarkers(event) {
         // Кнопки нижнего ряда поднимаются вместе со шторкой ПДД, панели галерей — ещё выше (над кнопками)
         const btns = ['addPicBtn', 'addZnakBtn', 'addTlBtn', 'textBtn', 'eraserBtn', 'drawBtn']
             .map(id => document.getElementById(id)).filter(Boolean);
-        const panels = ['picPanel', 'znakPanel', 'tlPanel']
+        const panels = ['picPanel', 'tlPanel']
             .map(id => document.getElementById(id)).filter(Boolean);
+        const signModal = document.getElementById('znakModal');
+        // У панели знаков положение задаёт не bottom самой панели, а отступ
+        // оверлея-шторки — иначе отступ складывается и панель уезжает вверх.
+        if (znakPanelEl) znakPanelEl.style.bottom = '';
         if (document.body.classList.contains('pdd-open')) {
             const h = pddModal.offsetHeight + 12;
             for (const el of btns) el.style.bottom = h + 'px';
             for (const el of panels) el.style.bottom = (h + 64) + 'px';
+            if (signModal) signModal.style.setProperty('--pad-sheet-bottom', (h + 64) + 'px');
             const colorPanel = document.getElementById('colorPanel');
             const widthSlider = document.getElementById('widthSlider');
             if (colorPanel) colorPanel.style.bottom = (h + 64) + 'px';
@@ -2676,6 +2682,7 @@ function updateAllPicMarkers(event) {
         } else {
             for (const el of btns) el.style.bottom = '';
             for (const el of panels) el.style.bottom = '';
+            if (signModal) signModal.style.removeProperty('--pad-sheet-bottom');
             const colorPanel = document.getElementById('colorPanel');
             const widthSlider = document.getElementById('widthSlider');
             if (colorPanel) colorPanel.style.bottom = '';
