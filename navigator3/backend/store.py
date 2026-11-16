@@ -960,3 +960,54 @@ def get_road_meta(m_param):
         "visible": bool(getattr(row, "visible", False)),
         "owner_user_id": _text(getattr(row, "owner_user_id", "")),
     }
+
+# ---------------------------------------------------------------------------
+# Сцены PAD (таблица scene в YDB dbosm)
+# ---------------------------------------------------------------------------
+
+
+def _utf8(value):
+    if isinstance(value, bytes):
+        return value.decode("utf-8")
+    return "" if value is None else str(value)
+
+
+def _scene_row(row):
+    return {
+        "name": _utf8(getattr(row, "name", "")),
+        "data": _utf8(getattr(row, "data", "")),
+        "id": _utf8(getattr(row, "id", "")),
+    }
+
+
+def get_scene_by_name(name):
+    query = """
+        DECLARE $name AS Utf8;
+        SELECT name, data, id FROM scene WHERE name = $name;
+    """
+
+    def operation(session):
+        prepared = session.prepare(query)
+        return session.transaction().execute(
+            prepared, {"$name": str(name)}, commit_tx=True
+        )
+
+    rows = get_pool().retry_operation_sync(operation)[0].rows
+    return _scene_row(rows[0]) if rows else None
+
+
+def get_scene_by_id(scene_id):
+    query = """
+        DECLARE $id AS Utf8;
+        SELECT name, data, id FROM scene WHERE id = $id LIMIT 1;
+    """
+
+    def operation(session):
+        prepared = session.prepare(query)
+        return session.transaction().execute(
+            prepared, {"$id": str(scene_id)}, commit_tx=True
+        )
+
+    rows = get_pool().retry_operation_sync(operation)[0].rows
+    return _scene_row(rows[0]) if rows else None
+

@@ -53,6 +53,7 @@ https://<домен-шлюза>/
   /api/health             → функция osmn3
   /api/me                 → функция osmn3
   /api/catalog            → функция osmn3
+  /api/signs              → функция osmn3 (дорожные знаки из сцены PAD)
   /api/route?m=...        → функция osmn3
   /api/admin?action=...   → функция osmn3
   /auth/yandex/start      → функция osmn3
@@ -265,7 +266,25 @@ yc storage s3 cp navigator3/deploy-2files/navigator.html \
   s3://osmn-nav/navigator.html --content-type text/html --cache-control no-cache
 yc storage s3 cp navigator3/deploy-2files/editor.html \
   s3://osmn-nav/editor.html --content-type text/html --cache-control no-cache
+yc storage s3 cp --recursive navigator3/deploy-2files/signs/webp/ \
+  s3://osmn-nav/signs/webp/ --content-type image/webp \
+  --cache-control "public, max-age=31536000, immutable"
+yc storage s3 cp navigator3/deploy-2files/signs/catalog.json \
+  s3://osmn-nav/signs/catalog.json --content-type application/json \
+  --cache-control "public, max-age=600"
 ```
+
+## Дорожные знаки
+
+`GET /api/signs` читает сцену PAD `full` (ID `c5bk482x`) из таблицы `scene`
+в YDB `dbosm`. PAD пишет туда же, поэтому изменения сцены подхватываются
+при следующей загрузке навигатора без отдельного экспорта и деплоя.
+
+Клиент строит из знаков слой MapLibre: основной знак, таблички и ножку.
+Картинки берутся из `pad/znaki/webp/`; при сборке они копируются в
+`deploy-2files/signs/webp/`, каталог — в `deploy-2files/signs/catalog.json`.
+
+Показ слоя можно отключить в настройках («Знаки»).
 
 ## Проверка
 

@@ -237,4 +237,36 @@ buildLegalPage();
 fs.copyFileSync(path.join(root, 'admin.html'), path.join(output, 'admin.html'));
 console.log(`  admin.html: ${formatKb(fs.statSync(path.join(output, 'admin.html')).size)}`);
 
+// Знаки PAD для слоя навигатора: каталог + WebP. Сцена читается из YDB,
+// поэтому на клиенте нужны картинки всех знаков каталога, а не только текущих.
+const padZnaki = path.resolve(root, '..', 'pad', 'znaki');
+const signsOutput = path.join(output, 'signs');
+const signsWebpSource = path.join(padZnaki, 'webp');
+const signsWebpOutput = path.join(signsOutput, 'webp');
+if (fs.existsSync(signsWebpSource)) {
+    fs.rmSync(signsOutput, { recursive: true, force: true });
+    fs.mkdirSync(signsWebpOutput, { recursive: true });
+    fs.cpSync(signsWebpSource, signsWebpOutput, {
+        recursive: true,
+        filter: file => path.basename(file) !== '.DS_Store',
+    });
+    const catalogSource = path.join(padZnaki, 'catalog.json');
+    if (fs.existsSync(catalogSource)) {
+        fs.copyFileSync(catalogSource, path.join(signsOutput, 'catalog.json'));
+    }
+    let signsBytes = 0;
+    let signsFiles = 0;
+    const walk = dir => {
+        for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+            const full = path.join(dir, entry.name);
+            if (entry.isDirectory()) walk(full);
+            else { signsFiles += 1; signsBytes += fs.statSync(full).size; }
+        }
+    };
+    walk(signsWebpOutput);
+    console.log(`  signs/: ${signsFiles} WebP, ${formatKb(signsBytes)}`);
+} else {
+    console.warn('  signs/: папка pad/znaki/webp не найдена — слой знаков не соберётся');
+}
+
 console.log(`Static deploy bundle created: ${output}`);

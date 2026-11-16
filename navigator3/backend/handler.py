@@ -31,6 +31,11 @@ import urllib.parse
 import auth
 import store
 
+# Сцена PAD, которую навигатор показывает слоем дорожных знаков.
+# ID не меняется при переименовании сцены; ``full`` — запасной путь по имени.
+PAD_SIGNS_SCENE_ID = os.getenv("PAD_SIGNS_SCENE_ID", "c5bk482x").strip() or "c5bk482x"
+PAD_SIGNS_SCENE_NAME = os.getenv("PAD_SIGNS_SCENE_NAME", "full").strip() or "full"
+
 # ---------------------------------------------------------------------------
 # YDB-запросы
 # ---------------------------------------------------------------------------
@@ -1054,6 +1059,81 @@ def _auth_logout_get(event, sid):
 # ---------------------------------------------------------------------------
 
 
+def _api_signs(event):
+    """Дорожные знаки из сцены PAD.
+
+    Читаем сцену из общей таблицы ``scene`` (YDB dbosm). PAD пишет туда же,
+    поэтому изменения в редакторе подхватываются при следующей загрузке
+    навигатора без деплоя и синхронизации.
+    """
+    try:
+        scene = store.get_scene_by_name(PAD_SIGNS_SCENE_NAME)
+        if not scene or scene.get("id") != PAD_SIGNS_SCENE_ID:
+            scene = store.get_scene_by_id(PAD_SIGNS_SCENE_ID)
+    except Exception as exc:  # noqa: BLE001
+        print(f"[signs] scene read failed: {exc}")
+        return auth.json_response(500, {"error": "storage_failed"})
+
+    if not scene:
+        return auth.json_response(404, {"error": "signs_scene_not_found"})
+
+    raw = scene.get("data") or ""
+    try:
+        data = json.loads(raw)
+        if isinstance(data, str):
+            data = json.loads(data)
+    except Exception as exc:  # noqa: BLE001
+        print(f"[signs] scene json failed: {exc}")
+        return auth.json_response(500, {"error": "invalid_scene"})
+
+    if not isinstance(data, dict):
+        return auth.json_response(500, {"error": "invalid_scene"})
+
+    signs = []
+    for marker in data.get("markers") or []:
+        if not isinstance(marker, dict) or marker.get("kind") != "znak":
+            continue
+        code = _text(marker.get("code")).strip()
+        file_name = _text(marker.get("file")).strip()
+        if not code or not file_name:
+            continue
+        try:
+            lat = float(marker.get("lat"))
+            lon = float(marker.get("lon"))
+        except (TypeError, ValueError):
+            continue
+        plates = [
+            _text(plate).strip()
+            for plate in (marker.get("plates") or [])
+            if _text(plate).strip()
+        ]
+        try:
+            heading = float(marker.get("heading") or 0)
+        except (TypeError, ValueError):
+            heading = 0.0
+        signs.append(
+            {
+                "code": code,
+                "file": file_name,
+                "lat": lat,
+                "lon": lon,
+                "heading": heading,
+                "leg": bool(marker.get("leg")),
+                "plates": plates,
+            }
+        )
+
+    return auth.json_response(
+        200,
+        {
+            "name": scene.get("name") or PAD_SIGNS_SCENE_NAME,
+            "id": scene.get("id") or PAD_SIGNS_SCENE_ID,
+            "savedAt": data.get("savedAt"),
+            "signs": signs,
+        },
+    )
+
+
 def _api_catalog(event):
     """Папки и видимые маршруты вместе с геометрией открытых маршрутов.
 
@@ -2002,6 +2082,9 @@ def _handle_api(event, path, method):
 
     if normalized == "/api/catalog" and method == "GET":
         return _api_catalog(event)
+
+    if normalized == "/api/signs" and method == "GET":
+        return _api_signs(event)
 
     if normalized == "/api/route/view" and method == "GET":
         return _api_route_view(event)

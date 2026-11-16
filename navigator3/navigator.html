@@ -265,10 +265,29 @@ const APP = {
     _navSeq: 0,
     _audioPending: 0,
     _autoCenterTimer: null,
-    premiumStatus: null
+    premiumStatus: null,
+    _signsData: null,
+    _signsLoading: null,
+    _signsEnabled: true,
+    _signCatalog: new Map(),
+    _signImageCache: new Map(),
+    _signIconDefs: [],
+    _signFeatures: null,
+    _signSourceData: null
 };
 
 const $ = id => document.getElementById(id);
+
+// ---------- Дорожные знаки из сцены PAD ----------
+const SIGNS_SOURCE_ID = 'nav-signs';
+const SIGNS_LAYER_ID = 'nav-signs-icons';
+const SIGNS_ENABLED_KEY = 'osm_signs_enabled_v1';
+const SIGNS_REF_PX = 128;
+const SIGNS_DSF = 2;
+const SIGNS_MIN_ZOOM = 13;
+try {
+    APP._signsEnabled = localStorage.getItem(SIGNS_ENABLED_KEY) !== '0';
+} catch (e) {}
 
 const NAV_PLAY_ICONS = {
     play: '<svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>',
@@ -1315,6 +1334,8 @@ function openSettings() {
     $('themeToggle').checked = document.documentElement.getAttribute('data-theme') === 'dark';
     $('themeValue').textContent = document.documentElement.getAttribute('data-theme') === 'dark' ? 'Вкл' : 'Выкл';
     $('commentToggle').checked = APP._commentEnabled;
+    const signsToggle = $('signsToggle');
+    if (signsToggle) signsToggle.checked = APP._signsEnabled;
     const shockOn = APP.navConfig.SHOCK_THRESHOLD > 0 && APP._motionPermissionGranted;
     $('triggerShockToggle').checked = shockOn;
     $('triggerShock').value = shockOn ? APP.navConfig.SHOCK_THRESHOLD : 1;
@@ -1716,6 +1737,317 @@ function restoreRouteLayers() {
     if (!APP.map) return;
     ensureRouteLayers();
     updateRouteLines();
+    ensureSignLayers();
+}
+
+/* ---------- Слой дорожных знаков из сцены PAD ---------- */
+
+function signCatalogItem(code) {
+    return APP._signCatalog.get(String(code || '')) || null;
+}
+
+function signItemFor(code, file) {
+    const item = signCatalogItem(code);
+    if (item && item.file) {
+        return { code: String(code || ''), file: item.file, w: Number(item.w) || 0, h: Number(item.h) || 0 };
+    }
+    if (file) {
+        return { code: String(code || ''), file: String(file), w: 0, h: 0 };
+    }
+    return null;
+}
+
+function signComboKey(sign) {
+    return [sign.code, (sign.plates || []).join('+'), sign.leg ? '1' : '0'].join('|');
+}
+
+function loadSignImage(file) {
+    const key = String(file || '');
+    if (APP._signImageCache.has(key)) return APP._signImageCache.get(key);
+    const promise = new Promise((resolve, reject) => {
+        const img = new Image();
+        img.decoding = 'async';
+        img.onload = () => resolve(img);
+        img.onerror = () => reject(new Error('Не загрузился знак: ' + key));
+        img.src = 'signs/' + key;
+    });
+    APP._signImageCache.set(key, promise);
+    return promise;
+}
+
+function buildSignComposite(combo, images) {
+    const mainImage = images.get(combo.main.file);
+    if (!mainImage) return null;
+
+    const ref = SIGNS_REF_PX;
+    const dsf = SIGNS_DSF;
+
+    const mainW0 = combo.main.w || mainImage.naturalWidth || 1;
+    const mainH0 = combo.main.h || mainImage.naturalHeight || 1;
+    const mainAspect = mainW0 / mainH0;
+    let mainW, mainH;
+    if (mainAspect >= 1) {
+        mainW = ref;
+        mainH = ref / mainAspect;
+    } else {
+        mainH = ref;
+        mainW = ref * mainAspect;
+    }
+
+    const plates = [];
+    for (const item of combo.plates) {
+        const image = images.get(item.file);
+        if (!image) continue;
+        const w0 = item.w || image.naturalWidth || 1;
+        const h0 = item.h || image.naturalHeight || 1;
+        const aspect = w0 / h0;
+        let w, h;
+        if (aspect >= 1) {
+            w = ref;
+            h = ref / aspect;
+        } else {
+            h = ref;
+            w = ref * aspect;
+        }
+        plates.push({ image, w, h });
+    }
+
+    const gap = 2;
+    const stackH = mainH + plates.reduce((sum, plate) => sum + plate.h + gap, 0);
+    const legW = ref * 0.09;
+    const poleBottom = combo.leg ? stackH + ref * 0.6 : stackH;
+    const contentTop = mainH / 2;
+    const contentBottom = Math.max(mainH / 2, poleBottom - mainH / 2);
+    const maxPlateW = plates.reduce((max, plate) => Math.max(max, plate.w), 0);
+    const contentHalfW = Math.max(mainW, maxPlateW, legW * 1.56) / 2;
+    const pad = 2;
+    const halfW = contentHalfW + pad;
+    const halfH = Math.max(contentTop, contentBottom) + pad;
+
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.max(1, Math.ceil(halfW * 2 * dsf));
+    canvas.height = Math.max(1, Math.ceil(halfH * 2 * dsf));
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return null;
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
+
+    const cx = canvas.width / 2;
+    const cy = canvas.height / 2;
+
+    if (combo.leg) {
+        const topY = cy;
+        const bottomY = cy + (poleBottom - mainH / 2) * dsf;
+        const poleH = Math.max(1, bottomY - topY);
+        const totalW = legW * 1.56 * dsf;
+        const poleW = legW * dsf;
+
+        ctx.fillStyle = '#ffffff';
+        if (ctx.roundRect) {
+            ctx.beginPath();
+            ctx.roundRect(cx - totalW / 2, topY, totalW, poleH, totalW / 2);
+            ctx.fill();
+        } else {
+            ctx.fillRect(cx - totalW / 2, topY, totalW, poleH);
+        }
+
+        const gradient = ctx.createLinearGradient(cx - poleW / 2, 0, cx + poleW / 2, 0);
+        gradient.addColorStop(0, '#6F7378');
+        gradient.addColorStop(0.35, '#B8BCC2');
+        gradient.addColorStop(0.6, '#8E9298');
+        gradient.addColorStop(1, '#6F7378');
+        ctx.fillStyle = gradient;
+        if (ctx.roundRect) {
+            ctx.beginPath();
+            ctx.roundRect(cx - poleW / 2, topY, poleW, poleH, poleW / 2);
+            ctx.fill();
+        } else {
+            ctx.fillRect(cx - poleW / 2, topY, poleW, poleH);
+        }
+    }
+
+    const mainTop = cy - mainH * dsf / 2;
+    ctx.drawImage(mainImage, cx - mainW * dsf / 2, mainTop, mainW * dsf, mainH * dsf);
+
+    let y = mainTop + mainH * dsf;
+    for (const plate of plates) {
+        y += gap * dsf;
+        ctx.drawImage(plate.image, cx - plate.w * dsf / 2, y, plate.w * dsf, plate.h * dsf);
+        y += plate.h * dsf;
+    }
+
+    return canvas;
+}
+
+async function buildSignIcons() {
+    const signs = (APP._signsData && APP._signsData.signs) || [];
+    if (!signs.length) {
+        APP._signFeatures = [];
+        return;
+    }
+
+    const combos = new Map();
+    for (const sign of signs) {
+        if (!sign || !sign.code) continue;
+        const main = signItemFor(sign.code, sign.file);
+        if (!main) continue;
+        const plateItems = (sign.plates || [])
+            .map(code => signItemFor(code, ''))
+            .filter(Boolean);
+        const key = signComboKey(sign);
+        if (!combos.has(key)) {
+            combos.set(key, { key, main, plates: plateItems, leg: !!sign.leg });
+        }
+    }
+
+    const files = new Set();
+    for (const combo of combos.values()) {
+        files.add(combo.main.file);
+        combo.plates.forEach(plate => files.add(plate.file));
+    }
+    const images = new Map();
+    await Promise.all(Array.from(files).map(async file => {
+        try {
+            images.set(file, await loadSignImage(file));
+        } catch (e) {
+            console.warn(e);
+        }
+    }));
+
+    const defs = [];
+    const iconByCombo = new Map();
+    let index = 0;
+    for (const combo of combos.values()) {
+        const canvas = buildSignComposite(combo, images);
+        if (!canvas) continue;
+        const iconId = 'pad-sign-' + index++;
+        defs.push({ iconId, canvas });
+        iconByCombo.set(combo.key, iconId);
+    }
+
+    const features = [];
+    for (const sign of signs) {
+        if (!sign || !sign.code) continue;
+        const icon = iconByCombo.get(signComboKey(sign));
+        if (!icon) continue;
+        features.push({
+            type: 'Feature',
+            geometry: { type: 'Point', coordinates: [Number(sign.lon), Number(sign.lat)] },
+            properties: {
+                icon,
+                heading: Number(sign.heading) || 0
+            }
+        });
+    }
+
+    APP._signIconDefs = defs;
+    APP._signFeatures = features;
+}
+
+function updateSignsVisibility() {
+    if (!APP.map) return;
+    try {
+        if (APP.map.getLayer(SIGNS_LAYER_ID)) {
+            APP.map.setLayoutProperty(SIGNS_LAYER_ID, 'visibility', APP._signsEnabled ? 'visible' : 'none');
+        }
+    } catch (e) {}
+}
+
+function applySignsConfig() {
+    const toggle = $('signsToggle');
+    APP._signsEnabled = !!(toggle && toggle.checked);
+    try {
+        localStorage.setItem(SIGNS_ENABLED_KEY, APP._signsEnabled ? '1' : '0');
+    } catch (e) {}
+    updateSignsVisibility();
+}
+
+function ensureSignLayers() {
+    const map = APP.map;
+    if (!map || !APP._signFeatures) return;
+    try {
+        // Не ждём isStyleLoaded(): в стиле могут быть медленные/недоступные
+        // источники, из-за которых флаг остаётся false. Пробуем добавить слой
+        // на каждом styledata/idle; если стиль ещё не готов — повторим позже.
+        const collection = { type: 'FeatureCollection', features: APP._signFeatures };
+        const source = map.getSource(SIGNS_SOURCE_ID);
+        if (!source) {
+            map.addSource(SIGNS_SOURCE_ID, { type: 'geojson', data: collection });
+            APP._signSourceData = APP._signFeatures;
+        } else if (APP._signSourceData !== APP._signFeatures) {
+            source.setData(collection);
+            APP._signSourceData = APP._signFeatures;
+        }
+
+        for (const def of APP._signIconDefs) {
+            if (map.hasImage(def.iconId)) continue;
+            const ctx = def.canvas.getContext('2d');
+            if (!ctx) continue;
+            const imageData = ctx.getImageData(0, 0, def.canvas.width, def.canvas.height);
+            map.addImage(def.iconId, imageData, { pixelRatio: SIGNS_DSF });
+        }
+
+        if (!map.getLayer(SIGNS_LAYER_ID)) {
+            map.addLayer({
+                id: SIGNS_LAYER_ID,
+                type: 'symbol',
+                source: SIGNS_SOURCE_ID,
+                minzoom: SIGNS_MIN_ZOOM,
+                layout: {
+                    'icon-image': ['get', 'icon'],
+                    'icon-rotate': ['get', 'heading'],
+                    'icon-rotation-alignment': 'map',
+                    'icon-pitch-alignment': 'map',
+                    'icon-keep-upright': false,
+                    'icon-anchor': 'center',
+                    'icon-allow-overlap': true,
+                    'icon-ignore-placement': true,
+                    'icon-size': ['interpolate', ['exponential', 2], ['zoom'],
+                        0, 15 / SIGNS_REF_PX,
+                        18, 15 / SIGNS_REF_PX,
+                        19, 18.1 / SIGNS_REF_PX,
+                        20, 36.2 / SIGNS_REF_PX
+                    ],
+                    'visibility': APP._signsEnabled ? 'visible' : 'none'
+                }
+            });
+        } else {
+            map.moveLayer(SIGNS_LAYER_ID);
+            updateSignsVisibility();
+        }
+    } catch (e) {
+        console.warn('Не удалось добавить слой знаков:', e);
+    }
+}
+
+async function loadSigns() {
+    if (APP._signsLoading) return APP._signsLoading;
+    APP._signsLoading = (async () => {
+        try {
+            const [signsResponse, catalogResponse] = await Promise.all([
+                fetch('/api/signs', { cache: 'no-store', credentials: 'same-origin' }),
+                fetch('signs/catalog.json', { cache: 'force-cache' })
+            ]);
+            if (!signsResponse.ok) throw new Error('HTTP ' + signsResponse.status);
+            const data = await signsResponse.json();
+            const catalog = catalogResponse.ok ? await catalogResponse.json() : [];
+            APP._signsData = data && Array.isArray(data.signs) ? data : { signs: [] };
+            APP._signCatalog = new Map(
+                (Array.isArray(catalog) ? catalog : [])
+                    .filter(item => item && item.code)
+                    .map(item => [String(item.code), item])
+            );
+            await buildSignIcons();
+            ensureSignLayers();
+        } catch (e) {
+            console.warn('Не удалось загрузить дорожные знаки:', e);
+            APP._signsData = { signs: [] };
+            APP._signFeatures = [];
+        }
+    })().finally(() => {
+        APP._signsLoading = null;
+    });
+    return APP._signsLoading;
 }
 
 
@@ -2453,6 +2785,8 @@ if (typeof maplibregl === 'undefined') {
     $('loading').classList.add('hidden');
 } else {
 (async () => {
+    // Данные знаков грузим параллельно с геолокацией и инициализацией карты.
+    loadSigns();
     let initCenter = [43.9968, 56.3269];
     if (navigator.geolocation) {
         try {
@@ -2879,6 +3213,19 @@ if (typeof maplibregl === 'undefined') {
             <div class="settings-group">
                 <div class="settings-label">Вид карты</div>
                 <div id="mapStyleGrid" class="map-style-grid"></div>
+            </div>
+
+            <div class="settings-group">
+                <div class="settings-label">Знаки</div>
+                <div class="trigger-setting-row">
+                    <div class="trigger-setting-header">
+                        <label class="toggle-switch">
+                            <input type="checkbox" class="toggle-input" id="signsToggle" checked onchange="applySignsConfig()">
+                            <span class="toggle-slider"></span>
+                        </label>
+                        <span class="label">Показывать дорожные знаки</span>
+                    </div>
+                </div>
             </div>
 
             <div class="settings-group">
