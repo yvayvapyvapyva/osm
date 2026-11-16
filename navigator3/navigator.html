@@ -2002,11 +2002,16 @@ function ensureSignLayers() {
                     'icon-anchor': 'center',
                     'icon-allow-overlap': true,
                     'icon-ignore-placement': true,
+                    // Как в PAD: 3 метра по большей стороне, минимум 15 px.
+                    // MapLibre использует 512-пиксельные тайлы, поэтому
+                    // масштаб соответствует PAD-формуле 2^(zoom + 1).
                     'icon-size': ['interpolate', ['exponential', 2], ['zoom'],
                         0, 15 / SIGNS_REF_PX,
-                        18, 15 / SIGNS_REF_PX,
-                        19, 18.1 / SIGNS_REF_PX,
-                        20, 36.2 / SIGNS_REF_PX
+                        17, 15 / SIGNS_REF_PX,
+                        18, 18.1 / SIGNS_REF_PX,
+                        19, 36.2 / SIGNS_REF_PX,
+                        20, 72.4 / SIGNS_REF_PX,
+                        21, 144.8 / SIGNS_REF_PX
                     ],
                     'visibility': APP._signsEnabled ? 'visible' : 'none'
                 }
