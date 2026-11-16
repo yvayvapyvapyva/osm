@@ -226,46 +226,42 @@
             flex-shrink:0; color:#fff; font-size:16px; font-weight:700;
             letter-spacing:-0.2px; text-align:center;
         }
-        #znakPanelHead { display:flex; align-items:center; gap:6px; flex-shrink:0; }
-        #znakSearch {
-            flex:1; min-width:0; box-sizing:border-box; padding:8px 10px; border-radius:9px;
-            border:1px solid rgba(255,255,255,0.16); background:rgba(255,255,255,0.08);
-            color:#fff; font:inherit; font-size:13px; outline:none;
+        #znakPanelHead { display:flex; align-items:center; gap:8px; flex-shrink:0; min-width:0; }
+        #znakTabs {
+            display:flex; align-items:stretch; gap:5px; flex:1; min-width:0;
+            overflow-x:auto; overflow-y:hidden; padding:2px;
+            scrollbar-width:none; -webkit-overflow-scrolling:touch;
         }
-        #znakSearch::placeholder { color:rgba(255,255,255,0.45); }
-        #znakTabs { display:none !important; }
-        #znakBackBtn {
-            flex-shrink:0; width:44px; height:44px; min-width:44px; border-radius:12px;
-            border:1px solid rgba(255,255,255,0.16); background:rgba(255,255,255,0.08);
-            color:#fff; font-size:22px; line-height:1; cursor:pointer; padding:0;
-            display:flex; align-items:center; justify-content:center;
-            -webkit-tap-highlight-color:transparent;
-        }
-        #znakBackBtn:active { background:rgba(48,209,88,0.2); border-color:#30D158; }
-        #znakBackBtn[hidden] { display:none; }
-        #znakGrid.znak-groups {
-            display:grid; grid-template-columns:repeat(2, minmax(0, 1fr));
-            gap:8px; width:100%; align-content:start;
-        }
-        .znak-group-card {
-            display:flex; flex-direction:column; align-items:center; justify-content:flex-start; gap:4px;
-            padding:10px 8px; border-radius:12px; border:1px solid rgba(255,255,255,0.12);
-            background:rgba(255,255,255,0.06); color:#fff; font:inherit; cursor:pointer;
-            min-height:142px; box-sizing:border-box;
-        }
-        .znak-group-card:active { background:rgba(48,209,88,0.18); border-color:#30D158; }
-        .znak-group-card img { display:block; max-width:96px; max-height:72px; object-fit:contain; pointer-events:none; }
-        .znak-group-name { font-size:12px; font-weight:700; line-height:1.2; text-align:center; }
-        .znak-group-count { font-size:10px; color:rgba(255,255,255,0.55); }
-        @media (min-width:700px) {
-            #znakGrid.znak-groups { grid-template-columns:repeat(4, minmax(0, 1fr)); }
-        }
+        #znakTabs::-webkit-scrollbar { display:none; }
         .znak-tab {
-            flex-shrink:0; border:1px solid rgba(255,255,255,0.14); border-radius:999px;
-            background:rgba(255,255,255,0.06); color:rgba(255,255,255,0.75);
-            padding:5px 9px; font:inherit; font-size:11px; font-weight:600; cursor:pointer; white-space:nowrap;
+            flex:0 0 auto; width:50px; padding:5px 3px 4px; border-radius:11px;
+            border:1px solid rgba(255,255,255,0.14); background:rgba(255,255,255,0.06);
+            color:rgba(255,255,255,0.68); font:inherit; cursor:pointer;
+            display:flex; flex-direction:column; align-items:center; justify-content:flex-start; gap:2px;
+            -webkit-tap-highlight-color:transparent; touch-action:manipulation;
+        }
+        .znak-tab .sign-sprite { pointer-events:none; }
+        .znak-tab-label {
+            font-size:9px; font-weight:700; line-height:1.05; text-align:center;
+            white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%;
         }
         .znak-tab.active { background:rgba(48,209,88,0.22); border-color:#30D158; color:#fff; }
+        #znakSearchToggle {
+            flex-shrink:0; width:38px; height:38px; border-radius:11px;
+            border:1px solid rgba(255,255,255,0.16); background:rgba(255,255,255,0.08);
+            color:#fff; cursor:pointer; display:flex; align-items:center; justify-content:center; padding:0;
+            -webkit-tap-highlight-color:transparent; touch-action:manipulation;
+        }
+        #znakSearchToggle.active { background:rgba(48,209,88,0.22); border-color:#30D158; }
+        #znakSearchRow { flex-shrink:0; }
+        #znakSearchRow[hidden] { display:none; }
+        #znakSearch {
+            width:100%; box-sizing:border-box; padding:9px 11px; border-radius:10px;
+            border:1px solid rgba(255,255,255,0.18); background:rgba(255,255,255,0.08);
+            color:#fff; font:inherit; font-size:14px; outline:none;
+        }
+        #znakSearch::placeholder { color:rgba(255,255,255,0.45); }
+        #znakSearch:focus { border-color:#30D158; }
         #znakBody { display:flex; flex:1; min-height:0; gap:2px; }
         #znakScroll { flex:1; overflow-y:auto; overflow-x:hidden; -webkit-overflow-scrolling:touch; scrollbar-width:none; overscroll-behavior:contain; }
         #znakScroll::-webkit-scrollbar { display:none; }
@@ -583,10 +579,15 @@
     <div id="znakPanel" role="dialog" aria-modal="true" aria-labelledby="znakModalTitle">
         <div id="znakModalTitle">Добавить знак</div>
         <div id="znakPanelHead">
-            <button id="znakBackBtn" type="button" aria-label="Назад" hidden onclick="znakBackToGroups()">←</button>
+            <div id="znakTabs"></div>
+            <button id="znakSearchToggle" type="button" aria-label="Поиск по знакам" aria-expanded="false" title="Поиск"
+                onclick="setZnakSearchVisible(document.getElementById('znakSearchRow').hidden)">
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M16.5 16.5L21 21"/></svg>
+            </button>
+        </div>
+        <div id="znakSearchRow" hidden>
             <input id="znakSearch" type="search" placeholder="Поиск по всем знакам" autocomplete="off" oninput="znakSearchChanged(this.value)">
         </div>
-        <div id="znakTabs"></div>
         <div id="znakBody">
             <div id="znakScroll">
                 <div id="znakGrid"></div>
@@ -670,18 +671,17 @@ const SIGN_SPRITE_URL = 'znaki/sprite.webp?v=3';
 let znakCatalogPromise = null;
 let znakGroup = 'all';
 let znakSearchQuery = '';
-let znakView = 'groups';
 let znakPanelMode = 'place';
 const ZNAK_GROUPS = [
     { id: 'all', title: 'Все' },
-    { id: 'warning', title: 'Предупреждающие знаки' },
-    { id: 'priority', title: 'Знаки приоритета' },
-    { id: 'prohibitory', title: 'Запрещающие знаки' },
-    { id: 'mandatory', title: 'Предписывающие знаки' },
-    { id: 'special', title: 'Знаки особых предписаний' },
-    { id: 'information', title: 'Информационные знаки' },
-    { id: 'service', title: 'Знаки сервиса' },
-    { id: 'additional', title: 'Знаки дополнительной информации (таблички)' }
+    { id: 'warning', title: 'Предупреждающие знаки', short: 'Предупр.' },
+    { id: 'priority', title: 'Знаки приоритета', short: 'Приоритет' },
+    { id: 'prohibitory', title: 'Запрещающие знаки', short: 'Запрещ.' },
+    { id: 'mandatory', title: 'Предписывающие знаки', short: 'Предпис.' },
+    { id: 'special', title: 'Знаки особых предписаний', short: 'Особые' },
+    { id: 'information', title: 'Информационные знаки', short: 'Информ.' },
+    { id: 'service', title: 'Знаки сервиса', short: 'Сервис' },
+    { id: 'additional', title: 'Знаки дополнительной информации (таблички)', short: 'Табл.' }
 ];
 
 // Долгое нажатие по маркеру: длительность и допуск смещения (стилус/палец дрожит)
@@ -834,27 +834,66 @@ function signThumbElement(item, maxWidth, maxHeight) {
     return el;
 }
 
+function syncZnakTabActive() {
+    const tabs = document.getElementById('znakTabs');
+    if (!tabs) return;
+    tabs.querySelectorAll('.znak-tab').forEach(button => {
+        button.classList.toggle('active', button.dataset.group === znakGroup);
+    });
+}
+
 function buildZnakTabs() {
     const tabs = document.getElementById('znakTabs');
     if (!tabs) return;
     tabs.innerHTML = '';
-    if (znakPanelMode === 'attach') {
-        tabs.style.display = 'none';
-        return;
-    }
-    tabs.style.display = 'flex';
-    ZNAK_GROUPS.forEach(group => {
+    ZNAK_GROUPS.filter(group => group.id !== 'all').forEach(group => {
+        const items = ZNAKI_CATALOG.filter(item => item.group === group.id);
         const button = document.createElement('button');
         button.type = 'button';
         button.className = 'znak-tab' + (znakGroup === group.id ? ' active' : '');
-        button.textContent = group.title;
+        button.dataset.group = group.id;
+        button.title = group.title;
+        button.setAttribute('aria-label', group.title);
+        const thumb = signThumbElement(items[0] || null, 28, 28);
+        const label = document.createElement('span');
+        label.className = 'znak-tab-label';
+        label.textContent = group.short || group.title;
+        button.append(thumb, label);
         button.addEventListener('click', () => {
-            znakGroup = group.id;
-            buildZnakTabs();
+            // Повторное нажатие на активную вкладку показывает все знаки.
+            znakGroup = znakGroup === group.id ? 'all' : group.id;
+            if (znakSearchQuery) {
+                znakSearchQuery = '';
+                const input = document.getElementById('znakSearch');
+                if (input) input.value = '';
+            }
+            syncZnakTabActive();
             buildZnakGrid();
         });
         tabs.appendChild(button);
     });
+}
+
+function setZnakSearchVisible(visible) {
+    const row = document.getElementById('znakSearchRow');
+    const button = document.getElementById('znakSearchToggle');
+    const input = document.getElementById('znakSearch');
+    if (row) row.hidden = !visible;
+    if (button) {
+        button.classList.toggle('active', !!visible);
+        button.setAttribute('aria-expanded', visible ? 'true' : 'false');
+    }
+    if (!visible) {
+        if (znakSearchQuery) {
+            znakSearchQuery = '';
+            if (input) input.value = '';
+            buildZnakGrid();
+        }
+        if (input) input.blur();
+    } else if (input) {
+        // Фокус в том же жесте, чтобы на мобильном открылась клавиатура.
+        input.focus();
+    }
 }
 
 function filteredZnakItems() {
@@ -873,8 +912,6 @@ function filteredZnakItems() {
 }
 
 function updateZnakPanelHeader() {
-    const back = document.getElementById('znakBackBtn');
-    if (back) back.hidden = znakView === 'groups' && !znakSearchQuery;
     const title = document.getElementById('znakModalTitle');
     if (title) {
         title.hidden = znakPanelMode !== 'attach';
@@ -882,33 +919,6 @@ function updateZnakPanelHeader() {
             ? 'Добавить знак на столб'
             : 'Добавить знак';
     }
-}
-
-function buildZnakGroups(grid) {
-    grid.classList.add('znak-groups');
-    ZNAK_GROUPS.filter(group => group.id !== 'all').forEach(group => {
-        const items = ZNAKI_CATALOG.filter(item => item.group === group.id);
-        if (!items.length) return;
-        const first = items[0];
-        const card = document.createElement('button');
-        card.type = 'button';
-        card.className = 'znak-group-card';
-        card.dataset.group = group.id;
-        const img = signThumbElement(first, 96, 72);
-        const name = document.createElement('span');
-        name.className = 'znak-group-name';
-        name.textContent = group.title;
-        const count = document.createElement('span');
-        count.className = 'znak-group-count';
-        count.textContent = items.length + ' знаков';
-        card.append(img, name, count);
-        card.addEventListener('click', () => {
-            znakView = 'list';
-            znakGroup = group.id;
-            buildZnakGrid();
-        });
-        grid.appendChild(card);
-    });
 }
 
 function buildZnakGrid() {
@@ -920,11 +930,6 @@ function buildZnakGrid() {
     }
     updateZnakPanelHeader();
     grid.innerHTML = '';
-    grid.classList.remove('znak-groups');
-    if (!znakSearchQuery && znakView === 'groups') {
-        buildZnakGroups(grid);
-        return;
-    }
     const items = filteredZnakItems();
     if (!items.length) {
         const empty = document.createElement('div');
@@ -984,11 +989,11 @@ function openZnakPanel(mode) {
         console.warn('Сначала выберите знак');
         return;
     }
-    znakView = 'groups';
     znakGroup = 'all';
     znakSearchQuery = '';
     const search = document.getElementById('znakSearch');
     if (search) search.value = '';
+    setZnakSearchVisible(false);
     buildZnakTabs();
     const modal = document.getElementById('znakModal');
     modal.classList.toggle('is-sheet', znakPanelMode === 'place');
@@ -1009,19 +1014,11 @@ function openZnakPanel(mode) {
 
 function znakSearchChanged(value) {
     znakSearchQuery = String(value || '').trim();
-    znakView = znakSearchQuery ? 'list' : 'groups';
-    if (!znakSearchQuery) znakGroup = 'all';
-    buildZnakGrid();
-}
-
-function znakBackToGroups() {
-    if (znakSearchQuery) {
-        znakSearchQuery = '';
-        const search = document.getElementById('znakSearch');
-        if (search) search.value = '';
+    // Поиск идёт по всем знакам — активная вкладка группы снимается.
+    if (znakSearchQuery && znakGroup !== 'all') {
+        znakGroup = 'all';
+        syncZnakTabActive();
     }
-    znakView = 'groups';
-    znakGroup = 'all';
     buildZnakGrid();
 }
 
