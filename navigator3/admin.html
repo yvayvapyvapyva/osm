@@ -123,6 +123,20 @@ a { color: var(--accent); }
 }
 .search:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
 .count { color: var(--muted); font-size: 12px; }
+.select {
+    padding: 9px 12px;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: var(--surface);
+    color: var(--text);
+    outline: none;
+}
+.select:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.activity-more { padding: 14px; text-align: center; }
+.activity-more .btn { min-width: 180px; }
+.activity-user { cursor: pointer; color: var(--accent); font-weight: 650; }
+.activity-when { white-space: nowrap; color: var(--muted); font-size: 12px; }
+.activity-details { color: var(--muted); font-size: 12px; overflow-wrap: anywhere; }
 
 .panel {
     background: var(--surface);
@@ -272,31 +286,91 @@ tbody tr:last-child td { border-bottom: 0; }
         <h1>Админка</h1>
         <span id="meChip" class="chip"></span>
         <span class="spacer"></span>
+        <button type="button" class="link-btn" id="activityBtn">Последние действия</button>
         <button type="button" class="link-btn" id="refreshBtn">Обновить</button>
         <a class="link-btn" id="logoutLink" href="/auth/logout">Выйти</a>
     </div>
 
-    <div class="toolbar">
-        <input id="search" class="search" type="search" placeholder="Поиск по имени, логину, email, ID" autocomplete="off">
-        <span id="count" class="count"></span>
+    <div id="usersView">
+        <div class="toolbar">
+            <input id="search" class="search" type="search" placeholder="Поиск по имени, логину, email, ID" autocomplete="off">
+            <span id="count" class="count"></span>
+        </div>
+
+        <div class="panel">
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Пользователь</th>
+                            <th>Премиум</th>
+                            <th>Статус</th>
+                            <th>Последний вход</th>
+                            <th>Регистрация</th>
+                        </tr>
+                    </thead>
+                    <tbody id="usersBody"></tbody>
+                </table>
+            </div>
+            <div id="usersEmpty" class="empty hidden">Пользователи не найдены</div>
+        </div>
     </div>
 
-    <div class="panel">
-        <div class="table-wrap">
-            <table>
-                <thead>
-                    <tr>
-                        <th>Пользователь</th>
-                        <th>Премиум</th>
-                        <th>Статус</th>
-                        <th>Последний вход</th>
-                        <th>Регистрация</th>
-                    </tr>
-                </thead>
-                <tbody id="usersBody"></tbody>
-            </table>
+    <div id="activityView" class="hidden">
+        <div class="toolbar">
+            <button type="button" class="btn" id="activityBack">← К пользователям</button>
+            <select id="activitySource" class="select">
+                <option value="">Все источники</option>
+                <option value="navigator">Навигатор</option>
+                <option value="editor">Редактор</option>
+                <option value="admin">Админка</option>
+                <option value="auth">Авторизация</option>
+                <option value="premium">Оплата</option>
+                <option value="profile">Профиль</option>
+            </select>
+            <select id="activityAction" class="select">
+                <option value="">Все действия</option>
+                <option value="login">Вход</option>
+                <option value="logout">Выход</option>
+                <option value="route_open">Открытие маршрута</option>
+                <option value="route_create">Создание маршрута</option>
+                <option value="route_save">Сохранение маршрута</option>
+                <option value="route_update">Изменение маршрута</option>
+                <option value="route_delete">Удаление маршрута</option>
+                <option value="folder_create">Создание папки</option>
+                <option value="folder_update">Изменение папки</option>
+                <option value="folder_delete">Удаление папки</option>
+                <option value="signs_save">Сохранение знаков</option>
+                <option value="premium_checkout">Начало оплаты</option>
+                <option value="premium_paid">Оплата премиума</option>
+                <option value="profile_update">Смена названия папки</option>
+                <option value="admin_premium">Админ: премиум</option>
+                <option value="admin_block">Админ: блокировка</option>
+                <option value="admin_sessions_revoke">Админ: завершение сессий</option>
+            </select>
+            <button type="button" class="link-btn" id="activityRefresh">Обновить</button>
         </div>
-        <div id="usersEmpty" class="empty hidden">Пользователи не найдены</div>
+
+        <div class="panel">
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Время</th>
+                            <th>Пользователь</th>
+                            <th>Действие</th>
+                            <th>Объект</th>
+                            <th>Подробности</th>
+                        </tr>
+                    </thead>
+                    <tbody id="activityBody"></tbody>
+                </table>
+            </div>
+            <div id="activityEmpty" class="empty hidden">Действий пока нет</div>
+            <div class="activity-more">
+                <button type="button" class="btn" id="activityMore">Показать ещё</button>
+            </div>
+        </div>
     </div>
 </div>
 
@@ -315,7 +389,14 @@ tbody tr:last-child td { border-bottom: 0; }
 
 <script>
 (function () {
-    const state = { me: null, users: [], selected: null, loading: false };
+    const state = {
+        me: null,
+        users: [],
+        selected: null,
+        loading: false,
+        activity: { items: [], loading: false, done: false },
+        view: 'users',
+    };
     const $ = id => document.getElementById(id);
 
     function toast(text, kind) {
@@ -413,6 +494,162 @@ tbody tr:last-child td { border-bottom: 0; }
         state.users = data.users || [];
         state.total = data.total || state.users.length;
         renderUsers();
+    }
+
+    const ACTIVITY_SOURCES = {
+        auth: 'Авторизация',
+        navigator: 'Навигатор',
+        editor: 'Редактор',
+        admin: 'Админка',
+        premium: 'Оплата',
+        profile: 'Профиль',
+    };
+
+    const ACTIVITY_ACTIONS = {
+        login: 'Вход',
+        logout: 'Выход',
+        route_open: 'Открыл маршрут',
+        route_create: 'Создал маршрут',
+        route_save: 'Сохранил маршрут',
+        route_update: 'Изменил маршрут',
+        route_delete: 'Удалил маршрут',
+        folder_create: 'Создал папку',
+        folder_update: 'Изменил папку',
+        folder_delete: 'Удалил папку',
+        signs_save: 'Сохранил знаки',
+        premium_checkout: 'Начал оплату',
+        premium_paid: 'Оплатил премиум',
+        profile_update: 'Сменил название папки',
+        admin_premium: 'Админ: премиум',
+        admin_block: 'Админ: блокировка',
+        admin_sessions_revoke: 'Админ: завершил сессии',
+    };
+
+    function activityObject(item) {
+        const type = item.entity_type;
+        if (type === 'route') return item.title || item.route_m || '—';
+        if (type === 'folder') return item.title || item.folder_id || '—';
+        if (type === 'signs') return 'Знаки';
+        if (type === 'payment') return item.entity_id ? 'Платёж ' + item.entity_id : 'Платёж';
+        if (type === 'user') return item.title || item.entity_id || '—';
+        return item.title || item.route_m || item.folder_id || '—';
+    }
+
+    function activityDetails(item) {
+        const meta = item.metadata && typeof item.metadata === 'object' ? item.metadata : {};
+        const parts = [];
+        if (item.action === 'route_create' || item.action === 'route_save') {
+            if (meta.points) parts.push(meta.points + ' точек');
+        } else if (item.action === 'route_update') {
+            if (meta.renamed) parts.push('новый ID: ' + item.route_m);
+            if (meta.folder_changed) parts.push('перенесён в другую папку');
+            if (meta.premium) parts.push('премиум');
+            if (meta.visible === false) parts.push('скрыт');
+        } else if (item.action === 'signs_save') {
+            parts.push((meta.total || 0) + ' знаков');
+            if (meta.added) parts.push('+' + meta.added);
+            if (meta.removed) parts.push('−' + meta.removed);
+            if (Array.isArray(meta.added_codes) && meta.added_codes.length) {
+                parts.push('добавлены: ' + meta.added_codes.join(', '));
+            }
+        } else if (item.action === 'premium_checkout') {
+            if (meta.amount_kopecks) parts.push((meta.amount_kopecks / 100).toFixed(2) + ' ₽');
+            if (meta.days) parts.push(meta.days + ' дн.');
+        } else if (item.action === 'premium_paid') {
+            if (meta.until) parts.push('премиум до ' + fmtDate(meta.until));
+            if (meta.amount_kopecks) parts.push((meta.amount_kopecks / 100).toFixed(2) + ' ₽');
+        } else if (item.action === 'admin_premium') {
+            if (meta.days) parts.push('+' + meta.days + ' дн.');
+            if (meta.until) parts.push('до ' + fmtDate(meta.until));
+            if (!meta.until) parts.push('снят');
+        } else if (item.action === 'admin_block') {
+            parts.push(meta.blocked ? 'заблокирован' : 'разблокирован');
+        } else if (item.action === 'admin_sessions_revoke') {
+            parts.push('все сессии завершены');
+        } else if (item.action === 'profile_update') {
+            if (meta.folder_name) parts.push('папка: ' + meta.folder_name);
+        } else if (item.action === 'folder_create' || item.action === 'folder_update') {
+            if (meta.parent_id) parts.push('родитель: ' + meta.parent_id);
+        }
+        return parts.join(' · ');
+    }
+
+    function activityPerson(item) {
+        return item.display_name || item.login || item.yandex_id || item.user_id || 'гость';
+    }
+
+    function renderActivity() {
+        const items = state.activity.items;
+        const body = $('activityBody');
+        body.innerHTML = items.map(item => {
+            const person = activityPerson(item);
+            const personCell = item.user_id
+                ? '<div class="activity-user" data-user-id="' + escapeHtml(item.user_id) + '">' + escapeHtml(person) + '</div>'
+                : '<div class="user-name">' + escapeHtml(person) + '</div>';
+            const sub = [item.login, item.user_id ? 'ID ' + item.user_id : ''].filter(Boolean).join(' · ');
+            return '<tr>' +
+                '<td class="activity-when">' + escapeHtml(fmtDate(item.created_at)) + '</td>' +
+                '<td>' + personCell +
+                (sub && item.user_id ? '<div class="user-sub">' + escapeHtml(sub) + '</div>' : '') + '</td>' +
+                '<td>' + escapeHtml(ACTIVITY_ACTIONS[item.action] || item.action) + '</td>' +
+                '<td>' + escapeHtml(activityObject(item)) +
+                (item.route_m && item.entity_type === 'route' ? '<div class="user-sub mono">' + escapeHtml(item.route_m) + '</div>' : '') + '</td>' +
+                '<td class="activity-details">' + escapeHtml(activityDetails(item)) + '</td>' +
+                '</tr>';
+        }).join('');
+        $('activityEmpty').classList.toggle('hidden', items.length > 0);
+        $('activityMore').classList.toggle('hidden', state.activity.done || !items.length);
+        $('activityMore').disabled = state.activity.loading;
+        $('activityMore').textContent = state.activity.loading ? 'Загружаю…' : 'Показать ещё';
+    }
+
+    async function loadActivity(reset) {
+        if (state.activity.loading) return;
+        state.activity.loading = true;
+        if (reset) {
+            state.activity.items = [];
+            state.activity.done = false;
+            renderActivity();
+        } else {
+            renderActivity();
+        }
+        const params = new URLSearchParams();
+        params.set('limit', '100');
+        const source = $('activitySource').value;
+        const action = $('activityAction').value;
+        if (source) params.set('source', source);
+        if (action) params.set('action', action);
+        if (!reset && state.activity.items.length) {
+            params.set('before', state.activity.items[state.activity.items.length - 1].created_at);
+        }
+        try {
+            const data = await api('/api/superadmin/activity?' + params.toString());
+            const items = data.items || [];
+            state.activity.items = reset ? items : state.activity.items.concat(items);
+            state.activity.done = items.length < (data.limit || 100);
+        } catch (error) {
+            if (error && (error.message === 'unauthorized' || error.message === 'forbidden')) return;
+            toast('Не удалось загрузить действия', 'error');
+            state.activity.done = true;
+        } finally {
+            state.activity.loading = false;
+            renderActivity();
+        }
+    }
+
+    function showActivity() {
+        state.view = 'activity';
+        $('usersView').classList.add('hidden');
+        $('activityView').classList.remove('hidden');
+        $('activityBtn').classList.add('hidden');
+        loadActivity(true).catch(() => {});
+    }
+
+    function showUsers() {
+        state.view = 'users';
+        $('activityView').classList.add('hidden');
+        $('usersView').classList.remove('hidden');
+        $('activityBtn').classList.remove('hidden');
     }
 
     async function loadMe() {
@@ -543,7 +780,23 @@ tbody tr:last-child td { border-bottom: 0; }
         if (event.target === $('drawer')) closeDrawer();
     });
     $('refreshBtn').addEventListener('click', () => {
+        if (state.view === 'activity') {
+            loadActivity(true).then(() => toast('Обновлено')).catch(() => {});
+            return;
+        }
         loadUsers().then(() => toast('Обновлено')).catch(() => {});
+    });
+    $('activityBtn').addEventListener('click', showActivity);
+    $('activityBack').addEventListener('click', showUsers);
+    $('activityRefresh').addEventListener('click', () => {
+        loadActivity(true).then(() => toast('Обновлено')).catch(() => {});
+    });
+    $('activitySource').addEventListener('change', () => { loadActivity(true).catch(() => {}); });
+    $('activityAction').addEventListener('change', () => { loadActivity(true).catch(() => {}); });
+    $('activityMore').addEventListener('click', () => { loadActivity(false).catch(() => {}); });
+    $('activityBody').addEventListener('click', event => {
+        const link = event.target.closest('[data-user-id]');
+        if (link) openUser(link.dataset.userId).catch(() => {});
     });
     let searchTimer = null;
     $('search').addEventListener('input', () => {

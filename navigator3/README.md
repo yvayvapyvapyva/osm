@@ -96,6 +96,7 @@ navigator3/
 ├── migrations/
 │   ├── add_route_ownership.py  # владельцы routes/folders и индексы
 │   ├── add_owner_signs.py      # личная сцена знаков владельца
+│   ├── add_activity_log.py     # журнал значимых действий
 │   └── drop_road_name.py       # удаление roads.name
 ├── scripts/
 │   └── build-static-deploy.js
@@ -168,6 +169,7 @@ owner_user_id Utf8         -- users.user_id владельца маршрута
 | POST | `/api/admin?action=...` | операции редактора маршрутов и знаков |
 | POST | `/api/admin?action=signs_get` | личная сцена знаков текущего владельца |
 | POST | `/api/admin?action=signs_save` | сохранить личную сцену знаков |
+| GET | `/api/superadmin/activity` | лента значимых действий (только `ADMIN_YANDEX_IDS`) |
 | GET | `/auth/yandex/start?return=/...&base=https://...` | 302 на Яндекс + state-cookie |
 | GET | `/auth/yandex/callback` | 302 обратно + sid-cookie |
 | GET | `/auth/logout?t=<token>&return=/...` | 302 обратно + удаление cookie |
@@ -312,6 +314,46 @@ CREATE TABLE owner_signs (
 Картинки знаков берутся из `pad/znaki/webp/`; при сборке они копируются в
 `deploy-2files/signs/webp/`, каталог — в `deploy-2files/signs/catalog.json`.
 Показ слоя в навигаторе можно отключить в настройках («Знаки»).
+
+## Журнал действий
+
+`activity_log` — отдельный поток значимых событий: вход и выход, открытие
+маршрута в навигаторе и редакторе, создание/изменение/удаление маршрутов и
+папок, сохранение знаков, оплата и действия админов. Просмотры маршрутов
+по-прежнему агрегируются в `route_views`, старые действия админов — в
+`admin_audit`; в админке они показываются вместе.
+
+```sql
+CREATE TABLE activity_log (
+    id           Utf8,
+    created_at   Timestamp,
+    user_id      Utf8,
+    yandex_id    Utf8,
+    login        Utf8,
+    display_name Utf8,
+    action       Utf8,
+    source       Utf8,      -- navigator / editor / admin / auth / premium / profile
+    entity_type  Utf8,      -- route / folder / signs / payment / user
+    entity_id    Utf8,
+    route_m      Utf8,
+    folder_id    Utf8,
+    title        Utf8,
+    metadata     Utf8,      -- JSON: количество точек, добавленные знаки, сумма и т.п.
+    PRIMARY KEY (id)
+);
+```
+
+TTL — 180 дней, индекс `activity_created_idx` по `created_at`.
+Миграция: `migrations/add_activity_log.py`.
+
+Запись — best-effort: ошибка журнала не ломает сохранение маршрута, знаков
+или оплату. Для знаков сравнивается предыдущая и новая сцена, поэтому в
+`metadata` попадают `total`, `added`, `removed` и коды добавленных знаков.
+
+`GET /api/superadmin/activity?limit=100&before=<iso>&action=<...>&source=<...>&user_id=<...>`
+доступен только аккаунтам из `ADMIN_YANDEX_IDS`. В админке кнопка
+«Последние действия» открывает ленту с фильтрами по источнику и типу действия
+и кнопкой «Показать ещё».
 
 ## Проверка
 

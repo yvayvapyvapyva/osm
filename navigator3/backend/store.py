@@ -7,6 +7,7 @@ sid_hash (первичный ключ). В базе хранится тольк�
 
 import datetime as dt
 import hashlib
+import json
 import os
 import secrets
 import uuid
@@ -1017,3 +1018,141 @@ def save_owner_signs(owner_user_id, data):
         )
 
     get_pool().retry_operation_sync(operation)
+
+
+# ---------------------------------------------------------------------------
+# Журнал значимых действий
+# ---------------------------------------------------------------------------
+
+
+def add_activity(user, action, source="", entity_type="", entity_id="",
+                 route_m="", folder_id="", title="", metadata=None):
+    """Пишет одно значимое действие пользователя в activity_log."""
+    user = user or {}
+    query = """
+        DECLARE $id AS Utf8;
+        DECLARE $created_at AS Timestamp;
+        DECLARE $user_id AS Utf8;
+        DECLARE $yandex_id AS Utf8;
+        DECLARE $login AS Utf8;
+        DECLARE $display_name AS Utf8;
+        DECLARE $action AS Utf8;
+        DECLARE $source AS Utf8;
+        DECLARE $entity_type AS Utf8;
+        DECLARE $entity_id AS Utf8;
+        DECLARE $route_m AS Utf8;
+        DECLARE $folder_id AS Utf8;
+        DECLARE $title AS Utf8;
+        DECLARE $metadata AS Utf8;
+        INSERT INTO activity_log
+            (id, created_at, user_id, yandex_id, login, display_name,
+             action, source, entity_type, entity_id, route_m, folder_id,
+             title, metadata)
+        VALUES
+            ($id, $created_at, $user_id, $yandex_id, $login, $display_name,
+             $action, $source, $entity_type, $entity_id, $route_m, $folder_id,
+             $title, $metadata);
+    """
+    if metadata is None:
+        metadata_text = ""
+    elif isinstance(metadata, str):
+        metadata_text = metadata
+    else:
+        metadata_text = json.dumps(metadata, ensure_ascii=False)
+    if len(metadata_text) > 4000:
+        metadata_text = metadata_text[:4000]
+
+    activity_id = uuid.uuid4().hex
+    now = _now()
+
+    def operation(session):
+        prepared = session.prepare(query)
+        return session.transaction().execute(
+            prepared,
+            {
+                "$id": activity_id,
+                "$created_at": now,
+                "$user_id": _text(user.get("user_id")),
+                "$yandex_id": _text(user.get("yandex_id")),
+                "$login": _text(user.get("login")),
+                "$display_name": _text(user.get("display_name")),
+                "$action": str(action or ""),
+                "$source": str(source or ""),
+                "$entity_type": str(entity_type or ""),
+                "$entity_id": str(entity_id or ""),
+                "$route_m": str(route_m or ""),
+                "$folder_id": str(folder_id or ""),
+                "$title": str(title or ""),
+                "$metadata": metadata_text,
+            },
+            commit_tx=True,
+        )
+
+    get_pool().retry_operation_sync(operation)
+    return activity_id
+
+
+def list_activity(limit=200, before=None, action=None, source=None, user_id=None):
+    limit = max(1, min(int(limit or 200), 500))
+    declarations = []
+    conditions = []
+    params = {}
+    if before is not None:
+        declarations.append("DECLARE $before AS Timestamp;")
+        conditions.append("created_at < $before")
+        params["$before"] = before
+    if action:
+        declarations.append("DECLARE $action AS Utf8;")
+        conditions.append("action = $action")
+        params["$action"] = str(action)
+    if source:
+        declarations.append("DECLARE $source AS Utf8;")
+        conditions.append("source = $source")
+        params["$source"] = str(source)
+    if user_id:
+        declarations.append("DECLARE $user_id AS Utf8;")
+        conditions.append("user_id = $user_id")
+        params["$user_id"] = str(user_id)
+    where = ("WHERE " + " AND ".join(conditions)) if conditions else ""
+    query = "\n".join(declarations) + f"""
+        SELECT id, created_at, user_id, yandex_id, login, display_name,
+               action, source, entity_type, entity_id, route_m, folder_id,
+               title, metadata
+        FROM activity_log
+        {where}
+        ORDER BY created_at DESC
+        LIMIT {limit};
+    """
+
+    def operation(session):
+        prepared = session.prepare(query)
+        return session.transaction().execute(prepared, params, commit_tx=True)
+
+    rows = get_pool().retry_operation_sync(operation)[0].rows
+    items = []
+    for row in rows:
+        metadata = _text(getattr(row, "metadata", ""))
+        try:
+            metadata_value = json.loads(metadata) if metadata else None
+        except Exception:
+            metadata_value = metadata
+        items.append(
+            {
+                "id": _text(getattr(row, "id", "")),
+                "created_at": _as_utc(getattr(row, "created_at", None)),
+                "user_id": _text(getattr(row, "user_id", "")),
+                "yandex_id": _text(getattr(row, "yandex_id", "")),
+                "login": _text(getattr(row, "login", "")),
+                "display_name": _text(getattr(row, "display_name", "")),
+                "action": _text(getattr(row, "action", "")),
+                "source": _text(getattr(row, "source", "")),
+                "entity_type": _text(getattr(row, "entity_type", "")),
+                "entity_id": _text(getattr(row, "entity_id", "")),
+                "route_m": _text(getattr(row, "route_m", "")),
+                "folder_id": _text(getattr(row, "folder_id", "")),
+                "title": _text(getattr(row, "title", "")),
+                "metadata": metadata_value,
+            }
+        )
+    return items
+

@@ -766,6 +766,29 @@ def _current_user(event):
     return user
 
 
+def _log_activity(user, action, source="", entity_type="", entity_id="",
+                  route_m="", folder_id="", title="", metadata=None):
+    """Best-effort запись в журнал действий.
+
+    Ошибка журнала не должна ломать основную операцию: маршрут, оплату или
+    сохранение знаков.
+    """
+    try:
+        store.add_activity(
+            user,
+            action,
+            source=source,
+            entity_type=entity_type,
+            entity_id=entity_id,
+            route_m=route_m,
+            folder_id=folder_id,
+            title=title,
+            metadata=metadata,
+        )
+    except Exception as exc:  # noqa: BLE001
+        print(f"[activity] {action} failed: {exc}")
+
+
 def _catalog_data(include_geometry=False, owner_user_id=None):
     pool = store.get_pool()
     folder_rows = _rows(pool.retry_operation_sync(execute_list_folders))
@@ -998,6 +1021,14 @@ def _auth_callback(event):
             "/?auth_error=storage_failed", auth.clear_oauth_cookies()
         )
 
+    _log_activity(
+        user,
+        "login",
+        source="auth",
+        entity_type="user",
+        entity_id=_text(user.get("user_id")),
+    )
+
     return_to = _strip_auth_params(
         auth.return_from_cookie(cookies.get(auth.RETURN_COOKIE))
     )
@@ -1016,11 +1047,20 @@ def _auth_logout(event):
     if method == "GET":
         return _auth_logout_get(event, sid)
 
+    user = _current_user(event)
     if sid:
         try:
             store.delete_session(sid)
         except Exception as exc:  # noqa: BLE001
             print(f"[auth] session delete failed: {exc}")
+    if user:
+        _log_activity(
+            user,
+            "logout",
+            source="auth",
+            entity_type="user",
+            entity_id=_text(user.get("user_id")),
+        )
     return auth.json_response(
         200,
         {"status": "logged_out"},
@@ -1051,10 +1091,19 @@ def _auth_logout_get(event, sid):
         return auth.redirect_response(
             _with_query(return_to, "auth_error", "logout_failed")
         )
+    user = _current_user(event)
     try:
         store.delete_session(sid)
     except Exception as exc:  # noqa: BLE001
         print(f"[auth] session delete failed: {exc}")
+    if user:
+        _log_activity(
+            user,
+            "logout",
+            source="auth",
+            entity_type="user",
+            entity_id=_text(user.get("user_id")),
+        )
     return auth.redirect_response(
         _with_query(return_to, "logged_out", "1"),
         [auth.clear_session_cookie()],
@@ -1317,6 +1366,14 @@ def _api_profile_update(event):
         print(f"[profile] routes_folder_name update failed: {exc}")
         return auth.json_response(500, {"error": "storage_failed"})
 
+    _log_activity(
+        user,
+        "profile_update",
+        source="profile",
+        entity_type="user",
+        entity_id=_text(user.get("user_id")),
+        metadata={"folder_name": folder_name},
+    )
     return auth.json_response(200, {"user": _public_user(updated or user)})
 
 
@@ -1384,6 +1441,18 @@ def _api_premium_checkout(event):
         print(f"[premium] failed to store Robokassa payment {inv_id}: {exc}")
         return auth.json_response(500, {"error": "payment_create_failed"})
 
+    _log_activity(
+        user,
+        "premium_checkout",
+        source="premium",
+        entity_type="payment",
+        entity_id=str(inv_id),
+        metadata={
+            "amount_kopecks": amount_kopecks,
+            "days": days,
+            "provider": "robokassa",
+        },
+    )
     return auth.json_response(
         200,
         {
@@ -1445,6 +1514,22 @@ def _api_premium_robokassa_result(event):
             store.mark_payment_succeeded(inv_id)
             until = store.extend_premium(payment["yandex_id"], _premium_days())
             print(f"[premium] Robokassa payment {inv_id} paid, premium until {until}")
+            _log_activity(
+                {
+                    "user_id": payment.get("user_id"),
+                    "yandex_id": payment.get("yandex_id"),
+                },
+                "premium_paid",
+                source="premium",
+                entity_type="payment",
+                entity_id=inv_id,
+                metadata={
+                    "amount_kopecks": payment.get("amount_kopecks"),
+                    "until": until.isoformat()
+                    if hasattr(until, "isoformat")
+                    else str(until),
+                },
+            )
         except Exception as exc:  # noqa: BLE001
             print(f"[premium] failed to apply Robokassa payment {inv_id}: {exc}")
             return _text_response(500, "ERROR: storage failed")
@@ -1501,6 +1586,14 @@ def _api_route_view(event):
         return auth.json_response(404, {"error": "route_not_found"})
 
     store.record_route_view(_text(user.get("user_id")), m_param)
+    _log_activity(
+        user,
+        "route_open",
+        source="navigator",
+        entity_type="route",
+        route_m=m_param,
+        title=_text(meta.get("title")),
+    )
     return auth.json_response(200, {"status": "ok", "viewed": True})
 
 
@@ -1580,6 +1673,14 @@ def _admin_get(event, user):
     owner_user_id = _text(user.get("user_id"))
     _, _, by_id = _editor_data(owner_user_id)
     route = _route_editor_dict(row, by_id)
+    _log_activity(
+        user,
+        "route_open",
+        source="editor",
+        entity_type="route",
+        route_m=_text(route.get("m")) or m_val,
+        title=_text(route.get("title")),
+    )
     return auth.json_response(
         200,
         {
@@ -1616,6 +1717,7 @@ def _admin_save(event, user):
             execute_get_route_owner, m_param=m_val
         )
     )
+    created = not owner_rows
     if owner_rows:
         if _text(_row_value(owner_rows[0], "owner_user_id")) != owner_user_id:
             return auth.json_response(404, {"error": "route_not_found"})
@@ -1632,6 +1734,16 @@ def _admin_save(event, user):
             json_data=body.get("data", []),
             owner_user_id=owner_user_id,
         )
+
+    data = body.get("data")
+    _log_activity(
+        user,
+        "route_create" if created else "route_save",
+        source="editor",
+        entity_type="route",
+        route_m=m_val,
+        metadata={"points": len(data) if isinstance(data, list) else None},
+    )
     return auth.json_response(200, {"status": "saved"})
 
 
@@ -1691,6 +1803,21 @@ def _admin_save_meta(event, user):
             owner_user_id=owner_user_id,
             premium=premium,
         )
+        _log_activity(
+            user,
+            "route_update",
+            source="editor",
+            entity_type="route",
+            route_m=new_m,
+            title=title,
+            metadata={
+                "old_m": m_val,
+                "renamed": True,
+                "folder_id": folder_id,
+                "visible": bool(visible),
+                "premium": premium,
+            },
+        )
         return auth.json_response(200, {"status": "meta_saved", "new_m": new_m})
 
     store.get_pool().retry_operation_sync(
@@ -1702,6 +1829,20 @@ def _admin_save_meta(event, user):
         visible=bool(visible),
         owner_user_id=owner_user_id,
         premium=premium,
+    )
+    _log_activity(
+        user,
+        "route_update",
+        source="editor",
+        entity_type="route",
+        route_m=m_val,
+        title=title,
+        metadata={
+            "folder_id": folder_id,
+            "folder_changed": folder_id != current["folder_id"],
+            "visible": bool(visible),
+            "premium": premium,
+        },
     )
     return auth.json_response(200, {"status": "meta_saved"})
 
@@ -1724,6 +1865,14 @@ def _admin_delete(event, user):
         execute_delete_route,
         m_param=m_val,
         owner_user_id=owner_user_id,
+    )
+    _log_activity(
+        user,
+        "route_delete",
+        source="editor",
+        entity_type="route",
+        route_m=m_val,
+        title=_text(_row_value(rows[0], "title")),
     )
     return auth.json_response(200, {"status": "deleted"})
 
@@ -1754,6 +1903,7 @@ def _admin_folder_save(event, user):
         seen.add(current)
         current = by_id.get(current, {}).get("parent_id", "")
 
+    created = folder_id not in by_id
     if folder_id in by_id:
         store.get_pool().retry_operation_sync(
             execute_update_folder,
@@ -1794,6 +1944,15 @@ def _admin_folder_save(event, user):
             for folder in _folder_chain(new_by_id, route_folder_id)
         }:
             continue
+    _log_activity(
+        user,
+        "folder_create" if created else "folder_update",
+        source="editor",
+        entity_type="folder",
+        folder_id=folder_id,
+        title=name,
+        metadata={"parent_id": parent_id, "sort_order": sort_order},
+    )
     return auth.json_response(
         200,
         {
@@ -1824,6 +1983,18 @@ def _admin_folder_delete(event, user):
         execute_delete_folder,
         folder_id=folder_id,
         owner_user_id=owner_user_id,
+    )
+    folder_name = next(
+        (folder["name"] for folder in folders if folder["folder_id"] == folder_id),
+        "",
+    )
+    _log_activity(
+        user,
+        "folder_delete",
+        source="editor",
+        entity_type="folder",
+        folder_id=folder_id,
+        title=_text(folder_name),
     )
     return auth.json_response(200, {"status": "folder_deleted"})
 
@@ -1897,6 +2068,27 @@ def _admin_signs_save(event, user):
             }
         )
 
+    def marker_key(item):
+        return (
+            _text(item.get("code")),
+            round(float(item.get("lat") or 0), 6),
+            round(float(item.get("lon") or 0), 6),
+        )
+
+    old_keys = set()
+    try:
+        old_raw = store.get_owner_signs(_text(user.get("user_id")))
+        if old_raw:
+            old_data = json.loads(old_raw)
+            if isinstance(old_data, str):
+                old_data = json.loads(old_data)
+            if isinstance(old_data, dict):
+                for item in old_data.get("markers") or []:
+                    if isinstance(item, dict) and item.get("kind") == "znak":
+                        old_keys.add(marker_key(item))
+    except Exception as exc:  # noqa: BLE001
+        print(f"[admin] signs diff failed: {exc}")
+
     camera = data.get("camera")
     payload_data = {
         "version": 1,
@@ -1914,6 +2106,22 @@ def _admin_signs_save(event, user):
         print(f"[admin] signs save failed: {exc}")
         return auth.json_response(500, {"error": "storage_failed"})
 
+    new_keys = {marker_key(marker) for marker in clean_markers}
+    added_keys = new_keys - old_keys
+    removed_keys = old_keys - new_keys
+    _log_activity(
+        user,
+        "signs_save",
+        source="editor",
+        entity_type="signs",
+        metadata={
+            "total": len(clean_markers),
+            "added": len(added_keys),
+            "removed": len(removed_keys),
+            "added_codes": sorted({key[0] for key in added_keys})[:20],
+            "removed_codes": sorted({key[0] for key in removed_keys})[:20],
+        },
+    )
     return auth.json_response(
         200, {"ok": True, "savedAt": payload_data["savedAt"], "count": len(clean_markers)}
     )
@@ -2170,6 +2378,19 @@ def _api_superadmin_premium(event):
             ensure_ascii=False,
         ),
     )
+    _log_activity(
+        admin,
+        "admin_premium",
+        source="admin",
+        entity_type="user",
+        entity_id=_text(user.get("user_id")),
+        title=_text(user.get("login")) or yandex_id,
+        metadata={
+            "target_yandex_id": yandex_id,
+            "until": until.isoformat() if until else None,
+            "days": days,
+        },
+    )
     return auth.json_response(
         200, {"user": _superadmin_user_dict(updated or user)}
     )
@@ -2204,6 +2425,15 @@ def _api_superadmin_block(event):
         yandex_id,
         json.dumps({"blocked": blocked}, ensure_ascii=False),
     )
+    _log_activity(
+        admin,
+        "admin_block",
+        source="admin",
+        entity_type="user",
+        entity_id=_text(user.get("user_id")),
+        title=_text(user.get("login")) or yandex_id,
+        metadata={"target_yandex_id": yandex_id, "blocked": blocked},
+    )
     return auth.json_response(
         200, {"user": _superadmin_user_dict(updated or user)}
     )
@@ -2234,6 +2464,15 @@ def _api_superadmin_sessions_revoke(event):
         yandex_id,
         "",
     )
+    _log_activity(
+        admin,
+        "admin_sessions_revoke",
+        source="admin",
+        entity_type="user",
+        entity_id=_text(user.get("user_id")),
+        title=_text(user.get("login")) or yandex_id,
+        metadata={"target_yandex_id": yandex_id},
+    )
     return auth.json_response(200, {"status": "ok"})
 
 
@@ -2249,6 +2488,48 @@ def _api_superadmin_audit(event):
     for item in items:
         item["created_at"] = _date_iso(item.get("created_at"))
     return auth.json_response(200, {"items": items})
+
+
+def _parse_timestamp(raw):
+    value = _text(raw).strip()
+    if not value:
+        return None
+    try:
+        parsed = dt.datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=dt.timezone.utc)
+    return parsed
+
+
+def _api_superadmin_activity(event):
+    """Лента значимых действий. Только для админов из ADMIN_YANDEX_IDS."""
+    admin, error = _superadmin_guard(event)
+    if error:
+        return error
+
+    params = _query(event)
+    try:
+        limit = max(1, min(int(params.get("limit") or 100), 500))
+    except (TypeError, ValueError):
+        return auth.json_response(400, {"error": "invalid_limit"})
+
+    before_raw = _text(params.get("before")).strip()
+    before = _parse_timestamp(before_raw)
+    if before_raw and before is None:
+        return auth.json_response(400, {"error": "invalid_before"})
+
+    items = store.list_activity(
+        limit=limit,
+        before=before,
+        action=_text(params.get("action")).strip(),
+        source=_text(params.get("source")).strip(),
+        user_id=_text(params.get("user_id")).strip(),
+    )
+    for item in items:
+        item["created_at"] = _date_iso(item.get("created_at"))
+    return auth.json_response(200, {"items": items, "limit": limit})
 
 
 # ---------------------------------------------------------------------------
@@ -2302,6 +2583,9 @@ def _handle_api(event, path, method):
 
     if normalized == "/api/superadmin/audit" and method == "GET":
         return _api_superadmin_audit(event)
+
+    if normalized == "/api/superadmin/activity" and method == "GET":
+        return _api_superadmin_activity(event)
 
     if normalized == "/api/premium/status" and method == "GET":
         return _api_premium_status(event)
