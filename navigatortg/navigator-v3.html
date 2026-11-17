@@ -170,7 +170,7 @@
         setTimeout(() => resolve(false), 5000);
     });
 </script>
-<script src="assets/js/tg-fullscreen.js?v=2"></script>
+<script src="assets/js/tg-fullscreen.js?v=3"></script>
 <script src="assets/js/tts-n3.js"></script>
 <script src="assets/js/maplibre-gl.js?v=4.7.1"></script>
 <script src="assets/js/pmtiles.js?v=3.2.1"></script>
@@ -181,14 +181,14 @@
 <script src="assets/js/menu-n3.js?v=18"></script>
 <script src="assets/js/auth-n3.js?v=4"></script>
 <script>
-const MAP_PREFS_KEY = 'osm_map_prefs_v1';
+const MAP_PREFS_KEY = 'osm_map_prefs_v2';
 
 function loadMapPrefs() {
-  const prefs = { style: 'nn_3d' };
+  const prefs = { style: 'yandex_sat' };
   try {
     const saved = JSON.parse(localStorage.getItem(MAP_PREFS_KEY) || '{}');
     if (saved && saved.style) {
-      prefs.style = MAP_STYLES[saved.style] ? saved.style : 'nn_3d';
+      prefs.style = MAP_STYLES[saved.style] ? saved.style : 'yandex_sat';
     }
   } catch (e) {}
   return prefs;

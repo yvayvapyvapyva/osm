@@ -20,11 +20,18 @@
         const content = app.contentSafeAreaInset || {};
         const fullscreen = !!app.isFullscreen;
 
-        let top = Math.max(Number(safe.top) || 0, Number(content.top) || 0);
+        const safeTop = Number(safe.top) || 0;
+        const contentTop = Number(content.top) || 0;
+        let top = Math.max(safeTop, contentTop);
         // В полноэкранном режиме Telegram рисует поверх приложения свои
-        // кнопки «закрыть/свернуть». Если клиент не прислал contentSafeAreaInset,
-        // оставляем запас, иначе верхняя панель уходит под них.
-        if (fullscreen && top < 60) top = 60;
+        // кнопки «закрыть/свернуть». contentSafeAreaInset должен включать их,
+        // но на iPhone он часто приходит нулевым. Тогда добавляем статус-бар
+        // и высоту кнопок Telegram сверху.
+        if (fullscreen) {
+            if (contentTop > 0) top = Math.max(contentTop, safeTop);
+            else top = safeTop + 48;
+            top = Math.max(top, 60);
+        }
 
         const bottom = Math.max(Number(safe.bottom) || 0, Number(content.bottom) || 0);
         root.style.setProperty('--tg-safe-top', top + 'px');
