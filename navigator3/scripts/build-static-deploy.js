@@ -119,12 +119,6 @@ function buildLegalPage() {
         ? `<a href="https://t.me/${escapeHtml(telegram)}" target="_blank" rel="noopener">@${escapeHtml(telegram)}</a>`
         : 'Не указан';
 
-    const refundDefault =
-        'Доступ предоставляется сразу после подтверждения оплаты. ' +
-        'До активации премиума пользователь может отказаться от услуги и получить полный возврат. ' +
-        'После активации возврат возможен за неиспользованный период или при технической ошибке.';
-    const refund = refundDefault;
-
     const price = (env.PREMIUM_PRICE_RUB || '299').trim() || '299';
     const days = (env.PREMIUM_DAYS || '30').trim() || '30';
     const updated = new Date().toLocaleDateString('ru-RU');
@@ -135,7 +129,6 @@ function buildLegalPage() {
         '{{LEGAL_INN}}': escapeHtml(inn),
         '{{LEGAL_CONTACT_EMAIL}}': emailHtml,
         '{{LEGAL_CONTACT_TELEGRAM}}': telegramHtml,
-        '{{LEGAL_REFUND_TERMS}}': escapeHtml(refund).replace(/\n/g, '<br>'),
         '{{PREMIUM_PRICE_RUB}}': escapeHtml(price),
         '{{PREMIUM_DAYS}}': escapeHtml(days),
         '{{LEGAL_UPDATED}}': escapeHtml(updated),
