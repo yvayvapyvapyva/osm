@@ -26,6 +26,14 @@
         return app && app.initData ? app.initData : '';
     }
 
+    function editorKey() {
+        try { return localStorage.getItem('editor_key') || ''; } catch (e) { return ''; }
+    }
+
+    function credentials() {
+        return { initData: initData(), editor_key: editorKey() };
+    }
+
     function worker(action, body) {
         const url = new URL(API);
         url.searchParams.set('action', action);
@@ -66,9 +74,9 @@
                 (data.locks || []).forEach((lock) => {
                     state.locks[String(lock.id)] = Number(lock.price) || 0;
                 });
-                const data2 = initData();
-                if (!data2) return null;
-                return worker('my_access', { initData: data2 }).catch(() => null);
+                const creds = credentials();
+                if (!creds.initData && !creds.editor_key) return null;
+                return worker('my_access', creds).catch(() => null);
             })
             .then((access) => {
                 if (access) {
@@ -228,7 +236,7 @@
         const label = button.textContent;
         button.disabled = true;
         button.textContent = 'Создаём счёт…';
-        worker('shop_invoice', { initData: data, folder_id: Number(lockId) })
+        worker('shop_invoice', Object.assign(credentials(), { folder_id: Number(lockId) }))
             .then((invoice) => {
                 if (invoice.owned) {
                     return load().then(() => {
@@ -269,7 +277,7 @@
         let index = 0;
 
         function attempt() {
-            worker('shop_claim', { initData: data })
+            worker('shop_claim', credentials())
                 .then((result) => {
                     state.access = new Set((result.ids || []).map(String));
                     state.unlimited = !!result.unlimited;

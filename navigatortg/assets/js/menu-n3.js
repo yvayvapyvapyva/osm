@@ -1261,7 +1261,14 @@ const MenuModule = {
             this.hideSpinner();
             console.error('[MenuModule] Ошибка загрузки маршрута:', e);
             if (typeof showToast === 'function') {
-                if (e && e.message === 'premium_locked') {
+                if (e && e.message === 'locked') {
+                    const meta = this.routesDescriptions && this.routesDescriptions[routeM];
+                    if (window.OnepageShop && meta && typeof window.OnepageShop.openPaywall === 'function') {
+                        window.OnepageShop.openPaywall(meta.folder_id);
+                    } else {
+                        showToast('Маршрут доступен после оплаты папки', 'info', 4000);
+                    }
+                } else if (e && e.message === 'premium_locked') {
                     if (typeof window.openPremiumOffer === 'function') {
                         window.openPremiumOffer();
                     } else {

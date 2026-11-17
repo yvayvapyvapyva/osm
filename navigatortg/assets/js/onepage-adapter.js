@@ -127,9 +127,34 @@
             .then(([catalog]) => jsonResponse(ownerBundle(catalog)));
     }
 
+    function tgInitData() {
+        try {
+            return (global.Telegram && global.Telegram.WebApp && global.Telegram.WebApp.initData) || '';
+        } catch (e) {
+            return '';
+        }
+    }
+
+    function editorKey() {
+        try { return global.localStorage.getItem('editor_key') || ''; } catch (e) { return ''; }
+    }
+
     function handleRoute(m) {
         if (!m) return Promise.resolve(jsonResponse({ error: 'missing_route_name' }, 400));
-        return workerGet('get', { m: m }).then(async (response) => {
+        // POST, чтобы передать подпись Telegram или ключ редактора:
+        // без них воркер считает посетителя гостем и закрывает платные папки.
+        const routeUrl = new URL(API);
+        routeUrl.searchParams.set('action', 'get');
+        routeUrl.searchParams.set('m', m);
+        return originalFetch(routeUrl.toString(), {
+            method: 'POST',
+            cache: 'no-store',
+            headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+            body: JSON.stringify({
+                tg_init_data: tgInitData(),
+                editor_key: editorKey()
+            })
+        }).then(async (response) => {
             let payload = null;
             try { payload = await response.json(); } catch (e) {}
             if (!response.ok) {
