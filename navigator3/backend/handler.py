@@ -2507,10 +2507,11 @@ def _parse_timestamp(raw):
 
 
 def _activity_folder_paths(items):
-    """Дополняет события путём папок до объекта.
+    """Дополняет события названием маршрута и путём папок до объекта.
 
-    Путь собирается из текущих папок. Для удалённого маршрута остаётся
-    `folder_id` из самого события, поэтому путь по возможности тоже виден.
+    Название берётся из текущих данных маршрута, если в событии его нет
+    (например, при сохранении геометрии приходит только `m`). Путь собирается
+    из текущих папок; у удалённого маршрута остаётся `folder_id` из события.
     """
     route_ms = [
         _text(item.get("route_m")).strip()
@@ -2528,6 +2529,8 @@ def _activity_folder_paths(items):
 
     for item in items:
         route_meta = roads.get(_text(item.get("route_m")).strip()) or {}
+        if not _text(item.get("title")).strip():
+            item["title"] = _text(route_meta.get("title"))
         metadata = item.get("metadata")
         if not isinstance(metadata, dict):
             metadata = {}
