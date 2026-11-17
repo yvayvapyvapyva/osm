@@ -137,6 +137,19 @@ a { color: var(--accent); }
 .activity-user { cursor: pointer; color: var(--accent); font-weight: 650; }
 .activity-when { white-space: nowrap; color: var(--muted); font-size: 12px; }
 .activity-details { color: var(--muted); font-size: 12px; overflow-wrap: anywhere; }
+.source-badge {
+    display: inline-block;
+    padding: 3px 8px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 700;
+    white-space: nowrap;
+    background: #F1F4F8;
+    color: var(--muted);
+}
+.source-navigator { background: var(--accent-soft); color: var(--accent-dark); }
+.source-editor { background: var(--success-soft); color: var(--success); }
+.source-admin { background: var(--danger-soft); color: var(--danger); }
 
 .panel {
     background: var(--surface);
@@ -146,7 +159,7 @@ a { color: var(--accent); }
     overflow: hidden;
 }
 .table-wrap { overflow-x: auto; }
-table { width: 100%; border-collapse: collapse; min-width: 720px; }
+table { width: 100%; border-collapse: collapse; min-width: 820px; }
 th, td { text-align: left; padding: 12px 14px; border-bottom: 1px solid var(--line); vertical-align: top; }
 th { font-size: 11px; text-transform: uppercase; letter-spacing: 0.4px; color: var(--muted); font-weight: 700; background: #F7FAFD; }
 tbody tr { cursor: pointer; }
@@ -359,6 +372,7 @@ tbody tr:last-child td { border-bottom: 0; }
                             <th>Время</th>
                             <th>Пользователь</th>
                             <th>Действие</th>
+                            <th>Источник</th>
                             <th>Объект</th>
                             <th>Подробности</th>
                         </tr>
@@ -574,6 +588,18 @@ tbody tr:last-child td { border-bottom: 0; }
         return parts.join(' · ');
     }
 
+    function sourceCell(source) {
+        if (!source) return '—';
+        const classes = {
+            navigator: 'source-navigator',
+            editor: 'source-editor',
+            admin: 'source-admin',
+        };
+        const label = ACTIVITY_SOURCES[source] || source;
+        return '<span class="source-badge ' + (classes[source] || '') + '">' +
+            escapeHtml(label) + '</span>';
+    }
+
     function activityPerson(item) {
         return item.display_name || item.login || item.yandex_id || item.user_id || 'гость';
     }
@@ -592,6 +618,7 @@ tbody tr:last-child td { border-bottom: 0; }
                 '<td>' + personCell +
                 (sub && item.user_id ? '<div class="user-sub">' + escapeHtml(sub) + '</div>' : '') + '</td>' +
                 '<td>' + escapeHtml(ACTIVITY_ACTIONS[item.action] || item.action) + '</td>' +
+                '<td>' + sourceCell(item.source) + '</td>' +
                 '<td>' + escapeHtml(activityObject(item)) +
                 (item.folder_path ? '<div class="user-sub">' + escapeHtml(item.folder_path) + '</div>' : '') +
                 (item.route_m && item.entity_type === 'route' ? '<div class="user-sub mono">' + escapeHtml(item.route_m) + '</div>' : '') + '</td>' +
