@@ -1,0 +1,5 @@
+.DS_Store
+.env
+.wrangler/
+__pycache__/
+*.pyc

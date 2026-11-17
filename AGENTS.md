@@ -4,6 +4,7 @@
 - `navigator3/` — основная версия с Яндекс ID, API Gateway, YDB.
 - `pad/` — разбор дорожных ситуаций.
 - `tts/` — озвучка.
+- `navigatortg/` — тестовая версия onepage2 (Telegram Mini App, Cloudflare Pages/Worker). Дальнейшие правки этого проекта ведутся здесь.
 
 ## Деплой (справка)
 - `navigator3/deploy.sh` — функция `osmn3` (ID `d4e8ds1489g0q91dt7do`), API Gateway `osmn3` (ID `d5dsd5u1tsc8fm9dbsg5`, служебный домен `https://d5dsd5u1tsc8fm9dbsg5.s183zexc.apigw.yandexcloud.net`), статика в бакет `osmn-nav`.
