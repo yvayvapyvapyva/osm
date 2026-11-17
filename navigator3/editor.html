@@ -1426,7 +1426,8 @@ function observeRoutePreviews(list) {
             return;
         }
         if (routePreviewRequests.has(routeKey)) return;
-        const request = callAdminApi('get', { m: routeKey })
+        // preview=1: миниатюра не считается открытием маршрута и не попадает в журнал.
+        const request = callAdminApi('get', { m: routeKey, preview: 1 })
             .then(result => {
                 if (!Array.isArray(result.data)) throw new Error('Некорректные данные маршрута');
                 const rendered = drawRoutePreview(result.data);

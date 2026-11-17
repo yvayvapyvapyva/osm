@@ -1673,14 +1673,16 @@ def _admin_get(event, user):
     owner_user_id = _text(user.get("user_id"))
     _, _, by_id = _editor_data(owner_user_id)
     route = _route_editor_dict(row, by_id)
-    _log_activity(
-        user,
-        "route_open",
-        source="editor",
-        entity_type="route",
-        route_m=_text(route.get("m")) or m_val,
-        title=_text(route.get("title")),
-    )
+    # Миниатюра в списке тоже запрашивает get — не считаем её открытием.
+    if _text(_query(event).get("preview")).strip() not in ("1", "true", "yes"):
+        _log_activity(
+            user,
+            "route_open",
+            source="editor",
+            entity_type="route",
+            route_m=_text(route.get("m")) or m_val,
+            title=_text(route.get("title")),
+        )
     return auth.json_response(
         200,
         {
