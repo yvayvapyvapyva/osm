@@ -86,7 +86,6 @@ navigator3/
 │       ├── menu-module.js      # дерево папок, /api/catalog, /api/route
 │       ├── auth-module.js      # вход, /api/me, выход
 │       ├── config.js           # палитра и названия категорий
-│       ├── report.js           # отчёт о маршруте в Telegram
 │       ├── map-styles.js
 │       └── tts-client.js
 ├── backend/
@@ -97,7 +96,6 @@ navigator3/
 ├── migrations/
 │   ├── add_route_ownership.py  # владельцы routes/folders и индексы
 │   ├── add_owner_signs.py      # личная сцена знаков владельца
-│   ├── add_folder_signs.py     # старая привязка знаков (архив)
 │   └── drop_road_name.py       # удаление roads.name
 ├── scripts/
 │   └── build-static-deploy.js
