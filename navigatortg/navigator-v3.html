@@ -50,6 +50,27 @@
     <!-- /Yandex.Metrika counter -->
 </head>
 <body>
+<script>
+    // Автообновление: сравниваем версию сборки с сохранённой. Если на сервере
+    // уже новая версия, а WebView отдал старую страницу из кэша — перезагружаем.
+    (function () {
+        try {
+            fetch('version.json', { cache: 'no-store' })
+                .then(function (r) { return r.ok ? r.json() : null; })
+                .then(function (data) {
+                    if (!data || !data.build) return;
+                    var key = 'osm_build';
+                    var previous = '';
+                    try { previous = localStorage.getItem(key) || ''; } catch (e) {}
+                    try { localStorage.setItem(key, data.build); } catch (e) {}
+                    if (previous && previous !== data.build) {
+                        window.location.reload();
+                    }
+                })
+                .catch(function () {});
+        } catch (e) {}
+    })();
+</script>
 
 <div id="loading" class="loading-overlay">
     <div>ЗАГРУЗКА...</div>
