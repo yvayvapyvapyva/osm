@@ -2282,7 +2282,7 @@ button, input, select, textarea {
     --tg-safe-bottom: 0px;
 }
 html.tg-fullscreen .top-nav {
-    padding-top: max(10px, var(--tg-safe-top));
+    padding-top: max(10px, env(safe-area-inset-top, 0px), var(--tg-safe-top));
 }
 html.tg-fullscreen #locateBtn {
     top: calc(100px + max(env(safe-area-inset-top, 0px), var(--tg-safe-top)));
@@ -2294,7 +2294,7 @@ html.tg-fullscreen #topCenterControls {
     top: calc(72px + max(env(safe-area-inset-top, 0px), var(--tg-safe-top)));
 }
 html.tg-fullscreen #shockBar {
-    top: max(4px, var(--tg-safe-top));
+    top: max(4px, env(safe-area-inset-top, 0px), var(--tg-safe-top));
 }
 html.tg-fullscreen #toast {
     top: calc(90px + max(env(safe-area-inset-top, 0px), var(--tg-safe-top)));

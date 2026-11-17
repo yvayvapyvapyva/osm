@@ -15,28 +15,60 @@
         return (global.Telegram && global.Telegram.WebApp) || null;
     }
 
+    function cssPx(name) {
+        const value = getComputedStyle(root).getPropertyValue(name);
+        const parsed = parseFloat(value);
+        return Number.isFinite(parsed) ? parsed : 0;
+    }
+
     function applyInsets(app) {
         const safe = app.safeAreaInset || {};
         const content = app.contentSafeAreaInset || {};
         const fullscreen = !!app.isFullscreen;
 
-        const safeTop = Number(safe.top) || 0;
-        const contentTop = Number(content.top) || 0;
-        let top = Math.max(safeTop, contentTop);
-        // В полноэкранном режиме Telegram рисует поверх приложения свои
-        // кнопки «закрыть/свернуть». contentSafeAreaInset должен включать их,
-        // но на iPhone он часто приходит нулевым. Тогда добавляем статус-бар
-        // и высоту кнопок Telegram сверху.
+        // Значения берём из двух источников: поля WebApp и CSS-переменные,
+        // которые выставляет telegram-web-app.js. На разных клиентах
+        // заполняется что-то одно.
+        const safeTop = Math.max(
+            Number(safe.top) || 0,
+            cssPx('--tg-safe-area-inset-top')
+        );
+        const contentTop = Math.max(
+            Number(content.top) || 0,
+            cssPx('--tg-content-safe-area-inset-top')
+        );
+
+        // Официальная рекомендация — складывать safe area и content safe area.
+        // content — это зона, занятая интерфейсом Telegram (шапка, кнопки),
+        // safe — вырез/статус-бар устройства.
+        let top = safeTop + contentTop;
         if (fullscreen) {
-            if (contentTop > 0) top = Math.max(contentTop, safeTop);
-            else top = safeTop + 48;
+            // Если клиент не прислал content safe area, оставляем запас
+            // под кнопки Telegram, иначе панель уходит под них.
+            if (contentTop === 0) top = safeTop + 48;
             top = Math.max(top, 60);
+        } else {
+            // В обычном режиме контент и так начинается под шапкой Telegram.
+            top = Math.max(safeTop, contentTop);
         }
 
-        const bottom = Math.max(Number(safe.bottom) || 0, Number(content.bottom) || 0);
+        const bottom = Math.max(
+            Number(safe.bottom) || 0,
+            Number(content.bottom) || 0,
+            cssPx('--tg-safe-area-inset-bottom'),
+            cssPx('--tg-content-safe-area-inset-bottom')
+        );
         root.style.setProperty('--tg-safe-top', top + 'px');
         root.style.setProperty('--tg-safe-bottom', bottom + 'px');
         root.classList.toggle('tg-fullscreen', fullscreen);
+
+        global.__tgInsets = {
+            safeTop: safeTop,
+            contentTop: contentTop,
+            top: top,
+            bottom: bottom,
+            fullscreen: fullscreen
+        };
     }
 
     function apply() {
