@@ -1,4 +1,6 @@
 :root {
+    --screen-panel-top: calc(max(10px, env(safe-area-inset-top, 0px), var(--tg-safe-top, 0px)) + 70px);
+
     color-scheme: light;
 
     /* Поверхности и фон */
@@ -1738,7 +1740,9 @@ button, input, select, textarea {
 
 .screen-panel {
     position: absolute;
-    top: calc(var(--screen-top) + 74px);
+    /* Шторка поднимается только до нижнего края верхней панели:
+       10 px отступа + 56 px панель + 14 px нижний отступ. */
+    top: var(--screen-panel-top, calc(var(--screen-top) + 74px));
     bottom: 0;
     left: 0;
     right: 0;
