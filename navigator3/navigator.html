@@ -1774,7 +1774,10 @@ function loadSignImage(file) {
         const img = new Image();
         img.decoding = 'async';
         img.onload = () => resolve(img);
-        img.onerror = () => reject(new Error('Не загрузился знак: ' + key));
+        img.onerror = () => {
+            APP._signImageCache.delete(key);
+            reject(new Error('Не загрузился знак: ' + key));
+        };
         img.src = 'signs/' + key;
     });
     APP._signImageCache.set(key, promise);
