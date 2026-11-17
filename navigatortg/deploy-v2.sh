@@ -19,7 +19,6 @@ SITE_FILES=(
   instr_editor.html
   ico.png
   assets
-  znaki
 )
 
 STAGE="$(mktemp -d)"
@@ -80,9 +79,6 @@ cat > "$STAGE/_headers" <<'HEADERS'
 
 /assets/*
   Cache-Control: public, max-age=31536000, immutable
-
-/znaki/*
-  Cache-Control: public, max-age=604800
 HEADERS
 
 echo "Build: $BUILD_ID"

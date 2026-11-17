@@ -176,7 +176,6 @@ const APP = {
     _driveSpeed: 90,
     _userMarkerEl: null, markerRotation: 0,
     _lastMarkerPos: null, _currentDisplayAz: 0, _prevAnim: null,
-    _infoMarkers: [],
     _audioCache: new Map(),
     _commentEnabled: true,
     _lastShockTime: 0,
@@ -864,35 +863,11 @@ function updateRouteNameDisplay() {
     el.style.display = name ? 'block' : 'none';
 }
 
-function clearInfoMarkers() {
-    APP._infoMarkers.forEach(m => { if (APP.map) APP.map.removeChild(m); });
-    APP._infoMarkers = [];
-}
-
-function renderInfoMarkers() {
-    clearInfoMarkers();
-    if (!APP.map) return;
-    const idx = APP.navCurrentIndex;
-    const pt = APP.navPoints[idx];
-    if (!pt || !pt.info || !pt.info.length) return;
-    pt.info.forEach(inf => {
-        const img = inf.image;
-        if (!img) return;
-        const el = document.createElement('img');
-        el.src = `znaki/${img}`;
-        el.style.cssText = 'width:36px;height:36px;border:none;outline:none;display:block;margin:-18px 0 0 -18px;';
-        const marker = new ymaps3.YMapMarker({ coordinates: [inf.lon, inf.lat] }, el);
-        APP.map.addChild(marker);
-        APP._infoMarkers.push(marker);
-    });
-}
-
 function clearRoute() {
     stopDrive();
     APP._simMode = false;
     updateTiltState();
     removeRouteObjects();
-    clearInfoMarkers();
     APP.navPoints = [];
     APP.navCurrentIndex = 0;
     APP._routeTotalDistance = 0;
@@ -971,7 +946,6 @@ function renderRoutePoints() {
                 pt.placemark._onMap = true;
             }
         }
-        renderInfoMarkers();
     }
     updateHud();
 }

@@ -16,7 +16,6 @@ SITE_FILES=(
   instr_editor.html
   ico.png
   assets
-  znaki
 )
 
 STAGE="$(mktemp -d)"
