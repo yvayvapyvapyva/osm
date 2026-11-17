@@ -1872,6 +1872,7 @@ def _admin_delete(event, user):
         source="editor",
         entity_type="route",
         route_m=m_val,
+        folder_id=_text(_row_value(rows[0], "folder_id")),
         title=_text(_row_value(rows[0], "title")),
     )
     return auth.json_response(200, {"status": "deleted"})
@@ -2503,6 +2504,44 @@ def _parse_timestamp(raw):
     return parsed
 
 
+def _activity_folder_paths(items):
+    """Дополняет события путём папок до объекта.
+
+    Путь собирается из текущих папок. Для удалённого маршрута остаётся
+    `folder_id` из самого события, поэтому путь по возможности тоже виден.
+    """
+    route_ms = [
+        _text(item.get("route_m")).strip()
+        for item in items
+        if _text(item.get("route_m")).strip()
+    ]
+    roads = store.roads_meta_for(route_ms) if route_ms else {}
+    folder_rows = _rows(
+        store.get_pool().retry_operation_sync(execute_list_folders)
+    )
+    by_id = {
+        _text(_row_value(row, "folder_id")): _folder_dict(row)
+        for row in folder_rows
+    }
+
+    for item in items:
+        route_meta = roads.get(_text(item.get("route_m")).strip()) or {}
+        metadata = item.get("metadata")
+        if not isinstance(metadata, dict):
+            metadata = {}
+        folder_id = (
+            _text(route_meta.get("folder_id"))
+            or _text(item.get("folder_id"))
+            or _text(metadata.get("folder_id"))
+        )
+        chain = _folder_chain(by_id, folder_id)
+        if item.get("entity_type") == "folder" and chain:
+            chain = chain[:-1]
+        item["folder_path"] = " / ".join(
+            folder["name"] for folder in chain if folder.get("name")
+        )
+
+
 def _api_superadmin_activity(event):
     """Лента значимых действий. Только для админов из ADMIN_YANDEX_IDS."""
     admin, error = _superadmin_guard(event)
@@ -2527,6 +2566,10 @@ def _api_superadmin_activity(event):
         source=_text(params.get("source")).strip(),
         user_id=_text(params.get("user_id")).strip(),
     )
+    try:
+        _activity_folder_paths(items)
+    except Exception as exc:  # noqa: BLE001
+        print(f"[activity] folder paths failed: {exc}")
     for item in items:
         item["created_at"] = _date_iso(item.get("created_at"))
     return auth.json_response(200, {"items": items, "limit": limit})

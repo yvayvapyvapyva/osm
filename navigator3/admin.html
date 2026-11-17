@@ -593,6 +593,7 @@ tbody tr:last-child td { border-bottom: 0; }
                 (sub && item.user_id ? '<div class="user-sub">' + escapeHtml(sub) + '</div>' : '') + '</td>' +
                 '<td>' + escapeHtml(ACTIVITY_ACTIONS[item.action] || item.action) + '</td>' +
                 '<td>' + escapeHtml(activityObject(item)) +
+                (item.folder_path ? '<div class="user-sub">' + escapeHtml(item.folder_path) + '</div>' : '') +
                 (item.route_m && item.entity_type === 'route' ? '<div class="user-sub mono">' + escapeHtml(item.route_m) + '</div>' : '') + '</td>' +
                 '<td class="activity-details">' + escapeHtml(activityDetails(item)) + '</td>' +
                 '</tr>';

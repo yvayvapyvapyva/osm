@@ -936,6 +936,39 @@ def list_roads_meta():
     return meta
 
 
+def roads_meta_for(route_ms):
+    """Метаданные конкретных маршрутов: нужно для путей в журнале действий."""
+    values = [str(m) for m in (route_ms or []) if m]
+    if not values:
+        return {}
+    query = """
+        DECLARE $ms AS List<Utf8>;
+        SELECT m, title, folder_id, owner_user_id
+        FROM roads
+        WHERE m IN $ms;
+    """
+
+    def operation(session):
+        prepared = session.prepare(query)
+        return session.transaction().execute(
+            prepared, {"$ms": values}, commit_tx=True
+        )
+
+    rows = get_pool().retry_operation_sync(operation)[0].rows
+    meta = {}
+    for row in rows:
+        key = _text(getattr(row, "m", ""))
+        if not key:
+            continue
+        meta[key] = {
+            "m": key,
+            "title": _text(getattr(row, "title", "")),
+            "folder_id": _text(getattr(row, "folder_id", "")),
+            "owner_user_id": _text(getattr(row, "owner_user_id", "")),
+        }
+    return meta
+
+
 def get_road_meta(m_param):
     query = """
         DECLARE $m AS Utf8;
