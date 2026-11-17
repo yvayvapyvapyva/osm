@@ -1104,25 +1104,17 @@ def _signs_from_scene_data(data):
     return signs
 
 
-def _owner_root_for_user(owner_user_id):
-    return _owner_folder_id(_text(owner_user_id))
-
-
 def _owner_signs(owner_user_id):
-    """Знаки корневой папки владельца. Пустой сценарий — пустой список."""
-    root_folder_id = _owner_root_for_user(owner_user_id)
-    scene_id = store.get_folder_sign_scene(root_folder_id)
-    if not scene_id:
-        return []
-    scene = store.get_scene_by_id(scene_id)
-    if not scene:
+    """Знаки личной сцены владельца. Пустая сцена — пустой список."""
+    raw = store.get_owner_signs(owner_user_id)
+    if not raw:
         return []
     try:
-        data = json.loads(scene.get("data") or "{}")
+        data = json.loads(raw)
         if isinstance(data, str):
             data = json.loads(data)
     except Exception as exc:  # noqa: BLE001
-        print(f"[signs] scene json failed for {scene_id}: {exc}")
+        print(f"[signs] owner scene json failed: {exc}")
         return []
     if not isinstance(data, dict):
         return []
@@ -1836,6 +1828,97 @@ def _admin_folder_delete(event, user):
     return auth.json_response(200, {"status": "folder_deleted"})
 
 
+def _admin_signs_get(user):
+    owner_user_id = _text(user.get("user_id"))
+    raw = store.get_owner_signs(owner_user_id)
+    data = None
+    if raw:
+        try:
+            data = json.loads(raw)
+            if isinstance(data, str):
+                data = json.loads(data)
+        except Exception as exc:  # noqa: BLE001
+            print(f"[admin] signs get json failed: {exc}")
+    if not isinstance(data, dict):
+        data = {"version": 1, "camera": None, "markers": []}
+    return auth.json_response(200, {"data": data})
+
+
+def _admin_signs_save(event, user):
+    body = _body_json(event)
+    if body is None:
+        return auth.json_response(400, {"error": "invalid_json_body"})
+    data = body.get("data") if isinstance(body, dict) and "data" in body else body
+    if not isinstance(data, dict):
+        return auth.json_response(400, {"error": "invalid_signs_data"})
+
+    markers = data.get("markers")
+    if markers is None:
+        markers = []
+    if not isinstance(markers, list):
+        return auth.json_response(400, {"error": "invalid_markers"})
+    if len(markers) > 5000:
+        return auth.json_response(400, {"error": "too_many_markers"})
+
+    clean_markers = []
+    for marker in markers:
+        if not isinstance(marker, dict) or marker.get("kind") != "znak":
+            continue
+        code = _text(marker.get("code")).strip()
+        file_name = _text(marker.get("file")).strip()
+        if not code or not file_name:
+            continue
+        try:
+            lat = float(marker.get("lat"))
+            lon = float(marker.get("lon"))
+        except (TypeError, ValueError):
+            continue
+        if not (-90 <= lat <= 90 and -180 <= lon <= 180):
+            continue
+        try:
+            heading = float(marker.get("heading") or 0)
+        except (TypeError, ValueError):
+            heading = 0.0
+        plates = []
+        for plate in marker.get("plates") or []:
+            plate_code = _text(plate).strip()
+            if plate_code:
+                plates.append(plate_code)
+        clean_markers.append(
+            {
+                "kind": "znak",
+                "code": code,
+                "file": file_name,
+                "lat": lat,
+                "lon": lon,
+                "heading": heading,
+                "leg": bool(marker.get("leg")),
+                "plates": plates,
+            }
+        )
+
+    camera = data.get("camera")
+    payload_data = {
+        "version": 1,
+        "savedAt": dt.datetime.now(dt.timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z"),
+        "camera": camera if isinstance(camera, dict) else None,
+        "markers": clean_markers,
+    }
+    payload = json.dumps(payload_data, ensure_ascii=False)
+    if len(payload.encode("utf-8")) > 2_000_000:
+        return auth.json_response(400, {"error": "signs_too_large"})
+
+    try:
+        store.save_owner_signs(_text(user.get("user_id")), payload)
+    except Exception as exc:  # noqa: BLE001
+        print(f"[admin] signs save failed: {exc}")
+        return auth.json_response(500, {"error": "storage_failed"})
+
+    return auth.json_response(
+        200, {"ok": True, "savedAt": payload_data["savedAt"], "count": len(clean_markers)}
+    )
+
+
 def _handle_admin(event, user):
     action = _query(event).get("action") or "list"
 
@@ -1856,6 +1939,10 @@ def _handle_admin(event, user):
             return _admin_folder_save(event, user)
         if action == "folder_delete":
             return _admin_folder_delete(event, user)
+        if action == "signs_get":
+            return _admin_signs_get(user)
+        if action == "signs_save":
+            return _admin_signs_save(event, user)
         return auth.json_response(400, {"error": "unknown_action"})
     except ValueError as exc:
         return auth.json_response(

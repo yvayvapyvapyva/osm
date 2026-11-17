@@ -962,7 +962,7 @@ def get_road_meta(m_param):
     }
 
 # ---------------------------------------------------------------------------
-# Сцены PAD (таблица scene в YDB dbosm)
+# Личная сцена знаков владельца (редактор навигатора)
 # ---------------------------------------------------------------------------
 
 
@@ -972,65 +972,48 @@ def _utf8(value):
     return "" if value is None else str(value)
 
 
-def _scene_row(row):
-    return {
-        "name": _utf8(getattr(row, "name", "")),
-        "data": _utf8(getattr(row, "data", "")),
-        "id": _utf8(getattr(row, "id", "")),
-    }
-
-
-def get_scene_by_name(name):
-    query = """
-        DECLARE $name AS Utf8;
-        SELECT name, data, id FROM scene WHERE name = $name;
-    """
-
-    def operation(session):
-        prepared = session.prepare(query)
-        return session.transaction().execute(
-            prepared, {"$name": str(name)}, commit_tx=True
-        )
-
-    rows = get_pool().retry_operation_sync(operation)[0].rows
-    return _scene_row(rows[0]) if rows else None
-
-
-def get_scene_by_id(scene_id):
-    query = """
-        DECLARE $id AS Utf8;
-        SELECT name, data, id FROM scene WHERE id = $id LIMIT 1;
-    """
-
-    def operation(session):
-        prepared = session.prepare(query)
-        return session.transaction().execute(
-            prepared, {"$id": str(scene_id)}, commit_tx=True
-        )
-
-    rows = get_pool().retry_operation_sync(operation)[0].rows
-    return _scene_row(rows[0]) if rows else None
-
-
-
 # ---------------------------------------------------------------------------
-# Знаки, привязанные к корневой папке владельца
+# Личная сцена знаков владельца (редактор навигатора)
 # ---------------------------------------------------------------------------
 
 
-def get_folder_sign_scene(root_folder_id):
+def get_owner_signs(owner_user_id):
     query = """
-        DECLARE $root_folder_id AS Utf8;
-        SELECT scene_id FROM folder_signs WHERE root_folder_id = $root_folder_id;
+        DECLARE $owner_user_id AS Utf8;
+        SELECT data FROM owner_signs WHERE owner_user_id = $owner_user_id;
     """
 
     def operation(session):
         prepared = session.prepare(query)
         return session.transaction().execute(
-            prepared, {"$root_folder_id": str(root_folder_id)}, commit_tx=True
+            prepared, {"$owner_user_id": str(owner_user_id)}, commit_tx=True
         )
 
     rows = get_pool().retry_operation_sync(operation)[0].rows
     if not rows:
         return None
-    return _utf8(getattr(rows[0], "scene_id", "")) or None
+    return _utf8(getattr(rows[0], "data", "")) or None
+
+
+def save_owner_signs(owner_user_id, data):
+    query = """
+        DECLARE $owner_user_id AS Utf8;
+        DECLARE $data AS Utf8;
+        DECLARE $updated_at AS Timestamp;
+        UPSERT INTO owner_signs (owner_user_id, data, updated_at)
+        VALUES ($owner_user_id, $data, $updated_at);
+    """
+
+    def operation(session):
+        prepared = session.prepare(query)
+        return session.transaction().execute(
+            prepared,
+            {
+                "$owner_user_id": str(owner_user_id),
+                "$data": str(data),
+                "$updated_at": dt.datetime.now(dt.timezone.utc),
+            },
+            commit_tx=True,
+        )
+
+    get_pool().retry_operation_sync(operation)

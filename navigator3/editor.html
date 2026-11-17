@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
     <meta charset="utf-8">
-    <title>Редактор маршрутов</title>
+    <title>Редактор маршрутов и знаков</title>
     <link rel="icon" href="ico.png" type="image/png">
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
     <meta name="robots" content="noindex, nofollow">
@@ -41,6 +41,13 @@
                 <path d="M8.5 19H15a4 4 0 0 0 0-8H9a4 4 0 0 1 0-8h6"/>
             </svg>
             <span>Маршруты</span>
+        </button>
+        <button type="button" class="editor-top-nav-btn" data-tab="signs" role="tab">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M12 3 3 20h18L12 3Z"/>
+                <path d="M12 9v5M12 17h.01"/>
+            </svg>
+            <span>Знаки</span>
         </button>
         <button type="button" class="editor-top-nav-btn" data-tab="instruction" role="tab">
             <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -119,6 +126,37 @@
 <button class="btn-action" onclick="shareRouteFromSettings();">🔗 Ссылка</button>
 <button class="btn-action btn-danger" onclick="confirmDeleteRoute();">🗑️ Удалить</button>
 </div></div></div>
+<div id="signEditorPanel" class="sign-editor-panel" hidden>
+    <div class="sign-editor-head">
+        <div id="signGroupTabs" class="sign-group-tabs"></div>
+        <button type="button" id="signSearchToggle" class="sign-icon-btn" title="Поиск" aria-label="Поиск">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M16.5 16.5 21 21"/></svg>
+        </button>
+    </div>
+    <div id="signModeBar" class="sign-mode-bar" hidden>
+        <span>Добавить знак на столб</span>
+        <button type="button" id="signModeDone">Готово</button>
+    </div>
+    <div id="signSearchRow" class="sign-search-row" hidden>
+        <input id="signSearchInput" type="search" placeholder="Поиск по всем знакам" autocomplete="off">
+    </div>
+    <div id="signCatalogScroll" class="sign-catalog-scroll">
+        <div id="signCatalogGrid" class="sign-catalog-grid"></div>
+    </div>
+    <div class="sign-editor-footer">
+        <button type="button" id="signSaveBtn" class="sign-save-btn">Сохранить знаки</button>
+    </div>
+</div>
+
+<div id="signSelectedBar" class="sign-selected-bar" hidden>
+    <span id="signSelectedName" class="sign-selected-name"></span>
+    <button type="button" data-sign-action="rotate-left" title="Повернуть влево">↺</button>
+    <button type="button" data-sign-action="rotate-right" title="Повернуть вправо">↻</button>
+    <button type="button" data-sign-action="plate" title="Добавить знак на столб">＋</button>
+    <button type="button" data-sign-action="leg" title="Ножка">┃</button>
+    <button type="button" data-sign-action="delete" title="Удалить" class="danger">×</button>
+</div>
+
 <div id="confirmDeleteModal" onclick="if(event.target===this) toggleM('confirmDeleteModal')"><div class="modal-sheet modal-sheet-compact"><h3 class="modal-title">Удалить маршрут?</h3><p id="confirmDeleteText" class="modal-desc-text" style="font-size:16px;"></p><div class="modal-actions"><button class="btn-action flex-1" onclick="toggleM('confirmDeleteModal')">Отмена</button><button id="confirmDeleteRouteBtn" class="btn-action btn-danger flex-1" onclick="executeDeleteRoute()">Удалить</button></div></div></div>
 <div id="confirmDeletePointModal" onclick="if(event.target===this) toggleM('confirmDeletePointModal')"><div class="modal-sheet modal-sheet-compact"><h3 class="modal-title">Удалить точку?</h3><p class="modal-desc-text" style="font-size:16px;">Вы уверены, что хотите удалить эту точку?</p><div class="modal-actions"><button class="btn-action flex-1" onclick="toggleM('confirmDeletePointModal')">Отмена</button><button class="btn-action btn-danger flex-1" onclick="executeDeletePoint()">Удалить</button></div></div></div>
 <div id="shareModal" onclick="if(event.target===this) toggleM('shareModal')"><div class="modal-sheet modal-sheet-compact"><h3 class="modal-title">Поделиться маршрутом</h3><p class="modal-desc-text">При открытии ссылки откроется навигатор с этим маршрутом.</p><div style="display:flex;flex-direction:column;gap:12px"><button class="btn-action flex-1" onclick="copyShareLink()">Скопировать ссылку</button><button class="btn-action flex-1" onclick="toggleM('shareModal')">Отмена</button></div></div></div>
@@ -1007,6 +1045,11 @@ if (typeof maplibregl === 'undefined') {
 
     map.on('click', (e) => {
         const target = e.originalEvent?.target;
+        if (signsMode) {
+            if (target?.closest?.('.maplibregl-marker')) return;
+            selectEditorSign(null);
+            return;
+        }
         if (target?.closest?.('.maplibregl-marker, .maplibregl-ctrl')) return;
         if (!e.lngLat) return;
         const latLon = [f6(e.lngLat.lat), f6(e.lngLat.lng)];
@@ -2723,6 +2766,573 @@ window.copyShareLink = copyShareLink;
 window.openInstruction = openInstruction;
 window.closeInstruction = closeInstruction;
 
+/* ---------- Редактор знаков владельца ---------- */
+const EDITOR_SIGN_GROUPS = [
+    { id: 'warning', title: 'Предупреждающие', short: 'Предупр.' },
+    { id: 'priority', title: 'Приоритет', short: 'Приоритет' },
+    { id: 'prohibitory', title: 'Запрещающие', short: 'Запрещ.' },
+    { id: 'mandatory', title: 'Предписывающие', short: 'Предпис.' },
+    { id: 'special', title: 'Особые предписания', short: 'Особые' },
+    { id: 'information', title: 'Информационные', short: 'Информ.' },
+    { id: 'service', title: 'Сервис', short: 'Сервис' },
+    { id: 'additional', title: 'Таблички', short: 'Табл.' }
+];
+let signsMode = false;
+let signsLoaded = false;
+let signsLoading = false;
+let signsSaving = false;
+let signsDirty = false;
+let signScene = { version: 1, camera: null, markers: [] };
+let signMarkers = [];
+let selectedSign = null;
+let signGroup = 'all';
+let signSearch = '';
+let signPanelMode = 'place';
+let signCatalog = [];
+let signCatalogByCode = new Map();
+let signCatalogPromise = null;
+let signIdSeq = 0;
+
+function editorMetersPerPixel(lat) {
+    const zoom = Math.min(map ? map.getZoom() : 17, 21);
+    return 156543.03392 * Math.cos(lat * Math.PI / 180) / Math.pow(2, zoom + 1);
+}
+
+function signCatalogItemByCode(code) {
+    return signCatalogByCode.get(String(code || '')) || null;
+}
+
+function loadSignCatalog() {
+    if (signCatalogPromise) return signCatalogPromise;
+    signCatalogPromise = fetch('signs/catalog.json', { cache: 'force-cache' })
+        .then(response => response.ok ? response.json() : [])
+        .then(list => {
+            signCatalog = Array.isArray(list) ? list : [];
+            signCatalogByCode = new Map(
+                signCatalog.filter(item => item && item.code).map(item => [String(item.code), item])
+            );
+            return signCatalog;
+        })
+        .catch(e => {
+            console.warn('Не удалось загрузить каталог знаков:', e);
+            signCatalog = [];
+            signCatalogByCode = new Map();
+            return signCatalog;
+        });
+    return signCatalogPromise;
+}
+
+class EditorSignMarker {
+    constructor(data) {
+        this.data = {
+            id: data.id || ('s' + (++signIdSeq)),
+            code: data.code,
+            file: data.file,
+            lat: data.lat,
+            lon: data.lon,
+            heading: Number(data.heading) || 0,
+            leg: !!data.leg,
+            plates: Array.isArray(data.plates) ? data.plates.slice() : []
+        };
+        this.el = document.createElement('div');
+        this.el.className = 'ed-sign-marker';
+        this.rot = document.createElement('div');
+        this.rot.className = 'ed-sign-rot';
+        this.el.appendChild(this.rot);
+        this.leg = document.createElement('div');
+        this.leg.className = 'ed-sign-leg';
+        this.rot.appendChild(this.leg);
+        this.main = document.createElement('img');
+        this.main.className = 'ed-sign-main';
+        this.main.draggable = false;
+        this.main.alt = '';
+        this.rot.appendChild(this.main);
+        this.platesEl = document.createElement('div');
+        this.platesEl.className = 'ed-sign-plates';
+        this.rot.appendChild(this.platesEl);
+
+        this.main.addEventListener('pointerdown', e => {
+            e.stopPropagation();
+            selectEditorSign(this);
+        });
+        this.platesEl.addEventListener('pointerdown', e => {
+            e.stopPropagation();
+            selectEditorSign(this);
+        });
+
+        this.marker = new maplibregl.Marker({
+            element: this.el,
+            anchor: 'center',
+            draggable: true
+        }).setLngLat([this.data.lon, this.data.lat]);
+
+        this.marker.on('dragstart', () => selectEditorSign(this));
+        this.marker.on('dragend', () => {
+            const ll = this.marker.getLngLat();
+            this.data.lat = ll.lat;
+            this.data.lon = ll.lng;
+            markSignsDirty();
+        });
+
+        this.update(true);
+    }
+
+    addToMap() {
+        this.marker.addTo(map);
+        this.el.style.display = signsMode ? '' : 'none';
+    }
+
+    removeFromMap() {
+        this.marker.remove();
+    }
+
+    setVisible(visible) {
+        this.el.style.display = visible ? '' : 'none';
+    }
+
+    setSelected(selected) {
+        this.el.classList.toggle('selected', !!selected);
+    }
+
+    setRotation() {
+        const bearing = map ? map.getBearing() : 0;
+        this.rot.style.transform = `rotate(${this.data.heading - bearing}deg)`;
+    }
+
+    renderPlates() {
+        this.platesEl.replaceChildren();
+        for (const code of this.data.plates) {
+            const item = signCatalogItemByCode(code);
+            if (!item) continue;
+            const img = document.createElement('img');
+            img.className = 'ed-sign-plate';
+            img.draggable = false;
+            img.alt = item.title || code;
+            img.dataset.code = code;
+            img.src = 'signs/' + item.file;
+            img.addEventListener('pointerdown', e => {
+                e.stopPropagation();
+                selectEditorSign(this);
+            });
+            this.platesEl.appendChild(img);
+        }
+        this.update(false);
+    }
+
+    update(rebuildPlates) {
+        const item = signCatalogItemByCode(this.data.code);
+        const mainFile = item ? item.file : this.data.file;
+        if (this.main.dataset.file !== mainFile) {
+            this.main.dataset.file = mainFile;
+            this.main.src = 'signs/' + mainFile;
+        }
+        if (rebuildPlates) this.renderPlates();
+
+        const mpp = editorMetersPerPixel(this.data.lat);
+        const realPx = Math.max(1, 3 / mpp);
+        const maxPx = Math.max(15, realPx);
+        const aspect = item ? (Number(item.w) || 1) / (Number(item.h) || 1) : 1;
+        let mainW, mainH;
+        if (aspect >= 1) { mainW = maxPx; mainH = maxPx / aspect; }
+        else { mainH = maxPx; mainW = maxPx * aspect; }
+        this.main.style.width = mainW + 'px';
+        this.main.style.height = mainH + 'px';
+
+        const gap = 2;
+        let plateTop = mainH / 2 + gap;
+        let maxPlateW = 0;
+        let stackBottom = mainH / 2;
+        const plateImgs = Array.from(this.platesEl.children);
+        plateImgs.forEach(img => {
+            const plateItem = signCatalogItemByCode(img.dataset.code);
+            if (!plateItem) return;
+            const a = (Number(plateItem.w) || 1) / (Number(plateItem.h) || 1);
+            let w, h;
+            if (a >= 1) { w = maxPx; h = maxPx / a; }
+            else { h = maxPx; w = maxPx * a; }
+            img.style.width = w + 'px';
+            img.style.height = h + 'px';
+            maxPlateW = Math.max(maxPlateW, w);
+            stackBottom = plateTop + h;
+            plateTop += h + gap;
+        });
+        this.platesEl.style.top = (mainH / 2 + gap) + 'px';
+        this.platesEl.style.width = Math.max(1, maxPlateW) + 'px';
+
+        if (this.data.leg) {
+            const legW = Math.max(1.2, realPx * 0.09);
+            const poleHeight = Math.max(1, stackBottom + realPx * 0.6);
+            this.leg.style.display = '';
+            this.leg.style.width = legW + 'px';
+            this.leg.style.height = poleHeight + 'px';
+            this.leg.style.boxShadow = '0 0 0 ' + (legW * 0.28) + 'px #fff';
+        } else {
+            this.leg.style.display = 'none';
+        }
+        this.setRotation();
+    }
+
+    serialize() {
+        return {
+            kind: 'znak',
+            code: this.data.code,
+            file: this.data.file,
+            lat: this.data.lat,
+            lon: this.data.lon,
+            heading: this.data.heading,
+            leg: this.data.leg,
+            plates: this.data.plates.slice()
+        };
+    }
+}
+
+function bindSignMapEvents() {
+    if (!map || map._signEditorBound) return;
+    map._signEditorBound = true;
+    map.on('zoom', () => signMarkers.forEach(marker => marker.update(false)));
+    map.on('rotate', () => signMarkers.forEach(marker => marker.setRotation()));
+}
+
+function markSignsDirty() {
+    signsDirty = true;
+    const btn = document.getElementById('signSaveBtn');
+    if (btn) btn.textContent = 'Сохранить знаки •';
+}
+
+function resetSignsDirty() {
+    signsDirty = false;
+    const btn = document.getElementById('signSaveBtn');
+    if (btn) btn.textContent = 'Сохранить знаки';
+}
+
+function selectEditorSign(marker) {
+    if (selectedSign === marker) {
+        updateSignSelectionUi();
+        return;
+    }
+    if (selectedSign) selectedSign.setSelected(false);
+    selectedSign = marker || null;
+    if (selectedSign) selectedSign.setSelected(true);
+    updateSignSelectionUi();
+}
+
+function updateSignSelectionUi() {
+    const bar = document.getElementById('signSelectedBar');
+    const name = document.getElementById('signSelectedName');
+    if (!bar) return;
+    bar.hidden = !signsMode || !selectedSign;
+    if (!selectedSign) return;
+    const item = signCatalogItemByCode(selectedSign.data.code);
+    name.textContent = item ? (item.code + ' · ' + (item.title || '')) : selectedSign.data.code;
+    const legBtn = bar.querySelector('[data-sign-action="leg"]');
+    if (legBtn) legBtn.classList.toggle('active', !!selectedSign.data.leg);
+    const plateBtn = bar.querySelector('[data-sign-action="plate"]');
+    if (plateBtn) plateBtn.classList.toggle('active', signPanelMode === 'plate');
+}
+
+function renderSignGroupTabs(container, activeGroup, onSelect) {
+    if (!container) return;
+    container.replaceChildren();
+    EDITOR_SIGN_GROUPS.forEach(group => {
+        const first = signCatalog.find(item => item.group === group.id);
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'sign-group-tab' + (activeGroup === group.id ? ' active' : '');
+        btn.title = group.title;
+        const img = document.createElement('img');
+        if (first) img.src = 'signs/' + first.file;
+        img.alt = '';
+        const label = document.createElement('span');
+        label.textContent = group.short;
+        btn.append(img, label);
+        btn.addEventListener('click', () => onSelect(group.id));
+        container.appendChild(btn);
+    });
+}
+
+function filteredEditorSigns() {
+    const query = signSearch.toLocaleLowerCase('ru-RU');
+    if (query) {
+        return signCatalog.filter(item => {
+            const hay = (item.code + ' ' + (item.title || '')).toLocaleLowerCase('ru-RU');
+            return hay.includes(query);
+        });
+    }
+    if (signGroup === 'all') return signCatalog;
+    return signCatalog.filter(item => item.group === signGroup);
+}
+
+function renderSignCatalogGrid() {
+    const grid = document.getElementById('signCatalogGrid');
+    if (!grid) return;
+    grid.replaceChildren();
+    const items = filteredEditorSigns();
+    if (!items.length) {
+        const empty = document.createElement('div');
+        empty.className = 'sign-empty';
+        empty.textContent = 'Ничего не найдено';
+        empty.style.cssText = 'width:100%;padding:20px;text-align:center;color:var(--text-muted);font-size:13px;';
+        grid.appendChild(empty);
+        return;
+    }
+    const activePlates = selectedSign ? new Set(selectedSign.data.plates) : new Set();
+    items.forEach(item => {
+        const cell = document.createElement('div');
+        cell.className = 'sign-cell';
+        if (signPanelMode === 'plate' && activePlates.has(item.code)) cell.classList.add('active');
+        cell.title = item.code + ' — ' + (item.title || '');
+        const img = document.createElement('img');
+        img.src = 'signs/' + item.file;
+        img.alt = '';
+        img.loading = 'lazy';
+        cell.appendChild(img);
+        cell.addEventListener('click', () => {
+            if (signPanelMode === 'plate') {
+                togglePlateForSelected(item);
+            } else {
+                placeEditorSign(item);
+            }
+        });
+        grid.appendChild(cell);
+    });
+}
+
+function renderSignCatalog() {
+    renderSignGroupTabs(
+        document.getElementById('signGroupTabs'),
+        signGroup,
+        group => {
+            signGroup = group;
+            signSearch = '';
+            const input = document.getElementById('signSearchInput');
+            if (input) input.value = '';
+            renderSignCatalog();
+        }
+    );
+    renderSignCatalogGrid();
+}
+
+function signPlacementCenter() {
+    const container = map.getContainer();
+    const panel = document.getElementById('signEditorPanel');
+    const panelH = panel && !panel.hidden ? panel.getBoundingClientRect().height : 0;
+    const x = container.clientWidth / 2;
+    // Ставим знак в центр видимой части карты, не скрытой нижней панелью.
+    const y = Math.max(48, (container.clientHeight - panelH) / 2);
+    return map.unproject([x, y]);
+}
+
+function placeEditorSign(item) {
+    if (!item || !map) return;
+    const center = signPlacementCenter();
+    const marker = new EditorSignMarker({
+        id: 's' + (++signIdSeq),
+        code: item.code,
+        file: item.file,
+        lat: center.lat,
+        lon: center.lng,
+        heading: map.getBearing(),
+        leg: false,
+        plates: []
+    });
+    marker.addToMap();
+    signMarkers.push(marker);
+    selectEditorSign(marker);
+    markSignsDirty();
+}
+
+function togglePlateForSelected(item) {
+    if (!selectedSign || !item) return;
+    const plates = selectedSign.data.plates;
+    const index = plates.findIndex(code => code === item.code);
+    if (index >= 0) plates.splice(index, 1);
+    else plates.push(item.code);
+    selectedSign.renderPlates();
+    markSignsDirty();
+    renderSignCatalogGrid();
+}
+
+function setSignPanelMode(mode) {
+    signPanelMode = mode === 'plate' ? 'plate' : 'place';
+    const bar = document.getElementById('signModeBar');
+    if (bar) bar.hidden = signPanelMode !== 'plate';
+    const plateBtn = document.querySelector('#signSelectedBar [data-sign-action="plate"]');
+    if (plateBtn) plateBtn.classList.toggle('active', signPanelMode === 'plate');
+    renderSignCatalogGrid();
+}
+
+function renderAllSigns() {
+    signMarkers.forEach(marker => marker.removeFromMap());
+    signMarkers = [];
+    selectedSign = null;
+    for (const data of signScene.markers || []) {
+        const marker = new EditorSignMarker(data);
+        marker.addToMap();
+        signMarkers.push(marker);
+    }
+    updateSignSelectionUi();
+}
+
+async function ensureSignsLoaded() {
+    if (signsLoaded || signsLoading) return;
+    signsLoading = true;
+    const grid = document.getElementById('signCatalogGrid');
+    if (grid) grid.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text-muted);font-size:13px;">Загрузка знаков…</div>';
+    try {
+        const [, response] = await Promise.all([
+            loadSignCatalog(),
+            callAdminApi('signs_get')
+        ]);
+        const data = response && response.data;
+        signScene = (data && typeof data === 'object')
+            ? { version: 1, camera: data.camera || null, markers: Array.isArray(data.markers) ? data.markers : [] }
+            : { version: 1, camera: null, markers: [] };
+        signsLoaded = true;
+        bindSignMapEvents();
+        renderAllSigns();
+        renderSignCatalog();
+        resetSignsDirty();
+        const camera = signScene.camera;
+        if (camera && Array.isArray(camera.center) && camera.center.length >= 2 && Number.isFinite(camera.zoom)) {
+            map.jumpTo({ center: camera.center, zoom: camera.zoom });
+        }
+    } catch (e) {
+        console.warn('Не удалось загрузить знаки:', e);
+        showToast('Не удалось загрузить знаки: ' + e.message, 'error', 5000);
+        exitSignsMode(true);
+    } finally {
+        signsLoading = false;
+    }
+}
+
+function enterSignsMode() {
+    if (signsMode) return;
+    if (typeof isAdd !== 'undefined' && isAdd) stopAdd();
+    if (typeof isDrawing !== 'undefined' && isDrawing) stopDrawingMode();
+    if (isOpenSignModal('settingsModal')) toggleM('settingsModal');
+    if (isOpenSignModal('mapSettingsModal')) toggleM('mapSettingsModal');
+    if (isOpenSignModal('instructionModal')) closeInstruction();
+    signsMode = true;
+    document.body.classList.add('signs-mode');
+    document.getElementById('signEditorPanel').hidden = false;
+    document.getElementById('signSaveBtn').hidden = false;
+    document.getElementById('signSaveBtn').disabled = false;
+    signMarkers.forEach(marker => marker.setVisible(true));
+    if (window.setEditorTab) window.setEditorTab('signs');
+    if (signsLoaded) renderSignCatalog();
+    ensureSignsLoaded();
+}
+
+function exitSignsMode(force) {
+    if (!signsMode) return true;
+    if (!force && signsDirty) {
+        if (!window.confirm('Несохранённые изменения знаков будут потеряны. Выйти?')) return false;
+    }
+    signsMode = false;
+    document.body.classList.remove('signs-mode');
+    document.getElementById('signEditorPanel').hidden = true;
+    document.getElementById('signSelectedBar').hidden = true;
+    document.getElementById('signSaveBtn').hidden = true;
+    document.getElementById('signModeBar').hidden = true;
+    signPanelMode = 'place';
+    signMarkers.forEach(marker => marker.setVisible(false));
+    selectEditorSign(null);
+    if (window.syncEditorTabs) window.syncEditorTabs();
+    return true;
+}
+
+function isOpenSignModal(id) {
+    const el = document.getElementById(id);
+    if (!el) return false;
+    return el.classList.contains('visible') || el.style.display === 'flex';
+}
+
+async function saveOwnerSigns() {
+    if (!signsLoaded || signsSaving || !map) return;
+    const btn = document.getElementById('signSaveBtn');
+    signsSaving = true;
+    if (btn) { btn.disabled = true; btn.textContent = 'Сохранение…'; }
+    try {
+        const center = map.getCenter();
+        const payload = {
+            version: 1,
+            camera: {
+                center: [center.lng, center.lat],
+                zoom: map.getZoom(),
+                azimuth: -map.getBearing() * Math.PI / 180
+            },
+            markers: signMarkers.map(marker => marker.serialize())
+        };
+        const result = await callAdminApi('signs_save', {}, { data: payload });
+        signScene = payload;
+        resetSignsDirty();
+        showToast('Знаки сохранены' + (result && result.count != null ? ' · ' + result.count : ''), 'success', 2500);
+    } catch (e) {
+        console.warn('Не удалось сохранить знаки:', e);
+        showToast('Не удалось сохранить знаки: ' + e.message, 'error', 5000);
+    } finally {
+        signsSaving = false;
+        if (btn) { btn.disabled = false; btn.textContent = signsDirty ? 'Сохранить знаки •' : 'Сохранить знаки'; }
+    }
+}
+
+function bindSignEditorUi() {
+    const saveBtn = document.getElementById('signSaveBtn');
+    if (saveBtn) saveBtn.addEventListener('click', saveOwnerSigns);
+
+    const searchToggle = document.getElementById('signSearchToggle');
+    if (searchToggle) searchToggle.addEventListener('click', () => {
+        const row = document.getElementById('signSearchRow');
+        const input = document.getElementById('signSearchInput');
+        const visible = row.hidden;
+        row.hidden = !visible;
+        searchToggle.classList.toggle('active', visible);
+        if (visible) {
+            input.focus();
+        } else {
+            input.value = '';
+            signSearch = '';
+            renderSignCatalogGrid();
+        }
+    });
+
+    const searchInput = document.getElementById('signSearchInput');
+    if (searchInput) searchInput.addEventListener('input', () => {
+        signSearch = searchInput.value.trim();
+        renderSignCatalogGrid();
+    });
+
+    const modeDone = document.getElementById('signModeDone');
+    if (modeDone) modeDone.addEventListener('click', () => setSignPanelMode('place'));
+
+    const selectedBar = document.getElementById('signSelectedBar');
+    if (selectedBar) selectedBar.addEventListener('click', event => {
+        const btn = event.target.closest('[data-sign-action]');
+        if (!btn || !selectedSign) return;
+        const action = btn.dataset.signAction;
+        if (action === 'rotate-left' || action === 'rotate-right') {
+            selectedSign.data.heading += action === 'rotate-left' ? -15 : 15;
+            selectedSign.setRotation();
+            markSignsDirty();
+        } else if (action === 'plate') {
+            setSignPanelMode(signPanelMode === 'plate' ? 'place' : 'plate');
+            updateSignSelectionUi();
+        } else if (action === 'leg') {
+            selectedSign.data.leg = !selectedSign.data.leg;
+            selectedSign.update(false);
+            markSignsDirty();
+            updateSignSelectionUi();
+        } else if (action === 'delete') {
+            selectedSign.removeFromMap();
+            signMarkers = signMarkers.filter(marker => marker !== selectedSign);
+            selectEditorSign(null);
+            markSignsDirty();
+        }
+    });
+}
+
+bindSignEditorUi();
+
 /* Верхняя панель-пилюля: «Маршруты», «Инструкция», «Настройки» */
 (function () {
     const nav = document.getElementById('editorTopNav');
@@ -2746,11 +3356,15 @@ window.closeInstruction = closeInstruction;
     };
 
     const sync = () => {
-        if (isOpen('settingsModal')) setActive('routes');
+        if (signsMode) setActive('signs');
+        else if (isOpen('settingsModal')) setActive('routes');
         else if (isOpen('mapSettingsModal')) setActive('settings');
         else if (isOpen('instructionModal')) setActive('instruction');
         else setActive('');
     };
+
+    window.syncEditorTabs = sync;
+    window.setEditorTab = setActive;
 
     const closeOthers = keep => {
         if (keep !== 'routes' && isOpen('settingsModal')) toggleM('settingsModal');
@@ -2762,6 +3376,16 @@ window.closeInstruction = closeInstruction;
         const btn = event.target.closest('.editor-top-nav-btn');
         if (!btn || !nav.contains(btn)) return;
         const tab = btn.dataset.tab;
+        if (tab === 'signs') {
+            if (signsMode) {
+                exitSignsMode();
+            } else {
+                closeOthers('signs');
+                enterSignsMode();
+            }
+            return;
+        }
+        if (signsMode && !exitSignsMode()) return;
         if (tab === 'routes') {
             if (isOpen('settingsModal')) toggleM('settingsModal');
             else { closeOthers('routes'); openSettingsModal(); }

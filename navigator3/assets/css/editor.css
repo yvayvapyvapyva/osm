@@ -2735,3 +2735,137 @@ select,
         animation: none;
     }
 }
+
+/* ============================================
+   Редактор знаков
+   ============================================ */
+.sign-editor-panel {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 16000;
+    height: min(42vh, 380px);
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 10px 12px calc(10px + env(safe-area-inset-bottom));
+    background: var(--surface);
+    border-top: 1px solid var(--line-surface);
+    border-radius: 20px 20px 0 0;
+    box-shadow: var(--shadow-panel);
+    box-sizing: border-box;
+}
+.sign-editor-panel[hidden] { display: none; }
+.sign-editor-head { display: flex; align-items: center; gap: 8px; flex-shrink: 0; min-width: 0; }
+.sign-group-tabs {
+    flex: 1; min-width: 0; display: flex; gap: 5px;
+    overflow-x: auto; overflow-y: hidden; padding: 2px;
+    scrollbar-width: none; -webkit-overflow-scrolling: touch;
+}
+.sign-group-tabs::-webkit-scrollbar { display: none; }
+.sign-group-tab {
+    flex: 0 0 auto; width: 50px; padding: 5px 3px 4px;
+    border: 1px solid var(--line); border-radius: 11px;
+    background: var(--fill-1); color: var(--text-muted);
+    font: inherit; cursor: pointer; display: flex; flex-direction: column;
+    align-items: center; gap: 2px; touch-action: manipulation;
+}
+.sign-group-tab img { width: 28px; height: 28px; object-fit: contain; display: block; pointer-events: none; }
+.sign-group-tab span { font-size: 9px; font-weight: 700; line-height: 1.05; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.sign-group-tab.active { background: var(--green-tint-strong); border-color: var(--green); color: var(--text); }
+.sign-icon-btn {
+    flex-shrink: 0; width: 40px; height: 40px; border-radius: 11px;
+    border: 1px solid var(--line); background: var(--fill-1); color: var(--text);
+    display: flex; align-items: center; justify-content: center; padding: 0; cursor: pointer;
+    touch-action: manipulation;
+}
+.sign-icon-btn.active { background: var(--green-tint-strong); border-color: var(--green); }
+.sign-search-row { flex-shrink: 0; }
+.sign-search-row[hidden] { display: none; }
+.sign-search-row input {
+    width: 100%; box-sizing: border-box; padding: 9px 11px;
+    border-radius: 10px; border: 1px solid var(--line-strong);
+    background: var(--fill-1); color: var(--text); font: inherit;
+    font-size: 14px; outline: none;
+}
+.sign-search-row input:focus { border-color: var(--green); }
+.sign-catalog-scroll {
+    flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden;
+    -webkit-overflow-scrolling: touch; overscroll-behavior: contain;
+}
+.sign-catalog-grid { display: flex; flex-wrap: wrap; gap: 6px; align-content: flex-start; }
+.sign-cell {
+    width: 58px; height: 58px; box-sizing: border-box;
+    display: flex; align-items: center; justify-content: center;
+    border: 1px solid var(--line); border-radius: 10px;
+    background: var(--fill-1); cursor: pointer; flex: 0 0 auto;
+    touch-action: pan-y; padding: 4px;
+}
+.sign-cell img { max-width: 48px; max-height: 48px; object-fit: contain; display: block; pointer-events: none; }
+.sign-cell.active { border-color: var(--green); background: var(--green-tint-strong); }
+.sign-editor-footer { flex-shrink: 0; display: flex; justify-content: center; }
+.sign-save-btn {
+    min-width: 180px; padding: 10px 20px; border-radius: 100px;
+    border: 1px solid var(--green-line); background: var(--green); color: #fff;
+    font: inherit; font-size: 14px; font-weight: 700; cursor: pointer;
+    touch-action: manipulation; box-shadow: var(--shadow-float);
+}
+.sign-save-btn:disabled { opacity: 0.55; cursor: default; }
+.sign-mode-bar {
+    flex-shrink: 0; display: flex; align-items: center; justify-content: space-between;
+    gap: 10px; padding: 6px 8px; border-radius: 10px;
+    background: var(--green-tint-strong); color: var(--text); font-size: 13px; font-weight: 600;
+}
+.sign-mode-bar[hidden] { display: none; }
+.sign-mode-bar button {
+    border: 1px solid var(--green-line); background: var(--surface); color: var(--text);
+    border-radius: 8px; padding: 5px 10px; font: inherit; font-size: 12px; font-weight: 700; cursor: pointer;
+}
+.sign-selected-bar {
+    position: fixed; left: 50%; z-index: 16001;
+    bottom: calc(min(42vh, 380px) + 8px);
+    transform: translateX(-50%);
+    display: flex; align-items: center; gap: 6px;
+    padding: 6px 8px; border-radius: 100px;
+    background: var(--surface); border: 1px solid var(--line-surface);
+    box-shadow: var(--shadow-float); max-width: calc(100vw - 24px);
+}
+.sign-selected-bar[hidden] { display: none; }
+.sign-selected-name { font-size: 12px; font-weight: 700; color: var(--text-muted); max-width: 110px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding-left: 4px; }
+.sign-selected-bar button {
+    width: 38px; height: 38px; border-radius: 50%; border: 1px solid var(--line);
+    background: var(--fill-1); color: var(--text); font-size: 20px; line-height: 1;
+    display: flex; align-items: center; justify-content: center; cursor: pointer; padding: 0;
+    touch-action: manipulation;
+}
+.sign-selected-bar button.active { background: var(--green-tint-strong); border-color: var(--green); }
+.sign-selected-bar button.danger { color: var(--danger); }
+.sign-selected-bar button[data-sign-action="leg"] { font-size: 22px; }
+
+body.signs-mode #addMarkerBtn,
+body.signs-mode #gpsModeBtn,
+body.signs-mode #listPointsBtn,
+body.signs-mode #routeSettingsBtn,
+body.signs-mode #floatingSave,
+body.signs-mode #routeNameDisplay,
+body.signs-mode [data-point-id] { display: none !important; }
+
+/* Маркеры знаков на карте редактора */
+.ed-sign-marker { width: 0; height: 0; position: relative; z-index: 5; }
+.ed-sign-rot { position: absolute; left: 0; top: 0; transform-origin: 0 0; will-change: transform; }
+.ed-sign-main, .ed-sign-plate { display: block; max-width: none; pointer-events: auto; cursor: grab; -webkit-user-drag: none; user-select: none; }
+.ed-sign-main { position: absolute; left: 0; top: 0; transform: translate(-50%, -50%); z-index: 2; }
+.ed-sign-plates {
+    position: absolute; left: 0; z-index: 2;
+    transform: translateX(-50%); display: flex; flex-direction: column;
+    align-items: center; gap: 2px;
+}
+.ed-sign-leg {
+    position: absolute; left: 0; top: 0; transform: translateX(-50%);
+    z-index: 1; border-radius: 2px;
+    background: linear-gradient(90deg, #6F7378 0%, #B8BCC2 35%, #8E9298 60%, #6F7378 100%);
+    pointer-events: none;
+}
+.ed-sign-marker.selected .ed-sign-main,
+.ed-sign-marker.selected .ed-sign-plate { outline: 2px solid var(--green); outline-offset: 2px; border-radius: 4px; }
