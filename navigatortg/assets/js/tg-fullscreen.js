@@ -18,11 +18,18 @@
     function applyInsets(app) {
         const safe = app.safeAreaInset || {};
         const content = app.contentSafeAreaInset || {};
-        const top = Math.max(Number(safe.top) || 0, Number(content.top) || 0);
+        const fullscreen = !!app.isFullscreen;
+
+        let top = Math.max(Number(safe.top) || 0, Number(content.top) || 0);
+        // В полноэкранном режиме Telegram рисует поверх приложения свои
+        // кнопки «закрыть/свернуть». Если клиент не прислал contentSafeAreaInset,
+        // оставляем запас, иначе верхняя панель уходит под них.
+        if (fullscreen && top < 60) top = 60;
+
         const bottom = Math.max(Number(safe.bottom) || 0, Number(content.bottom) || 0);
         root.style.setProperty('--tg-safe-top', top + 'px');
         root.style.setProperty('--tg-safe-bottom', bottom + 'px');
-        root.classList.toggle('tg-fullscreen', !!app.isFullscreen);
+        root.classList.toggle('tg-fullscreen', fullscreen);
     }
 
     function apply() {
