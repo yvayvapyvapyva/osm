@@ -275,6 +275,9 @@ const APP = {
     _signCatalogLoaded: false,
     _signImageCache: new Map(),
     _signIconDefs: [],
+    _signIconCacheBySigns: new WeakMap(),
+    _signBuildPromises: new WeakMap(),
+    _signIconGen: 0,
     _signFeatures: null,
     _signSourceData: null
 };
@@ -1918,11 +1921,15 @@ async function buildSignIcons(signs) {
 
     const defs = [];
     const iconByCombo = new Map();
+    const generation = ++APP._signIconGen;
     let index = 0;
     for (const combo of combos.values()) {
         const canvas = buildSignComposite(combo, images);
         if (!canvas) continue;
-        const iconId = 'pad-sign-' + index++;
+        // Уникальный ID на каждую сборку: у разных владельцев могут быть
+        // одинаковые номера комбинаций, и старые картинки не должны
+        // подменять новые.
+        const iconId = 'pad-sign-' + generation + '-' + index++;
         defs.push({ iconId, canvas });
         iconByCombo.set(combo.key, iconId);
     }
@@ -2061,6 +2068,31 @@ function clearSigns() {
     }
 }
 
+function buildSignsCached(signs) {
+    if (APP._signIconCacheBySigns.has(signs)) {
+        return Promise.resolve(APP._signIconCacheBySigns.get(signs));
+    }
+    if (APP._signBuildPromises.has(signs)) {
+        return APP._signBuildPromises.get(signs);
+    }
+    const promise = (async () => {
+        await ensureSignCatalog();
+        const built = await buildSignIcons(signs);
+        APP._signIconCacheBySigns.set(signs, built);
+        return built;
+    })().finally(() => {
+        APP._signBuildPromises.delete(signs);
+    });
+    APP._signBuildPromises.set(signs, promise);
+    return promise;
+}
+
+function preloadOwnerSigns(signs) {
+    if (!Array.isArray(signs) || !signs.length) return;
+    buildSignsCached(signs).catch(e => console.warn('Не удалось подготовить знаки:', e));
+}
+window.preloadOwnerSigns = preloadOwnerSigns;
+
 async function loadSignsForCurrentRoute() {
     const routeM = (typeof MenuModule !== 'undefined' && MenuModule.currentRoute) ? MenuModule.currentRoute : '';
     if (!routeM) {
@@ -2076,15 +2108,13 @@ async function loadSignsForCurrentRoute() {
     }
 
     const seq = ++APP._signsSeq;
+    let built;
     try {
-        await ensureSignCatalog();
+        built = await buildSignsCached(signs);
     } catch (e) {
-        console.warn('Каталог знаков недоступен:', e);
+        console.warn('Не удалось подготовить знаки:', e);
         return;
     }
-    if (seq !== APP._signsSeq) return;
-
-    const built = await buildSignIcons(signs);
     if (seq !== APP._signsSeq) return;
     APP._signsData = { signs };
     APP._signIconDefs = built.defs;

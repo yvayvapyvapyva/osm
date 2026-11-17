@@ -198,7 +198,12 @@ const MenuModule = {
         }
 
         this._ownerBundles.set(rootId, bundle);
-        this._ownerSigns.set(rootId, Array.isArray(bundle.signs) ? bundle.signs : []);
+        const ownerSigns = Array.isArray(bundle.signs) ? bundle.signs : [];
+        this._ownerSigns.set(rootId, ownerSigns);
+        // Готовим иконки знаков заранее, пока пользователь выбирает маршрут.
+        if (ownerSigns.length && typeof window.preloadOwnerSigns === 'function') {
+            window.preloadOwnerSigns(ownerSigns);
+        }
         this._folders = Array.isArray(bundle.folders) ? bundle.folders.slice() : [];
         if (!this._folders.some(folder => folder.folder_id === rootId) && bundle.owner) {
             this._folders.unshift({
