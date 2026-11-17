@@ -7,8 +7,8 @@
 Что уже есть:
 
 - вход через Яндекс ID (OAuth + PKCE, сессия в YDB);
-- каталог с геометрией: `/api/catalog` отдаёт видимые маршруты сразу с `data`,
-  запасной путь — `/api/route?m=...`;
+- каталог по владельцам: `/api/owners` отдаёт корневые папки и счётчики,
+  `/api/catalog?owner=...` — маршруты владельца с геометрией и знаками;
 - дерево папок как отдельная сущность в БД;
 - все видимые маршруты открыты без входа;
 - в публичном меню видимые маршруты сгруппированы по корневой папке владельца;
@@ -52,8 +52,10 @@ https://<домен-шлюза>/
   /admin                  → бакет osmn-nav: admin.html
   /api/health             → функция osmn3
   /api/me                 → функция osmn3
-  /api/catalog            → функция osmn3
-  /api/signs              → функция osmn3 (дорожные знаки из сцены PAD)
+  /api/owners             → функция osmn3 (корневые папки владельцев и счётчики)
+  /api/catalog?owner=...  → функция osmn3 (маршруты и знаки владельца)
+  /api/catalog?m=...      → функция osmn3 (пакет владельца по маршруту)
+  /api/signs?owner=...    → функция osmn3 (только знаки владельца)
   /api/route?m=...        → функция osmn3
   /api/admin?action=...   → функция osmn3
   /auth/yandex/start      → функция osmn3
@@ -94,6 +96,7 @@ navigator3/
 │   └── requirements.txt
 ├── migrations/
 │   ├── add_route_ownership.py  # владельцы routes/folders и индексы
+│   ├── add_folder_signs.py     # привязка знаков к корневой папке
 │   └── drop_road_name.py       # удаление roads.name
 ├── scripts/
 │   └── build-static-deploy.js
@@ -157,7 +160,10 @@ owner_user_id Utf8         -- users.user_id владельца маршрута
 |---|---|---|
 | GET | `/api/health` | `{"status":"ok"}` |
 | GET | `/api/me` | `{"user":{...},"logout_token":"..."}` или 401 |
-| GET | `/api/catalog` | `{"folders":[...],"routes":[...],"user":...}`; у открытых маршрутов есть `data` |
+| GET | `/api/owners` | `{"owners":[{"root_folder_id","name","routes_count","premium_count"}]}` |
+| GET | `/api/catalog?owner=<root_folder_id>` | пакет владельца: `folders`, `routes`, `signs`; у открытых маршрутов есть `data` |
+| GET | `/api/catalog?m=<m>` | пакет владельца маршрута (для прямых ссылок) |
+| GET | `/api/signs?owner=<root_folder_id>` | `{"signs":[...]}` только знаки владельца |
 | GET | `/api/route?m=<m>` | маршрут с `data` |
 | GET | `/api/route/view?m=...` | отметка загрузки маршрута |
 | POST | `/api/admin?action=...` | операции редактора |
@@ -276,14 +282,31 @@ yc storage s3 cp navigator3/deploy-2files/signs/catalog.json \
 
 ## Дорожные знаки
 
-`GET /api/signs` читает сцену PAD `full` (ID `c5bk482x`) из таблицы `scene`
-в YDB `dbosm`. PAD пишет туда же, поэтому изменения сцены подхватываются
-при следующей загрузке навигатора без отдельного экспорта и деплоя.
+Знаки привязаны к корневой папке владельца маршрутов. Соответствие
+`root_folder_id → scene_id` хранится в таблице `folder_signs` в YDB `dbosm`.
+Для текущего владельца сцена PAD `full` (`c5bk482x`) привязана к его
+корневой папке.
+
+При старте навигатор больше не загружает знаки. Сначала запрашивается только
+`/api/owners` — корневые папки и количество маршрутов. При открытии папки
+владельца загружается один пакет `/api/catalog?owner=...`, в котором уже есть:
+
+- дерево папок владельца;
+- все его видимые маршруты;
+- геометрия открытых маршрутов;
+- знаки владельца.
+
+Пакет кэшируется в памяти до перезагрузки страницы: переключение между
+маршрутами одного владельца не делает новых запросов. Знаки показываются
+только после открытия маршрута. При открытии маршрута другого владельца
+старые знаки убираются, загружаются знаки нового владельца.
+
+Прямая ссылка `?m=<маршрут>` работает без предварительного открытия папки:
+`/api/catalog?m=...` находит владельца и отдаёт его пакет.
 
 Клиент строит из знаков слой MapLibre: основной знак, таблички и ножку.
 Картинки берутся из `pad/znaki/webp/`; при сборке они копируются в
 `deploy-2files/signs/webp/`, каталог — в `deploy-2files/signs/catalog.json`.
-
 Показ слоя можно отключить в настройках («Знаки»).
 
 ## Проверка
@@ -293,7 +316,9 @@ yc storage s3 cp navigator3/deploy-2files/signs/catalog.json \
 ```bash
 curl -i https://<домен>/api/health
 curl -i https://<домен>/api/me
-curl -i https://<домен>/api/catalog
+curl -i https://<домен>/api/owners
+curl -i 'https://<домен>/api/catalog?owner=<root_folder_id>'
+curl -i 'https://<домен>/api/catalog?m=<m>'
 curl -i 'https://<домен>/api/route?m=<m>'
 curl -i -X POST 'https://<домен>/api/admin?action=list' \
   -H 'Cookie: osm_sid=<сессионная-cookie>'
@@ -301,7 +326,8 @@ curl -i -X POST 'https://<домен>/api/admin?action=list' \
 
 Ожидается:
 
-- `/api/catalog` — 200, в ответе есть `folders`, у маршрутов нет `data`;
+- `/api/owners` — 200, в ответе есть корневые папки и счётчики;
+- `/api/catalog?owner=...` — 200, в ответе есть `folders`, `routes`, `signs`;
 - `/api/route?m=<m>` — 200 с `data` для видимого маршрута;
 - `/api/admin` без сессии — 401, с сессией Яндекс — список собственных маршрутов;
 

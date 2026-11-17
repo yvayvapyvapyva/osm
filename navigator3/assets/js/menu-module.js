@@ -20,6 +20,13 @@ const MenuModule = {
     _previewFetching: new Set(),
     _previewActive: false,
     _catalogLoaded: false,
+    _owners: [],
+    _ownersLoaded: false,
+    _ownerBundles: new Map(),
+    _routeOwners: new Map(),
+    _ownerSigns: new Map(),
+    _activeOwnerId: null,
+    API_OWNERS_URL: '/api/owners',
     API_CATALOG_URL: '/api/catalog',
     API_ROUTE_URL: '/api/route',
 
@@ -68,27 +75,48 @@ const MenuModule = {
         this.createModal();
         this.hide();
 
-        // Загружаем список маршрутов динамически
-        await this._loadRoutesList();
+        // На старте грузим только корневые папки владельцев и счётчики.
+        await this._loadOwners();
 
         // Проверяем параметр #m=<маршрут> в адресе
         this.checkUrlParam();
-
     },
 
-    /**
-     * Загрузка списка маршрутов из Яндекс-функции
-     */
-    async _loadRoutesList() {
+    async _loadOwners() {
         if (this._isFetchingRoutes) return;
         if (this._retryTimer) {
             clearTimeout(this._retryTimer);
             this._retryTimer = null;
         }
         this._isFetchingRoutes = true;
-        const container = document.getElementById('routesListContainer');
-        this._showListLoading();
-        const showLoadError = () => {
+        this._showListLoading('Загрузка владельцев...');
+        try {
+            const response = await fetch(this.API_OWNERS_URL, {
+                credentials: 'same-origin',
+                headers: { Accept: 'application/json' },
+                cache: 'no-store'
+            });
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            const payload = await response.json();
+            const owners = Array.isArray(payload && payload.owners) ? payload.owners : [];
+            this._owners = owners
+                .filter(owner => owner && owner.root_folder_id)
+                .map(owner => ({
+                    folder_id: String(owner.root_folder_id),
+                    parent_id: '',
+                    name: owner.name || 'Владелец',
+                    sort_order: 0,
+                    is_owner_root: true,
+                    ownerRootId: String(owner.root_folder_id),
+                    count: Number(owner.routes_count) || 0,
+                    premium_count: Number(owner.premium_count) || 0
+                }));
+            this._ownersLoaded = true;
+            this._routesLoaded = true;
+            this._showOwnersRoot();
+        } catch (e) {
+            console.warn('Не удалось загрузить список владельцев:', e);
+            const container = document.getElementById('routesListContainer');
             if (container) {
                 container.innerHTML = `
                     <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:30px;gap:12px;">
@@ -97,86 +125,146 @@ const MenuModule = {
                     </div>
                 `;
             }
-        };
-        const attempt = async () => {
-            try {
-                // Каталог грузим один раз: дерево папок, метаданные и
-                // геометрия всех открытых маршрутов. Переходы по папкам и
-                // открытие маршрута дальше работают из памяти.
-                if (!this._catalogLoaded) {
-                    await this._fetchFromAPI();
-                }
-                this._routesLoaded = true;
-                this._buildRoutesList();
-                return true;
-            } catch (e) {
-                console.warn('Не удалось загрузить каталог маршрутов:', e);
-                showLoadError();
-                return false;
-            }
-        };
-        const ok = await attempt();
-        if (!ok) {
-            this._isFetchingRoutes = false;
-            this._retryTimer = setTimeout(() => this._loadRoutesList(), 5000);
-        } else {
+            this._retryTimer = setTimeout(() => this._loadOwners(), 5000);
+        } finally {
             this._isFetchingRoutes = false;
         }
     },
 
-    /**
-     * Запрос к API за каталогом вместе с геометрией маршрутов.
-     *
-     * Сервер отдаёт дерево папок, метаданные и data открытых маршрутов.
-     * Дальше переходы по папкам и открытие маршрута идут из памяти.
-     */
-    async _fetchFromAPI() {
-        const response = await fetch(this.API_CATALOG_URL, {
+    _showOwnersRoot() {
+        this._activeOwnerId = null;
+        this._folderPath = [];
+        this._folders = this._owners.slice();
+        this._folderMap = new Map(
+            this._owners.map(folder => [folder.folder_id, folder])
+        );
+        this._folderCounts = new Map(
+            this._owners.map(folder => [folder.folder_id, folder.count || 0])
+        );
+        this._folderPremiumCounts = new Map(
+            this._owners.map(folder => [folder.folder_id, folder.premium_count || 0])
+        );
+        this._catalog = [];
+        this._routesLoaded = true;
+        this._buildRoutesList();
+    },
+
+    async _fetchOwnerBundle(kind, value) {
+        const param = kind === 'm' ? 'm' : 'owner';
+        const url = this.API_CATALOG_URL + '?' + param + '=' + encodeURIComponent(value);
+        const response = await fetch(url, {
             credentials: 'same-origin',
             headers: { Accept: 'application/json' },
             cache: 'no-store'
         });
-
         if (!response.ok) {
-            throw new Error(`HTTP ${response.status}`);
+            let detail = '';
+            try { detail = (await response.json()).error || ''; } catch (e) {}
+            throw new Error(detail || `HTTP ${response.status}`);
         }
-
         const payload = await response.json();
-        const data = Array.isArray(payload) ? payload : payload && payload.routes;
-        if (!Array.isArray(data)) {
-            throw new Error('Некорректный ответ каталога');
+        if (!payload || !payload.owner || !Array.isArray(payload.folders) || !Array.isArray(payload.routes)) {
+            throw new Error('Некорректный ответ каталога владельца');
         }
+        return payload;
+    },
 
-        this._folders = Array.isArray(payload.folders) ? payload.folders : [];
-        this._folderMap = new Map(
-            this._folders.map(folder => [folder.folder_id, folder])
-        );
+    _applyOwnerBundle(rootFolderId, bundle) {
+        const rootId = String(rootFolderId || '');
+        if (!rootId || !bundle) return;
+        this._activeOwnerId = rootId;
 
-        const routesFlat = {};
-
-        for (const route of data) {
-            const key = route.m;
+        for (const route of bundle.routes || []) {
+            const key = String(route.m || '');
             if (!key) continue;
-            if (!route.locked && Array.isArray(route.data)) {
-                this._routeDataCache.set(key, route);
-            }
-            routesFlat[key] = {
-                m: route.m,
-                name: route.name || route.title || route.m,
-                title: route.title || route.name || route.m,
+            const previous = this.routesDescriptions[key];
+            this.routesDescriptions[key] = {
+                m: key,
+                name: route.name || route.title || key,
+                title: route.title || route.name || key,
                 folder_id: route.folder_id || '',
                 description: typeof route.description === 'string' ? route.description.trim() : '',
                 point_count: Number.isFinite(route.point_count) ? route.point_count : null,
                 distance_meters: Number.isFinite(route.distance_meters) ? route.distance_meters : null,
                 premium: !!route.premium,
                 locked: !!route.locked,
-                viewed: !!route.viewed
+                viewed: !!route.viewed || !!(previous && previous.viewed),
+                ownerRootId: rootId
             };
+            this._routeOwners.set(key, rootId);
+            if (!route.locked && Array.isArray(route.data)) {
+                this._routeDataCache.set(key, route);
+            }
         }
 
-        this.routesDescriptions = routesFlat;
-        this._catalogLoaded = true;
+        this._ownerBundles.set(rootId, bundle);
+        this._ownerSigns.set(rootId, Array.isArray(bundle.signs) ? bundle.signs : []);
+        this._folders = Array.isArray(bundle.folders) ? bundle.folders.slice() : [];
+        if (!this._folders.some(folder => folder.folder_id === rootId) && bundle.owner) {
+            this._folders.unshift({
+                folder_id: rootId,
+                parent_id: '',
+                name: bundle.owner.name || 'Владелец',
+                sort_order: 0,
+                is_owner_root: true
+            });
+        }
+        this._folderMap = new Map(
+            this._folders.map(folder => [folder.folder_id, folder])
+        );
+        this._folderPath = [rootId];
         this._buildCatalog();
+        this._routesLoaded = true;
+        this._buildRoutesList();
+    },
+
+    async _openOwner(rootFolderId) {
+        const rootId = String(rootFolderId || '');
+        if (!rootId) return;
+        const cached = this._ownerBundles.get(rootId);
+        if (cached) {
+            this._applyOwnerBundle(rootId, cached);
+            return;
+        }
+        this._isFetchingRoutes = true;
+        this._showListLoading('Загрузка маршрутов...');
+        try {
+            const bundle = await this._fetchOwnerBundle('owner', rootId);
+            this._applyOwnerBundle(rootId, bundle);
+        } catch (e) {
+            console.warn('Не удалось загрузить маршруты владельца:', e);
+            if (typeof showToast === 'function') {
+                showToast('Ошибка загрузки: ' + e.message, 'error', 5000);
+            }
+            this._showOwnersRoot();
+        } finally {
+            this._isFetchingRoutes = false;
+        }
+    },
+
+    async _ensureOwnerForRoute(routeM) {
+        const key = String(routeM || '');
+        const cachedRoot = this._routeOwners.get(key);
+        if (cachedRoot && this._ownerBundles.has(cachedRoot)) {
+            const cached = this._ownerBundles.get(cachedRoot);
+            // Не сбрасываем текущую папку меню, если владелец уже активен.
+            if (this._activeOwnerId !== cachedRoot) {
+                this._applyOwnerBundle(cachedRoot, cached);
+            }
+            return cached;
+        }
+        const bundle = await this._fetchOwnerBundle('m', key);
+        const rootId = String(bundle.owner.root_folder_id || '');
+        if (!rootId) throw new Error('Не найден владелец маршрута');
+        this._applyOwnerBundle(rootId, bundle);
+        return bundle;
+    },
+
+    getSignsForRoute(routeM) {
+        const rootId = this._routeOwners.get(String(routeM || ''));
+        if (!rootId) return [];
+        const signs = this._ownerSigns.get(rootId);
+        return Array.isArray(signs) ? signs : [];
     },
 
     async _fetchRoute(routeM) {
@@ -233,6 +321,7 @@ const MenuModule = {
         this._folderPremiumCounts = new Map();
 
         for (const [key, route] of Object.entries(this.routesDescriptions)) {
+            if (this._activeOwnerId && route.ownerRootId !== this._activeOwnerId) continue;
             const chain = this._folderChain(route.folder_id);
             const folders = chain.map(folder => folder.folder_id);
             const folderNames = chain.map(folder => folder.name);
@@ -388,14 +477,14 @@ const MenuModule = {
     },
 
     // Индикация загрузки списка маршрутов
-    _showListLoading() {
+    _showListLoading(text) {
         const container = document.getElementById('routesListContainer');
         if (!container) return;
         this._destroyRoutePreviews();
         container.innerHTML = `
             <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:30px;gap:12px;">
                 <div class="spinner-ring" style="width:28px;height:28px;border-width:3px;"></div>
-                <div style="color:rgba(18,28,46,0.5);font-size:14px;">Загрузка маршрутов...</div>
+                <div style="color:rgba(18,28,46,0.5);font-size:14px;">${text || 'Загрузка маршрутов...'}</div>
             </div>
         `;
     },
@@ -411,7 +500,7 @@ const MenuModule = {
             if (this._isFetchingRoutes) {
                 this._showListLoading();
             } else {
-                this._loadRoutesList();
+                this._loadOwners();
             }
             return;
         }
@@ -438,9 +527,12 @@ const MenuModule = {
         const summary = document.createElement('div');
         summary.className = 'routes-results-meta';
         const countLabel = `${routes.length} ${this._pluralize(routes.length, 'маршрут', 'маршрута', 'маршрутов')}`;
-        summary.textContent = childFolders.length
-            ? `${childFolders.length} ${this._pluralize(childFolders.length, 'папка', 'папки', 'папок')} · ${countLabel}`
-            : countLabel;
+        const ownersRoot = !this._activeOwnerId && this._folderPath.length === 0;
+        summary.textContent = ownersRoot
+            ? `${childFolders.length} ${this._pluralize(childFolders.length, 'владелец', 'владельца', 'владельцев')}`
+            : childFolders.length
+                ? `${childFolders.length} ${this._pluralize(childFolders.length, 'папка', 'папки', 'папок')} · ${countLabel}`
+                : countLabel;
         container.appendChild(summary);
         if (childFolders.length) {
             const folderList = document.createElement('div');
@@ -451,6 +543,7 @@ const MenuModule = {
                 button.className = 'routes-folder-row';
                 button.dataset.folderId = folder.folder_id;
                 button.dataset.folderName = folder.name;
+                if (folder.is_owner_root) button.dataset.ownerRoot = '1';
                 const premiumCount = folder.premiumCount || 0;
                 const countAria = `${folder.count} ${this._pluralize(folder.count, 'маршрут', 'маршрута', 'маршрутов')}` +
                     (premiumCount > 0
@@ -497,7 +590,7 @@ const MenuModule = {
         if (!el) return;
         el.innerHTML = '';
         const labels = [
-            { id: '', name: 'Все маршруты' },
+            { id: '', name: this._ownersLoaded ? 'Владельцы' : 'Все маршруты' },
             ...this._folderPath.map(id => ({
                 id,
                 name: this._folderMap.get(id)?.name || id
@@ -1042,6 +1135,10 @@ const MenuModule = {
         if (backBtn) {
             backBtn.addEventListener('click', () => {
                 if (this._folderPath.length === 0) return;
+                if (this._activeOwnerId && this._folderPath.length === 1) {
+                    this._showOwnersRoot();
+                    return;
+                }
                 this._folderPath = this._folderPath.slice(0, -1);
                 this._buildRoutesList();
             });
@@ -1054,6 +1151,10 @@ const MenuModule = {
                 if (!item) return;
                 const index = Number(item.dataset.breadcrumbIndex);
                 if (!Number.isInteger(index)) return;
+                if (index === 0 && this._activeOwnerId) {
+                    this._showOwnersRoot();
+                    return;
+                }
                 this._folderPath = index === 0 ? [] : this._folderPath.slice(0, index);
                 this._buildRoutesList();
             });
@@ -1064,8 +1165,13 @@ const MenuModule = {
             routesList.addEventListener('click', event => {
                 const folder = event.target.closest('[data-folder-id]');
                 if (!folder || !routesList.contains(folder)) return;
+                if (folder.dataset.ownerRoot === '1' && !this._activeOwnerId) {
+                    this._openOwner(folder.dataset.folderId);
+                    return;
+                }
+                // Внутри загруженного пакета владельца переходы по папкам
+                // выполняются без запросов к сети.
                 this._folderPath = [...this._folderPath, folder.dataset.folderId];
-                this._routesLoaded = false;
                 this._buildRoutesList();
             });
         }
@@ -1073,6 +1179,12 @@ const MenuModule = {
 
     _resetCatalog() {
         this._catalogLoaded = false;
+        this._owners = [];
+        this._ownersLoaded = false;
+        this._ownerBundles.clear();
+        this._routeOwners.clear();
+        this._ownerSigns.clear();
+        this._activeOwnerId = null;
         this._catalog = [];
         this.routesDescriptions = {};
         this._folders = [];
@@ -1099,6 +1211,11 @@ const MenuModule = {
         this.showSpinner();
         try {
             if (!routeM) throw new Error('Не указан маршрут');
+
+            // Пакет владельца содержит маршруты и знаки. Он загружается один
+            // раз при открытии корневой папки или по прямой ссылке ?m=...
+            await this._ensureOwnerForRoute(routeM);
+
             const meta = this.routesDescriptions && this.routesDescriptions[routeM];
             if (meta && meta.locked) {
                 throw new Error('premium_locked');
@@ -1107,8 +1224,8 @@ const MenuModule = {
 
             this.hide();
 
-            // Каталог больше не содержит геометрию: грузим только выбранный
-            // маршрут и кэшируем его до перезагрузки страницы.
+            // Геометрия уже в кэше пакета владельца; _fetchRoute остаётся
+            // запасным путём для премиум-маршрута после оплаты.
             const data = await this._fetchRoute(routeM);
 
             await this.loadRoute(data);

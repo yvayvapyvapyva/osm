@@ -268,8 +268,11 @@ const APP = {
     premiumStatus: null,
     _signsData: null,
     _signsLoading: null,
+    _signsSeq: 0,
     _signsEnabled: true,
     _signCatalog: new Map(),
+    _signCatalogPromise: null,
+    _signCatalogLoaded: false,
     _signImageCache: new Map(),
     _signIconDefs: [],
     _signFeatures: null,
@@ -1879,11 +1882,10 @@ function buildSignComposite(combo, images) {
     return canvas;
 }
 
-async function buildSignIcons() {
-    const signs = (APP._signsData && APP._signsData.signs) || [];
+async function buildSignIcons(signs) {
+    signs = Array.isArray(signs) ? signs : [];
     if (!signs.length) {
-        APP._signFeatures = [];
-        return;
+        return { defs: [], features: [] };
     }
 
     const combos = new Map();
@@ -1940,8 +1942,7 @@ async function buildSignIcons() {
         });
     }
 
-    APP._signIconDefs = defs;
-    APP._signFeatures = features;
+    return { defs, features };
 }
 
 function updateSignsVisibility() {
@@ -2025,36 +2026,71 @@ function ensureSignLayers() {
     }
 }
 
-async function loadSigns() {
-    if (APP._signsLoading) return APP._signsLoading;
-    APP._signsLoading = (async () => {
-        try {
-            const [signsResponse, catalogResponse] = await Promise.all([
-                fetch('/api/signs', { cache: 'no-store', credentials: 'same-origin' }),
-                fetch('signs/catalog.json', { cache: 'force-cache' })
-            ]);
-            if (!signsResponse.ok) throw new Error('HTTP ' + signsResponse.status);
-            const data = await signsResponse.json();
-            const catalog = catalogResponse.ok ? await catalogResponse.json() : [];
-            APP._signsData = data && Array.isArray(data.signs) ? data : { signs: [] };
-            APP._signCatalog = new Map(
-                (Array.isArray(catalog) ? catalog : [])
-                    .filter(item => item && item.code)
-                    .map(item => [String(item.code), item])
-            );
-            await buildSignIcons();
-            ensureSignLayers();
-        } catch (e) {
-            console.warn('Не удалось загрузить дорожные знаки:', e);
-            APP._signsData = { signs: [] };
-            APP._signFeatures = [];
-        }
-    })().finally(() => {
-        APP._signsLoading = null;
-    });
-    return APP._signsLoading;
+async function ensureSignCatalog() {
+    if (APP._signCatalogLoaded) return APP._signCatalog;
+    if (!APP._signCatalogPromise) {
+        APP._signCatalogPromise = fetch('signs/catalog.json', { cache: 'force-cache' })
+            .then(response => (response.ok ? response.json() : []))
+            .then(catalog => {
+                APP._signCatalog = new Map(
+                    (Array.isArray(catalog) ? catalog : [])
+                        .filter(item => item && item.code)
+                        .map(item => [String(item.code), item])
+                );
+                APP._signCatalogLoaded = true;
+                return APP._signCatalog;
+            })
+            .catch(e => {
+                console.warn('Не удалось загрузить каталог знаков:', e);
+                APP._signCatalog = new Map();
+                return APP._signCatalog;
+            });
+    }
+    return APP._signCatalogPromise;
 }
 
+function clearSigns() {
+    APP._signsSeq += 1;
+    APP._signsData = { signs: [] };
+    APP._signFeatures = [];
+    if (APP.map && APP.map.getSource(SIGNS_SOURCE_ID)) {
+        try {
+            APP.map.getSource(SIGNS_SOURCE_ID).setData({ type: 'FeatureCollection', features: [] });
+            APP._signSourceData = APP._signFeatures;
+        } catch (e) {}
+    }
+}
+
+async function loadSignsForCurrentRoute() {
+    const routeM = (typeof MenuModule !== 'undefined' && MenuModule.currentRoute) ? MenuModule.currentRoute : '';
+    if (!routeM) {
+        clearSigns();
+        return;
+    }
+    const signs = (typeof MenuModule.getSignsForRoute === 'function')
+        ? MenuModule.getSignsForRoute(routeM)
+        : [];
+    if (!Array.isArray(signs) || !signs.length) {
+        clearSigns();
+        return;
+    }
+
+    const seq = ++APP._signsSeq;
+    try {
+        await ensureSignCatalog();
+    } catch (e) {
+        console.warn('Каталог знаков недоступен:', e);
+        return;
+    }
+    if (seq !== APP._signsSeq) return;
+
+    const built = await buildSignIcons(signs);
+    if (seq !== APP._signsSeq) return;
+    APP._signsData = { signs };
+    APP._signIconDefs = built.defs;
+    APP._signFeatures = built.features;
+    ensureSignLayers();
+}
 
 function removeRouteObjects() {
     APP.navPoints.forEach(p => {
@@ -2091,6 +2127,7 @@ function updateRouteNameDisplay() {
 function clearRoute() {
     endSimulation();
     removeRouteObjects();
+    clearSigns();
     APP.navPoints = [];
     APP.navCurrentIndex = 0;
     APP._routeTotalDistance = 0;
@@ -2572,6 +2609,9 @@ function navCheckTriggers() {
 async function loadRouteFromJSON(data) {
     await processRouteData(data);
     recordRouteView();
+    // Знаки владельца загружены вместе с пакетом маршрутов и показываются
+    // только после успешного открытия маршрута.
+    loadSignsForCurrentRoute().catch(e => console.warn('Не удалось показать знаки:', e));
 }
 
 // Отмечает маршрут как загруженный. GET, потому что CDN на apex
@@ -2790,8 +2830,6 @@ if (typeof maplibregl === 'undefined') {
     $('loading').classList.add('hidden');
 } else {
 (async () => {
-    // Данные знаков грузим параллельно с геолокацией и инициализацией карты.
-    loadSigns();
     let initCenter = [43.9968, 56.3269];
     if (navigator.geolocation) {
         try {

@@ -31,11 +31,6 @@ import urllib.parse
 import auth
 import store
 
-# Сцена PAD, которую навигатор показывает слоем дорожных знаков.
-# ID не меняется при переименовании сцены; ``full`` — запасной путь по имени.
-PAD_SIGNS_SCENE_ID = os.getenv("PAD_SIGNS_SCENE_ID", "c5bk482x").strip() or "c5bk482x"
-PAD_SIGNS_SCENE_NAME = os.getenv("PAD_SIGNS_SCENE_NAME", "full").strip() or "full"
-
 # ---------------------------------------------------------------------------
 # YDB-запросы
 # ---------------------------------------------------------------------------
@@ -769,7 +764,7 @@ def _current_user(event):
     return user
 
 
-def _catalog_data(include_geometry=False):
+def _catalog_data(include_geometry=False, owner_user_id=None):
     pool = store.get_pool()
     folder_rows = _rows(pool.retry_operation_sync(execute_list_folders))
     route_query = (
@@ -778,6 +773,16 @@ def _catalog_data(include_geometry=False):
         else execute_list_public_routes
     )
     route_rows = _rows(pool.retry_operation_sync(route_query))
+    if owner_user_id is not None:
+        owner_user_id = _text(owner_user_id)
+        route_rows = [
+            row for row in route_rows
+            if _text(_row_value(row, "owner_user_id")) == owner_user_id
+        ]
+        folder_rows = [
+            row for row in folder_rows
+            if _text(_row_value(row, "owner_user_id")) == owner_user_id
+        ]
     owner_rows = _rows(pool.retry_operation_sync(execute_list_owner_names))
     owner_names = {
         _text(_row_value(row, "user_id")): (
@@ -1059,38 +1064,8 @@ def _auth_logout_get(event, sid):
 # ---------------------------------------------------------------------------
 
 
-def _api_signs(event):
-    """Дорожные знаки из сцены PAD.
-
-    Читаем сцену из общей таблицы ``scene`` (YDB dbosm). PAD пишет туда же,
-    поэтому изменения в редакторе подхватываются при следующей загрузке
-    навигатора без деплоя и синхронизации.
-    """
-    try:
-        # Сначала стабильный ID: сцену можно переименовать. Если ID не найден
-        # (сцену пересоздали), берём её по имени ``full``.
-        scene = store.get_scene_by_id(PAD_SIGNS_SCENE_ID)
-        if not scene:
-            scene = store.get_scene_by_name(PAD_SIGNS_SCENE_NAME)
-    except Exception as exc:  # noqa: BLE001
-        print(f"[signs] scene read failed: {exc}")
-        return auth.json_response(500, {"error": "storage_failed"})
-
-    if not scene:
-        return auth.json_response(404, {"error": "signs_scene_not_found"})
-
-    raw = scene.get("data") or ""
-    try:
-        data = json.loads(raw)
-        if isinstance(data, str):
-            data = json.loads(data)
-    except Exception as exc:  # noqa: BLE001
-        print(f"[signs] scene json failed: {exc}")
-        return auth.json_response(500, {"error": "invalid_scene"})
-
-    if not isinstance(data, dict):
-        return auth.json_response(500, {"error": "invalid_scene"})
-
+def _signs_from_scene_data(data):
+    """Достаёт знаки из JSON сцены PAD в компактном формате навигатора."""
     signs = []
     for marker in data.get("markers") or []:
         if not isinstance(marker, dict) or marker.get("kind") != "znak":
@@ -1124,65 +1099,189 @@ def _api_signs(event):
                 "plates": plates,
             }
         )
+    return signs
 
-    return auth.json_response(
-        200,
-        {
-            "name": scene.get("name") or PAD_SIGNS_SCENE_NAME,
-            "id": scene.get("id") or PAD_SIGNS_SCENE_ID,
-            "savedAt": data.get("savedAt"),
-            "signs": signs,
-        },
+
+def _owner_root_for_user(owner_user_id):
+    return _owner_folder_id(_text(owner_user_id))
+
+
+def _owner_signs(owner_user_id):
+    """Знаки корневой папки владельца. Пустой сценарий — пустой список."""
+    root_folder_id = _owner_root_for_user(owner_user_id)
+    scene_id = store.get_folder_sign_scene(root_folder_id)
+    if not scene_id:
+        return []
+    scene = store.get_scene_by_id(scene_id)
+    if not scene:
+        return []
+    try:
+        data = json.loads(scene.get("data") or "{}")
+        if isinstance(data, str):
+            data = json.loads(data)
+    except Exception as exc:  # noqa: BLE001
+        print(f"[signs] scene json failed for {scene_id}: {exc}")
+        return []
+    if not isinstance(data, dict):
+        return []
+    return _signs_from_scene_data(data)
+
+
+def _api_owners(event):
+    """Корневые папки владельцев и количество маршрутов в них."""
+    try:
+        folders, route_rows, _ = _catalog_data(include_geometry=False)
+    except Exception as exc:  # noqa: BLE001
+        print(f"[owners] read failed: {exc}")
+        return auth.json_response(500, {"error": "storage_failed"})
+
+    total = {}
+    premium = {}
+    for row in route_rows:
+        owner = _text(_row_value(row, "owner_user_id"))
+        total[owner] = total.get(owner, 0) + 1
+        if _is_premium(row):
+            premium[owner] = premium.get(owner, 0) + 1
+
+    owners = []
+    for folder in folders:
+        if not folder.get("is_owner_root"):
+            continue
+        owner = _text(folder.get("owner_user_id"))
+        if not owner:
+            continue
+        owners.append(
+            {
+                "root_folder_id": folder["folder_id"],
+                "name": folder["name"],
+                "routes_count": total.get(owner, 0),
+                "premium_count": premium.get(owner, 0),
+            }
+        )
+    owners.sort(key=lambda item: item["name"].lower())
+    return auth.json_response(200, {"owners": owners})
+
+
+def _owner_user_id_for_root(root_folder_id):
+    root_folder_id = _text(root_folder_id).strip()
+    if not root_folder_id:
+        return None
+    folders, _, _ = _catalog_data(include_geometry=False)
+    for folder in folders:
+        if folder.get("is_owner_root") and folder["folder_id"] == root_folder_id:
+            return _text(folder.get("owner_user_id"))
+    return None
+
+
+def _owner_bundle(owner_user_id, user, views):
+    folders, route_rows, by_id = _catalog_data(
+        include_geometry=True, owner_user_id=owner_user_id
     )
+    routes = []
+    for row in route_rows:
+        folder_id = _text(_row_value(row, "folder_id"))
+        if not folder_id or folder_id not in by_id:
+            folder_id = _owner_folder_id(owner_user_id)
+        data = _json_value(_row_value(row, "json"))
+        route = _route_public_dict(
+            row,
+            by_id,
+            folder_id_override=folder_id,
+            user=user,
+            data=data,
+        )
+        if not route["locked"]:
+            route["data"] = data if isinstance(data, list) else []
+        route["viewed"] = route["m"] in views
+        routes.append(route)
+
+    root_id = _owner_folder_id(owner_user_id)
+    root = next(
+        (folder for folder in folders if folder.get("is_owner_root")),
+        None,
+    )
+    return {
+        "owner": {
+            "root_folder_id": root_id,
+            "name": root["name"] if root else "Владелец",
+        },
+        "folders": [
+            {
+                "folder_id": folder["folder_id"],
+                "parent_id": folder["parent_id"],
+                "name": folder["name"],
+                "sort_order": folder["sort_order"],
+            }
+            for folder in folders
+        ],
+        "routes": routes,
+        "signs": _owner_signs(owner_user_id),
+        "user": _public_user(user) if user else None,
+    }
 
 
 def _api_catalog(event):
-    """Папки и видимые маршруты вместе с геометрией открытых маршрутов.
+    """Каталог одного владельца: папки, маршруты, геометрия и знаки.
 
-    Геометрия приходит сразу, чтобы переходы по папкам и открытие маршрута
-    работали на клиенте без дополнительных запросов. Закрытые премиум-маршруты
-    отдаются без data.
+    Без параметров возвращает список корневых папок владельцев.
+    ``owner=<root_folder_id>`` — пакет владельца.
+    ``m=<route_m>`` — пакет владельца маршрута (для глубоких ссылок).
     """
     user = _current_user(event)
-    views = store.route_views_for_user(user["user_id"]) if user else {}
+    owner_param = _text(_query(event).get("owner")).strip()
+    route_param = _text(_query(event).get("m")).strip()
     try:
-        folders, route_rows, by_id = _catalog_data(include_geometry=True)
-        routes = []
-        for row in route_rows:
-            owner_user_id = _text(_row_value(row, "owner_user_id"))
-            folder_id = _text(_row_value(row, "folder_id"))
-            if not folder_id or folder_id not in by_id:
-                folder_id = _owner_folder_id(owner_user_id)
-            data = _json_value(_row_value(row, "json"))
-            route = _route_public_dict(
-                row,
-                by_id,
-                folder_id_override=folder_id,
-                user=user,
-                data=data,
+        if not owner_param and not route_param:
+            return _api_owners(event)
+
+        owner_user_id = None
+        if owner_param:
+            owner_user_id = _owner_user_id_for_root(owner_param)
+            if not owner_user_id:
+                return auth.json_response(404, {"error": "owner_not_found"})
+        else:
+            rows = _rows(
+                store.get_pool().retry_operation_sync(
+                    execute_get_public_route, m_param=route_param
+                )
             )
-            if not route["locked"]:
-                route["data"] = data if isinstance(data, list) else []
-            route["viewed"] = route["m"] in views
-            routes.append(route)
-        return auth.json_response(
-            200,
-            {
-                "folders": [
-                    {
-                        "folder_id": folder["folder_id"],
-                        "parent_id": folder["parent_id"],
-                        "name": folder["name"],
-                        "sort_order": folder["sort_order"],
-                    }
-                    for folder in folders
-                ],
-                "routes": routes,
-                "user": _public_user(user) if user else None,
-            },
-        )
+            if not rows:
+                return auth.json_response(404, {"error": "route_not_found"})
+            owner_user_id = _text(_row_value(rows[0], "owner_user_id"))
+            if not owner_user_id:
+                return auth.json_response(404, {"error": "owner_not_found"})
+
+        views = store.route_views_for_user(user["user_id"]) if user else {}
+        return auth.json_response(200, _owner_bundle(owner_user_id, user, views))
     except Exception as exc:  # noqa: BLE001
         print(f"[api] catalog failed: {exc}")
+        return auth.json_response(500, {"error": "storage_failed"})
+
+
+def _api_signs(event):
+    """Совместимый endpoint: знаки владельца по owner или m.
+
+    Основной клиент получает знаки внутри /api/catalog?owner=... .
+    """
+    owner_param = _text(_query(event).get("owner")).strip()
+    route_param = _text(_query(event).get("m")).strip()
+    try:
+        if owner_param:
+            owner_user_id = _owner_user_id_for_root(owner_param)
+        elif route_param:
+            rows = _rows(
+                store.get_pool().retry_operation_sync(
+                    execute_get_public_route, m_param=route_param
+                )
+            )
+            owner_user_id = _text(_row_value(rows[0], "owner_user_id")) if rows else None
+        else:
+            owner_user_id = None
+        if not owner_user_id:
+            return auth.json_response(404, {"error": "owner_not_found"})
+        return auth.json_response(200, {"signs": _owner_signs(owner_user_id)})
+    except Exception as exc:  # noqa: BLE001
+        print(f"[signs] read failed: {exc}")
         return auth.json_response(500, {"error": "storage_failed"})
 
 
@@ -2081,6 +2180,9 @@ def _handle_api(event, path, method):
         if method != "POST":
             return auth.json_response(405, {"error": "method_not_allowed"})
         return _api_profile_update(event)
+
+    if normalized == "/api/owners" and method == "GET":
+        return _api_owners(event)
 
     if normalized == "/api/catalog" and method == "GET":
         return _api_catalog(event)

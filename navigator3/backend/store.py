@@ -1011,3 +1011,26 @@ def get_scene_by_id(scene_id):
     rows = get_pool().retry_operation_sync(operation)[0].rows
     return _scene_row(rows[0]) if rows else None
 
+
+
+# ---------------------------------------------------------------------------
+# Знаки, привязанные к корневой папке владельца
+# ---------------------------------------------------------------------------
+
+
+def get_folder_sign_scene(root_folder_id):
+    query = """
+        DECLARE $root_folder_id AS Utf8;
+        SELECT scene_id FROM folder_signs WHERE root_folder_id = $root_folder_id;
+    """
+
+    def operation(session):
+        prepared = session.prepare(query)
+        return session.transaction().execute(
+            prepared, {"$root_folder_id": str(root_folder_id)}, commit_tx=True
+        )
+
+    rows = get_pool().retry_operation_sync(operation)[0].rows
+    if not rows:
+        return None
+    return _utf8(getattr(rows[0], "scene_id", "")) or None
