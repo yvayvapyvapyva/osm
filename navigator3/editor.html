@@ -8,6 +8,21 @@
     <meta name="robots" content="noindex, nofollow">
     <script>
         (function () {
+            // Редактору нужен POST, а CDN на публичном домене пропускает только GET.
+            // Поэтому с apex/www уходим на отдельный домен редактора.
+            var host = window.location.hostname;
+            if (host === 'ainstruktor.ru' || host === 'www.ainstruktor.ru') {
+                window.location.replace(
+                    'https://editor.ainstruktor.ru' +
+                    window.location.pathname +
+                    window.location.search +
+                    window.location.hash
+                );
+            }
+        })();
+    </script>
+    <script>
+        (function () {
             var theme = '';
             try { theme = localStorage.getItem('osm_editor_theme_v1') || ''; } catch (e) {}
             if (theme !== 'dark' && theme !== 'light') {

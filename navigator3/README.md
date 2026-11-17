@@ -15,9 +15,10 @@
 - редактор маршрутов, папок и личной сцены знаков на `/editor.html`, доступный через Яндекс ID;
 - маршруты и папки в редакторе изолированы по владельцу.
 
-Редактор на `ainstruktor.ru` сразу перенаправляет браузер на домен API Gateway:
-промежуточный nginx на apex пропускает GET, но блокирует POST. OAuth и вызовы
-редактора выполняются на одном origin API Gateway.
+Редактор живёт на отдельном домене `https://editor.ainstruktor.ru`, привязанном
+к API Gateway: там разрешён `POST`, а cookie и OAuth остаются first-party.
+Страница `editor.html` на apex сразу перенаправляет туда: CDN перед публичным
+доменом пропускает только `GET`, поэтому сохранять маршруты с apex нельзя.
 
 ## Текущий контур
 
@@ -25,23 +26,28 @@
 |---|---|
 | Бакет | `osmn-nav` (приватный) |
 | Домен | `https://ainstruktor.ru` — DNS only в Cloudflare, трафик напрямую в API Gateway (сертификат Yandex Certificate Manager). `www` — через Cloudflare, 301 на apex |
+| Домен редактора | `https://editor.ainstruktor.ru` — CNAME на служебный домен API Gateway, сертификат `editor-ainstruktor` |
 | Домен шлюза | `https://d5dsd5u1tsc8fm9dbsg5.s183zexc.apigw.yandexcloud.net` |
 | API Gateway | `osmn3` / `d5dsd5u1tsc8fm9dbsg5` |
 | Функция | `osmn3` / `d4e8ds1489g0q91dt7do` |
 | Сервисный аккаунт шлюза | `osmn3-gateway` / `ajec0sf19r17r3tv6vrg` |
 | YDB | `dbosm`, таблицы `users`, `sessions`, `roads`, `folders` |
 
-Redirect URI приложения Яндекс OAuth (должны быть зарегистрированы оба):
+Redirect URI приложения Яндекс OAuth (должны быть зарегистрированы все):
 
 ```
 https://ainstruktor.ru/auth/yandex/callback
+https://editor.ainstruktor.ru/auth/yandex/callback
 https://d5dsd5u1tsc8fm9dbsg5.s183zexc.apigw.yandexcloud.net/auth/yandex/callback
 ```
 
 `PUBLIC_BASE_URL` задаёт основной origin (`https://ainstruktor.ru`),
-`PUBLIC_ALTERNATE_URLS` — дополнительные через запятую. Redirect URI и
-return-адреса строятся от того хоста, с которого пользователь начал запрос,
-поэтому вход работает и на старом домене шлюза.
+`PUBLIC_ALTERNATE_URLS` — дополнительные через запятую, `PUBLIC_EDITOR_URL` —
+домен редактора. Redirect URI и return-адреса строятся от того хоста, с
+которого пользователь начал запрос, поэтому вход работает на всех трёх.
+
+У облака квота API Gateway — один домен. Сейчас она занята доменом редактора:
+apex и `www` обслуживает CDN и отдельная привязка к шлюзу им не нужна.
 
 ## Схема
 
@@ -183,9 +189,9 @@ owner_user_id Utf8         -- users.user_id владельца маршрута
 
 Параметр `base` задаёт origin, на котором закончится вход, и принимается
 только из списка `PUBLIC_BASE_URL` + `PUBLIC_ALTERNATE_URLS`. Он нужен
-редактору: он открывается на домене шлюза (там разрешён `POST /api/admin`),
-и `redirect_uri` должен указывать на тот же хост, иначе state-cookie не
-совпадёт с callback.
+редактору: он открывается на `editor.ainstruktor.ru` (там разрешён
+`POST /api/admin`), и `redirect_uri` должен указывать на тот же хост, иначе
+state-cookie не совпадёт с callback.
 
 ### Редактор
 
@@ -234,6 +240,7 @@ python3 navigator3/migrations/drop_road_name.py
 | `YDB_DATABASE` | да | `/ru-central1/.../etnjvaftd6eakeq08kqr` |
 | `PUBLIC_BASE_URL` | да | `https://<домен-шлюза>` |
 | `PUBLIC_ALTERNATE_URLS` | нет | дополнительные origin'ы через запятую |
+| `PUBLIC_EDITOR_URL` | нет | домен редактора, например `https://editor.ainstruktor.ru` |
 | `YANDEX_CLIENT_ID` | да | ClientID приложения OAuth |
 | `SESSION_TTL_DAYS` | нет | срок сессии, по умолчанию 30 |
 | `OAUTH_SCOPE` | нет | по умолчанию `login:info login:email` |

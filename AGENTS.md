@@ -13,17 +13,19 @@
   - сертификат Certificate Manager `fpqp0bmtjpsj89butg6j` (apex + www, managed, автопродление);
   - HTTP→HTTPS редирект на CDN.
 - **CDN обязателен и удалять его нельзя**: он проходит в белых списках мобильного интернета РФ. Обходить CDN или включать проксирование Cloudflare для apex не нужно — это возвращает проблему с DPI/ECH.
-- У CDN разрешены только `GET`, `HEAD`, `OPTIONS`. **POST включить нельзя.** Следствие:
+- У CDN разрешены только `GET`, `HEAD`, `OPTIONS`. **POST включить нельзя** (CLI отвечает `method POST management is unavailable`). Следствие:
   - навигатор работает через `https://ainstruktor.ru`;
-  - редактор на apex/CDN **не сохраняет**: `POST /api/admin` возвращает `405`. Редактор открывается по служебному домену шлюза: `https://d5dsd5u1tsc8fm9dbsg5.s183zexc.apigw.yandexcloud.net/editor.html`;
-  - `editor.ainstruktor.ru` не настроен; через CDN он всё равно не заработает из-за отсутствия POST.
+  - редактор на apex/CDN **не сохраняет**: `POST /api/admin` возвращает `405`;
+  - редактор открывается на `https://editor.ainstruktor.ru/editor.html` — домен привязан напрямую к API Gateway (CNAME на служебный домен), без CDN;
+  - `editor.html` на apex сам перенаправляет на `editor.ainstruktor.ru`.
 - API отвечает с `Cache-Control: no-store`, поэтому CDN не кэширует ответы API. Статические JS/CSS в бакете отдаются с `Cache-Control: immutable`; у HTML cache-control отдельно не задан, поэтому после деплоя статики учитывайте возможный кэш CDN.
 - DNS в Cloudflare используется только как DNS:
   - `ainstruktor.ru` — A-запись на edge Yandex CDN (`188.72.112.1`);
   - `www.ainstruktor.ru` — CNAME на `9708731cbf7d9658.topology.gslb.yccdn.ru`;
   - `www` обслуживается тем же CDN как secondary hostname, а не редиректом на apex.
-- На API Gateway также привязан домен `ainstruktor.ru` с сертификатом `fpqp0bmtjpsj89butg6j`, но публичный трафик apex/www идёт через CDN.
-- OAuth: `PUBLIC_BASE_URL=https://ainstruktor.ru`, `PUBLIC_ALTERNATE_URLS=https://d5dsd5u1tsc8fm9dbsg5.s183zexc.apigw.yandexcloud.net`. Редактор логинится с origin служебного домена шлюза.
+- На API Gateway привязан домен `editor.ainstruktor.ru` с сертификатом `fpqrn7r551s28cds8mir` (`editor-ainstruktor`, managed, автопродление). Квота API Gateway — **один домен на облако**, поэтому `ainstruktor.ru` к шлюзу больше не привязан: apex/www обслуживает CDN, отдельная привязка им не нужна. Смена домена — `yc serverless api-gateway remove-domain` и `add-domain`.
+- DNS редактора: `editor.ainstruktor.ru` — CNAME на `d5dsd5u1tsc8fm9dbsg5.s183zexc.apigw.yandexcloud.net`, DNS only (не проксируется Cloudflare).
+- OAuth: `PUBLIC_BASE_URL=https://ainstruktor.ru`, `PUBLIC_ALTERNATE_URLS=https://d5dsd5u1tsc8fm9dbsg5.s183zexc.apigw.yandexcloud.net`, `PUBLIC_EDITOR_URL=https://editor.ainstruktor.ru`. Redirect URI приложения Яндекса: apex, editor и служебный домен шлюза.
 - Статика: `node navigator3/scripts/build-static-deploy.js`, затем `yc storage s3 cp --recursive navigator3/deploy-2files/ s3://osmn-nav/`. Внешние `maplibre-gl.js`, `maplibre-gl.css`, `pmtiles.js`, `sortable.min.js` лежат в бакете отдельно и в `deploy-2files/` не попадают — при их обновлении загружать вручную.
 - `pad/deploy.sh` — функция `pad-osm` (ID `d4esfoiand5dinv3mfth`).
 - Статика PAD: бакет `pad2`, сайт `https://pad2.website.yandexcloud.net/`.

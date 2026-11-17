@@ -55,9 +55,18 @@ def public_base_url():
 
 
 def alternate_base_urls():
-    """Дополнительные origin'ы (через запятую), например старый адрес шлюза."""
+    """Дополнительные origin'ы, например старый адрес шлюза.
+
+    Значения разделяются запятой, точкой с запятой или пробелом: запятая
+    ломает формат окружения функции, поэтому в .env используется `;`.
+    """
     raw = _env("PUBLIC_ALTERNATE_URLS")
-    return [item.strip().rstrip("/") for item in raw.split(",") if item.strip()]
+    normalized = raw.replace(",", " ").replace(";", " ")
+    urls = [item.rstrip("/") for item in normalized.split() if item]
+    editor = _env("PUBLIC_EDITOR_URL").strip().rstrip("/")
+    if editor and editor not in urls:
+        urls.append(editor)
+    return urls
 
 
 def base_url_for_event(event=None):
