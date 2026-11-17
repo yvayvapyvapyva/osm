@@ -2869,3 +2869,35 @@ body.signs-mode [data-point-id] { display: none !important; }
 }
 .ed-sign-marker.selected .ed-sign-main,
 .ed-sign-marker.selected .ed-sign-plate { outline: 2px solid var(--green); outline-offset: 2px; border-radius: 4px; }
+
+.sign-expand-btn {
+    position: fixed;
+    right: 12px;
+    bottom: calc(16px + env(safe-area-inset-bottom));
+    z-index: 16002;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 0 16px;
+    height: 46px;
+    border-radius: 23px;
+    border: 1px solid var(--green-line);
+    background: var(--surface);
+    color: var(--text);
+    font: inherit;
+    font-size: 13px;
+    font-weight: 700;
+    box-shadow: var(--shadow-float);
+    cursor: pointer;
+    touch-action: manipulation;
+}
+.sign-expand-btn[hidden] { display: none; }
+body.signs-panel-collapsed .sign-selected-bar {
+    bottom: calc(74px + env(safe-area-inset-bottom));
+}
+.ed-sign-marker:not(.selected) .ed-sign-main,
+.ed-sign-marker:not(.selected) .ed-sign-plate { cursor: pointer; }
+.ed-sign-marker.selected .ed-sign-main,
+.ed-sign-marker.selected .ed-sign-plate { cursor: grab; }
+.ed-sign-marker.dragging .ed-sign-main,
+.ed-sign-marker.dragging .ed-sign-plate { cursor: grabbing; }
