@@ -529,16 +529,17 @@ const MenuModule = {
             return;
         }
 
-        const summary = document.createElement('div');
-        summary.className = 'routes-results-meta';
         const countLabel = `${routes.length} ${this._pluralize(routes.length, 'маршрут', 'маршрута', 'маршрутов')}`;
         const ownersRoot = !this._activeOwnerId && this._folderPath.length === 0;
-        summary.textContent = ownersRoot
-            ? `${childFolders.length} ${this._pluralize(childFolders.length, 'владелец', 'владельца', 'владельцев')}`
-            : childFolders.length
+        // В корне (список владельцев) счётчик не показываем.
+        if (!ownersRoot) {
+            const summary = document.createElement('div');
+            summary.className = 'routes-results-meta';
+            summary.textContent = childFolders.length
                 ? `${childFolders.length} ${this._pluralize(childFolders.length, 'папка', 'папки', 'папок')} · ${countLabel}`
                 : countLabel;
-        container.appendChild(summary);
+            container.appendChild(summary);
+        }
         if (childFolders.length) {
             const folderList = document.createElement('div');
             folderList.className = 'routes-folder-list';
@@ -595,7 +596,7 @@ const MenuModule = {
         if (!el) return;
         el.innerHTML = '';
         const labels = [
-            { id: '', name: this._ownersLoaded ? 'Владельцы' : 'Все маршруты' },
+            { id: '', name: 'Главная' },
             ...this._folderPath.map(id => ({
                 id,
                 name: this._folderMap.get(id)?.name || id
