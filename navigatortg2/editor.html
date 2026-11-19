@@ -153,6 +153,15 @@
                     </div>
                 </div>
             </div>
+            <div class="settings-card" id="adminOwnerCard" hidden>
+                <div class="settings-card-title">Администратор</div>
+                <div class="field-label">Работать от имени</div>
+                <div class="input-wrapper" style="padding:3px;border-radius:12px;margin-bottom:8px;">
+                    <select id="adminOwnerSelect" onchange="switchAdminOwner()" style="width:100%;padding:10px;border:none;font-size:15px;outline:none;background:transparent;color:var(--text);font-family:inherit;box-sizing:border-box;"></select>
+                </div>
+                <div class="settings-name-hint">Все действия в редакторе будут выполняться от имени выбранного владельца.</div>
+            </div>
+
             <div class="settings-card">
                 <div class="settings-card-title">Информация</div>
                 <div class="settings-profile" style="display:block;padding:0;">
@@ -829,6 +838,10 @@ async function callAdminApi(action, params = {}, bodyData = null) {
         });
         const payload = Object.assign({}, body || {});
         if (initData) payload.tg_init_data = initData;
+        if (editorIsAdmin && editorActingOwner &&
+            workerAction !== 'editor_check' && workerAction !== 'admin_owners') {
+            payload.owner = editorActingOwner;
+        }
         const response = await fetch(url.toString(), {
             method: 'POST',
             cache: 'no-store',
@@ -890,7 +903,9 @@ async function callAdminApi(action, params = {}, bodyData = null) {
                 visible: !!body.visible,
                 folder_id: normFolderId(body.folder_id),
                 new_m: body.new_m || '',
-                creator_name: body.creator_name || (editorUser && editorUser.display_name) || ''
+                creator_name: body.creator_name ||
+                    ((editorAdminOwners.find(o => o.owner_tg_id === editorActingOwner) || {}).owner_name) ||
+                    (editorUser && editorUser.display_name) || ''
             });
         }
         case 'delete':
@@ -996,6 +1011,23 @@ async function initializeEditorAuth() {
             avatar: u.photo_url || '',
             login: u.username ? '@' + u.username : ''
         };
+        editorIsAdmin = !!check.is_admin;
+        if (editorIsAdmin) {
+            try {
+                const owners = await callAdminApi('admin_owners');
+                editorAdminOwners = Array.isArray(owners && owners.owners) ? owners.owners : [];
+            } catch (e) {
+                editorAdminOwners = [];
+            }
+            if (editorActingOwner &&
+                !editorAdminOwners.some(o => String(o.owner_tg_id) === String(editorActingOwner))) {
+                editorActingOwner = '';
+                try { localStorage.removeItem('editor_admin_owner'); } catch (e) {}
+            }
+        } else {
+            editorActingOwner = '';
+            try { localStorage.removeItem('editor_admin_owner'); } catch (e) {}
+        }
         if (gate) gate.style.display = 'none';
         await handleInitialLoad();
     } catch (e) {
@@ -1359,6 +1391,11 @@ const handleInitialLoad = async () => {
 };
 
 let editorRoot = null;
+let editorIsAdmin = false;
+let editorAdminOwners = [];
+let editorActingOwner = (function () {
+    try { return localStorage.getItem('editor_admin_owner') || ''; } catch (e) { return ''; }
+})();
 
 function renderRootFolderName() {
     const input = $('rootFolderNameInput');
@@ -1426,7 +1463,42 @@ function renderEditorProfileScreen() {
     if (infoInput && document.activeElement !== infoInput) {
         infoInput.value = root.owner_info || (username ? '@' + String(username).replace(/^@/, '') : '');
     }
+    renderAdminOwnerCard();
     renderRootFolderName();
+}
+
+function renderAdminOwnerCard() {
+    const card = $('adminOwnerCard');
+    const select = $('adminOwnerSelect');
+    if (!card || !select) return;
+    card.hidden = !editorIsAdmin;
+    if (!editorIsAdmin) return;
+    const current = String(editorActingOwner || '');
+    select.replaceChildren();
+    const selfOption = document.createElement('option');
+    selfOption.value = '';
+    selfOption.textContent = 'Мой аккаунт';
+    select.appendChild(selfOption);
+    editorAdminOwners.forEach((owner) => {
+        const option = document.createElement('option');
+        option.value = String(owner.owner_tg_id);
+        option.textContent = (owner.owner_name || owner.owner_tg_id) +
+            (owner.root_name ? ' · ' + owner.root_name : '');
+        select.appendChild(option);
+    });
+    select.value = current;
+    if (select.value !== current) select.value = '';
+}
+
+function switchAdminOwner() {
+    const select = $('adminOwnerSelect');
+    if (!select) return;
+    const value = select.value || '';
+    try {
+        if (value) localStorage.setItem('editor_admin_owner', value);
+        else localStorage.removeItem('editor_admin_owner');
+    } catch (e) {}
+    location.reload();
 }
 
 function openEditorProfile() {
@@ -3075,6 +3147,7 @@ window.openMapSettingsModal = openMapSettingsModal;
 window.applyEditorTheme = applyEditorTheme;
 window.saveRootFolderName = saveRootFolderName;
 window.openEditorProfile = openEditorProfile;
+window.switchAdminOwner = switchAdminOwner;
 window.saveOwnerInfo = saveOwnerInfo;
 window.handleAddBtnClick = handleAddBtnClick;
 window.saveGist = saveGist;

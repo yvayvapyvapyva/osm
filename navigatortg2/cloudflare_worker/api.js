@@ -386,7 +386,13 @@ export default {
       // ---- Проверка прав пользователя (без изменений данных) ----
       if (action === 'editor_check') {
         const guard = await requireUser(request, bodyData, env);
-        return json({ allowed: guard.ok, via: guard.via || null, uid: guard.uid || null });
+        const uid = guard.ok ? String(guard.uid || '') : '';
+        return json({
+          allowed: guard.ok,
+          via: guard.via || null,
+          uid: uid || null,
+          is_admin: !!uid && isAdmin(uid, env),
+        });
       }
 
       // ---- Защита экшенов редактора ----
@@ -400,6 +406,47 @@ export default {
         if (!userUid) return json({ error: 'forbidden' }, 403);
       }
 
+      // Админ может работать от имени другого владельца: все owner-scoped
+      // действия ниже используют actingUid. Для остальных owner игнорируется.
+      const isAdminUser = !!userUid && isAdmin(userUid, env);
+      let actingUid = userUid;
+      if (isAdminUser) {
+        const requestedOwner = String(bodyData.owner || url.searchParams.get('owner') || '').trim();
+        if (requestedOwner && requestedOwner !== userUid) {
+          const ownerRow = await env.DB.prepare(
+            'SELECT owner_tg_id FROM owner_roots WHERE owner_tg_id = ?').bind(requestedOwner).first();
+          if (!ownerRow) return json({ error: 'owner_not_found' }, 404);
+          actingUid = requestedOwner;
+        }
+      }
+
+      // ---- Список владельцев для админского переключения ----
+      if (action === 'admin_owners') {
+        if (!isAdminUser) return json({ error: 'forbidden' }, 403);
+        const rows = (await env.DB.prepare(
+          `SELECT r.owner_tg_id, r.owner_name, r.owner_username, r.owner_info,
+                  f.id AS root_folder_id, f.name AS root_name,
+                  (SELECT COUNT(*) FROM roads WHERE owner_tg_id = r.owner_tg_id) AS routes_count,
+                  (SELECT COUNT(*) FROM folders WHERE owner_tg_id = r.owner_tg_id) AS folders_count
+             FROM owner_roots r
+             JOIN folders f ON f.id = r.folder_id
+            WHERE r.owner_tg_id <> ?
+            ORDER BY r.owner_name, r.owner_tg_id`).bind(userUid).all()).results || [];
+        return json({
+          self: userUid,
+          owners: rows.map((row) => ({
+            owner_tg_id: String(row.owner_tg_id),
+            owner_name: row.owner_name || String(row.owner_tg_id),
+            owner_username: row.owner_username || '',
+            owner_info: row.owner_info || '',
+            root_folder_id: row.root_folder_id,
+            root_name: row.root_name || '',
+            routes_count: Number(row.routes_count) || 0,
+            folders_count: Number(row.folders_count) || 0,
+          })),
+        });
+      }
+
       // ---- Получение маршрута ----
       // get — навигатор, с проверкой платных папок (нужен tg_init_data покупателя).
       // get_protected — редактор, без ограничений.
@@ -407,7 +454,7 @@ export default {
         if (!mVal) return json({ error: 'missing_route_name' }, 400);
         const { row, m } = await findRoute(env, mVal);
         if (!row) return json({ error: 'not_found' }, 404);
-        if (action === 'get_protected' && String(row.owner_tg_id || '') !== userUid) {
+        if (action === 'get_protected' && String(row.owner_tg_id || '') !== actingUid) {
           return json({ error: 'not_found' }, 404);
         }
         if (action === 'get') {
@@ -435,22 +482,22 @@ export default {
 
       // ---- Полный список (для редактора) ----
       if (action === 'list') {
-        const root = await ensureOwnerRoot(env, userUid, '', {
+        const root = await ensureOwnerRoot(env, actingUid, '', actingUid === userUid ? {
           avatar: bodyData.tg_avatar,
           username: bodyData.tg_username,
-        });
+        } : {});
         const rows = (await env.DB.prepare(
           'SELECT m, name, visible, folder_id FROM roads WHERE owner_tg_id = ? ORDER BY name')
-          .bind(userUid).all()).results || [];
+          .bind(actingUid).all()).results || [];
         return json({
           root: {
             folder_id: root.folder_id,
             name: root.name || '',
-            owner_name: root.owner_name || userUid,
+            owner_name: root.owner_name || actingUid,
             owner_avatar: root.owner_avatar || '',
             owner_username: root.owner_username || '',
             owner_info: root.owner_info || '',
-            owner_tg_id: userUid,
+            owner_tg_id: actingUid,
           },
           routes: rows.map((r) => ({
             m: r.m, name: r.name || '', visible: r.visible === 1, folder_id: r.folder_id || null,
@@ -463,11 +510,11 @@ export default {
         const m = resolveM(mVal);
         const own = await env.DB.prepare(
           'SELECT owner_tg_id FROM roads WHERE m = ?').bind(m).first();
-        if (!own || String(own.owner_tg_id || '') !== userUid) {
+        if (!own || String(own.owner_tg_id || '') !== actingUid) {
           return json({ error: 'route_not_found' }, 404);
         }
         await env.DB.prepare('DELETE FROM roads WHERE m = ? AND owner_tg_id = ?')
-          .bind(m, userUid).run();
+          .bind(m, actingUid).run();
         return json({ status: 'deleted' });
       }
 
@@ -476,14 +523,14 @@ export default {
         const m = resolveM(mVal);
         const own = await env.DB.prepare(
           'SELECT owner_tg_id FROM roads WHERE m = ?').bind(m).first();
-        if (own && String(own.owner_tg_id || '') !== userUid) {
+        if (own && String(own.owner_tg_id || '') !== actingUid) {
           return json({ error: 'route_not_found' }, 404);
         }
-        const root = await ensureOwnerRoot(env, userUid);
+        const root = await ensureOwnerRoot(env, actingUid);
         const newJson = bodyData.data || [];
         await env.DB.prepare(
           'INSERT INTO roads (id, m, json, owner_tg_id, folder_id) VALUES (?, ?, ?, ?, ?) ON CONFLICT(id, m) DO UPDATE SET json=excluded.json, owner_tg_id=excluded.owner_tg_id')
-          .bind(SHARED_ID, m, typeof newJson === 'string' ? newJson : JSON.stringify(newJson), userUid, root.folder_id).run();
+          .bind(SHARED_ID, m, typeof newJson === 'string' ? newJson : JSON.stringify(newJson), actingUid, root.folder_id).run();
         return json({ status: 'saved' });
       }
 
@@ -492,7 +539,7 @@ export default {
         const row = await env.DB.prepare(
           'SELECT name, description, visible, creator_name, folder_id, owner_tg_id FROM roads WHERE m = ?')
           .bind(resolveM(mVal)).first();
-        if (!row || String(row.owner_tg_id || '') !== userUid) {
+        if (!row || String(row.owner_tg_id || '') !== actingUid) {
           return json({ error: 'route_not_found' }, 404);
         }
         return json({
@@ -513,19 +560,19 @@ export default {
         const rawFolderId = bodyData.folder_id !== undefined ? bodyData.folder_id : null;
         let folderId = rawFolderId === '' ? null : rawFolderId;
         if (folderId === null || folderId === undefined) {
-          const root = await ensureOwnerRoot(env, userUid);
+          const root = await ensureOwnerRoot(env, actingUid);
           folderId = root.folder_id;
         }
         if (folderId !== null && folderId !== undefined) {
           const folder = await env.DB.prepare(
             'SELECT owner_tg_id FROM folders WHERE id = ?').bind(folderId).first();
-          if (!folder || String(folder.owner_tg_id || '') !== userUid) {
+          if (!folder || String(folder.owner_tg_id || '') !== actingUid) {
             return json({ error: 'folder_not_found' }, 404);
           }
         }
         const src = await env.DB.prepare(
           'SELECT json, creator_name, owner_tg_id FROM roads WHERE m = ?').bind(m).first();
-        if (!src || String(src.owner_tg_id || '') !== userUid) {
+        if (!src || String(src.owner_tg_id || '') !== actingUid) {
           return json({ error: 'route_not_found' }, 404);
         }
         if (newM && newM !== m) {
@@ -537,19 +584,19 @@ export default {
             env.DB.prepare(
               'INSERT INTO roads (id, m, json, name, description, visible, creator_name, folder_id, owner_tg_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)')
               .bind(SHARED_ID, newM, src.json, name, description, visible,
-                creatorName || src.creator_name || '', folderId, userUid),
-            env.DB.prepare('DELETE FROM roads WHERE m = ? AND owner_tg_id = ?').bind(m, userUid),
+                creatorName || src.creator_name || '', folderId, actingUid),
+            env.DB.prepare('DELETE FROM roads WHERE m = ? AND owner_tg_id = ?').bind(m, actingUid),
           ]);
           return json({ status: 'meta_saved', new_m: newM });
         }
         if (creatorName) {
           await env.DB.prepare(
             'UPDATE roads SET name = ?, description = ?, visible = ?, creator_name = ?, folder_id = ? WHERE m = ? AND owner_tg_id = ?')
-            .bind(name, description, visible, creatorName, folderId, m, userUid).run();
+            .bind(name, description, visible, creatorName, folderId, m, actingUid).run();
         } else {
           await env.DB.prepare(
             'UPDATE roads SET name = ?, description = ?, visible = ?, folder_id = ? WHERE m = ? AND owner_tg_id = ?')
-            .bind(name, description, visible, folderId, m, userUid).run();
+            .bind(name, description, visible, folderId, m, actingUid).run();
         }
         return json({ status: 'meta_saved' });
       }
@@ -570,7 +617,7 @@ export default {
         if (!folderId) return json({ error: 'folder_not_found' }, 400);
         const owner = await env.DB.prepare(
           'SELECT owner_tg_id FROM folders WHERE id = ?').bind(folderId).first();
-        if (!owner || String(owner.owner_tg_id || '') !== userUid) {
+        if (!owner || String(owner.owner_tg_id || '') !== actingUid) {
           return json({ error: 'folder_not_found' }, 404);
         }
         await env.DB.prepare('UPDATE folders SET price = ? WHERE id = ?').bind(price, folderId).run();
@@ -584,7 +631,7 @@ export default {
         if (!folderId) return json({ error: 'folder_not_found' }, 400);
         const owner = await env.DB.prepare(
           'SELECT owner_tg_id FROM folders WHERE id = ?').bind(folderId).first();
-        if (!owner || String(owner.owner_tg_id || '') !== userUid) {
+        if (!owner || String(owner.owner_tg_id || '') !== actingUid) {
           return json({ error: 'folder_not_found' }, 404);
         }
         await env.DB.prepare('UPDATE folders SET price = 0 WHERE id = ?').bind(folderId).run();
@@ -679,19 +726,19 @@ export default {
 
       // Список всех папок (плоский)
       if (action === 'folder_list') {
-        const root = await ensureOwnerRoot(env, userUid);
+        const root = await ensureOwnerRoot(env, actingUid);
         const rows = (await env.DB.prepare(
           'SELECT id, name, parent_id, visible, price FROM folders WHERE owner_tg_id = ? ORDER BY name')
-          .bind(userUid).all()).results || [];
+          .bind(actingUid).all()).results || [];
         return json({
           root: {
             folder_id: root.folder_id,
             name: root.name || '',
-            owner_name: root.owner_name || userUid,
+            owner_name: root.owner_name || actingUid,
             owner_avatar: root.owner_avatar || '',
             owner_username: root.owner_username || '',
             owner_info: root.owner_info || '',
-            owner_tg_id: userUid,
+            owner_tg_id: actingUid,
           },
           folders: rows.map((r) => ({
             id: r.id, name: r.name, parent_id: r.parent_id,
@@ -707,7 +754,7 @@ export default {
           ? Number(bodyData.parent_id)
           : null;
         if (parentId === null) {
-          const root = await ensureOwnerRoot(env, userUid);
+          const root = await ensureOwnerRoot(env, actingUid);
           parentId = root.folder_id;
         }
         const visible = bodyData.visible !== false ? 1 : 0;
@@ -719,13 +766,13 @@ export default {
         if (parentId !== null && parentId !== undefined) {
           const parent = await env.DB.prepare(
             'SELECT owner_tg_id FROM folders WHERE id = ?').bind(parentId).first();
-          if (!parent || String(parent.owner_tg_id || '') !== userUid) {
+          if (!parent || String(parent.owner_tg_id || '') !== actingUid) {
             return json({ error: 'folder_not_found' }, 404);
           }
         }
         const res = await env.DB.prepare(
           'INSERT INTO folders (name, parent_id, visible, price, owner_tg_id) VALUES (?, ?, ?, ?, ?)')
-          .bind(name, parentId, visible, price, userUid).run();
+          .bind(name, parentId, visible, price, actingUid).run();
         const id = res.meta && res.meta.last_row_id ? res.meta.last_row_id : null;
         return json({ status: 'ok', id, name, parent_id: parentId, visible: visible === 1, price });
       }
@@ -737,11 +784,11 @@ export default {
         if (!Number.isFinite(id) || !name) return json({ error: 'bad_params' }, 400);
         const own = await env.DB.prepare(
           'SELECT owner_tg_id FROM folders WHERE id = ?').bind(id).first();
-        if (!own || String(own.owner_tg_id || '') !== userUid) {
+        if (!own || String(own.owner_tg_id || '') !== actingUid) {
           return json({ error: 'folder_not_found' }, 404);
         }
         await env.DB.prepare('UPDATE folders SET name = ? WHERE id = ? AND owner_tg_id = ?')
-          .bind(name, id, userUid).run();
+          .bind(name, id, actingUid).run();
         return json({ status: 'ok' });
       }
 
@@ -749,11 +796,11 @@ export default {
       if (action === 'folder_delete') {
         const id = Number(bodyData.id);
         if (!Number.isFinite(id)) return json({ error: 'bad_params' }, 400);
-        const root = await ensureOwnerRoot(env, userUid);
+        const root = await ensureOwnerRoot(env, actingUid);
         if (id === Number(root.folder_id)) return json({ error: 'root_folder' }, 400);
         const own = await env.DB.prepare(
           'SELECT owner_tg_id FROM folders WHERE id = ?').bind(id).first();
-        if (!own || String(own.owner_tg_id || '') !== userUid) {
+        if (!own || String(own.owner_tg_id || '') !== actingUid) {
           return json({ error: 'folder_not_found' }, 404);
         }
         const children = (await env.DB.prepare('SELECT id FROM folders WHERE parent_id = ?').bind(id).all()).results || [];
@@ -761,7 +808,7 @@ export default {
         if (children.length > 0) return json({ error: 'folder_not_empty' }, 400);
         if (routes.length > 0) return json({ error: 'folder_has_routes' }, 400);
         await env.DB.prepare('DELETE FROM folders WHERE id = ? AND owner_tg_id = ?')
-          .bind(id, userUid).run();
+          .bind(id, actingUid).run();
         return json({ status: 'ok' });
       }
 
@@ -772,18 +819,18 @@ export default {
           ? Number(bodyData.parent_id)
           : null;
         if (!Number.isFinite(id)) return json({ error: 'bad_params' }, 400);
-        const root = await ensureOwnerRoot(env, userUid);
+        const root = await ensureOwnerRoot(env, actingUid);
         if (id === Number(root.folder_id)) return json({ error: 'root_folder' }, 400);
         if (parentId === null) parentId = Number(root.folder_id);
         const own = await env.DB.prepare(
           'SELECT owner_tg_id FROM folders WHERE id = ?').bind(id).first();
-        if (!own || String(own.owner_tg_id || '') !== userUid) {
+        if (!own || String(own.owner_tg_id || '') !== actingUid) {
           return json({ error: 'folder_not_found' }, 404);
         }
         if (parentId !== null) {
           const parent = await env.DB.prepare(
             'SELECT owner_tg_id FROM folders WHERE id = ?').bind(parentId).first();
-          if (!parent || String(parent.owner_tg_id || '') !== userUid) {
+          if (!parent || String(parent.owner_tg_id || '') !== actingUid) {
             return json({ error: 'folder_not_found' }, 404);
           }
         }
@@ -799,7 +846,7 @@ export default {
           if (cyclic) return json({ error: 'cyclic_move' }, 400);
         }
         await env.DB.prepare('UPDATE folders SET parent_id = ? WHERE id = ? AND owner_tg_id = ?')
-          .bind(parentId, id, userUid).run();
+          .bind(parentId, id, actingUid).run();
         return json({ status: 'ok' });
       }
 
@@ -815,7 +862,7 @@ export default {
         }
         const own = await env.DB.prepare(
           'SELECT owner_tg_id FROM folders WHERE id = ?').bind(id).first();
-        if (!own || String(own.owner_tg_id || '') !== userUid) {
+        if (!own || String(own.owner_tg_id || '') !== actingUid) {
           return json({ error: 'folder_not_found' }, 404);
         }
         const sets = [];
@@ -824,7 +871,7 @@ export default {
         if (visible !== null) { sets.push('visible = ?'); vals.push(visible); }
         if (price !== null) { sets.push('price = ?'); vals.push(price); }
         if (sets.length === 0) return json({ error: 'nothing_to_update' }, 400);
-        vals.push(id, userUid);
+        vals.push(id, actingUid);
         await env.DB.prepare(`UPDATE folders SET ${sets.join(', ')} WHERE id = ? AND owner_tg_id = ?`).bind(...vals).run();
         return json({ status: 'ok' });
       }
@@ -837,25 +884,25 @@ export default {
           ? null
           : Number(rawFolderId);
         if (folderId === null) {
-          const root = await ensureOwnerRoot(env, userUid);
+          const root = await ensureOwnerRoot(env, actingUid);
           folderId = root.folder_id;
         }
         if (!mVal) return json({ error: 'missing_route_name' }, 400);
         const m = resolveM(mVal);
         const row = await env.DB.prepare(
           'SELECT id, owner_tg_id FROM roads WHERE m = ?').bind(m).first();
-        if (!row || String(row.owner_tg_id || '') !== userUid) {
+        if (!row || String(row.owner_tg_id || '') !== actingUid) {
           return json({ error: 'route_not_found' }, 404);
         }
         if (folderId !== null && folderId !== undefined) {
           const folder = await env.DB.prepare(
             'SELECT owner_tg_id FROM folders WHERE id = ?').bind(folderId).first();
-          if (!folder || String(folder.owner_tg_id || '') !== userUid) {
+          if (!folder || String(folder.owner_tg_id || '') !== actingUid) {
             return json({ error: 'folder_not_found' }, 404);
           }
         }
         await env.DB.prepare('UPDATE roads SET folder_id = ? WHERE m = ? AND owner_tg_id = ?')
-          .bind(folderId, m, userUid).run();
+          .bind(folderId, m, actingUid).run();
         return json({ status: 'ok' });
       }
 
@@ -863,37 +910,37 @@ export default {
       if (action === 'root_save') {
         const name = String(bodyData.name || '').trim();
         if (!name) return json({ error: 'missing_name' }, 400);
-        const root = await ensureOwnerRoot(env, userUid);
+        const root = await ensureOwnerRoot(env, actingUid);
         await env.DB.prepare('UPDATE folders SET name = ? WHERE id = ? AND owner_tg_id = ?')
-          .bind(name, root.folder_id, userUid).run();
+          .bind(name, root.folder_id, actingUid).run();
         return json({ status: 'ok', root: {
           folder_id: root.folder_id,
           name,
-          owner_name: root.owner_name || userUid,
+          owner_name: root.owner_name || actingUid,
           owner_avatar: root.owner_avatar || '',
           owner_username: root.owner_username || '',
           owner_info: root.owner_info || '',
-          owner_tg_id: userUid,
+          owner_tg_id: actingUid,
         } });
       }
 
       // ---- Профиль владельца ----
       if (action === 'owner_save') {
-        const root = await ensureOwnerRoot(env, userUid);
+        const root = await ensureOwnerRoot(env, actingUid);
         const info = bodyData.info !== undefined ? String(bodyData.info).trim() : null;
         if (info === null) return json({ error: 'nothing_to_update' }, 400);
         await env.DB.prepare('UPDATE owner_roots SET owner_info = ? WHERE owner_tg_id = ?')
-          .bind(info, userUid).run();
+          .bind(info, actingUid).run();
         return json({
           status: 'ok',
           root: {
             folder_id: root.folder_id,
             name: root.name || '',
-            owner_name: root.owner_name || userUid,
+            owner_name: root.owner_name || actingUid,
             owner_avatar: root.owner_avatar || '',
             owner_username: root.owner_username || '',
             owner_info: info,
-            owner_tg_id: userUid,
+            owner_tg_id: actingUid,
           },
         });
       }
@@ -901,7 +948,7 @@ export default {
       // ---- Личная сцена знаков владельца ----
       if (action === 'signs_get') {
         const row = await env.DB.prepare(
-          'SELECT data FROM owner_signs WHERE owner_tg_id = ?').bind(userUid).first();
+          'SELECT data FROM owner_signs WHERE owner_tg_id = ?').bind(actingUid).first();
         let data = null;
         if (row && row.data) {
           try {
@@ -927,7 +974,7 @@ export default {
            VALUES (?, ?, ?)
            ON CONFLICT(owner_tg_id) DO UPDATE SET
              data = excluded.data, updated_at = excluded.updated_at`)
-          .bind(userUid, payload, Date.now()).run();
+          .bind(actingUid, payload, Date.now()).run();
         return json({ status: 'ok', count: data.markers.length });
       }
 
