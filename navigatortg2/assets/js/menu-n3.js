@@ -104,6 +104,11 @@ const MenuModule = {
                     folder_id: String(owner.root_folder_id),
                     parent_id: '',
                     name: owner.name || 'Владелец',
+                    owner_name: owner.owner_name || '',
+                    owner_avatar: owner.owner_avatar || '',
+                    owner_username: owner.owner_username || '',
+                    owner_info: owner.owner_info || '',
+                    owner_tg_id: owner.owner_tg_id || '',
                     sort_order: 0,
                     is_owner_root: true,
                     ownerRootId: String(owner.root_folder_id),
@@ -187,6 +192,7 @@ const MenuModule = {
                 distance_meters: Number.isFinite(route.distance_meters) ? route.distance_meters : null,
                 premium: !!route.premium,
                 locked: !!route.locked,
+                owned: !!route.owned,
                 viewed: !!route.viewed || !!(previous && previous.viewed),
                 ownerRootId: rootId
             };
@@ -382,6 +388,7 @@ const MenuModule = {
                 folder_id: route.folder_id || '',
                 premium: !!route.premium,
                 locked: !!route.locked,
+                owned: !!route.owned,
                 viewed: !!route.viewed,
                 ...this._routeStats(route)
             });
@@ -579,7 +586,7 @@ const MenuModule = {
             for (const folder of childFolders) {
                 const button = document.createElement('button');
                 button.type = 'button';
-                button.className = 'routes-folder-row';
+                button.className = 'routes-folder-row' + (Number(folder.price) > 0 ? ' is-paid-folder' : '');
                 button.dataset.folderId = folder.folder_id;
                 button.dataset.folderName = folder.name;
                 if (folder.is_owner_root) button.dataset.ownerRoot = '1';
@@ -590,7 +597,13 @@ const MenuModule = {
                         : '');
                 button.innerHTML = `
                     <span class="routes-folder-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6.5A1.5 1.5 0 0 1 4.5 5h5l2 2h8A1.5 1.5 0 0 1 21 8.5v9a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 17.5z"/></svg></span>
-                    <span class="routes-folder-name">${this._escape(folder.name)}</span>
+                    <span class="routes-folder-text">
+                        <span class="routes-folder-name">${this._escape(folder.name)}</span>
+                        ${(folder.owner_name || Number(folder.price) > 0) ? `<span class="routes-folder-badges">
+                            ${folder.owner_name ? `<span class="routes-owner-badge" data-owner-root="${this._escape(folder.folder_id)}" role="button" tabindex="0">${this._escape(folder.owner_name)}</span>` : ''}
+                            ${Number(folder.price) > 0 ? `<span class="routes-folder-paid" title="Платная папка">★ Премиум ${folder.price}</span>` : ''}
+                        </span>` : ''}
+                    </span>
                     <span class="routes-folder-count" aria-label="${countAria}">
                         ${folder.count}
                     </span>
@@ -604,9 +617,11 @@ const MenuModule = {
         const frag = document.createDocumentFragment();
         for (const route of routes) frag.appendChild(this._createRouteRow(route));
         container.appendChild(frag);
+
         this._observeRoutePreviews(container);
         this._scrollToCurrentRoute(container);
     },
+
 
     // Прокручивает список к загруженному маршруту, чтобы при открытии меню
     // было видно, где остановились. Срабатывает, только если строка есть
@@ -630,10 +645,14 @@ const MenuModule = {
         el.innerHTML = '';
         const labels = [
             { id: '', name: this._ownersLoaded ? 'Главная' : 'Все маршруты' },
-            ...this._folderPath.map(id => ({
-                id,
-                name: this._folderMap.get(id)?.name || id
-            }))
+            ...this._folderPath.map(id => {
+                const folder = this._folderMap.get(id);
+                return {
+                    id,
+                    name: folder?.name || id,
+                    paid: Number(folder?.price) > 0
+                };
+            })
         ];
         el.hidden = false;
 
@@ -650,6 +669,12 @@ const MenuModule = {
             const isCurrent = index === labels.length - 1;
             item.className = 'routes-breadcrumb-item' + (isCurrent ? ' current' : '');
             item.textContent = label.name;
+            if (label.paid) {
+                const star = document.createElement('span');
+                star.className = 'routes-breadcrumb-premium';
+                star.textContent = '★';
+                item.appendChild(star);
+            }
             item.dataset.breadcrumbIndex = String(index);
             if (isCurrent) item.setAttribute('aria-current', 'location');
             el.appendChild(item);
@@ -763,6 +788,12 @@ const MenuModule = {
             premiumBadge.className = 'route-row-badge route-row-badge-premium';
             premiumBadge.textContent = '★ Премиум';
             flags.push(premiumBadge);
+        }
+        if (route.owned) {
+            const ownerBadge = document.createElement('span');
+            ownerBadge.className = 'route-row-badge route-row-badge-owner';
+            ownerBadge.textContent = 'Владелец';
+            flags.push(ownerBadge);
         }
         if (route.viewed && !isActive) {
             const viewed = document.createElement('span');
@@ -1204,6 +1235,16 @@ const MenuModule = {
         const routesList = document.getElementById('routesListContainer');
         if (routesList) {
             routesList.addEventListener('click', event => {
+                const ownerBadge = event.target.closest('.routes-owner-badge');
+                if (ownerBadge) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    const rootId = ownerBadge.dataset.ownerRoot || '';
+                    if (rootId && typeof window.openOwnerInfo === 'function') {
+                        window.openOwnerInfo(rootId);
+                    }
+                    return;
+                }
                 const folder = event.target.closest('[data-folder-id]');
                 if (!folder || !routesList.contains(folder)) return;
                 if (folder.dataset.ownerRoot === '1' && !this._activeOwnerId) {

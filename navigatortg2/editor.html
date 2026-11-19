@@ -2,55 +2,79 @@
 <html lang="ru">
 <head>
     <meta charset="utf-8">
-    <title>Редактор маршрутов</title>
+    <title>Редактор маршрутов и знаков</title>
     <link rel="icon" href="ico.png" type="image/png">
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
-    <link rel="stylesheet" href="assets/css/editor.css?v=2">
-    <link rel="stylesheet" href="assets/css/maplibre-gl.css?v=1">
+    <meta name="robots" content="noindex, nofollow">
+    <script>
+        (function () {
+            var theme = '';
+            try { theme = localStorage.getItem('osm_editor_theme_v1') || ''; } catch (e) {}
+            if (theme !== 'dark' && theme !== 'light') {
+                theme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+            }
+            document.documentElement.setAttribute('data-theme', theme);
+        })();
+    </script>
+    <link rel="stylesheet" href="assets/css/editor.css?v=15">
+    <link rel="stylesheet" href="assets/css/maplibre-gl.css?v=4.7.1">
 </head>
 <body>
-<script>
-    // Автообновление: сравниваем версию сборки с сохранённой. Если на сервере
-    // уже новая версия, а WebView отдал старую страницу из кэша — перезагружаем.
-    (function () {
-        try {
-            fetch('version.json', { cache: 'no-store' })
-                .then(function (r) { return r.ok ? r.json() : null; })
-                .then(function (data) {
-                    if (!data || !data.build) return;
-                    var key = 'osm_build';
-                    var previous = '';
-                    try { previous = localStorage.getItem(key) || ''; } catch (e) {}
-                    try { localStorage.setItem(key, data.build); } catch (e) {}
-                    if (previous && previous !== data.build) {
-                        window.location.reload();
-                    }
-                })
-                .catch(function () {});
-        } catch (e) {}
-    })();
-</script>
 
 <div id="toast">Готово</div>
-<div id="welcomeScreen" style="display:flex;align-items:center;justify-content:center;background:rgba(10,11,15,0.95);"><div style="display:flex;flex-direction:column;align-items:center;gap:16px;"><span style="width:32px;height:32px;border:3px solid rgba(255,255,255,0.3);border-top-color:#fff;border-radius:50%;animation:spin 1s linear infinite;"></span><div style="font-size:16px;font-weight:600;color:#fff;">Загрузка</div></div></div>
-<div id="noAccessScreen" style="display:none;position:fixed;inset:0;z-index:100000;background:rgba(10,11,15,0.97);align-items:center;justify-content:center;padding:24px;">
-    <div style="max-width:360px;width:100%;text-align:center;color:#f5f7fa;font-family:inherit;">
-        <div style="font-size:40px;line-height:1;margin-bottom:10px;">🔒</div>
-        <div style="font-size:18px;font-weight:700;margin-bottom:8px;">Редактор доступен только в Telegram</div>
-        <div id="noAccessText" style="font-size:14px;color:rgba(245,247,250,0.7);margin-bottom:18px;">Откройте редактор из Telegram Mini App.</div>
+<div id="editorAuthGate" style="position:fixed;inset:0;z-index:30000;display:flex;align-items:center;justify-content:center;padding:24px;background:rgba(0,0,0,0.88);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);">
+    <div style="box-sizing:border-box;width:min(100%,360px);max-width:100%;display:flex;flex-direction:column;gap:14px;padding:24px;border:1px solid rgba(255,255,255,0.16);border-radius:20px;background:rgba(20,20,24,0.96);box-shadow:0 20px 60px rgba(0,0,0,0.5);">
+        <div style="text-align:center;font-size:38px;line-height:1;">🔒</div>
+        <h2 style="margin:0;text-align:center;font-size:20px;">Редактор доступен только в Telegram</h2>
+        <p id="editorAuthMessage" role="status" style="margin:0;text-align:center;color:rgba(255,255,255,0.65);font-size:14px;">Проверяем вход через Telegram…</p>
+        <div id="editorAuthError" role="alert" style="min-height:18px;text-align:center;color:#ff6961;font-size:13px;overflow-wrap:anywhere;"></div>
     </div>
 </div>
+<div id="welcomeScreen" style="display:flex;align-items:center;justify-content:center;background:rgba(10,11,15,0.95);"><div style="display:flex;flex-direction:column;align-items:center;gap:16px;"><span style="width:32px;height:32px;border:3px solid rgba(255,255,255,0.3);border-top-color:#fff;border-radius:50%;animation:spin 1s linear infinite;"></span><div style="font-size:16px;font-weight:600;color:#fff;">Загрузка</div></div></div>
 <div id="map"></div>
 <div class="top-controls" id="uiControls" style="display:none">
-    <button id="settingsBtn" onclick="openSettingsModal()">
-        Маршруты
-    </button>
-    <button id="signsBtn" onclick="toggleSignsMode()">Знаки</button>
-    <div id="routeNameDisplay"></div>
+    <div class="editor-top-nav" id="editorTopNav" role="tablist" aria-label="Разделы редактора">
+        <button type="button" class="editor-top-nav-btn" data-tab="routes" role="tab">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+                <circle cx="6" cy="19" r="2.5"/>
+                <circle cx="18" cy="5" r="2.5"/>
+                <path d="M8.5 19H15a4 4 0 0 0 0-8H9a4 4 0 0 1 0-8h6"/>
+            </svg>
+            <span>Маршруты</span>
+        </button>
+        <button type="button" class="editor-top-nav-btn" data-tab="signs" role="tab">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M12 3 3 20h18L12 3Z"/>
+                <path d="M12 9v5M12 17h.01"/>
+            </svg>
+            <span>Знаки</span>
+        </button>
+        <button type="button" class="editor-top-nav-btn" data-tab="instruction" role="tab">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M12 6.2C10.4 4.9 8.2 4.2 5.5 4.2H4.5a1 1 0 0 0-1 1v11.6a1 1 0 0 0 1 1h1c2.7 0 4.9.7 6.5 2 1.6-1.3 3.8-2 6.5-2h1a1 1 0 0 0 1-1V5.2a1 1 0 0 0-1-1h-1c-2.7 0-4.9.7-6.5 2Z"/>
+                <path d="M12 6.2v13.6"/>
+            </svg>
+            <span>Инструкция</span>
+        </button>
+        <button type="button" class="editor-top-nav-btn" data-tab="settings" role="tab">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M4 7h10M18 7h2M4 17h2M10 17h10M4 12h4M12 12h8"/>
+                <circle cx="16" cy="7" r="2"/>
+                <circle cx="8" cy="17" r="2"/>
+                <circle cx="10" cy="12" r="2"/>
+            </svg>
+            <span>Настройки</span>
+        </button>
+        <button type="button" class="editor-top-nav-btn" data-tab="profile" role="tab">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+                <circle cx="12" cy="8" r="4"/>
+                <path d="M4 20c0-4 4-6 8-6s8 2 8 6"/>
+            </svg>
+            <span>Профиль</span>
+        </button>
+    </div>
 </div>
-<button id="layerSwitchBtn" class="circle-btn hidden-vis" onclick="toggleLayer()">
-    <svg viewBox="0 0 24 24"><path d="M11.99 18.54l-7.37-5.73L3 14.07l9 7 9-7-1.63-1.27-7.38 5.74zM12 16l7.36-5.73L21 9l-9-7-9 7 1.63 1.27L12 16z"/></svg>
-</button>
+<div id="routeNameDisplay"></div>
 <button id="listPointsBtn" class="circle-btn hidden-vis" onclick="openPointsOrderModal()">
     <svg viewBox="0 0 24 24"><path d="M3 13h2v-2H3v2zm0 4h2v-2H3v2zm0-8h2V7H3v2zm4 4h14v-2H7v2zm0 4h14v-2H7v2zM7 7v2h14V7H7z"/></svg>
 </button>
@@ -67,39 +91,130 @@
 <div id="dropdownOverlay" class="dropdown-overlay" onclick="closeD()"></div>
 <div id="listColorDropdown" class="color-dropdown"></div>
 
+<div id="mapSettingsModal" onclick="if(event.target===this) toggleM('mapSettingsModal')"><div class="modal-sheet"><div class="modal-header"><h3>Настройки</h3><button class="close-circle" onclick="toggleM('mapSettingsModal')">✕</button></div><div class="modal-body-scroll"><div class="settings-card"><div class="settings-card-title">Слой карты</div><div id="mapStyleGrid" class="map-style-grid"></div></div><div class="settings-card"><div class="settings-card-title">Тема</div><label class="theme-row"><span class="theme-row-label">Тёмная тема</span><span class="theme-switch"><input type="checkbox" id="editorThemeToggle" onchange="applyEditorTheme(this.checked ? 'dark' : 'light')"><span class="theme-switch-track"><span class="theme-switch-thumb"></span></span></span></label></div></div><div class="modal-actions-sm"><button class="btn-action flex-1" onclick="toggleM('mapSettingsModal')">Готово</button></div></div></div>
 <div id="pointsOrderModal" onclick="if(event.target===this) toggleM('pointsOrderModal')"><div class="modal-sheet" style="gap:0;"><div class="modal-header"><h3 id="orderModalTitle">Маршрут</h3><button class="close-circle" onclick="toggleM('pointsOrderModal')">✕</button></div><div id="pointsSortList" style="flex:1;overflow-y:auto;padding:14px;"></div><div class="modal-footer"><button id="saveInListBtn" class="btn-action" onclick="handleModalSave()"><span id="saveBtnText">Готово</span></button></div></div></div>
-<div id="settingsModal" onclick="if(event.target===this) toggleM('settingsModal')"><div class="modal-sheet"><div class="modal-header" style="padding:16px 20px 16px 10px;"><span id="settingsTitle">Маршруты</span><div style="display:flex;gap:6px;margin-left:auto;"><button class="close-circle" onclick="toggleM('settingsModal')">✕</button></div></div><div class="settings-body" id="routesList"></div><div class="modal-actions-sm"><button class="settings-tool-btn settings-tool-btn-green flex-1" onclick="openCreateRouteModal()" style="text-align:center;">Создать маршрут</button><button class="settings-tool-btn flex-1" onclick="window.createFolder()" style="text-align:center;background:rgba(0,122,255,0.25);border-color:rgba(0,122,255,0.4);">Создать папку</button></div></div></div>
+<div id="settingsModal" onclick="if(event.target===this) toggleM('settingsModal')"><div class="modal-sheet"><div class="modal-header"><span id="settingsTitle">Маршруты</span><div style="display:flex;gap:6px;margin-left:auto;"><button class="close-circle" onclick="toggleM('settingsModal')">✕</button></div></div><nav id="editorRoutesBreadcrumb" class="routes-breadcrumb" aria-label="Путь к папке"></nav><div class="settings-body" id="routesList"></div><div class="modal-actions-sm"><button class="settings-tool-btn settings-tool-btn-green flex-1" onclick="openCreateRouteModal()" style="text-align:center;">Создать маршрут</button><button class="settings-tool-btn settings-tool-btn-blue flex-1" onclick="window.createFolder()" style="text-align:center;">Создать папку</button></div></div></div>
 <div id="createRouteModal" onclick="if(event.target===this) toggleM('createRouteModal')"><div class="modal-sheet modal-sheet-compact"><h3 class="modal-title">Новый маршрут</h3><div class="input-wrapper" style="padding:4px;border-radius:14px;"><input type="text" id="newRouteNameInput" placeholder="Название маршрута"></div><div class="modal-actions"><button class="btn-action flex-1" onclick="toggleM('createRouteModal')">Отмена</button><button class="btn-action btn-primary flex-1" onclick="handleCreateNew()">Создать</button></div></div></div>
 <div id="createFolderModal" onclick="if(event.target===this) toggleM('createFolderModal')"><div class="modal-sheet modal-sheet-compact"><h3 class="modal-title">Новая папка</h3><div class="input-wrapper" style="padding:4px;border-radius:14px;"><input type="text" id="newFolderNameInput" placeholder="Название папки"></div><div class="modal-actions"><button class="btn-action flex-1" onclick="toggleM('createFolderModal')">Отмена</button><button class="btn-action btn-primary flex-1" onclick="handleCreateFolder()">Создать</button></div></div></div>
-<div id="folderSettingsModal" onclick="if(event.target===this) toggleM('folderSettingsModal')"><div class="modal-sheet" style="gap:0;padding:0;"><div class="modal-header"><h3 id="settingsRouteTitle">Настройки папки</h3><button class="close-circle" onclick="toggleM('folderSettingsModal')">✕</button></div><div class="modal-body-scroll"><div class="field-label">Название папки</div><div class="input-wrapper" style="padding:3px;border-radius:12px;margin-bottom:8px;"><input type="text" id="folderSettingsNameInput" placeholder="Введите название папки" style="width:100%;padding:10px;border:none;font-size:16px;outline:none;background:transparent;color:#f5f7fa;font-family:inherit;box-sizing:border-box;"></div><div class="field-label">Цена доступа (⭐)</div><div class="input-wrapper" style="padding:3px;border-radius:12px;margin-bottom:8px;"><input type="number" id="folderSettingsPriceInput" placeholder="0" min="0" max="10000" style="width:100%;padding:10px;border:none;font-size:16px;outline:none;background:transparent;color:#f5f7fa;font-family:inherit;box-sizing:border-box;"></div><div class="field-label">Видимость</div><div style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:14px;background:rgba(25,25,30,0.7);border:1px solid rgba(255,255,255,0.25);"><label style="display:flex;align-items:center;gap:10px;cursor:pointer;flex:1;"><input type="checkbox" id="folderSettingsVisibleCheckbox" style="width:20px;height:20px;accent-color:#34C759;cursor:pointer;"><span style="font-size:16px;font-weight:600;color:#ffffff;">Отображать в списке</span></label></div></div><div style="display:flex;flex-direction:column;gap:8px;padding:20px;padding-top:0;"><button class="btn-action" onclick="saveFolderSettings();">💾 Сохранить</button><button class="btn-action btn-danger" onclick="deleteCurrentFolder();">🗑️ Удалить папку</button></div></div></div>
-<div id="settingsRouteModal" onclick="if(event.target===this) toggleM('settingsRouteModal')"><div class="modal-sheet" style="gap:0;padding:0;"><div class="modal-header"><h3 id="settingsRouteTitle">Настройки маршрута</h3><button class="close-circle" onclick="toggleM('settingsRouteModal')">✕</button></div><div class="modal-body-scroll">
-<div class="field-label">Имя маршрута</div>
-<div class="input-wrapper" style="padding:3px;border-radius:12px;margin-bottom:8px;"><textarea id="routeDisplayName" placeholder="Введите имя маршрута" rows="2" style="width:100%;padding:10px;border:none;font-size:16px;outline:none;background:transparent;color:#f5f7fa;font-family:inherit;resize:none;min-height:56px;box-sizing:border-box;"></textarea></div>
-<div class="field-label">Описание маршрута</div>
-<div class="input-wrapper" style="padding:3px;border-radius:12px;margin-bottom:8px;"><textarea id="routeDescription" placeholder="Введите описание маршрута" rows="2" style="width:100%;padding:10px;border:none;font-size:16px;outline:none;background:transparent;color:#f5f7fa;font-family:inherit;resize:none;min-height:56px;"></textarea></div>
-
-<div class="field-label">Папка</div>
-<div class="input-wrapper" style="padding:3px;border-radius:12px;margin-bottom:8px;">
-<select id="routeFolderSelect" style="width:100%;padding:10px;border-radius:8px;background:rgba(25,25,30,0.7);color:#f5f7fa;border:1px solid rgba(255,255,255,0.25);outline:none;"><option value="">Корень</option></select>
-</div>
-
-<div style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:14px;background:rgba(25,25,30,0.7);border:1px solid rgba(255,255,255,0.25);">
+<div id="folderSettingsModal" onclick="if(event.target===this) toggleM('folderSettingsModal')"><div class="modal-sheet" style="gap:0;"><div class="modal-header"><h3 id="folderSettingsTitle">Настройки папки</h3><button class="close-circle" onclick="toggleM('folderSettingsModal')">✕</button></div><div class="modal-body-scroll">
+<div class="field-label">Название папки</div>
+<div class="input-wrapper" style="padding:3px;border-radius:12px;margin-bottom:8px;"><input id="folderNameInput" type="text" placeholder="Название папки" style="width:100%;padding:12px 10px;border:none;font-size:16px;outline:none;background:transparent;color:var(--text);font-family:inherit;box-sizing:border-box;"></div>
+<div class="field-label">Родительская папка</div>
+<div class="input-wrapper" style="padding:3px;border-radius:12px;margin-bottom:8px;"><select id="folderParentSelect" style="width:100%;padding:12px 10px;border:none;font-size:16px;outline:none;background:transparent;color:var(--text);font-family:inherit;box-sizing:border-box;"></select></div>
+<div class="field-label">Цена доступа (⭐)</div>
+<div class="input-wrapper" style="padding:3px;border-radius:12px;margin-bottom:8px;"><input id="folderPriceInput" type="number" min="0" max="10000" placeholder="0" style="width:100%;padding:12px 10px;border:none;font-size:16px;outline:none;background:transparent;color:var(--text);font-family:inherit;box-sizing:border-box;"></div>
+<div style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:14px;background:var(--surface-muted);border:1px solid var(--line);margin-bottom:8px;">
 <label style="display:flex;align-items:center;gap:10px;cursor:pointer;flex:1;">
-<input type="checkbox" id="routeVisible" style="width:20px;height:20px;accent-color:#34C759;cursor:pointer;">
-<span style="font-size:16px;font-weight:600;color:#ffffff;">Отображать маршрут в публичном списке</span>
+<input type="checkbox" id="folderVisibleCheckbox" style="width:20px;height:20px;accent-color:var(--green);cursor:pointer;">
+<span style="font-size:16px;font-weight:600;color:var(--text);">Отображать в списке</span>
 </label>
 </div>
 </div>
 <div style="display:flex;flex-direction:column;gap:8px;padding:20px;padding-top:0;">
-<button class="btn-action" onclick="saveRouteMeta();">💾 Сохранить метаданные</button>
-<button class="btn-action" onclick="openInNavigator();">🧭 Открыть в навигаторе</button>
-<button class="btn-action" onclick="shareRouteFromSettings();">🔗 Скопировать ссылку</button>
-<button class="btn-action btn-danger" onclick="confirmDeleteRoute();">🗑️ Удалить маршрут</button>
+<button class="btn-action" onclick="saveFolderSettings();">💾 Сохранить папку</button>
+<button class="btn-action btn-danger" onclick="confirmDeleteFolder();">🗑️ Удалить папку</button>
 </div></div></div>
-<div id="confirmDeleteModal" onclick="if(event.target===this) toggleM('confirmDeleteModal')"><div class="modal-sheet modal-sheet-compact"><h3 class="modal-title">Удалить маршрут?</h3><p id="confirmDeleteText" class="modal-desc-text" style="font-size:16px;"></p><div class="modal-actions"><button class="btn-action flex-1" onclick="toggleM('confirmDeleteModal')">Отмена</button><button class="btn-action btn-danger flex-1" onclick="executeDeleteRoute()">Удалить</button></div></div></div>
+<div id="settingsRouteModal" onclick="if(event.target===this) toggleM('settingsRouteModal')"><div class="modal-sheet" style="gap:0;"><div class="modal-header"><h3 id="settingsRouteTitle">Настройки маршрута</h3><button class="close-circle" onclick="toggleM('settingsRouteModal')">✕</button></div><div class="modal-body-scroll">
+<div class="field-label">Название маршрута</div>
+<div class="input-wrapper" style="padding:3px;border-radius:12px;"><textarea id="routeDisplayName" placeholder="Введите название маршрута" rows="2" style="width:100%;padding:10px;border:none;font-size:16px;outline:none;background:transparent;color:var(--text);font-family:inherit;resize:none;min-height:56px;box-sizing:border-box;"></textarea></div>
+<div class="field-label">Папка</div>
+<div class="input-wrapper" style="padding:3px;border-radius:12px;"><select id="routeFolderSelect" style="width:100%;padding:12px 10px;border:none;font-size:16px;outline:none;background:transparent;color:var(--text);font-family:inherit;box-sizing:border-box;"></select></div>
+<div class="field-label">Описание маршрута</div>
+<div class="input-wrapper" style="padding:3px;border-radius:12px;"><textarea id="routeDescription" placeholder="Введите описание маршрута" rows="2" style="width:100%;padding:10px;border:none;font-size:16px;outline:none;background:transparent;color:var(--text);font-family:inherit;resize:none;min-height:56px;"></textarea></div>
+
+<div style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:14px;background:var(--surface-muted);border:1px solid var(--line);">
+<label style="display:flex;align-items:center;gap:10px;cursor:pointer;flex:1;">
+<input type="checkbox" id="routeVisible" style="width:20px;height:20px;accent-color:var(--green);cursor:pointer;">
+<span style="font-size:16px;font-weight:600;color:var(--text);">Виден в публичном списке</span>
+</label>
+</div>
+<div style="display:none;">
+<input type="checkbox" id="routePremium">
+</div>
+</div>
+<div class="route-settings-actions">
+<button class="btn-action" onclick="saveRouteMeta();">💾 Сохранить</button>
+<button class="btn-action" onclick="openInNavigator();">🧭 В навигатор</button>
+<button class="btn-action" onclick="shareRouteFromSettings();">🔗 Ссылка</button>
+<button class="btn-action btn-danger" onclick="confirmDeleteRoute();">🗑️ Удалить</button>
+</div></div></div>
+<div id="editorProfileModal" onclick="if(event.target===this) toggleM('editorProfileModal')">
+    <div class="modal-sheet">
+        <div class="modal-header"><h3>Профиль</h3><button class="close-circle" onclick="toggleM('editorProfileModal')">✕</button></div>
+        <div class="modal-body-scroll">
+            <div class="settings-card">
+                <div class="settings-card-title">Telegram</div>
+                <div class="settings-profile" style="display:flex;">
+                    <div id="profileScreenAvatar" class="settings-profile-avatar"></div>
+                    <div class="settings-profile-info">
+                        <div id="profileScreenName" class="settings-profile-name"></div>
+                        <div id="profileScreenUsername" class="settings-profile-email"></div>
+                        <div id="profileScreenId" class="settings-profile-email"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="settings-card">
+                <div class="settings-card-title">Информация</div>
+                <div class="settings-profile" style="display:block;padding:0;">
+                    <textarea id="ownerInfoInput" class="settings-name-input" rows="3" maxlength="500" placeholder="Например: @username или контакты" style="width:100%;min-height:64px;resize:none;box-sizing:border-box;"></textarea>
+                    <button id="ownerInfoSave" class="settings-name-save" onclick="saveOwnerInfo()" style="margin-top:8px;width:100%;">Сохранить</button>
+                </div>
+                <div class="settings-name-hint">Показывается в навигаторе при нажатии на бейдж владельца.</div>
+            </div>
+            <div class="settings-card">
+                <div class="settings-card-title">Корневая папка</div>
+                <div class="settings-name-row">
+                    <input id="rootFolderNameInput" class="settings-name-input" type="text" maxlength="60" placeholder="Название корневой папки" onkeydown="if(event.key==='Enter')saveRootFolderName()">
+                    <button id="rootFolderNameSave" class="settings-name-save" onclick="saveRootFolderName()">Сохранить</button>
+                </div>
+                <div class="settings-name-hint">Так корневая папка называется в навигаторе.</div>
+            </div>
+        </div>
+        <div class="modal-actions-sm"><button class="btn-action flex-1" onclick="toggleM('editorProfileModal')">Готово</button></div>
+    </div>
+</div>
+<div id="signEditorPanel" class="sign-editor-panel" hidden>
+    <div class="sign-editor-head">
+        <div id="signGroupTabs" class="sign-group-tabs"></div>
+        <button type="button" id="signSearchToggle" class="sign-icon-btn" title="Поиск" aria-label="Поиск">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M16.5 16.5 21 21"/></svg>
+        </button>
+        <button type="button" id="signPanelCollapse" class="sign-icon-btn" title="Свернуть панель" aria-label="Свернуть панель знаков">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+        </button>
+    </div>
+    <div id="signModeBar" class="sign-mode-bar" hidden>
+        <span>Добавить знак на столб</span>
+        <button type="button" id="signModeDone">Готово</button>
+    </div>
+    <div id="signSearchRow" class="sign-search-row" hidden>
+        <input id="signSearchInput" type="search" placeholder="Поиск по всем знакам" autocomplete="off">
+    </div>
+    <div id="signCatalogScroll" class="sign-catalog-scroll">
+        <div id="signCatalogGrid" class="sign-catalog-grid"></div>
+    </div>
+    <div class="sign-editor-footer">
+        <button type="button" id="signSaveBtn" class="sign-save-btn">Сохранить знаки</button>
+    </div>
+</div>
+
+<button type="button" id="signPanelExpand" class="sign-expand-btn" hidden>
+    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m6 15 6-6 6 6"/></svg>
+    <span>Знаки</span>
+</button>
+
+<div id="signSelectedBar" class="sign-selected-bar" hidden>
+    <span id="signSelectedName" class="sign-selected-name"></span>
+    <button type="button" data-sign-action="rotate-left" title="Повернуть влево">↺</button>
+    <button type="button" data-sign-action="rotate-right" title="Повернуть вправо">↻</button>
+    <button type="button" data-sign-action="plate" title="Добавить знак на столб">＋</button>
+    <button type="button" data-sign-action="leg" title="Ножка">┃</button>
+    <button type="button" data-sign-action="delete" title="Удалить" class="danger">×</button>
+</div>
+
+<div id="confirmDeleteModal" onclick="if(event.target===this) toggleM('confirmDeleteModal')"><div class="modal-sheet modal-sheet-compact"><h3 class="modal-title">Удалить маршрут?</h3><p id="confirmDeleteText" class="modal-desc-text" style="font-size:16px;"></p><div class="modal-actions"><button class="btn-action flex-1" onclick="toggleM('confirmDeleteModal')">Отмена</button><button id="confirmDeleteRouteBtn" class="btn-action btn-danger flex-1" onclick="executeDeleteRoute()">Удалить</button></div></div></div>
 <div id="confirmDeletePointModal" onclick="if(event.target===this) toggleM('confirmDeletePointModal')"><div class="modal-sheet modal-sheet-compact"><h3 class="modal-title">Удалить точку?</h3><p class="modal-desc-text" style="font-size:16px;">Вы уверены, что хотите удалить эту точку?</p><div class="modal-actions"><button class="btn-action flex-1" onclick="toggleM('confirmDeletePointModal')">Отмена</button><button class="btn-action btn-danger flex-1" onclick="executeDeletePoint()">Удалить</button></div></div></div>
-<div id="shareModal" onclick="if(event.target===this) toggleM('shareModal')"><div class="modal-sheet modal-sheet-compact"><h3 class="modal-title">Поделиться маршрутом</h3><p class="modal-desc-text">По ссылке откроется навигатор с этим маршрутом.</p><div style="display:flex;flex-direction:column;gap:12px"><button class="btn-action flex-1" onclick="copyShareLink('tg')">Telegram</button><button class="btn-action flex-1" onclick="copyShareLink('web')">Браузер</button><button class="btn-action flex-1" onclick="toggleM('shareModal')">Отмена</button></div></div></div>
-<button id="instructionBtn" onclick="openInstruction()">📖 Инструкция</button>
+<div id="shareModal" onclick="if(event.target===this) toggleM('shareModal')"><div class="modal-sheet modal-sheet-compact"><h3 class="modal-title">Поделиться маршрутом</h3><p class="modal-desc-text">При открытии ссылки откроется навигатор с этим маршрутом.</p><div style="display:flex;flex-direction:column;gap:12px"><button class="btn-action flex-1" onclick="copyShareLink()">Скопировать ссылку</button><button class="btn-action flex-1" onclick="toggleM('shareModal')">Отмена</button></div></div></div>
 <div id="instructionModal" class="instruction-overlay" onclick="if(event.target===this) closeInstruction()">
     <div class="instruction-sheet">
         <div class="instruction-header">
@@ -112,37 +227,9 @@
     </div>
 </div>
 
-<div class="sign-editor-panel" id="signEditorPanel" hidden>
-    <div class="sign-editor-head">
-        <div class="sign-group-tabs" id="signGroupTabs"></div>
-        <button type="button" class="sign-icon-btn" id="signSearchToggle" title="Поиск" aria-label="Поиск">🔍</button>
-    </div>
-    <div class="sign-search-row" id="signSearchRow" hidden>
-        <input id="signSearchInput" type="search" placeholder="Поиск по номеру или названию" autocomplete="off">
-    </div>
-    <div class="sign-mode-bar" id="signModeBar" hidden>
-        <span>Режим табличек: нажмите табличку в каталоге</span>
-        <button type="button" id="signModeDone">Готово</button>
-    </div>
-    <div class="sign-catalog-scroll">
-        <div class="sign-catalog-grid" id="signCatalogGrid"></div>
-    </div>
-    <div class="sign-editor-footer">
-        <button type="button" class="sign-save-btn" id="signSaveBtn">Сохранить знаки</button>
-    </div>
-</div>
-<div class="sign-selected-bar" id="signSelectedBar" hidden>
-    <span class="sign-selected-name" id="signSelectedName">Знак</span>
-    <button type="button" data-sign-action="rotate-left" title="Повернуть влево" aria-label="Повернуть влево">⟲</button>
-    <button type="button" data-sign-action="plate" title="Добавить табличку" aria-label="Табличка">＋</button>
-    <button type="button" data-sign-action="leg" title="Ножка" aria-label="Ножка">⏐</button>
-    <button type="button" data-sign-action="rotate-right" title="Повернуть вправо" aria-label="Повернуть вправо">⟳</button>
-    <button type="button" data-sign-action="delete" class="danger" title="Удалить знак" aria-label="Удалить знак">✕</button>
-</div>
 <div id="loadingSpinner"><div class="spinner-box"><div class="spinner-ring"></div><div class="spinner-text">Загрузка...</div></div></div>
-<script>
-// Грузим Telegram SDK асинхронно с таймаутом 10с.
-// Если telegram.org заблокирован или недоступен — не блокируем загрузку приложения.
+
+    <script>
 (function (g) {
   var finished = false, pending = 0, cbs = [];
   function finish() {
@@ -165,7 +252,6 @@
     }
     timeout = setTimeout(function () { settle(true); }, 10000);
     if (typeof fetch === 'function' && typeof AbortController !== 'undefined') {
-      // Реально отменяем запрос через 10с, чтобы браузер не крутил спиннер
       controller = new AbortController();
       fetch(url, { signal: controller.signal })
         .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.text(); })
@@ -198,16 +284,14 @@
   g.platformReady = new Promise(function (r) { g.bootPlatforms(r); });
   tryLoad('https://telegram.org/js/telegram-web-app.js', '__tgWebAppFailed');
 })(window);
-</script>
-    <script src="assets/js/maplibre-gl.js?v=1"></script>
-    <script src="assets/js/pmtiles.js?v=1"></script>
-    <script src="assets/js/map-styles.js?v=1"></script>
-    <script src="assets/js/map-shim.js?v=1"></script>
-<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js" defer onerror="window.__sortableFailed = true;"></script>
-<script src="assets/js/config.js?v=4"></script>
-<script src="assets/js/tg-fullscreen.js?v=4"></script>
-<script src="assets/js/tts-client.js?v=1"></script>
-<script src="assets/js/report.js?v=4"></script>
+    </script>
+    <script src="assets/js/tg-fullscreen.js?v=4"></script>
+    <script src="assets/js/maplibre-gl.js?v=4.7.1"></script>
+    <script src="assets/js/pmtiles.js?v=3.2.1"></script>
+<script src="assets/js/sortable.min.js?v=1.15.0" defer onerror="window.__sortableFailed = true;"></script>
+<script src="assets/js/config.js?v=2"></script>
+<script src="assets/js/tts-client.js"></script>
+<script src="assets/js/map-styles.js?v=10"></script>
 <script>
 (function (global) {
   const byId = (id) => document.getElementById(id);
@@ -224,40 +308,323 @@ const { byId, round6 } = window.AppShared;
 const $ = byId;
 const f6 = round6;
 
-// ---- Telegram detection (только для подписи отчётов window.tgUser, авторизации нет) ----
-(function() {
-    const runAuth = () => {
-        if (window._authRan) return;
-        window._authRan = true;
-        if (typeof Telegram !== 'undefined' && Telegram.WebApp) {
-            try {
-                Telegram.WebApp.ready();
-                Telegram.WebApp.expand();
-                if (Telegram.WebApp.version && parseFloat(Telegram.WebApp.version) >= 7.0) {
-                    try { Telegram.WebApp.requestFullscreen?.(); } catch (e) {}
-                    try { Telegram.WebApp.disableVerticalSwipes?.(); } catch (e) {}
-                }
-                const user = Telegram.WebApp.initDataUnsafe?.user;
-                if (user) window.tgUser = user;
-            } catch (e) {}
-        }
-        if (navigator.userAgent.includes('Android') && window.tgUser) {
-            document.documentElement.classList.add('android-app');
-        }
-    };
-    if (window.bootPlatforms) window.bootPlatforms(runAuth); else runAuth();
-})();
-// -------------------------
+// Редактор работает с воркером nav-api-v2 (D1 nav-db-v2), авторизация —
+// подпись Telegram.WebApp.initData.
+const ADMIN_API_BASE = 'https://nav-api-v2.ivan43103.workers.dev';
 
-const API_URL = API_CONFIG.API_BASE;
+/* ---------- Яндекс.Спутник: проекция EPSG:3395 -> Web Mercator ---------- */
+const YANDEX_MERC_E = 0.0818191908426;
+let _yandexProtoRegistered = false;
+
+function webRowToLat(R, worldPx) {
+    return Math.atan(Math.sinh(Math.PI * (1 - 2 * R / worldPx))) * 180 / Math.PI;
+}
+
+function latToYandexRow(lat, worldPx) {
+    const b = lat * Math.PI / 180;
+    const phi = (1 - YANDEX_MERC_E * Math.sin(b)) / (1 + YANDEX_MERC_E * Math.sin(b));
+    const theta = Math.tan(Math.PI / 4 + b / 2) * Math.pow(phi, YANDEX_MERC_E / 2);
+    return worldPx * (1 - Math.log(theta) / Math.PI) / 2;
+}
+
+function makeCanvas(w, h) {
+    if (typeof OffscreenCanvas !== 'undefined') {
+        const c = new OffscreenCanvas(w, h);
+        return { canvas: c, ctx: c.getContext('2d'), offscreen: true };
+    }
+    const c = document.createElement('canvas');
+    c.width = w; c.height = h;
+    return { canvas: c, ctx: c.getContext('2d'), offscreen: false };
+}
+
+async function fetchTileBitmap(url, signal) {
+    const res = await fetch(url, { signal, mode: 'cors' });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    return await createImageBitmap(await res.blob());
+}
+
+async function buildYandexTile(params, abortController) {
+    const m = /yandexsat:\/\/sat\/(\d+)\/(\d+)\/(\d+)/.exec((params && params.url) || '');
+    if (!m) throw new Error('Некорректный URL тайла Яндекса');
+    const z = +m[1], x = +m[2], y = +m[3];
+    const n = Math.pow(2, z);
+    const worldPx = 256 * n;
+
+    const lat = webRowToLat(256 * y, worldPx);
+    const yRow = latToYandexRow(lat, worldPx);
+    let srcY = Math.floor(yRow / 256);
+    srcY = Math.max(0, Math.min(n - 1, srcY));
+    const shiftUp = Math.max(0, Math.min(255.999, yRow - 256 * srcY));
+    const snap = Math.max(0, Math.min(255, Math.round(shiftUp)));
+
+    const base = 'https://core-sat.maps.yandex.net/tiles?l=sat&x=' + x + '&y=';
+    const signal = abortController && abortController.signal;
+    const secondY = Math.min(n - 1, srcY + 1);
+    const [imgA, imgB] = await Promise.all([
+        fetchTileBitmap(base + srcY + '&z=' + z, signal),
+        snap > 0
+            ? fetchTileBitmap(base + secondY + '&z=' + z, signal).catch(() => null)
+            : Promise.resolve(null)
+    ]);
+
+    const { canvas, ctx, offscreen } = makeCanvas(256, 256);
+    ctx.drawImage(imgA, 0, -snap);
+    if (imgB) ctx.drawImage(imgB, 0, 256 - snap);
+    if (imgA.close) imgA.close();
+    if (imgB && imgB.close) imgB.close();
+
+    const data = offscreen ? canvas.transferToImageBitmap() : await createImageBitmap(canvas);
+    return { data };
+}
+
+function registerYandexProtocol() {
+    if (_yandexProtoRegistered) return;
+    if (typeof maplibregl === 'undefined' || !maplibregl.addProtocol) return;
+    maplibregl.addProtocol('yandexsat', buildYandexTile);
+    if (typeof pmtiles === 'undefined' || !pmtiles.Protocol) {
+        throw new Error('PMTiles protocol library is unavailable');
+    }
+    maplibregl.addProtocol('pmtiles', new pmtiles.Protocol().tile);
+    _yandexProtoRegistered = true;
+}
+
+const EDITOR_LINE_SOURCE = 'editor-lines';
+const EDITOR_ACTIVE_PRIORITY = 10000;
+const editorLines = new Map();
+let _mapObjectSeq = 0;
+
+class MapMarker {
+    constructor(options, element) {
+        this.element = element;
+        this.coordinates = options?.coordinates || [0, 0];
+        this._onMap = false;
+        this._marker = new maplibregl.Marker({
+            element,
+            anchor: options?.anchor || 'center',
+            rotationAlignment: 'viewport',
+            pitchAlignment: 'viewport',
+            draggable: !!options?.draggable
+        }).setLngLat(this.coordinates);
+
+        if (options?.onDragMove) {
+            this._marker.on('drag', () => {
+                const ll = this._marker.getLngLat();
+                options.onDragMove([ll.lng, ll.lat]);
+            });
+        }
+    }
+
+    update(options) {
+        if (options?.coordinates) {
+            this.coordinates = options.coordinates;
+            this._marker.setLngLat(this.coordinates);
+        }
+    }
+
+    _add(map) {
+        if (!this._onMap) {
+            this._marker.addTo(map);
+            this._onMap = true;
+        }
+    }
+
+    _remove() {
+        if (this._onMap) {
+            this._marker.remove();
+            this._onMap = false;
+        }
+    }
+}
+
+class MapLine {
+    constructor(options) {
+        this.id = ++_mapObjectSeq;
+        this.coordinates = options?.geometry?.coordinates || [];
+        this.kind = options?.kind || 'route';
+        this.color = options?.color || '#FFD700';
+        this.width = options?.width ?? 4;
+        this.casingColor = options?.casingColor || '#000000';
+        this.casingWidth = options?.casingWidth ?? 6;
+        this.priority = options?.priority ?? 0;
+        this._active = false;
+    }
+
+    _add() {
+        this._active = true;
+        editorLines.set(this.id, this);
+        ensureEditorLineLayers();
+        renderEditorLineFeatures();
+    }
+
+    _remove() {
+        this._active = false;
+        editorLines.delete(this.id);
+        renderEditorLineFeatures();
+    }
+
+    update(options) {
+        const coords = options?.geometry?.coordinates;
+        if (coords) this.coordinates = coords;
+        renderEditorLineFeatures();
+    }
+}
+
+function ensureEditorLineLayers() {
+    if (!map || typeof map.getSource !== 'function') return false;
+    if (typeof map.isStyleLoaded === 'function' && !map.isStyleLoaded()) return false;
+    try {
+        let changed = false;
+        if (!map.getSource(EDITOR_LINE_SOURCE)) {
+            map.addSource(EDITOR_LINE_SOURCE, {
+                type: 'geojson',
+                data: { type: 'FeatureCollection', features: [] }
+            });
+            changed = true;
+        }
+
+        const normalFilter = ['all', ['!=', ['get', 'kind'], 'hit'], ['<', ['get', 'priority'], EDITOR_ACTIVE_PRIORITY]];
+        const activeFilter = ['all', ['==', ['get', 'kind'], 'route'], ['>=', ['get', 'priority'], EDITOR_ACTIVE_PRIORITY]];
+        const hitFilter = ['==', ['get', 'kind'], 'hit'];
+        const sortKey = ['get', 'priority'];
+        const layout = { 'line-cap': 'round', 'line-join': 'round', 'line-sort-key': sortKey };
+
+        const add = (id, layer) => {
+            if (!map.getLayer(id)) {
+                map.addLayer(Object.assign({ id, source: EDITOR_LINE_SOURCE }, layer));
+                changed = true;
+            }
+        };
+
+        add('editor-lines-casing', {
+            type: 'line',
+            filter: normalFilter,
+            layout,
+            paint: {
+                'line-color': ['coalesce', ['get', 'casingColor'], '#000000'],
+                'line-width': ['coalesce', ['get', 'casingWidth'], 6]
+            }
+        });
+
+        add('editor-lines-main', {
+            type: 'line',
+            filter: normalFilter,
+            layout,
+            paint: {
+                'line-color': ['coalesce', ['get', 'color'], '#FFD700'],
+                'line-width': ['coalesce', ['get', 'width'], 4]
+            }
+        });
+
+        add('editor-lines-hit', {
+            type: 'line',
+            filter: hitFilter,
+            layout: { 'line-cap': 'round', 'line-join': 'round' },
+            paint: {
+                'line-color': '#808080',
+                'line-width': 30,
+                'line-opacity': 0.2
+            }
+        });
+
+        add('editor-lines-active-casing', {
+            type: 'line',
+            filter: activeFilter,
+            layout,
+            paint: {
+                'line-color': ['coalesce', ['get', 'casingColor'], '#000000'],
+                'line-width': ['coalesce', ['get', 'casingWidth'], 10]
+            }
+        });
+
+        add('editor-lines-active-glow', {
+            type: 'line',
+            filter: activeFilter,
+            layout,
+            paint: {
+                'line-color': '#A4E84A',
+                'line-width': ['-', ['coalesce', ['get', 'casingWidth'], 10], 2],
+                'line-opacity': 0.95,
+                'line-blur': 1
+            }
+        });
+
+        add('editor-lines-active-main', {
+            type: 'line',
+            filter: activeFilter,
+            layout,
+            paint: {
+                'line-color': ['coalesce', ['get', 'color'], '#FFD700'],
+                'line-width': ['coalesce', ['get', 'width'], 4]
+            }
+        });
+
+        return changed;
+    } catch (e) {
+        // Стиль ещё не готов — слои добавит следующий styledata/idle.
+        return false;
+    }
+}
+
+function renderEditorLineFeatures() {
+    if (!map || typeof map.getSource !== 'function') return;
+    const source = map.getSource(EDITOR_LINE_SOURCE);
+    if (!source) return;
+
+    const features = [];
+    for (const line of editorLines.values()) {
+        if (!line._active || !line.coordinates || line.coordinates.length < 2) continue;
+        features.push({
+            type: 'Feature',
+            id: line.id,
+            properties: {
+                kind: line.kind,
+                color: line.color,
+                width: line.width,
+                casingColor: line.casingColor,
+                casingWidth: line.casingWidth,
+                priority: line.priority
+            },
+            geometry: { type: 'LineString', coordinates: line.coordinates }
+        });
+    }
+
+    try {
+        source.setData({ type: 'FeatureCollection', features });
+    } catch (e) {}
+}
+
+function attachEditorMapApi() {
+    if (!map) return;
+    map.addChild = function(obj) {
+        if (obj?._add) obj._add(this);
+    };
+    map.removeChild = function(obj) {
+        if (obj?._remove) obj._remove();
+    };
+    map.update = function(options) {
+        const loc = options?.location;
+        if (loc?.center) this.easeTo({ center: loc.center, duration: loc.duration || 0 });
+    };
+}
 
 let map, points = [], cur = null, isAdd = false, isDrawing = false, curRoute = null, activeListPoint = null, modalMode = 'list', tempNewPointData = null, userLocPlacemark = null, activePoint = null, settingsRouteFiles = [];
 let historyStack = [], historyIndex = -1, lastSavedSnapshot = "[]", toastTimer = null;
 let pendingDeletePoint = null;
 let _currentFolderId = null;
-let _folders = new Map(); // id -> {id, name, parent_id}
-let _emptyFolders = [];
-let _expandedFolders = new Set();
+let _currentFolderParent = null;
+let _folderSettingsId = null;
+let settingsFolders = [];
+let settingsFolderPath = [];
+const routePreviewImages = new Map();
+const routePreviewRequests = new Map();
+let routePreviewObserver = null;
+const routePreviewColors = {
+    Gold: '#FFD700', Blue: '#007AFF', Red: '#FF3B30', Fuchsia: '#AF52DE',
+    Orange: '#FF9500', Purple: '#5856D6', Cyan: '#5AC8FA', Brown: '#A2845E',
+    Lime: '#34C759'
+};
+const editorIconFolder = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6.5A1.5 1.5 0 0 1 4.5 5h5l2 2h8A1.5 1.5 0 0 1 21 8.5v9a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 17.5z"/></svg>';
+const editorIconGear = '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M19.14 12.94c0.04-0.3 0.06-0.61 0.06-0.94c0-0.32-0.02-0.64-0.07-0.94l2.03-1.58c0.18-0.14 0.23-0.41 0.12-0.61l-1.92-3.32c-0.12-0.22-0.37-0.29-0.59-0.22l-2.39 0.96c-0.5-0.38-1.03-0.7-1.62-0.94L14.4 2.81c-0.04-0.24-0.24-0.41-0.48-0.41h-3.84c-0.24 0-0.43 0.17-0.47 0.41L9.25 5.35C8.66 5.59 8.12 5.92 7.63 6.29L5.24 5.33c-0.22-0.08-0.47 0-0.59 0.22L2.74 8.87C2.62 9.08 2.66 9.34 2.86 9.48l2.03 1.58C4.84 11.36 4.8 11.69 4.8 12s0.02 0.64 0.07 0.94l-2.03 1.58c-0.18 0.14-0.23 0.41-0.12 0.61l1.92 3.32c0.12 0.22 0.37 0.29 0.59 0.22l2.39-0.96c0.5 0.38 1.03 0.7 1.62 0.94l0.36 2.54c0.05 0.24 0.24 0.41 0.48 0.41h3.84c0.24 0 0.44-0.17 0.47-0.41l0.36-2.54c0.59-0.24 1.13-0.56 1.62-0.94l2.39 0.96c0.22 0.08 0.47 0 0.59-0.22l1.92-3.32c0.12-0.22 0.07-0.47-0.12-0.61L19.14 12.94z M12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6s3.6 1.62 3.6 3.6S13.98 15.6 12 15.6z"/></svg>';
 
 // Custom path editor state (API v3 has no built-in polyline editor)
 let _drawPathPoints = [];
@@ -270,13 +637,13 @@ function setDrawMapClickHandler(handler) {
 
 function updateHitLine(p) {
     if (!p || !map) return;
-    if (p._hitLine && map) map.removeChild(p._hitLine);
+    if (p._hitLine) map.removeChild(p._hitLine);
     p._hitLine = null;
     if (!p.pts || p.pts.length < 2) return;
-    const { YMapFeature } = ymaps3;
-    p._hitLine = new YMapFeature({
+    p._hitLine = new MapLine({
         geometry: { type: 'LineString', coordinates: swapCoords(p.pts) },
-        style: { stroke: [{ width: 30, color: 'rgba(128,128,128,0.2)' }], zIndex: 5 }
+        kind: 'hit',
+        priority: EDITOR_ACTIVE_PRIORITY
     });
     map.addChild(p._hitLine);
 }
@@ -285,13 +652,12 @@ function updateDrawVertexMarkers(pts, colorHex) {
     _drawVertexMarkers.forEach(m => { if (map) map.removeChild(m); });
     _drawVertexMarkers = [];
     if (!pts || pts.length < 2 || !map) return;
-    const YMapMarker = ymaps3.YMapMarker;
     const col = colorHex || '#0066ff';
     pts.forEach((pt, i) => {
         const wrap = document.createElement('div');
-        wrap.style.cssText = 'position:relative;transform:translate(-50%,-50%);line-height:0;';
+        wrap.style.cssText = 'position:relative;width:0;height:0;overflow:visible;line-height:0;';
         const dot = document.createElement('div');
-        dot.style.cssText = `width:30px;height:30px;border-radius:50%;cursor:grab;display:flex;align-items:center;justify-content:center;position:relative;`;
+        dot.style.cssText = `position:absolute;left:-15px;top:-15px;width:30px;height:30px;border-radius:50%;cursor:grab;display:flex;align-items:center;justify-content:center;`;
         const bg = document.createElement('div');
         bg.style.cssText = `position:absolute;inset:0;border-radius:50%;background:${col};opacity:0.2;pointer-events:none;`;
         dot.appendChild(bg);
@@ -303,8 +669,9 @@ function updateDrawVertexMarkers(pts, colorHex) {
         del.style.cssText = 'position:absolute;top:-50px;left:50%;transform:translateX(-50%);width:36px;height:36px;border-radius:4px;background:#ff3b30;color:#fff;font-size:24px;font-weight:700;line-height:36px;text-align:center;cursor:pointer;display:none;user-select:none;z-index:10;';
         wrap.appendChild(dot);
         wrap.appendChild(del);
-        const m = new YMapMarker({
+        const m = new MapMarker({
             coordinates: [pt[1], pt[0]],
+            anchor: 'top-left',
             draggable: true,
             onDragMove: (newCoords) => {
                 const idx = _drawVertexMarkers.indexOf(m);
@@ -364,6 +731,12 @@ function openInstruction() {
     if (!modal || !body) return;
     modal.classList.add('visible');
     if (!body.dataset.loaded) {
+        const embeddedInstruction = $('embeddedInstruction');
+        if (embeddedInstruction) {
+            body.innerHTML = embeddedInstruction.innerHTML;
+            body.dataset.loaded = '1';
+            return;
+        }
         fetch('instr_editor.html')
             .then(r => r.text())
             .then(html => {
@@ -380,125 +753,259 @@ function closeInstruction() {
     if (modal) modal.classList.remove('visible');
 }
 
-function getFormattedCreatorName() {
-    const user = window.tgUser;
-    if (user) {
-        const fullName = [user.first_name, user.last_name].filter(Boolean).join(' ');
-        const uname = user.username ? ` (tg: @${user.username})` : ' (tg)';
-        return (fullName || String(user.id)) + uname;
-    }
-    return '';
-}
-
-const showToast = (text, type = 'info', duration = 2200) => {
+const showToast = (text, type = 'info', duration = 2000) => {
     const el = $('toast');
     el.textContent = text;
-    el.className = '';
-    el.classList.add(type || 'info');
+    el.className = `toast ${type || 'info'} show`;
     if (toastTimer) clearTimeout(toastTimer);
-    el.classList.add('show');
     toastTimer = setTimeout(() => el.classList.remove('show'), duration);
 };
 
-    document.addEventListener('pointerdown', (e) => {
-        const btn = $('instructionBtn');
-        if (!btn) return;
-        const isBtn = btn.contains(e.target);
-        btn.style.display = 'none';
-        if (isBtn) openInstruction();
-    }, { once: true });
-
-// Подпись Telegram Mini App (непусто только внутри Telegram).
 function tgInitData() {
     try {
         return (typeof Telegram !== 'undefined' && Telegram.WebApp && Telegram.WebApp.initData) || '';
     } catch (e) { return ''; }
 }
 
-// Проверка прав на старте: показать редактор или экран «Нет доступа».
-async function ensureAccess() {
-    const ws = document.getElementById('welcomeScreen');
-    if (ws) ws.style.display = 'flex';
-
-    // Telegram SDK грузится асинхронно: до его загрузки initData пустой.
-    // Ждём его, иначе внутри Telegram покажется экран с ключом доступа.
-    if (!tgInitData()) {
-        if (window.platformReady) {
-            try {
-                await Promise.race([
-                    window.platformReady,
-                    new Promise(resolve => setTimeout(resolve, 4000))
-                ]);
-            } catch (e) {}
-        }
-        for (let i = 0; i < 20 && !tgInitData(); i++) {
-            await new Promise(resolve => setTimeout(resolve, 100));
-        }
-    }
-
-    let allowed = false;
-    try {
-        const r = await callApi('editor_check');
-        allowed = !!(r && r.allowed);
-    } catch (e) {
-        allowed = false;
-    }
-    if (allowed) return true;
-    if (ws) ws.style.display = 'none';
-    const deny = document.getElementById('noAccessScreen');
-    if (deny) {
-        const text = document.getElementById('noAccessText');
-        if (text) {
-            text.textContent = tgInitData()
-                ? 'Не удалось подтвердить Telegram-аккаунт. Закройте редактор и откройте его заново из Telegram.'
-                : 'Откройте редактор из Telegram Mini App.';
-        }
-        deny.style.display = 'flex';
-    } else {
-        showToast('Редактор доступен только в Telegram', 'error', 6000);
-    }
-    return false;
+function normFolderId(value) {
+    if (value === null || value === undefined || value === '') return null;
+    const n = Number(value);
+    return Number.isFinite(n) ? n : null;
 }
 
-async function callApi(action, params = {}, bodyData = null) {
-    const url = new URL(API_URL);
-    url.searchParams.set('action', action);
+function editorFolderChain(folders, folderId) {
+    const byId = new Map(folders.map(folder => [String(folder.folder_id), folder]));
+    const chain = [];
+    let current = folderId == null ? '' : String(folderId);
+    const seen = new Set();
+    while (current && byId.has(current) && !seen.has(current)) {
+        seen.add(current);
+        const folder = byId.get(current);
+        chain.push(folder.name || '');
+        current = folder.parent_id == null ? '' : String(folder.parent_id);
+    }
+    return chain.reverse();
+}
 
-    Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
+function mapEditorFolders(list) {
+    return (list || []).map(folder => ({
+        folder_id: String(folder.id),
+        parent_id: folder.parent_id == null ? '' : String(folder.parent_id),
+        name: folder.name || 'Папка',
+        sort_order: Number(folder.sort_order) || 0,
+        visible: folder.visible === undefined ? true : !!folder.visible,
+        price: Number(folder.price) || 0
+    }));
+}
 
-    // Удостоверение редактора уходит на сервер в теле каждого запроса.
-    const payload = Object.assign({}, bodyData || {});
+function mapEditorRoutes(routes, folders) {
+    return (routes || []).map(route => {
+        const folderId = route.folder_id == null ? '' : String(route.folder_id);
+        const title = route.name || route.m;
+        const path = editorFolderChain(folders, folderId).concat([title]).filter(Boolean).join('/');
+        return {
+            m: route.m,
+            title,
+            name: path || title,
+            folder_id: folderId,
+            description: route.description || '',
+            visible: !!route.visible,
+            premium: false
+        };
+    });
+}
+
+// Мост между интерфейсом navigator3 и API nav-api-v2.
+async function callAdminApi(action, params = {}, bodyData = null) {
     const initData = tgInitData();
-    if (initData) payload.tg_init_data = initData;
 
-    const options = {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-    };
-
-    const response = await fetch(url.toString(), options);
-
-    if (!response.ok) {
-        const err = new Error(`HTTP ${response.status}`);
-        err.status = response.status;
-        throw err;
+    async function post(workerAction, query = {}, body = null) {
+        const url = new URL(ADMIN_API_BASE);
+        url.searchParams.set('action', workerAction);
+        Object.entries(query || {}).forEach(([key, value]) => {
+            if (value !== undefined && value !== null && value !== '') {
+                url.searchParams.set(key, value);
+            }
+        });
+        const payload = Object.assign({}, body || {});
+        if (initData) payload.tg_init_data = initData;
+        const response = await fetch(url.toString(), {
+            method: 'POST',
+            cache: 'no-store',
+            headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        let data = null;
+        try { data = await response.json(); } catch (e) {}
+        if (!response.ok) {
+            const error = new Error((data && data.error) || ('HTTP ' + response.status));
+            error.status = response.status;
+            error.payload = data;
+            throw error;
+        }
+        return data || {};
     }
 
-    return await response.json();
+    switch (action) {
+        case 'list': {
+            const [routeList, folderList] = await Promise.all([
+                post('list', {}, {
+                    tg_avatar: (editorUser && editorUser.avatar) || '',
+                    tg_username: (editorUser && editorUser.username) || ''
+                }),
+                post('folder_list')
+            ]);
+            const folders = mapEditorFolders(folderList.folders);
+            return {
+                root: routeList.root || null,
+                routes: mapEditorRoutes(routeList.routes, folders),
+                folders
+            };
+        }
+        case 'get': {
+            const data = await post('get_protected', { m: params.m });
+            return Object.assign({ title: data.title || data.name || params.m }, data);
+        }
+        case 'get_meta': {
+            const meta = await post('get_meta', { m: params.m });
+            const title = meta.name || params.m;
+            return {
+                m: params.m,
+                title,
+                name: title,
+                description: meta.description || '',
+                visible: !!meta.visible,
+                folder_id: meta.folder_id == null ? '' : String(meta.folder_id),
+                premium: false
+            };
+        }
+        case 'save':
+            return post('save', { m: params.m }, { data: (bodyData && bodyData.data) || [] });
+        case 'save_meta': {
+            const body = bodyData || {};
+            const title = body.title !== undefined ? body.title : body.name;
+            return post('save_meta', { m: params.m }, {
+                name: title || '',
+                description: body.description || '',
+                visible: !!body.visible,
+                folder_id: normFolderId(body.folder_id),
+                new_m: body.new_m || '',
+                creator_name: body.creator_name || (editorUser && editorUser.display_name) || ''
+            });
+        }
+        case 'delete':
+            return post('delete', { m: params.m });
+        case 'folder_save': {
+            const body = bodyData || {};
+            const parentId = normFolderId(body.parent_id);
+            const visible = body.visible === undefined ? true : !!body.visible;
+            const price = Number(body.price) || 0;
+            if (!body.folder_id) {
+                const created = await post('folder_create', {}, {
+                    name: body.name || '',
+                    parent_id: parentId,
+                    visible: visible ? 1 : 0,
+                    price
+                });
+                return {
+                    status: 'folder_saved',
+                    folder: {
+                        folder_id: String(created.id),
+                        parent_id: parentId == null ? '' : String(parentId),
+                        name: created.name || body.name || '',
+                        sort_order: 0,
+                        visible,
+                        price
+                    }
+                };
+            }
+            const id = normFolderId(body.folder_id);
+            await post('folder_settings', {}, {
+                id,
+                name: body.name || '',
+                visible: visible ? 1 : 0,
+                price
+            });
+            await post('folder_move', {}, { id, parent_id: parentId });
+            return {
+                status: 'folder_saved',
+                folder: {
+                    folder_id: String(id),
+                    parent_id: parentId == null ? '' : String(parentId),
+                    name: body.name || '',
+                    sort_order: 0,
+                    visible,
+                    price
+                }
+            };
+        }
+        case 'folder_delete':
+            return post('folder_delete', {}, { id: normFolderId(bodyData && bodyData.folder_id) });
+        case 'signs_get':
+            return post('signs_get');
+        case 'signs_save':
+            return post('signs_save', {}, { data: bodyData && bodyData.data });
+        case 'editor_check':
+            return post('editor_check');
+        default:
+            return post(action, params, bodyData);
+    }
 }
 
-function encodeUserInfo() {
-    try {
-        if (window.tgUser) {
-            const user = window.tgUser;
-            const fullName = [user.first_name, user.last_name].filter(Boolean).join(' ');
-            const userInfoStr = 'tg:' + [user.id, fullName, user.username || ''].join(',');
-            return btoa(encodeURIComponent(userInfoStr));
-        }
-    } catch (e) {}
-    return null;
+async function waitForTelegramInitData() {
+    if (tgInitData()) return true;
+    if (window.platformReady) {
+        try {
+            await Promise.race([
+                window.platformReady,
+                new Promise(resolve => setTimeout(resolve, 4000))
+            ]);
+        } catch (e) {}
+    }
+    for (let i = 0; i < 20 && !tgInitData(); i++) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+    }
+    return !!tgInitData();
 }
+
+async function initializeEditorAuth() {
+    const gate = $('editorAuthGate');
+    const message = $('editorAuthMessage');
+    const error = $('editorAuthError');
+    if (gate) gate.style.display = 'flex';
+
+    await waitForTelegramInitData();
+    if (!tgInitData()) {
+        if (message) message.textContent = 'Редактор доступен только в Telegram';
+        if (error) error.textContent = 'Откройте редактор из Telegram Mini App.';
+        return;
+    }
+
+    try {
+        const check = await callAdminApi('editor_check');
+        if (!check || !check.allowed) {
+            if (message) message.textContent = 'Не удалось подтвердить Telegram-аккаунт';
+            if (error) error.textContent = 'Закройте редактор и откройте его заново из Telegram.';
+            return;
+        }
+        const u = (Telegram.WebApp.initDataUnsafe && Telegram.WebApp.initDataUnsafe.user) || {};
+        const fullName = [u.first_name, u.last_name].filter(Boolean).join(' ');
+        editorUser = {
+            display_name: fullName || u.username || (u.id ? String(u.id) : 'Telegram'),
+            username: u.username || '',
+            avatar: u.photo_url || '',
+            login: u.username ? '@' + u.username : ''
+        };
+        if (gate) gate.style.display = 'none';
+        await handleInitialLoad();
+    } catch (e) {
+        if (message) message.textContent = 'Не удалось подключиться к API';
+        if (error) error.textContent = String(e && e.message || e);
+    }
+}
+
+let editorUser = null;
+
 function getNavIconSvg(col, txt, az, isEnd = false, isCurr = false, hasComm = false) {
     const s = isEnd ? 34 : 40, c = s / 2;
     const r = isEnd ? 7 : 9;
@@ -526,7 +1033,7 @@ function calcAzimuth(p1, p2) {
     const x = Math.cos(la1) * Math.sin(la2) - Math.sin(la1) * Math.cos(la2) * Math.cos(lo2 - lo1);
     return Math.round((Math.atan2(y, x) * 180 / Math.PI + 360) % 360);
 }
-const serializePoints = () => JSON.stringify(points.map(p => ({ id: p.id, color: p.color, pts: p.pts, cmd: p.cmd, comm: p.comm, info: p.info })));
+const serializePoints = () => JSON.stringify(points.map(p => ({ id: p.id, color: p.color, pts: p.pts, cmd: p.cmd, comm: p.comm })));
 
 const clearRouteObjects = () => {
     points.forEach(p => { 
@@ -578,19 +1085,85 @@ const applySnapshot = (snapshot) => {
 };
 
 let initialCenter = [56.3399, 43.9332];
-let currentLayerType = 'satellite';
-let schemeLayer = null, satelliteLayer = null;
+let currentLayerType = 'yandex_sat';
 
-function toggleLayer() {
-    if (!map) return;
-    if (currentLayerType === 'satellite') {
-        if (satelliteLayer) map.removeChild(satelliteLayer);
-        if (schemeLayer) map.addChild(schemeLayer);
-        currentLayerType = 'scheme';
-    } else {
-        if (schemeLayer) map.removeChild(schemeLayer);
-        if (satelliteLayer) map.addChild(satelliteLayer);
-        currentLayerType = 'satellite';
+function syncMapStyleButtons() {
+    document.querySelectorAll('#mapStyleGrid .map-style-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.style === currentLayerType);
+    });
+}
+
+function renderMapStyleGrid() {
+    const grid = $('mapStyleGrid');
+    if (!grid) return;
+    grid.innerHTML = '';
+    Object.keys(MAP_STYLES).forEach(key => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'map-style-btn' + (currentLayerType === key ? ' active' : '');
+        btn.dataset.style = key;
+        btn.textContent = MAP_STYLES[key].label;
+        btn.title = MAP_STYLES[key].label;
+        btn.addEventListener('click', () => {
+            applyMapLayer(key);
+            toggleM('mapSettingsModal');
+        });
+        grid.appendChild(btn);
+    });
+}
+
+function applyMapLayer(type) {
+    if (!map || !MAP_STYLES[type] || type === currentLayerType) return;
+    currentLayerType = type;
+    map.setStyle(mapStyleDefinition(type));
+    syncMapStyleButtons();
+    showToast(MAP_STYLES[type].label, 'info', 1200);
+}
+
+function openMapSettingsModal() {
+    renderEditorProfile();
+    renderRootFolderName();
+    renderMapStyleGrid();
+    const themeToggle = $('editorThemeToggle');
+    if (themeToggle) {
+        themeToggle.checked = document.documentElement.getAttribute('data-theme') === 'dark';
+    }
+    $('mapSettingsModal').style.display = 'flex';
+}
+
+const EDITOR_THEME_KEY = 'osm_editor_theme_v1';
+
+function applyEditorTheme(theme, persist = true) {
+    const value = theme === 'dark' ? 'dark' : 'light';
+    document.documentElement.setAttribute('data-theme', value);
+    const toggle = $('editorThemeToggle');
+    if (toggle) toggle.checked = value === 'dark';
+    if (persist) {
+        try { localStorage.setItem(EDITOR_THEME_KEY, value); } catch (e) {}
+    }
+    redrawRoutePreviews();
+}
+
+function renderEditorProfile() {
+    const wrap = $('mapSettingsProfile');
+    if (!wrap) return;
+    if (!editorUser) {
+        wrap.style.display = 'none';
+        return;
+    }
+    wrap.style.display = 'flex';
+    const name = editorUser.display_name || editorUser.login || 'Telegram';
+    const nameEl = $('settingsProfileName');
+    const emailEl = $('settingsProfileEmail');
+    const avatarEl = $('settingsProfileAvatar');
+    if (nameEl) nameEl.textContent = name;
+    if (emailEl) {
+        emailEl.textContent = editorUser.login || '';
+        emailEl.style.display = editorUser.login ? 'block' : 'none';
+    }
+    if (avatarEl) {
+        avatarEl.textContent =
+            name.trim().split(/\s+/).slice(0, 2).map(part => part[0] || '').join('').toUpperCase() || 'T';
     }
 }
 
@@ -609,43 +1182,67 @@ function initMapWithGeolocation() {
     });
 }
 
-if (typeof ymaps3 === 'undefined' || !ymaps3.ready) {
-    showToast('Ошибка загрузки карты (MapLibre)', 'error', 8000);
+if (typeof maplibregl === 'undefined') {
+    showToast('Ошибка загрузки MapLibre (проверьте интернет)', 'error', 8000);
     const wsEl = document.getElementById('welcomeScreen');
     if (wsEl) wsEl.style.display = 'none';
 } else {
-ymaps3.ready.then(async () => {
-    // Никакой редактор без прав: подпись Telegram или ключ доступа.
-    if (!(await ensureAccess())) return;
-
-    const { YMap, YMapDefaultSchemeLayer, YMapDefaultSatelliteLayer, YMapDefaultFeaturesLayer, YMapMarker, YMapFeature, YMapListener } = ymaps3;
-
-    // Скрываем welcomeScreen сразу, не дожидаясь загрузки SDK (в браузере блокировки тянутся до ~10с)
+(async () => {
+    // Скрываем welcomeScreen сразу, не дожидаясь загрузки карты
     const wsEl0 = document.getElementById('welcomeScreen');
     if (wsEl0) wsEl0.style.display = 'none';
-    // Даём SDK короткую фору (1.5с); в TG он приходит мгновенно, в браузере — продолжаем без него
-    if (window.platformReady) {
-        const grace = new Promise(r => setTimeout(r, 1500));
-        try { await Promise.race([window.platformReady, grace]); } catch (e) {}
-    }
 
     const center = await initMapWithGeolocation();
-    map = new YMap(document.getElementById('map'), {
-        location: { center: [center[1], center[0]], zoom: 17 },
-        zoomRange: { min: 3, max: 24 },
-        behaviors: ['drag', 'scrollZoom', 'dblClick', 'pinchZoom', 'pinchRotate']
+    registerYandexProtocol();
+    map = new maplibregl.Map({
+        container: 'map',
+        style: mapStyleDefinition(currentLayerType),
+        center: [center[1], center[0]],
+        zoom: 17,
+        minZoom: 3,
+        maxZoom: 24,
+        attributionControl: { compact: true },
+        dragRotate: true,
+        pitchWithRotate: true,
+        touchPitch: true
+    });
+    attachEditorMapApi();
+
+    let mapErrorShown = false;
+    map.on('error', (e) => {
+        if (mapErrorShown) return;
+        const msg = e && e.error ? String(e.error.message || '') : '';
+        const url = e && e.error && e.error.url ? String(e.error.url) : String((e && e.url) || '');
+        if (!/401|403|failed to fetch|load/i.test(msg + ' ' + url)) return;
+        mapErrorShown = true;
+        showToast(/(?:tile|vector)\.openstreetmap\.org/i.test(url)
+            ? 'Ошибка загрузки тайлов OpenStreetMap'
+            : currentLayerType === 'yandex_sat'
+                ? 'Ошибка загрузки тайлов Яндекса'
+                : 'Ошибка загрузки OpenStreetMap', 'error', 6000);
     });
 
+    const restoreEditorLayers = () => {
+        if (ensureEditorLineLayers()) renderEditorLineFeatures();
+    };
 
-    satelliteLayer = new YMapDefaultSatelliteLayer({});
-    schemeLayer = new YMapDefaultSchemeLayer({});
-    map.addChild(satelliteLayer);
-    map.addChild(new YMapDefaultFeaturesLayer({ zIndex: 100000 }));
+    // Копирайт держим свёрнутым (кнопка ⓘ)
+    const collapseAttribution = () => {
+        document.querySelectorAll('.maplibregl-ctrl-attrib.maplibregl-compact-show')
+            .forEach(el => el.classList.remove('maplibregl-compact-show'));
+    };
+    collapseAttribution();
+    map.once('load', collapseAttribution);
+
+    map.once('load', restoreEditorLayers);
+    map.on('style.load', restoreEditorLayers);
+    map.on('styledata', restoreEditorLayers);
+    map.on('idle', restoreEditorLayers);
 
     const userEl = document.createElement('div');
-    userEl.style.cssText = 'width:16px;height:16px;transform:translate(-50%,-50%);';
+    userEl.style.cssText = 'width:16px;height:16px;';
     userEl.innerHTML = '<img src="' + getUserLocSvg() + '" width="16" height="16" class="marker-img" />';
-    userLocPlacemark = new YMapMarker({ coordinates: [0, 0] }, userEl);
+    userLocPlacemark = new MapMarker({ coordinates: [0, 0] }, userEl);
     map.addChild(userLocPlacemark);
     initGeolocation();
 
@@ -659,35 +1256,45 @@ ymaps3.ready.then(async () => {
             if (dot) dot.style.borderColor = '#000';
         });
     }, true);
-    map.addChild(new YMapListener({
-        onFastClick: (object, event) => {
-            if (object?.type === 'marker' && !isDrawing) return;
-            if (!event || !event.coordinates) return;
-            const lonLat = event.coordinates;
-            const latLon = [f6(lonLat[1]), f6(lonLat[0])];
 
-            if (isDrawing && _drawMapClickHandler) {
-                if (object?.type === 'feature' && (object.entity === cur?.line || object.entity === cur?._hitLine) && _drawPathPoints.length >= 2) {
-                    const segIdx = findNearestSegment(_drawPathPoints, latLon);
-                    _drawPathPoints.splice(segIdx + 1, 0, latLon);
-                } else {
-                    _drawPathPoints.push(latLon);
-                }
-                _drawMapClickHandler(latLon);
-                return;
-            }
-
-            if(isAdd && tempNewPointData) {
-                const newPoint = addP(latLon, { ...tempNewPointData });
-                if (!newPoint) return;
-                pushHistorySnapshot();
-                updateSaveState();
-                setActivePoint(newPoint, false);
-                startDrawingForPoint(newPoint, true);
-                tempNewPointData = null;
-            }
+    map.on('click', (e) => {
+        const target = e.originalEvent?.target;
+        if (signsMode) {
+            if (target?.closest?.('.maplibregl-marker')) return;
+            selectEditorSign(null);
+            return;
         }
-    }));
+        if (target?.closest?.('.maplibregl-marker, .maplibregl-ctrl')) return;
+        if (!e.lngLat) return;
+        const latLon = [f6(e.lngLat.lat), f6(e.lngLat.lng)];
+
+        if (isDrawing && _drawMapClickHandler) {
+            let onCurrentLine = false;
+            if (cur?._hitLine && map.getLayer('editor-lines-hit')) {
+                try {
+                    onCurrentLine = map.queryRenderedFeatures(e.point, { layers: ['editor-lines-hit'] }).length > 0;
+                } catch (_) {}
+            }
+            if (onCurrentLine && _drawPathPoints.length >= 2) {
+                const segIdx = findNearestSegment(_drawPathPoints, latLon);
+                _drawPathPoints.splice(segIdx + 1, 0, latLon);
+            } else {
+                _drawPathPoints.push(latLon);
+            }
+            _drawMapClickHandler(latLon);
+            return;
+        }
+
+        if (isAdd && tempNewPointData) {
+            const newPoint = addP(latLon, { ...tempNewPointData });
+            if (!newPoint) return;
+            pushHistorySnapshot();
+            updateSaveState();
+            setActivePoint(newPoint, false);
+            startDrawingForPoint(newPoint, true);
+            tempNewPointData = null;
+        }
+    });
 
     initColorDropdown('listColorDropdown', (h, n) => {
         if(activeListPoint) {
@@ -708,8 +1315,7 @@ ymaps3.ready.then(async () => {
         new Sortable($('pointsSortList'), { animation: 150, handle: '.sort-handle', ghostClass: 'sortable-ghost', onEnd: reorderPointsFromList, scroll: $('pointsSortList'), scrollSensitivity: 40, scrollSpeed: 15 });
     }
 
-    handleInitialAuth();
-}).catch(e => {
+})().catch(e => {
     showToast('Ошибка загрузки карты: ' + e.message, 'error', 8000);
     const wsEl = document.getElementById('welcomeScreen');
     if (wsEl) wsEl.style.display = 'none';
@@ -739,7 +1345,7 @@ const initGeolocation = () => {
         }, null, { enableHighAccuracy: true, maximumAge: 5000 });
     }
 };
-const handleInitialAuth = async () => {
+const handleInitialLoad = async () => {
     
     $('welcomeScreen').style.display = 'none';
     $('uiControls').style.display = 'flex';
@@ -747,248 +1353,588 @@ const handleInitialAuth = async () => {
     seedHistory();
     updateSaveState();
     await refreshFileList();
+    loadEditorPhrases();
     const routeCount = settingsRouteFiles.length;
-    $('settingsTitle').textContent = `Маршрутов: ${routeCount}`;
+    $('settingsTitle').textContent = `Маршруты: ${routeCount}`;
 };
 
-// Путь папки (восстанавливает полный путь через parent_id).
-const getFolderPath = (folderId) => {
-    const parts = [];
-    let cur = folderId;
-    while (cur !== null && cur !== undefined) {
-        const f = _folders.get(cur);
-        if (!f) break;
-        parts.unshift(f.name);
-        cur = f.parent_id;
+let editorRoot = null;
+
+function renderRootFolderName() {
+    const input = $('rootFolderNameInput');
+    if (input && document.activeElement !== input) {
+        input.value = editorRoot ? (editorRoot.name || '') : '';
     }
-    return parts.join('/');
-};
+}
 
-const getFolderName = (folderId) => {
-    if (!folderId) return null;
-    const f = _folders.get(folderId);
-    return f ? f.name : null;
-};
+async function saveRootFolderName() {
+    const input = $('rootFolderNameInput');
+    const btn = $('rootFolderNameSave');
+    if (!input) return;
+    const name = input.value.trim();
+    if (!name) { showToast('Введите название корневой папки', 'error'); return; }
+    if (btn) { btn.disabled = true; btn.textContent = 'Сохраняю…'; }
+    try {
+        const result = await callAdminApi('root_save', {}, { name });
+        editorRoot = result.root || { folder_id: editorRoot && editorRoot.folder_id, name };
+        await refreshFileList();
+        showToast('Название корневой папки сохранено', 'success', 2500);
+    } catch (e) {
+        showToast('Не удалось сохранить название', 'error', 4000);
+    } finally {
+        if (btn) { btn.disabled = false; btn.textContent = 'Сохранить'; }
+    }
+}
+
+function renderEditorProfileScreen() {
+    const root = editorRoot || {};
+    const tgUser = editorUser || {};
+    const name = root.owner_name || tgUser.display_name || tgUser.login || 'Владелец';
+    const username = root.owner_username || tgUser.username || '';
+    const tgId = root.owner_tg_id || '';
+    const avatar = root.owner_avatar || tgUser.avatar || '';
+
+    const avatarEl = $('profileScreenAvatar');
+    if (avatarEl) {
+        avatarEl.replaceChildren();
+        if (avatar) {
+            const img = document.createElement('img');
+            img.src = avatar;
+            img.alt = '';
+            img.style.width = '100%';
+            img.style.height = '100%';
+            img.style.objectFit = 'cover';
+            img.style.borderRadius = '50%';
+            avatarEl.appendChild(img);
+        } else {
+            avatarEl.textContent = String(name).trim().charAt(0).toUpperCase() || '?';
+        }
+    }
+    const nameEl = $('profileScreenName');
+    if (nameEl) nameEl.textContent = name;
+    const userEl = $('profileScreenUsername');
+    if (userEl) {
+        userEl.textContent = username ? '@' + String(username).replace(/^@/, '') : '';
+        userEl.hidden = !username;
+    }
+    const idEl = $('profileScreenId');
+    if (idEl) {
+        idEl.textContent = tgId ? 'Telegram ID: ' + tgId : '';
+        idEl.hidden = !tgId;
+    }
+    const infoInput = $('ownerInfoInput');
+    if (infoInput && document.activeElement !== infoInput) {
+        infoInput.value = root.owner_info || (username ? '@' + String(username).replace(/^@/, '') : '');
+    }
+    renderRootFolderName();
+}
+
+function openEditorProfile() {
+    renderEditorProfileScreen();
+    const modal = $('editorProfileModal');
+    if (modal) modal.style.display = 'flex';
+}
+
+async function saveOwnerInfo() {
+    const input = $('ownerInfoInput');
+    const btn = $('ownerInfoSave');
+    if (!input) return;
+    const info = input.value.trim();
+    if (btn) { btn.disabled = true; btn.textContent = 'Сохраняю…'; }
+    try {
+        const result = await callAdminApi('owner_save', {}, { info });
+        editorRoot = result.root || editorRoot;
+        await refreshFileList();
+        showToast('Информация сохранена', 'success', 2500);
+    } catch (e) {
+        showToast('Не удалось сохранить информацию', 'error', 4000);
+    } finally {
+        if (btn) { btn.disabled = false; btn.textContent = 'Сохранить'; }
+    }
+}
 
 const refreshFileList = async () => {
     try {
-        const result = await callApi('list');
+        const result = await callAdminApi('list');
         settingsRouteFiles = result.routes || [];
-
-        // Загружаем реальные папки
-        try {
-            const folderRes = await callApi('folder_list');
-            _folders = new Map((folderRes.folders || []).map(f => [f.id, f]));
-        } catch (e) {
-            _folders = new Map();
-        }
-
+        settingsFolders = result.folders || [];
+        editorRoot = result.root || null;
+        renderEditorProfileScreen();
         renderSettingsFileList();
         updateVisibility();
     } catch (e) {
         settingsRouteFiles = [];
-        _folders = new Map();
+        settingsFolders = [];
+        editorRoot = null;
+        renderEditorProfileScreen();
         renderSettingsFileList();
         updateVisibility();
         showToast('Ошибка загрузки маршрутов', 'error');
     }
 };
-function countNodeRoutes(node) {
-    let c = node.routes.length;
-    for (const f of Object.values(node.folders)) c += countNodeRoutes(f);
-    return c;
+
+const escapeHtml = value => String(value == null ? '' : value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+
+function renderRouteItem(route, container) {
+    const isActive = route.key === curRoute;
+    const el = document.createElement('button');
+    el.type = 'button';
+    el.className = 'route-item' + (isActive ? ' is-active' : '');
+    el.draggable = true;
+    el.setAttribute('data-key', route.key);
+
+    const preview = document.createElement('span');
+    preview.className = 'route-preview';
+    preview.dataset.routeKey = route.key;
+    preview.setAttribute('aria-hidden', 'true');
+    el.appendChild(preview);
+
+    const main = document.createElement('span');
+    main.className = 'route-item-main';
+    const title = document.createElement('span');
+    title.className = 'route-item-title';
+    const nameSpan = document.createElement('span');
+    nameSpan.className = 'route-name';
+    nameSpan.textContent = route.name;
+    title.appendChild(nameSpan);
+
+    const visibility = document.createElement('span');
+    visibility.className = 'route-visibility-badge' + (route.visible ? ' is-visible' : '');
+    visibility.textContent = route.visible ? 'Виден' : 'Скрыт';
+    title.appendChild(visibility);
+
+    if (route.premium) {
+        const premiumBadge = document.createElement('span');
+        premiumBadge.className = 'route-premium-badge';
+        premiumBadge.textContent = '★ Премиум';
+        title.appendChild(premiumBadge);
+    }
+
+    if (isActive) {
+        const activeBadge = document.createElement('span');
+        activeBadge.className = 'route-active-badge';
+        activeBadge.textContent = 'Редактируется';
+        title.appendChild(activeBadge);
+    }
+
+    const details = document.createElement('span');
+    details.className = 'route-item-details';
+    const stats = document.createElement('span');
+    stats.className = 'route-item-stats';
+    stats.dataset.routeStats = route.key;
+    details.appendChild(stats);
+    main.append(title, details);
+    el.appendChild(main);
+
+    const tail = document.createElement('span');
+    tail.className = 'route-item-tail';
+    tail.setAttribute('aria-hidden', 'true');
+    tail.textContent = '›';
+    el.appendChild(tail);
+
+    const gear = document.createElement('span');
+    gear.className = 'route-info-btn';
+    gear.innerHTML = editorIconGear;
+    gear.title = 'Настройки маршрута';
+    gear.addEventListener('click', e => {
+        e.stopPropagation();
+        openRouteSettings(route.key);
+    });
+    el.appendChild(gear);
+
+    el.addEventListener('click', () => {
+        if (el.classList.contains('loading')) return;
+        el.classList.add('loading');
+        loadRoute(route.key).then(() => renderSettingsFileList());
+    });
+    el.addEventListener('dragstart', e => {
+        e.dataTransfer.setData('text/plain', route.key);
+        el.classList.add('dragging');
+    });
+    el.addEventListener('dragend', () => {
+        el.classList.remove('dragging');
+        document.querySelectorAll('.drag-over').forEach(d => d.classList.remove('drag-over'));
+    });
+    container.appendChild(el);
 }
 
-function buildRouteTree() {
-    const root = { folders: {}, routes: [], _isRoot: true };
-    const folderNodes = {}; // id -> node
+function drawRoutePreview(data) {
+    const width = 96;
+    const height = 96;
+    const pixelRatio = 2;
+    const canvas = document.createElement('canvas');
+    canvas.width = width * pixelRatio;
+    canvas.height = height * pixelRatio;
+    const context = canvas.getContext('2d');
+    if (!context) throw new Error('Could not create route preview canvas');
+    context.scale(pixelRatio, pixelRatio);
 
-    // Создаём узлы для всех папок
-    for (const [id, folder] of _folders) {
-        folderNodes[id] = {
-            id: Number(id),
-            name: folder.name,
-            parent_id: folder.parent_id,
-            visible: !!folder.visible,
-            price: folder.price || 0,
-            folders: {},
-            routes: [],
+    const rootStyles = getComputedStyle(document.documentElement);
+    const readVar = (name, fallback) =>
+        rootStyles.getPropertyValue(name).trim() || fallback;
+    const previewFrom = readVar('--preview-bg-from', '#F8FAFC');
+    const previewTo = readVar('--preview-bg-to', '#E8EEF6');
+    const previewShadow = readVar('--preview-shadow', 'rgba(18, 28, 46, 0.20)');
+    const dotStroke = '#121A28';
+
+    const background = context.createLinearGradient(0, 0, width, height);
+    background.addColorStop(0, previewFrom);
+    background.addColorStop(1, previewTo);
+    context.fillStyle = background;
+    context.fillRect(0, 0, width, height);
+
+    const project = point => {
+        const latitude = Math.max(-85.0511, Math.min(85.0511, point[0]));
+        const sinLatitude = Math.sin(latitude * Math.PI / 180);
+        return {
+            x: (point[1] + 180) / 360,
+            y: 0.5 - Math.log((1 + sinLatitude) / (1 - sinLatitude)) / (4 * Math.PI)
         };
+    };
+
+    const points = [];
+    for (const segment of data) {
+        if (!segment || !Array.isArray(segment.pts)) continue;
+        const coordinates = segment.pts.filter(point =>
+            Array.isArray(point) &&
+            Number.isFinite(point[0]) &&
+            Number.isFinite(point[1]) &&
+            Math.abs(point[0]) <= 90 &&
+            Math.abs(point[1]) <= 180
+        );
+        if (!coordinates.length) continue;
+        points.push({
+            coordinates,
+            path: coordinates.map(project),
+            color: routePreviewColors[segment.color] || '#FFD700'
+        });
     }
 
-    // Распределяем папки по дереву
-    for (const id of Object.keys(folderNodes)) {
-        const node = folderNodes[id];
-        if (node.parent_id !== null && node.parent_id !== undefined && folderNodes[node.parent_id]) {
-            folderNodes[node.parent_id].folders[id] = node;
-        } else {
-            root.folders[id] = node;
+    if (!points.length) {
+        return { image: canvas.toDataURL('image/jpeg', 0.92), pointCount: 0, distanceMeters: 0 };
+    }
+
+    let minX = Infinity;
+    let maxX = -Infinity;
+    let minY = Infinity;
+    let maxY = -Infinity;
+    let distanceMeters = 0;
+    for (const point of points) {
+        for (let index = 0; index < point.path.length; index++) {
+            const projected = point.path[index];
+            minX = Math.min(minX, projected.x);
+            maxX = Math.max(maxX, projected.x);
+            minY = Math.min(minY, projected.y);
+            maxY = Math.max(maxY, projected.y);
+            if (index === 0) continue;
+            const previous = point.coordinates[index - 1];
+            const current = point.coordinates[index];
+            const toRadians = value => value * Math.PI / 180;
+            const lat1 = toRadians(previous[0]);
+            const lat2 = toRadians(current[0]);
+            const deltaLat = lat2 - lat1;
+            const deltaLon = toRadians(current[1] - previous[1]);
+            const a = Math.min(1, Math.max(0,
+                Math.sin(deltaLat / 2) ** 2 +
+                Math.cos(lat1) * Math.cos(lat2) * Math.sin(deltaLon / 2) ** 2
+            ));
+            distanceMeters += 6371000 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
         }
     }
 
-    // Распределяем маршруты по папкам (folder_id) или в корень
-    for (const route of settingsRouteFiles) {
-        const key = typeof route === 'string' ? route : (route.m || '');
-        const name = typeof route === 'string' ? route : (route.name || route.m || '');
-        const visible = !(typeof route === 'string') && route.visible;
-        const fid = typeof route === 'string' ? null : route.folder_id;
-        if (fid !== null && fid !== undefined && folderNodes[fid]) {
-            folderNodes[fid].routes.push({ key, name, visible, folder_id: fid });
-        } else {
-            root.routes.push({ key, name, visible, folder_id: null });
-        }
-    }
-
-    return root;
-}
-
-function renderTreeLevel(node, container) {
-    const frag = document.createDocumentFragment();
-    const folderIds = Object.keys(node.folders).sort((a, b) => {
-        return node.folders[a].name.localeCompare(node.folders[b].name);
+    const padding = 6;
+    const scale = Math.min(
+        (width - padding * 2) / Math.max(maxX - minX, 1e-9),
+        (height - padding * 2) / Math.max(maxY - minY, 1e-9)
+    );
+    const offsetX = (width - (maxX - minX) * scale) / 2;
+    const offsetY = (height - (maxY - minY) * scale) / 2;
+    const toCanvas = point => ({
+        x: offsetX + (point.x - minX) * scale,
+        y: offsetY + (point.y - minY) * scale
     });
 
-    for (const id of folderIds) {
-        const sub = node.folders[id];
-        const folderPath = getFolderPath(sub.id);
-        const total = countNodeRoutes(sub);
-        const isExpanded = _expandedFolders.has(String(sub.id));
+    for (const point of points) {
+        if (point.path.length < 2) continue;
+        context.beginPath();
+        point.path.forEach((coordinate, index) => {
+            const position = toCanvas(coordinate);
+            if (index === 0) context.moveTo(position.x, position.y);
+            else context.lineTo(position.x, position.y);
+        });
+        context.lineCap = 'round';
+        context.lineJoin = 'round';
+        context.strokeStyle = previewShadow;
+        context.lineWidth = 4;
+        context.stroke();
+        context.strokeStyle = point.color;
+        context.lineWidth = 2;
+        context.stroke();
+    }
 
-        const el = document.createElement('div');
-        el.className = 'category-folder';
-        el.setAttribute('data-id', sub.id);
+    const dotRadius = 2.4;
+    for (const point of points) {
+        if (!point.path.length) continue;
+        const position = toCanvas(point.path[0]);
+        context.beginPath();
+        context.arc(position.x, position.y, dotRadius, 0, Math.PI * 2);
+        context.fillStyle = point.color;
+        context.fill();
+        context.beginPath();
+        context.arc(position.x, position.y, dotRadius + 0.3, 0, Math.PI * 2);
+        context.lineWidth = 0.5;
+        context.strokeStyle = dotStroke;
+        context.globalAlpha = 0.75;
+        context.stroke();
+        context.globalAlpha = 1;
+    }
 
-        const header = document.createElement('div');
-        header.className = 'category-header' + (isExpanded ? ' expanded' : '');
-        const price = sub.price || 0;
-        header.innerHTML = `
-            <span class="category-icon">${isExpanded ? '📂' : '📁'}</span>
-            <span class="category-name">${sub.visible ? '✅ ' : ''}${sub.name}</span>
-            ${price ? `<span class="category-price">🔒 ${price} ⭐</span>` : ''}
-            <span class="category-count">${total}</span>
-        `;
-        header.addEventListener('click', () => {
-            if (_expandedFolders.has(String(sub.id))) _expandedFolders.delete(String(sub.id));
-            else _expandedFolders.add(String(sub.id));
+    if (points[0].path.length) {
+        const position = toCanvas(points[0].path[0]);
+        context.beginPath();
+        context.arc(position.x, position.y, dotRadius + 1.6, 0, Math.PI * 2);
+        context.lineWidth = 1.5;
+        context.strokeStyle = '#34C759';
+        context.stroke();
+    }
+
+    return {
+        image: canvas.toDataURL('image/jpeg', 0.92),
+        pointCount: points.length,
+        distanceMeters: Math.round(distanceMeters)
+    };
+}
+
+function observeRoutePreviews(list) {
+    if (routePreviewObserver) routePreviewObserver.disconnect();
+    const previews = Array.from(list.querySelectorAll('.route-preview'));
+    for (const preview of previews) {
+        const image = routePreviewImages.get(preview.dataset.routeKey);
+        if (image) {
+            applyRoutePreview(preview.dataset.routeKey, image);
+        } else {
+            preview.classList.add('is-loading');
+        }
+    }
+    if (!previews.length) return;
+
+    const loadPreview = preview => {
+        if (!preview.isConnected) return;
+        const routeKey = preview.dataset.routeKey;
+        if (routePreviewImages.has(routeKey)) {
+            applyRoutePreview(routeKey, routePreviewImages.get(routeKey));
+            return;
+        }
+        if (routePreviewRequests.has(routeKey)) return;
+        // preview=1: миниатюра не считается открытием маршрута и не попадает в журнал.
+        const request = callAdminApi('get', { m: routeKey, preview: 1 })
+            .then(result => {
+                if (!Array.isArray(result.data)) throw new Error('Некорректные данные маршрута');
+                const rendered = drawRoutePreview(result.data);
+                routePreviewImages.set(routeKey, { ...rendered, data: result.data });
+                applyRoutePreview(routeKey, rendered);
+            })
+            .catch(error => {
+                console.warn(`Не удалось загрузить превью маршрута "${routeKey}":`, error);
+                document.querySelectorAll('#routesList .route-preview').forEach(element => {
+                    if (element.dataset.routeKey !== routeKey) return;
+                    element.classList.remove('is-loading');
+                    element.classList.add('is-empty');
+                    element.title = 'Не удалось загрузить миниатюру маршрута';
+                });
+            })
+            .finally(() => routePreviewRequests.delete(routeKey));
+        routePreviewRequests.set(routeKey, request);
+    };
+
+    if (typeof IntersectionObserver === 'undefined') {
+        previews.slice(0, 3).forEach(loadPreview);
+        list.addEventListener('scroll', () => {
+            previews.filter(preview => {
+                const bounds = preview.getBoundingClientRect();
+                return bounds.top < window.innerHeight + 200 && bounds.bottom > -200;
+            }).forEach(loadPreview);
+        }, { passive: true });
+        return;
+    }
+
+    routePreviewObserver = new IntersectionObserver(entries => {
+        for (const entry of entries) {
+            if (!entry.isIntersecting) continue;
+            routePreviewObserver.unobserve(entry.target);
+            loadPreview(entry.target);
+        }
+    }, { root: list, rootMargin: '200px 0px' });
+    previews.forEach(preview => {
+        if (!routePreviewImages.has(preview.dataset.routeKey)) routePreviewObserver.observe(preview);
+    });
+}
+
+function applyRoutePreview(routeKey, rendered) {
+    document.querySelectorAll('#routesList .route-preview').forEach(element => {
+        if (element.dataset.routeKey !== routeKey) return;
+        const image = document.createElement('img');
+        image.className = 'route-preview-image';
+        image.alt = '';
+        image.src = rendered.image;
+        element.replaceChildren(image);
+        element.classList.remove('is-loading', 'is-empty');
+    });
+    document.querySelectorAll('#routesList [data-route-stats]').forEach(element => {
+        if (element.dataset.routeStats !== routeKey) return;
+        const parts = [];
+        if (rendered.pointCount) {
+            const mod100 = rendered.pointCount % 100;
+            const mod10 = rendered.pointCount % 10;
+            const suffix = mod100 >= 11 && mod100 <= 14 ? 'точек'
+                : mod10 === 1 ? 'точка'
+                    : mod10 >= 2 && mod10 <= 4 ? 'точки' : 'точек';
+            parts.push(`${rendered.pointCount} ${suffix}`);
+        }
+        if (rendered.distanceMeters >= 10) {
+            const distance = rendered.distanceMeters >= 1000
+                ? `${(rendered.distanceMeters / 1000).toLocaleString('ru-RU', { maximumFractionDigits: 1 })} км`
+                : `${rendered.distanceMeters} м`;
+            parts.push(`≈ ${distance}`);
+        }
+        element.textContent = parts.join(' · ');
+    });
+}
+
+function redrawRoutePreviews() {
+    for (const [routeKey, entry] of routePreviewImages) {
+        if (!entry || !Array.isArray(entry.data)) continue;
+        const rendered = drawRoutePreview(entry.data);
+        routePreviewImages.set(routeKey, { ...rendered, data: entry.data });
+        applyRoutePreview(routeKey, rendered);
+    }
+}
+
+function currentSettingsFolderId() {
+    return settingsFolderPath[settingsFolderPath.length - 1] || '';
+}
+
+function editorFolderMap() {
+    return new Map(settingsFolders.map(folder => [folder.folder_id, folder]));
+}
+
+function normalizeSettingsFolderPath(byId) {
+    const next = [];
+    let parentId = '';
+    for (const folderId of settingsFolderPath) {
+        const folder = byId.get(folderId);
+        if (!folder || (folder.parent_id || '') !== parentId) break;
+        next.push(folderId);
+        parentId = folderId;
+    }
+    settingsFolderPath = next;
+}
+
+function renderSettingsBreadcrumbs(byId) {
+    const nav = $('editorRoutesBreadcrumb');
+    if (!nav) return;
+    nav.innerHTML = '';
+    const labels = [{ id: '', name: 'Все маршруты' }];
+    for (const folderId of settingsFolderPath) {
+        const folder = byId.get(folderId);
+        if (folder) labels.push({ id: folderId, name: folder.name || folderId });
+    }
+    labels.forEach((label, index) => {
+        if (index > 0) {
+            const separator = document.createElement('span');
+            separator.className = 'routes-breadcrumb-separator';
+            separator.textContent = '›';
+            separator.setAttribute('aria-hidden', 'true');
+            nav.appendChild(separator);
+        }
+        const item = document.createElement('button');
+        item.type = 'button';
+        const isCurrent = index === labels.length - 1;
+        item.className = 'routes-breadcrumb-item' + (isCurrent ? ' current' : '');
+        item.textContent = label.name;
+        item.dataset.breadcrumbIndex = String(index);
+        if (isCurrent) item.setAttribute('aria-current', 'location');
+        item.addEventListener('click', () => {
+            settingsFolderPath = settingsFolderPath.slice(0, index);
             renderSettingsFileList();
         });
+        nav.appendChild(item);
+    });
+    nav.hidden = false;
+}
 
-        const btnSettings = document.createElement('span');
-        btnSettings.className = 'route-info-btn';
-        btnSettings.textContent = '⚙️';
-        btnSettings.title = 'Настройки папки';
-        btnSettings.style.fontStyle = 'normal';
-        btnSettings.style.fontWeight = '400';
-        btnSettings.addEventListener('click', (e) => {
-            e.stopPropagation();
-            openFolderSettings(sub.id);
-        });
-        header.appendChild(btnSettings);
-
-        el.appendChild(header);
-        el.setAttribute('draggable', 'true');
-        el.addEventListener('dragstart', e => {
-            e.stopPropagation();
-            e.dataTransfer.setData('text/plain', 'folder:' + sub.id);
-            e.dataTransfer.effectAllowed = 'move';
-            el.classList.add('dragging');
-        });
-        el.addEventListener('dragend', () => {
-            el.classList.remove('dragging');
-            document.querySelectorAll('.drag-over').forEach(d => d.classList.remove('drag-over'));
-        });
-        el.addEventListener('dragover', e => { e.preventDefault(); el.classList.add('drag-over'); });
-        el.addEventListener('dragleave', () => el.classList.remove('drag-over'));
-        el.addEventListener('drop', e => {
-            e.preventDefault(); el.classList.remove('drag-over');
-            const data = e.dataTransfer.getData('text/plain');
-            const targetId = Number(el.getAttribute('data-id'));
-            if (data && data.startsWith('folder:')) {
-                const movingId = Number(data.substring(7));
-                if (movingId === targetId) return;
-                callApi('folder_move', {}, { id: movingId, parent_id: targetId })
-                    .then(() => { refreshFileList(); showToast('Папка перемещена', 'success'); })
-                    .catch(() => showToast('Ошибка перемещения папки', 'error'));
-            } else if (data) {
-                moveRouteToFolder(data, targetId);
-            }
-        });
-
-        frag.appendChild(el);
-
-        if (isExpanded) {
-            const childWrap = document.createElement('div');
-            childWrap.style.cssText = 'padding-left:16px;display:flex;flex-direction:column;gap:6px;';
-            renderTreeLevel(sub, childWrap);
-            frag.appendChild(childWrap);
+function editorFolderCounts(byId) {
+    const counts = new Map();
+    for (const route of settingsRouteFiles) {
+        let folderId = route && route.folder_id ? route.folder_id : '';
+        if (!byId.has(folderId)) folderId = '';
+        const seen = new Set();
+        while (folderId && !seen.has(folderId)) {
+            seen.add(folderId);
+            counts.set(folderId, (counts.get(folderId) || 0) + 1);
+            const folder = byId.get(folderId);
+            folderId = folder ? (folder.parent_id || '') : '';
         }
     }
+    return counts;
+}
 
-    for (const route of node.routes) {
-        const isActive = route.key === curRoute;
-        const el = document.createElement('button');
-        el.className = 'route-item' + (isActive ? ' active' : '');
-        if (isActive) el.style.cssText = 'background:rgba(48,209,88,0.2);border-color:rgba(48,209,88,0.4);';
-        el.draggable = true;
-        el.setAttribute('data-key', route.key);
+function renderEditorFolderRow(folder, total) {
+    const folderId = folder.folder_id;
+    const el = document.createElement('div');
+    el.className = 'category-folder';
+    el.dataset.path = folderId;
 
-        const nameWrap = document.createElement('div');
-        nameWrap.style.cssText = 'display:flex;align-items:center;gap:6px;';
-
-        const iconSpan = document.createElement('span');
-        iconSpan.className = 'route-icon';
-        iconSpan.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.65)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>';
-        nameWrap.appendChild(iconSpan);
-
-        const nameSpan = document.createElement('span');
-        nameSpan.className = 'route-name';
-        if (route.visible) {
-            const check = document.createElement('span');
-            check.textContent = '✅';
-            check.style.cssText = 'font-size:12px;margin-right:4px;';
-            nameSpan.appendChild(check);
-            nameSpan.appendChild(document.createTextNode(route.name));
-        } else {
-            nameSpan.textContent = route.name;
+    const header = document.createElement('div');
+    header.className = 'category-header';
+    header.innerHTML = `
+        <span class="category-icon" aria-hidden="true">${editorIconFolder}</span>
+        <span class="category-name">${escapeHtml(folder.name)}</span>
+        <span class="category-count">${total}</span>
+        <span class="category-chevron" aria-hidden="true">›</span>
+        <span class="route-info-btn" data-folder-settings="${escapeHtml(folderId)}" title="Настройки папки">${editorIconGear}</span>
+    `;
+    header.addEventListener('click', event => {
+        const gear = event.target.closest('[data-folder-settings]');
+        if (gear) {
+            event.stopPropagation();
+            openFolderSettings(gear.dataset.folderSettings);
+            return;
         }
-        nameWrap.appendChild(nameSpan);
+        settingsFolderPath.push(folderId);
+        renderSettingsFileList();
+    });
+    el.appendChild(header);
 
-        el.appendChild(nameWrap);
+    el.addEventListener('dragover', e => { e.preventDefault(); el.classList.add('drag-over'); });
+    el.addEventListener('dragleave', () => el.classList.remove('drag-over'));
+    el.addEventListener('drop', e => {
+        e.preventDefault(); el.classList.remove('drag-over');
+        const routeKey = e.dataTransfer.getData('text/plain');
+        if (routeKey) moveRouteToFolder(routeKey, folderId);
+    });
 
-        const gear = document.createElement('span');
-        gear.className = 'route-info-btn';
-        gear.textContent = '⚙️';
-        gear.style.fontStyle = 'normal';
-        gear.style.fontWeight = '400';
-        gear.addEventListener('click', e => {
-            e.stopPropagation();
-            openRouteSettings(route.key);
-        });
-        el.appendChild(gear);
-
-        el.addEventListener('click', () => {
-            if (el.classList.contains('loading')) return;
-            el.classList.add('loading');
-            loadRoute(route.key).then(() => renderSettingsFileList());
-        });
-        el.addEventListener('dragstart', e => {
-            e.dataTransfer.setData('text/plain', route.key);
-            el.classList.add('dragging');
-        });
-        el.addEventListener('dragend', () => {
-            el.classList.remove('dragging');
-            document.querySelectorAll('.drag-over').forEach(d => d.classList.remove('drag-over'));
-        });
-        frag.appendChild(el);
-    }
-    container.appendChild(frag);
+    return el;
 }
 
 async function moveRouteToFolder(routeKey, folderId) {
     try {
-        await callApi('route_move', {}, { m: routeKey, folder_id: folderId });
-        const route = settingsRouteFiles.find(r => r.m === routeKey);
-        if (route) route.folder_id = folderId;
+        const meta = await callAdminApi('get_meta', { m: routeKey });
+        await callAdminApi('save_meta', { m: routeKey }, {
+            title: meta.title || meta.name || routeKey,
+            folder_id: folderId || '',
+            description: meta.description || '',
+            visible: meta.visible !== undefined ? meta.visible : false,
+            premium: !!meta.premium
+        });
+        if (curRoute === routeKey) {
+            currentRouteMeta.title = meta.title || currentRouteMeta.title;
+        }
         await refreshFileList();
         showToast('Маршрут перемещён', 'success');
     } catch (e) {
@@ -996,25 +1942,10 @@ async function moveRouteToFolder(routeKey, folderId) {
     }
 }
 
-const openMoveRouteModal = (routeKey, currentFolderId) => {
-    const folders = Array.from(_folders.values());
-    if (folders.length === 0) {
-        showToast('Нет папок для перемещения', 'error');
-        return;
-    }
-    const list = folders.map(f => `${f.id}: ${f.name}`).join('\n');
-    const input = prompt('Введите ID папки для перемещения (или 0 для корня):\n' + list, currentFolderId || '0');
-    if (input === null) return;
-    const folderId = input === '0' || input === '' ? null : Number(input);
-    if (input !== '0' && input !== '' && !Number.isFinite(folderId)) {
-        showToast('Неверный ID папки', 'error');
-        return;
-    }
-    moveRouteToFolder(routeKey, folderId);
-};
-
 const openCreateRouteModal = (folderId) => {
-    _currentFolderId = folderId || null;
+    _currentFolderId = folderId === undefined
+        ? currentSettingsFolderId()
+        : (folderId || null);
     toggleM('createRouteModal');
     $('newRouteNameInput').value = '';
     setTimeout(() => $('newRouteNameInput').focus(), 100);
@@ -1032,15 +1963,57 @@ const _dragAutoScroll = (e, el, speed = 12) => {
 const renderSettingsFileList = () => {
     const list = $('routesList');
     if (!list) return;
+    if (routePreviewObserver) {
+        routePreviewObserver.disconnect();
+        routePreviewObserver = null;
+    }
     list.innerHTML = '';
-    if (settingsRouteFiles.length === 0 && _emptyFolders.length === 0) {
-        list.innerHTML = '<div style="text-align:center;padding:40px 20px;color:#8b8f99;font-size:15px;">У вас пока нет маршрутов.<br>Создайте первый маршрут.</div>';
-        $('settingsTitle').textContent = `${getFormattedCreatorName()} - маршрутов:0`;
+    const byId = editorFolderMap();
+    normalizeSettingsFolderPath(byId);
+    renderSettingsBreadcrumbs(byId);
+
+    const folderId = currentSettingsFolderId();
+    const counts = editorFolderCounts(byId);
+    const childFolders = settingsFolders
+        .filter(folder => (folder.parent_id || '') === folderId)
+        .sort((a, b) => {
+            const ao = Number.isFinite(a.sort_order) ? a.sort_order : 0;
+            const bo = Number.isFinite(b.sort_order) ? b.sort_order : 0;
+            if (ao !== bo) return ao - bo;
+            return String(a.name).localeCompare(String(b.name), 'ru');
+        });
+    const routes = settingsRouteFiles
+        .filter(route => {
+            const routeFolder = route && route.folder_id ? route.folder_id : '';
+            return (byId.has(routeFolder) ? routeFolder : '') === folderId;
+        })
+        .sort((a, b) => getRouteName(a).localeCompare(getRouteName(b), 'ru'));
+
+    $('settingsTitle').textContent = `Маршруты: ${settingsRouteFiles.length}`;
+
+    if (!childFolders.length && !routes.length) {
+        list.innerHTML = folderId
+            ? '<div style="text-align:center;padding:40px 20px;color:var(--text-muted);font-size:15px;">В этой папке пока нет маршрутов.</div>'
+            : '<div style="text-align:center;padding:40px 20px;color:var(--text-muted);font-size:15px;">Маршрутов пока нет.<br>Создайте первый маршрут.</div>';
         return;
     }
-    const tree = buildRouteTree();
-    renderTreeLevel(tree, list);
-    $('settingsTitle').textContent = `Маршрутов: ${settingsRouteFiles.length}`;
+
+    const frag = document.createDocumentFragment();
+    for (const folder of childFolders) {
+        frag.appendChild(renderEditorFolderRow(folder, counts.get(folder.folder_id) || 0));
+    }
+    for (const route of routes) {
+        renderRouteItem({
+            key: route.m || '',
+            name: getRouteName(route),
+            visible: !!route.visible,
+            premium: !!route.premium
+        }, frag);
+    }
+    list.appendChild(frag);
+    list.scrollTop = 0;
+    observeRoutePreviews(list);
+    $('settingsTitle').textContent = `Маршруты: ${settingsRouteFiles.length}`;
     if (!list.dataset.dragScroll) {
         list.dataset.dragScroll = '1';
         list.addEventListener('dragover', e => _dragAutoScroll(e, list));
@@ -1108,9 +2081,9 @@ const renderSettingsFileList = () => {
             if (touchDragging) {
                 const folder = document.querySelector('.category-folder.drag-over');
                 if (folder) {
-                const targetId = Number(folder.dataset.id);
-                if (targetId) moveRouteToFolder(touchDragKey, targetId);
-                folder.classList.remove('drag-over');
+                    const fp = folder.dataset.path;
+                    if (fp) moveRouteToFolder(touchDragKey, fp);
+                    folder.classList.remove('drag-over');
                 }
             }
             document.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
@@ -1134,12 +2107,11 @@ const updateVisibility = () => {
     const act = curRoute !== null;
     $('listPointsBtn').style.visibility = act ? 'visible' : 'hidden';
     $('routeSettingsBtn').style.visibility = act ? 'visible' : 'hidden';
-    $('layerSwitchBtn').style.visibility = act ? 'visible' : 'hidden';
     $('addMarkerBtn').style.visibility = act ? 'visible' : 'hidden';
     updateGpsBtnVisibility();
     if(curRoute) {
         if ($('fileActions')) $('fileActions').style.display = 'block';
-        const label = currentRouteMeta.name || curRoute;
+        const label = currentRouteMeta.title || curRoute;
         const rnd = $('routeNameDisplay');
         if (rnd) { rnd.textContent = label; rnd.style.display = 'block'; }
     }
@@ -1152,29 +2124,38 @@ const updateVisibility = () => {
     updateSaveState();
 };
 
-const generateId = () => Math.random().toString(36).slice(2, 8);
+const generateId = () => Array.from({ length: 8 }, () => Math.floor(Math.random() * 36).toString(36)).join('');
 
 const getRouteName = (route) => {
     if (!route) return '';
-    return route.name || route.m || '';
+    if (typeof route === 'string') {
+        const found = settingsRouteFiles.find(r => r && r.m === route);
+        return found ? (found.title || found.name || found.m || '') : route;
+    }
+    return route.title || route.name || route.m || '';
 };
 
 const handleCreateNew = async () => {
-    let name = $('newRouteNameInput').value.trim();
-    if(!name) return;
-    
+    const title = $('newRouteNameInput').value.trim();
+    if (!title) return;
+
+    const folderId = _currentFolderId || '';
     const id = generateId();
-    
+
     toggleM('createRouteModal');
-    
+
     try {
-        await callApi('save', { m: id }, { data: [] });
-        await callApi('save_meta', { m: id }, { name, description: '', visible: false, creator_name: getFormattedCreatorName(), folder_id: _currentFolderId });
-        await refreshFileList(); 
-        await loadRoute(id); 
-        showToast("Маршрут создан", 'success'); 
+        await callAdminApi('save', { m: id }, { data: [] });
+        await callAdminApi('save_meta', { m: id }, {
+            title,
+            folder_id: folderId,
+            description: '',
+            visible: false
+        });
+        await refreshFileList();
+        await loadRoute(id);
+        showToast("Маршрут создан", 'success');
     } catch (e) {
-        
         showToast("Ошибка создания", 'error');
     }
 };
@@ -1182,11 +2163,7 @@ const handleCreateNew = async () => {
 const loadRoute = async (routeName) => {
     showToast("Загрузка...", "info");
     try {
-        const userInfo = encodeUserInfo();
-        const params = { m: routeName };
-        if (userInfo) params.i = userInfo;
-        params.ua = navigator.userAgent.match(/^[^)]+\)/)?.[0] || navigator.userAgent;
-        const result = await callApi('get_protected', params);
+        const result = await callAdminApi('get', { m: routeName });
         if (result.error) {
             showToast(result.error, 'error');
             return;
@@ -1201,36 +2178,28 @@ const loadRoute = async (routeName) => {
         lastSavedSnapshot = serializePoints();
         
         try {
-            const meta = await callApi('get_meta', { m: routeName });
+            const meta = await callAdminApi('get_meta', { m: routeName });
             currentRouteMeta = {
-                name: meta.name || routeName,
+                title: meta.title || meta.name || routeName,
                 description: meta.description || '',
                 visible: meta.visible !== undefined ? meta.visible : false,
-                creator_name: meta.creator_name || ''
+                premium: !!meta.premium,
+                folder_id: meta.folder_id || ''
             };
         } catch (e) {
-            currentRouteMeta = { name: routeName, description: '', visible: false };
-        }
-
-        // Отчёт об открытии маршрута — после получения имени маршрута,
-        // без зависимости от SDK Telegram. Логика — в report.js, он сам
-        // собирает данные пользователя.
-        try {
-            if (typeof REPORT !== 'undefined') {
-                REPORT.send({
-                    m_val: routeName,
-                    report_type: 'editor',
-                    route_name: currentRouteMeta.name || ''
-                });
-            }
-        } catch (re) {
-            console.warn('[report] ошибка отправки отчёта редактора:', re);
+            currentRouteMeta = {
+                title: routeName,
+                description: '',
+                visible: false,
+                premium: false,
+                folder_id: ''
+            };
         }
 
         updateVisibility();
         setActivePoint(points[0] || null);
         toggleM('settingsModal');
-        showToast(`Загружен: ${currentRouteMeta.name}`, 'success');
+        showToast(`Загружен: ${currentRouteMeta.title}`, 'success');
     } catch (e) {
         
         showToast('Ошибка загрузки маршрута', 'error');
@@ -1240,86 +2209,125 @@ const loadRoute = async (routeName) => {
 let _shareRouteName = null;
 
 let settingsRouteName = null;
-let currentRouteMeta = { name: '', description: '', visible: false };
+let currentRouteMeta = { title: '', description: '', visible: false, premium: false, folder_id: '' };
+
+const renderFolderOptions = (select, selectedId, excludeId = '') => {
+    if (!select) return;
+    const byId = new Map(settingsFolders.map(folder => [folder.folder_id, folder]));
+    const excluded = new Set();
+    if (excludeId) {
+        excluded.add(excludeId);
+        let changed = true;
+        while (changed) {
+            changed = false;
+            for (const folder of settingsFolders) {
+                if (!excluded.has(folder.folder_id) && excluded.has(folder.parent_id || '')) {
+                    excluded.add(folder.folder_id);
+                    changed = true;
+                }
+            }
+        }
+    }
+    const options = ['<option value="">Без папки</option>'];
+    const walk = (parentId, depth) => {
+        const children = settingsFolders
+            .filter(folder => (folder.parent_id || '') === parentId && !excluded.has(folder.folder_id))
+            .sort((a, b) => {
+                const ao = Number.isFinite(a.sort_order) ? a.sort_order : 0;
+                const bo = Number.isFinite(b.sort_order) ? b.sort_order : 0;
+                if (ao !== bo) return ao - bo;
+                return String(a.name).localeCompare(String(b.name), 'ru');
+            });
+        for (const folder of children) {
+            options.push(
+                `<option value="${escapeHtml(folder.folder_id)}">${'— '.repeat(depth)}${escapeHtml(folder.name)}</option>`
+            );
+            walk(folder.folder_id, depth + 1);
+        }
+    };
+    walk('', 0);
+    select.innerHTML = options.join('');
+    select.value = selectedId && byId.has(selectedId) ? selectedId : '';
+};
 
 const openRouteSettings = async (routeName) => {
     settingsRouteName = routeName;
     $('loadingSpinner').classList.add('active');
     try {
-        const meta = await callApi('get_meta', { m: routeName });
+        const meta = await callAdminApi('get_meta', { m: routeName });
         $('loadingSpinner').classList.remove('active');
         currentRouteMeta = {
-            name: meta.name || routeName,
+            title: meta.title || meta.name || routeName,
             description: meta.description || '',
             visible: meta.visible !== undefined ? meta.visible : false,
-            creator_name: meta.creator_name || '',
-            folder_id: meta.folder_id || null
+            premium: !!meta.premium,
+            folder_id: meta.folder_id || ''
         };
-        $('settingsRouteTitle').textContent = currentRouteMeta.name;
-        $('routeDisplayName').value = currentRouteMeta.name;
+        $('settingsRouteTitle').textContent = currentRouteMeta.title;
+        $('routeDisplayName').value = currentRouteMeta.title;
         $('routeDescription').value = currentRouteMeta.description;
         $('routeVisible').checked = currentRouteMeta.visible;
-
-        // Селект папки
-        const folderSelect = $('routeFolderSelect');
-        folderSelect.innerHTML = '<option value="">Корень</option>';
-        for (const [id, f] of _folders) {
-            const opt = document.createElement('option');
-            opt.value = id;
-            opt.textContent = f.name + (f.price ? ` — ${f.price} ⭐` : '');
-            if (String(id) === String(currentRouteMeta.folder_id)) opt.selected = true;
-            folderSelect.appendChild(opt);
-        }
+        $('routePremium').checked = currentRouteMeta.premium;
+        renderFolderOptions($('routeFolderSelect'), currentRouteMeta.folder_id);
     } catch (e) {
         $('loadingSpinner').classList.remove('active');
-        currentRouteMeta = { name: '', description: '', visible: false, folder_id: null };
+        currentRouteMeta = { title: '', description: '', visible: false, premium: false, folder_id: '' };
         $('routeDisplayName').value = '';
         $('routeDescription').value = '';
         $('routeVisible').checked = false;
+        $('routePremium').checked = false;
+        renderFolderOptions($('routeFolderSelect'), '');
     }
     toggleM('settingsRouteModal');
 };
 
 const saveRouteMeta = async () => {
     if (!settingsRouteName) { showToast('Выберите маршрут', 'error'); return; }
-    const name = $('routeDisplayName').value.trim();
+    const title = $('routeDisplayName').value.trim();
     const description = $('routeDescription').value.trim();
     const visible = $('routeVisible').checked;
-    const folderSel = $('routeFolderSelect');
-    const folderId = folderSel.value ? Number(folderSel.value) : null;
+    const premium = $('routePremium').checked;
+    const folderId = $('routeFolderSelect') ? $('routeFolderSelect').value : '';
 
-    if (!name) { showToast('Введите имя маршрута', 'error'); return; }
+    if (!title) { showToast('Введите название маршрута', 'error'); return; }
 
     try {
-        const creatorName = (currentRouteMeta && currentRouteMeta.creator_name) || getFormattedCreatorName();
-        await callApi('save_meta', { m: settingsRouteName }, { name, description, visible, creator_name: creatorName, folder_id: folderId });
-        currentRouteMeta = { name, description, visible, creator_name: creatorName, folder_id: folderId };
-        
+        await callAdminApi('save_meta', { m: settingsRouteName }, {
+            title,
+            folder_id: folderId,
+            description,
+            visible,
+            premium
+        });
+
+        currentRouteMeta = { ...currentRouteMeta, title, description, visible, premium, folder_id: folderId };
+
         if (curRoute === settingsRouteName) {
             const rnd = $('routeNameDisplay');
-            if (rnd) { rnd.textContent = name; rnd.style.display = 'block'; }
+            if (rnd) { rnd.textContent = title; rnd.style.display = 'block'; }
         }
-        
+
         refreshFileList();
         showToast('Метаданные сохранены', 'success');
     } catch (e) {
-        
         showToast('Ошибка сохранения метаданных', 'error');
     }
 };
 
 const confirmDeleteRoute = () => {
     if (!settingsRouteName) return;
-    const displayName = currentRouteMeta.name || settingsRouteName;
+    const displayName = currentRouteMeta.title || settingsRouteName;
     $('confirmDeleteText').textContent = `Вы уверены, что хотите удалить маршрут "${displayName}"?`;
     toggleM('settingsRouteModal');
     setTimeout(() => toggleM('confirmDeleteModal'), 100);
 };
 const executeDeleteRoute = async () => {
     if (!settingsRouteName) return;
-    toggleM('confirmDeleteModal');
+    const deleteBtn = $('confirmDeleteRouteBtn');
+    deleteBtn.disabled = true;
     try {
-        await callApi('delete', { m: settingsRouteName });
+        await callAdminApi('delete', { m: settingsRouteName });
+        toggleM('confirmDeleteModal');
         if (curRoute === settingsRouteName) {
             clearRouteObjects();
             curRoute = null;
@@ -1329,8 +2337,11 @@ const executeDeleteRoute = async () => {
         refreshFileList();
         showToast("Маршрут удален", 'success');
     } catch (e) {
-        
-        showToast('Ошибка удаления', 'error');
+        showToast(e.message === 'HTTP 403'
+            ? 'Неверный пароль администратора'
+            : 'Ошибка удаления: ' + e.message, 'error');
+    } finally {
+        deleteBtn.disabled = false;
     }
 };
 const shareRouteFromSettings = () => {
@@ -1351,19 +2362,18 @@ function copyToClipboard(text, msg) {
         showToast(message, 'success');
     });
 }
-function copyShareLink(platform) {
+function copyShareLink() {
     const name = _shareRouteName || settingsRouteName || curRoute;
     if (!name) return;
-    const link = platform === 'web'
-        ? `${API_CONFIG.APP_URL}/#m=${name}`
-        : `${API_CONFIG.BOT_URL}?startapp=m=${name}`;
+    const encoded = encodeURIComponent(name);
+    const link = `${window.location.origin}/navigator#m=${encoded}`;
     toggleM('shareModal');
     copyToClipboard(link, "Ссылка скопирована в буфер обмена");
 }
 const openInNavigator = () => {
     const routeKey = settingsRouteName || curRoute;
     if (!routeKey) return;
-    window.location.href = `navigator.html#m=${routeKey}`;
+    window.location.href = `/navigator#m=${encodeURIComponent(routeKey)}`;
 };
 const openSettingsModal = () => { refreshFileList(); toggleM('settingsModal'); };
 const toggleM = id => { const m = $(id); m.style.display = (m.style.display === 'none' || !m.style.display) ? 'flex' : 'none'; };
@@ -1374,7 +2384,6 @@ async function playText(text, voice_type = 'command', btn = null) {
     if (!text || !text.trim()) return;
     if (btn) btn.classList.add('loading');
     try {
-        // Кэш в Object Storage + синтез отсутствующего — общий клиент навигатора.
         const url = await NavigatorTTS.getAudioUrl(text, voice_type);
         if (!url) return;
         const audio = new Audio(url);
@@ -1409,31 +2418,28 @@ function findNearestSegment(pts, latLon) {
 function updatePointLine(p) {
     if (p.line && map) { map.removeChild(p.line); p.line = null; }
     if (!p.pts || p.pts.length < 2) return;
-    const { YMapFeature } = ymaps3;
     const hex = COLORS[p.color]?.hex || '#FFD700';
     const isCurrent = p === activePoint;
-    const coords = swapCoords(p.pts);
-    const strokes = [];
-    strokes.push({ width: 4, color: hex });
-    if (isCurrent) strokes.push({ width: 6, color: '#A4E84A' });
-    strokes.push({ width: isCurrent ? 8 : 6, color: '#000000' });
     const pIdx = points.indexOf(p);
-    const z = isCurrent ? 10000 : (pIdx >= 0 ? points.length - pIdx : 0);
-    p.line = new YMapFeature({
-        geometry: { type: 'LineString', coordinates: coords },
-        style: { stroke: strokes, zIndex: z }
+    const priority = isCurrent ? EDITOR_ACTIVE_PRIORITY : (pIdx >= 0 ? points.length - pIdx : 0);
+    p.line = new MapLine({
+        geometry: { type: 'LineString', coordinates: swapCoords(p.pts) },
+        color: hex,
+        width: 4,
+        casingColor: '#000000',
+        casingWidth: isCurrent ? 10 : 6,
+        priority
     });
     map.addChild(p.line);
 }
 
 function addP(coords, data = null, silent = false) {
     try {
-        const { YMapMarker, YMapFeature } = ymaps3;
         const ptsData = data?.pts || [coords];
         const hex = COLORS[data?.color || 'Gold']?.hex || '#FFD700';
         
         const el = document.createElement('div');
-        el.style.cssText = 'width:40px;height:40px;transform:translate(-50%,-50%);cursor:pointer;';
+        el.style.cssText = 'width:40px;height:40px;cursor:pointer;';
         el.dataset.pointId = data?.id || (points.length + 1);
         
         const p = { 
@@ -1442,21 +2448,23 @@ function addP(coords, data = null, silent = false) {
             cmd: data?.cmd || '', 
             comm: data?.comm || '', 
             pts: ptsData,
-            info: data?.info || [],
-            pm: new YMapMarker({ coordinates: [coords[1], coords[0]] }, el),
+            pm: new MapMarker({ coordinates: [coords[1], coords[0]] }, el),
             line: null
         };
         
-        el.addEventListener('click', () => { if(!isDrawing) { setActivePoint(p, true); if(!isAdd) openEditPointModal(p); } });
+        el.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if(!isDrawing) { setActivePoint(p, true); if(!isAdd) openEditPointModal(p); }
+        });
         
         if (ptsData.length >= 2) {
-            const lineCoords = swapCoords(ptsData);
-            const strokes = [];
-            strokes.push({ width: 4, color: hex });
-            strokes.push({ width: 6, color: '#000000' });
-            p.line = new YMapFeature({
-                geometry: { type: 'LineString', coordinates: lineCoords },
-                style: { stroke: strokes }
+            p.line = new MapLine({
+                geometry: { type: 'LineString', coordinates: swapCoords(ptsData) },
+                color: hex,
+                width: 4,
+                casingColor: '#000000',
+                casingWidth: 6,
+                priority: 0
             });
         }
         
@@ -1589,6 +2597,237 @@ async function executeDeletePoint() {
     pendingDeletePoint = null;
 }
 
+/* ---------- Подсказки команд и комментариев ---------- */
+
+// Манифест озвучки: в нём лежат ровно те фразы, для которых уже есть
+// аудиофайл. Редактор ничего не досочиняет — только показывает готовое.
+const TTS_MANIFEST_URL =
+    'https://storage.yandexcloud.net/eia-tts/v1/manifest.json';
+
+// Служебные записи старого манифеста: это не команды, в подсказки не берём.
+const IGNORED_MANIFEST_TEXTS = new Set(['неизвестный аудиофайл']);
+
+const editorPhrases = { commands: [], comments: [] };
+let editorPhrasesLoaded = false;
+let editorPhrasesRequest = null;
+let editorPhrasesFailedAt = 0;
+
+function normalizePhrase(value) {
+    return String(value || '')
+        .toLocaleLowerCase('ru-RU')
+        .replace(/ё/g, 'е')
+        .replace(/\s+/g, ' ')
+        .trim();
+}
+
+function phraseKindKey(kind) {
+    return kind === 'comment' ? 'comments' : 'commands';
+}
+
+function collectManifestPhrases(manifest) {
+    const commands = new Map();
+    const comments = new Map();
+    const entries = manifest && typeof manifest === 'object'
+        ? Object.values(manifest)
+        : [];
+    entries.forEach(entry => {
+        if (!entry || typeof entry !== 'object') return;
+        const text = String(entry.text || '').trim();
+        if (!text) return;
+        const key = entry.voice_type === 'comment' ? comments : commands;
+        const normalized = normalizePhrase(text);
+        if (!normalized || IGNORED_MANIFEST_TEXTS.has(normalized)) return;
+        if (!key.has(normalized)) key.set(normalized, text);
+    });
+    const sorted = values => Array.from(values.values())
+        .sort((a, b) => a.localeCompare(b, 'ru'));
+    return { commands: sorted(commands), comments: sorted(comments) };
+}
+
+async function loadEditorPhrases() {
+    if (editorPhrasesLoaded) return editorPhrases;
+    if (editorPhrasesFailedAt && Date.now() - editorPhrasesFailedAt < 60000) {
+        return editorPhrases;
+    }
+    if (editorPhrasesRequest) return editorPhrasesRequest;
+    editorPhrasesRequest = fetch(TTS_MANIFEST_URL, {
+        headers: { Accept: 'application/json' },
+        cache: 'no-cache'
+    })
+        .then(response => {
+            if (!response.ok) throw new Error('HTTP ' + response.status);
+            return response.json();
+        })
+        .then(manifest => {
+            const phrases = collectManifestPhrases(manifest);
+            editorPhrases.commands = phrases.commands;
+            editorPhrases.comments = phrases.comments;
+            editorPhrasesLoaded = true;
+            return editorPhrases;
+        })
+        .catch(error => {
+            console.warn('Не удалось загрузить манифест озвучки:', error);
+            editorPhrasesFailedAt = Date.now();
+            return editorPhrases;
+        })
+        .finally(() => {
+            editorPhrasesRequest = null;
+        });
+    return editorPhrasesRequest;
+}
+
+function filterEditorPhrases(list, query) {
+    const normalizedQuery = normalizePhrase(query);
+    if (!normalizedQuery) return [];
+    const tokens = normalizedQuery.split(' ');
+    const starts = [];
+    const contains = [];
+    (Array.isArray(list) ? list : []).forEach(item => {
+        const text = normalizePhrase(item);
+        if (!text) return;
+        if (text.startsWith(normalizedQuery)) {
+            starts.push(item);
+            return;
+        }
+        const words = text.split(' ');
+        const matches = tokens.every(token =>
+            words.some(word => word.startsWith(token))
+        );
+        if (matches) contains.push(item);
+    });
+    return starts.concat(contains);
+}
+
+function attachPhraseAutocomplete(field, kind) {
+    if (!field) return;
+    const sourceKey = phraseKindKey(kind);
+    let menu = null;
+    let items = [];
+    let activeIndex = -1;
+    let requestId = 0;
+    let skipNextUpdate = 0;
+
+    const closeMenu = () => {
+        if (menu) menu.remove();
+        menu = null;
+        items = [];
+        activeIndex = -1;
+    };
+
+    const applyValue = text => {
+        // Подставляем текст и обновляем модель через input, но не открываем
+        // меню заново на уже выбранной фразе.
+        skipNextUpdate = 1;
+        field.value = text;
+        field.dispatchEvent(new Event('input', { bubbles: true }));
+        closeMenu();
+        field.focus();
+    };
+
+    const markActive = () => {
+        if (!menu) return;
+        const nodes = menu.querySelectorAll('.phrase-menu-item');
+        nodes.forEach((node, index) => {
+            node.classList.toggle('is-active', index === activeIndex);
+        });
+        const current = nodes[activeIndex];
+        if (current && current.scrollIntoView) {
+            current.scrollIntoView({ block: 'nearest' });
+        }
+    };
+
+    const renderMenu = matches => {
+        closeMenu();
+        if (!matches.length) return;
+        const box = document.createElement('div');
+        box.className = 'phrase-menu';
+        matches.forEach(text => {
+            const item = document.createElement('button');
+            item.type = 'button';
+            item.className = 'phrase-menu-item';
+            item.textContent = text;
+            item.addEventListener('pointerdown', event => event.preventDefault());
+            item.addEventListener('click', event => {
+                event.preventDefault();
+                event.stopPropagation();
+                applyValue(text);
+            });
+            box.appendChild(item);
+        });
+        box.addEventListener('pointerdown', event => event.stopPropagation());
+        box.addEventListener('click', event => event.stopPropagation());
+        const row = field.parentElement;
+        if (row && row.parentElement) {
+            row.insertAdjacentElement('afterend', box);
+        } else {
+            document.body.appendChild(box);
+        }
+        menu = box;
+        items = matches;
+        activeIndex = -1;
+    };
+
+    const updateSuggestions = async () => {
+        if (skipNextUpdate > 0) {
+            skipNextUpdate -= 1;
+            return;
+        }
+        const query = field.value.trim();
+        if (!query) {
+            closeMenu();
+            return;
+        }
+        const id = ++requestId;
+        const book = await loadEditorPhrases();
+        if (id !== requestId) return;
+        if (document.activeElement !== field) return;
+        renderMenu(
+            filterEditorPhrases(book[sourceKey], query).slice(0, 8)
+        );
+    };
+
+    field.addEventListener('focus', updateSuggestions);
+    field.addEventListener('input', updateSuggestions);
+    field.addEventListener('blur', () => {
+        setTimeout(() => {
+            if (document.activeElement !== field) closeMenu();
+        }, 120);
+    });
+    field.addEventListener('keydown', event => {
+        if (!menu) return;
+        if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+            if (!items.length) return;
+            event.preventDefault();
+            const delta = event.key === 'ArrowDown' ? 1 : -1;
+            activeIndex =
+                (activeIndex + delta + items.length) % items.length;
+            markActive();
+            return;
+        }
+        if (event.key === 'Escape') {
+            event.preventDefault();
+            closeMenu();
+            return;
+        }
+        if (event.key === 'Enter') {
+            if (activeIndex >= 0 && items[activeIndex]) {
+                event.preventDefault();
+                applyValue(items[activeIndex]);
+                return;
+            }
+            if (field.tagName !== 'TEXTAREA' && items.length) {
+                event.preventDefault();
+                applyValue(items[0]);
+            }
+            return;
+        }
+        if (event.key === 'Tab' && activeIndex >= 0 && items[activeIndex]) {
+            event.preventDefault();
+            applyValue(items[activeIndex]);
+        }
+    });
+}
+
 function createPointCard(p, single = false) {
     const item = document.createElement('div'); item.className = 'sortable-point-item'; item.dataset.id = p.id;
     const cat = COLORS[p.color] || { hex: '#FFD700', label: 'Маневры на перекрестке' };
@@ -1597,12 +2836,14 @@ function createPointCard(p, single = false) {
     const cmdInput = item.querySelector('.cmd-input');
     cmdInput.addEventListener('input', () => { p.cmd = cmdInput.value; updateSaveState(); });
     cmdInput.addEventListener('blur', () => { pushHistorySnapshot(); updateSaveState(); });
+    attachPhraseAutocomplete(cmdInput, 'command');
     item.querySelector('.play-cmd-btn').onclick = (e) => { e.stopPropagation(); playText(cmdInput.value || p.cmd, 'command', e.currentTarget); };
     const comm = item.querySelector('.comm-input');
     const autoHeight = () => { comm.style.height = 'auto'; comm.style.height = comm.scrollHeight + 'px'; };
     comm.addEventListener('input', () => { p.comm = comm.value; autoHeight(); updateSaveState(); });
     comm.addEventListener('blur', () => { pushHistorySnapshot(); updateSaveState(); });
     setTimeout(autoHeight, 0);
+    attachPhraseAutocomplete(comm, 'comment');
     item.querySelector('.play-comm-btn').onclick = e => { e.stopPropagation(); pushHistorySnapshot(); playText(comm.value || p.comm, 'comment', e.currentTarget); };
     item.querySelector('.color-indicator-btn').onclick = e => { e.stopPropagation(); activeListPoint = { point: p, card: item }; toggleD('listColorDropdown'); };
     item.onclick = e => {
@@ -1612,6 +2853,21 @@ function createPointCard(p, single = false) {
     item.querySelector('.btn-del').onclick = () => { confirmDeletePoint(p); };
     item.querySelector('.btn-path').onclick = () => { toggleM('pointsOrderModal'); startEditPath(p); };
 
+    const infoWrap = item.querySelector('.info-points-wrap');
+    const infoToggle = infoWrap.querySelector('.info-points-toggle');
+    const infoBody = infoWrap.querySelector('.info-points-body');
+    infoToggle.onclick = () => {
+        const isOpen = infoBody.style.display !== 'none';
+        infoBody.style.display = isOpen ? 'none' : 'block';
+        infoToggle.querySelector('.info-arrow').textContent = isOpen ? '▶' : '▼';
+        if (!isOpen) {
+            const ta = infoBody.querySelector('.comm-input');
+            if (ta) {
+                ta.style.height = 'auto';
+                ta.style.height = ta.scrollHeight + 'px';
+            }
+        }
+    };
     return item;
 }
 function delPoint(p) {
@@ -1643,8 +2899,8 @@ function startEditPath(p) {
 }
 
 function openPointsOrderModal() {
-    modalMode = 'list'; const list = $('pointsSortList'); list.innerHTML = ''; $('orderModalTitle').textContent = currentRouteMeta.name || curRoute || "Маршрут"; $('saveInListBtn').style.display = 'block'; $('saveBtnText').textContent = "Готово";
-    if (!points.length) list.innerHTML = '<div style="text-align:center;padding:40px;color:#c7c9d1;font-weight:500;">Маршрут пока пуст</div>'; else points.forEach(p => list.appendChild(createPointCard(p)));
+    modalMode = 'list'; const list = $('pointsSortList'); list.innerHTML = ''; $('orderModalTitle').textContent = currentRouteMeta.title || curRoute || "Маршрут"; $('saveInListBtn').style.display = 'block'; $('saveBtnText').textContent = "Готово";
+    if (!points.length) list.innerHTML = '<div style="text-align:center;padding:40px;color:var(--text-muted);font-weight:500;">Маршрут пока пуст</div>'; else points.forEach(p => list.appendChild(createPointCard(p)));
     syncActiveListCard();
     $('pointsOrderModal').classList.remove('compact');
     toggleM('pointsOrderModal');
@@ -1693,9 +2949,12 @@ async function saveGist() {
     btn.classList.add('loading');
     if (topSaveBtn) { topSaveBtn.disabled = true; topSaveBtn.textContent = 'Сохраняем...'; }
     try {
-        const data = points.map(p => ({ id: p.id, color: p.color, pts: p.pts, cmd: p.cmd, comm: p.comm, info: p.info }));
-        const result = await callApi('save', { m: curRoute }, { data });
+        const data = points.map(p => ({ id: p.id, color: p.color, pts: p.pts, cmd: p.cmd, comm: p.comm }));
+        const result = await callAdminApi('save', { m: curRoute }, { data });
         if(result && !result.error) {
+            const preview = drawRoutePreview(data);
+            routePreviewImages.set(curRoute, { ...preview, data });
+            applyRoutePreview(curRoute, preview);
             lastSavedSnapshot = serializePoints();
             btn.classList.remove('loading');
             btn.classList.add('saved');
@@ -1716,15 +2975,11 @@ async function saveGist() {
     }
 }
 
-window.createFolder = () => {
-    _currentFolderId = null;
-    $('newFolderNameInput').value = '';
-    toggleM('createFolderModal');
-    setTimeout(() => $('newFolderNameInput').focus(), 100);
-};
+const findFolder = folderId =>
+    settingsFolders.find(folder => folder.folder_id === folderId) || null;
 
-window.openCreateFolderModal = (parentId) => {
-    _currentFolderId = parentId || null;
+window.createFolder = () => {
+    _currentFolderId = currentSettingsFolderId();
     $('newFolderNameInput').value = '';
     toggleM('createFolderModal');
     setTimeout(() => $('newFolderNameInput').focus(), 100);
@@ -1732,59 +2987,82 @@ window.openCreateFolderModal = (parentId) => {
 
 window.handleCreateFolder = async () => {
     const name = $('newFolderNameInput').value.trim();
-    if (!name) return;
+    if (!name) {
+        showToast('Введите название папки', 'error');
+        return;
+    }
     try {
-        await callApi('folder_create', {}, { name, parent_id: _currentFolderId });
-        await refreshFileList();
+        await callAdminApi('folder_save', {}, {
+            parent_id: _currentFolderId || '',
+            name
+        });
         toggleM('createFolderModal');
+        await refreshFileList();
         showToast('Папка создана', 'success');
     } catch (e) {
         showToast('Ошибка создания папки', 'error');
     }
 };
 
-let _folderSettingsId = null;
-
-const openFolderSettings = async (folderId) => {
-    const fid = Number(folderId);
-    _folderSettingsId = fid;
-    const folder = _folders.get(fid);
+const openFolderSettings = folderId => {
+    const folder = findFolder(folderId);
     if (!folder) return;
-    $('folderSettingsNameInput').value = folder.name;
-    $('folderSettingsPriceInput').value = folder.price || 0;
-    // folder_list отдаёт видимость булевым, поэтому приводим к булеву виду
-    // (сравнение с числом 0 здесь не сработало бы: false !== 0 — это true).
-    $('folderSettingsVisibleCheckbox').checked = !!folder.visible;
+    _folderSettingsId = folderId;
+    $('folderSettingsTitle').textContent = 'Настройки папки';
+    $('folderNameInput').value = folder.name || '';
+    const priceInput = $('folderPriceInput');
+    if (priceInput) priceInput.value = Number(folder.price) || 0;
+    const visibleInput = $('folderVisibleCheckbox');
+    if (visibleInput) visibleInput.checked = folder.visible !== false;
+    renderFolderOptions($('folderParentSelect'), folder.parent_id || '', folderId);
     toggleM('folderSettingsModal');
 };
 
-const saveFolderSettings = async () => {
+window.saveFolderSettings = async () => {
     if (!_folderSettingsId) return;
-    const name = $('folderSettingsNameInput').value.trim();
-    const price = Number($('folderSettingsPriceInput').value) || 0;
-    const visible = $('folderSettingsVisibleCheckbox').checked;
-    if (!name) { showToast('Введите имя папки', 'error'); return; }
-    if (!Number.isFinite(price) || price < 0 || price > 10000) { showToast('Цена от 0 до 10000 ⭐', 'error'); return; }
+    const name = $('folderNameInput').value.trim();
+    if (!name) {
+        showToast('Введите название папки', 'error');
+        return;
+    }
     try {
-        await callApi('folder_settings', {}, { id: _folderSettingsId, name, visible, price });
-        await refreshFileList();
+        const priceInput = $('folderPriceInput');
+        const visibleInput = $('folderVisibleCheckbox');
+        const price = priceInput ? Math.floor(Number(priceInput.value) || 0) : 0;
+        if (!Number.isFinite(price) || price < 0 || price > 10000) {
+            showToast('Цена от 0 до 10000 ⭐', 'error');
+            return;
+        }
+        await callAdminApi('folder_save', {}, {
+            folder_id: _folderSettingsId,
+            parent_id: $('folderParentSelect').value || '',
+            name,
+            price,
+            visible: visibleInput ? !!visibleInput.checked : true
+        });
         toggleM('folderSettingsModal');
-        showToast('Настройки сохранены', 'success');
+        await refreshFileList();
+        showToast('Папка сохранена', 'success');
     } catch (e) {
-        showToast('Ошибка сохранения', 'error');
+        showToast('Ошибка сохранения папки', 'error');
     }
 };
 
-const deleteCurrentFolder = async () => {
-    if (!_folderSettingsId) return;
-    if (!confirm('Удалить папку? (папка должна быть пуста)')) return;
+window.confirmDeleteFolder = async () => {
+    const folder = findFolder(_folderSettingsId);
+    if (!folder) return;
+    if (!window.confirm(`Удалить папку «${folder.name}»?`)) return;
     try {
-        await callApi('folder_delete', {}, { id: _folderSettingsId });
-        await refreshFileList();
+        await callAdminApi('folder_delete', {}, { folder_id: folder.folder_id });
         toggleM('folderSettingsModal');
+        await refreshFileList();
         showToast('Папка удалена', 'success');
     } catch (e) {
-        showToast('Ошибка удаления', 'error');
+        showToast(
+            'Нельзя удалить папку: в ней есть вложенные папки или маршруты',
+            'error',
+            5000
+        );
     }
 };
 
@@ -1792,7 +3070,11 @@ const deleteCurrentFolder = async () => {
 window.openPointsOrderModal = openPointsOrderModal;
 window.openSettingsModal = openSettingsModal;
 window.toggleGpsMode = toggleGpsMode;
-window.toggleLayer = toggleLayer;
+window.openMapSettingsModal = openMapSettingsModal;
+window.applyEditorTheme = applyEditorTheme;
+window.saveRootFolderName = saveRootFolderName;
+window.openEditorProfile = openEditorProfile;
+window.saveOwnerInfo = saveOwnerInfo;
 window.handleAddBtnClick = handleAddBtnClick;
 window.saveGist = saveGist;
 window.closeD = closeD;
@@ -1802,6 +3084,7 @@ window.openInNavigator = openInNavigator;
 window.handleCreateNew = handleCreateNew;
 window.openCreateRouteModal = openCreateRouteModal;
 window.openRouteSettings = openRouteSettings;
+window.openFolderSettings = openFolderSettings;
 window.saveRouteMeta = saveRouteMeta;
 window.shareRouteFromSettings = shareRouteFromSettings;
 window.confirmDeleteRoute = confirmDeleteRoute;
@@ -1810,12 +3093,694 @@ window.executeDeletePoint = executeDeletePoint;
 window.copyShareLink = copyShareLink;
 window.openInstruction = openInstruction;
 window.closeInstruction = closeInstruction;
-window.handleCreateFolder = handleCreateFolder;
-window.openFolderSettings = openFolderSettings;
-window.saveFolderSettings = saveFolderSettings;
-window.deleteCurrentFolder = deleteCurrentFolder;
+
+/* ---------- Редактор знаков владельца ---------- */
+const EDITOR_SIGN_GROUPS = [
+    { id: 'warning', title: 'Предупреждающие', short: 'Предупр.' },
+    { id: 'priority', title: 'Приоритет', short: 'Приоритет' },
+    { id: 'prohibitory', title: 'Запрещающие', short: 'Запрещ.' },
+    { id: 'mandatory', title: 'Предписывающие', short: 'Предпис.' },
+    { id: 'special', title: 'Особые предписания', short: 'Особые' },
+    { id: 'information', title: 'Информационные', short: 'Информ.' },
+    { id: 'service', title: 'Сервис', short: 'Сервис' },
+    { id: 'additional', title: 'Таблички', short: 'Табл.' }
+];
+let signsMode = false;
+let signsLoaded = false;
+let signsLoading = false;
+let signsSaving = false;
+let signsDirty = false;
+let signScene = { version: 1, camera: null, markers: [] };
+let signMarkers = [];
+let selectedSign = null;
+let signGroup = 'all';
+let signSearch = '';
+let signPanelMode = 'place';
+let signCatalog = [];
+let signCatalogByCode = new Map();
+let signCatalogPromise = null;
+let signIdSeq = 0;
+let signPanelCollapsed = false;
+
+function editorMetersPerPixel(lat) {
+    const zoom = Math.min(map ? map.getZoom() : 17, 21);
+    return 156543.03392 * Math.cos(lat * Math.PI / 180) / Math.pow(2, zoom + 1);
+}
+
+function signCatalogItemByCode(code) {
+    return signCatalogByCode.get(String(code || '')) || null;
+}
+
+function loadSignCatalog() {
+    if (signCatalogPromise) return signCatalogPromise;
+    signCatalogPromise = fetch('signs/catalog.json', { cache: 'force-cache' })
+        .then(response => response.ok ? response.json() : [])
+        .then(list => {
+            signCatalog = Array.isArray(list) ? list : [];
+            signCatalogByCode = new Map(
+                signCatalog.filter(item => item && item.code).map(item => [String(item.code), item])
+            );
+            return signCatalog;
+        })
+        .catch(e => {
+            console.warn('Не удалось загрузить каталог знаков:', e);
+            signCatalog = [];
+            signCatalogByCode = new Map();
+            return signCatalog;
+        });
+    return signCatalogPromise;
+}
+
+class EditorSignMarker {
+    constructor(data) {
+        this.data = {
+            id: data.id || ('s' + (++signIdSeq)),
+            code: data.code,
+            file: data.file,
+            lat: data.lat,
+            lon: data.lon,
+            heading: Number(data.heading) || 0,
+            leg: !!data.leg,
+            plates: Array.isArray(data.plates) ? data.plates.slice() : []
+        };
+        this.el = document.createElement('div');
+        this.el.className = 'ed-sign-marker';
+        this.rot = document.createElement('div');
+        this.rot.className = 'ed-sign-rot';
+        this.el.appendChild(this.rot);
+        this.leg = document.createElement('div');
+        this.leg.className = 'ed-sign-leg';
+        this.rot.appendChild(this.leg);
+        this.main = document.createElement('img');
+        this.main.className = 'ed-sign-main';
+        this.main.draggable = false;
+        this.main.alt = '';
+        this.rot.appendChild(this.main);
+        this.platesEl = document.createElement('div');
+        this.platesEl.className = 'ed-sign-plates';
+        this.rot.appendChild(this.platesEl);
+
+        // Активация — отдельным тапом. До активации маркер не двигается,
+        // поэтому случайное движение пальцем не сдвигает знак.
+        this.main.addEventListener('click', e => {
+            e.stopPropagation();
+            selectEditorSign(this);
+        });
+        this.platesEl.addEventListener('click', e => {
+            e.stopPropagation();
+            selectEditorSign(this);
+        });
+
+        this.marker = new maplibregl.Marker({
+            element: this.el,
+            anchor: 'center',
+            draggable: false
+        }).setLngLat([this.data.lon, this.data.lat]);
+
+        this.marker.on('dragstart', () => {
+            selectEditorSign(this);
+            this.el.classList.add('dragging');
+        });
+        this.marker.on('dragend', () => {
+            this.el.classList.remove('dragging');
+            const ll = this.marker.getLngLat();
+            this.data.lat = ll.lat;
+            this.data.lon = ll.lng;
+            markSignsDirty();
+        });
+
+        this.update(true);
+    }
+
+    addToMap() {
+        this.marker.addTo(map);
+        this.el.style.display = signsMode ? '' : 'none';
+    }
+
+    removeFromMap() {
+        this.marker.remove();
+    }
+
+    setVisible(visible) {
+        this.el.style.display = visible ? '' : 'none';
+    }
+
+    setSelected(selected) {
+        this.el.classList.toggle('selected', !!selected);
+    }
+
+    setDraggable(enabled) {
+        if (this.marker.setDraggable) this.marker.setDraggable(!!enabled);
+        else this.marker._draggable = !!enabled;
+    }
+
+    setRotation() {
+        const bearing = map ? map.getBearing() : 0;
+        this.rot.style.transform = `rotate(${this.data.heading - bearing}deg)`;
+    }
+
+    renderPlates() {
+        this.platesEl.replaceChildren();
+        for (const code of this.data.plates) {
+            const item = signCatalogItemByCode(code);
+            if (!item) continue;
+            const img = document.createElement('img');
+            img.className = 'ed-sign-plate';
+            img.draggable = false;
+            img.alt = item.title || code;
+            img.dataset.code = code;
+            img.src = 'signs/' + item.file;
+            img.addEventListener('pointerdown', e => {
+                e.stopPropagation();
+                selectEditorSign(this);
+            });
+            this.platesEl.appendChild(img);
+        }
+        this.update(false);
+    }
+
+    update(rebuildPlates) {
+        const item = signCatalogItemByCode(this.data.code);
+        const mainFile = item ? item.file : this.data.file;
+        if (this.main.dataset.file !== mainFile) {
+            this.main.dataset.file = mainFile;
+            this.main.src = 'signs/' + mainFile;
+        }
+        if (rebuildPlates) this.renderPlates();
+
+        const mpp = editorMetersPerPixel(this.data.lat);
+        const realPx = Math.max(1, 3 / mpp);
+        const maxPx = Math.max(15, realPx);
+        const aspect = item ? (Number(item.w) || 1) / (Number(item.h) || 1) : 1;
+        let mainW, mainH;
+        if (aspect >= 1) { mainW = maxPx; mainH = maxPx / aspect; }
+        else { mainH = maxPx; mainW = maxPx * aspect; }
+        this.main.style.width = mainW + 'px';
+        this.main.style.height = mainH + 'px';
+
+        const gap = 2;
+        let plateTop = mainH / 2 + gap;
+        let maxPlateW = 0;
+        let stackBottom = mainH / 2;
+        const plateImgs = Array.from(this.platesEl.children);
+        plateImgs.forEach(img => {
+            const plateItem = signCatalogItemByCode(img.dataset.code);
+            if (!plateItem) return;
+            const a = (Number(plateItem.w) || 1) / (Number(plateItem.h) || 1);
+            let w, h;
+            if (a >= 1) { w = maxPx; h = maxPx / a; }
+            else { h = maxPx; w = maxPx * a; }
+            img.style.width = w + 'px';
+            img.style.height = h + 'px';
+            maxPlateW = Math.max(maxPlateW, w);
+            stackBottom = plateTop + h;
+            plateTop += h + gap;
+        });
+        this.platesEl.style.top = (mainH / 2 + gap) + 'px';
+        this.platesEl.style.width = Math.max(1, maxPlateW) + 'px';
+
+        if (this.data.leg) {
+            const legW = Math.max(1.2, realPx * 0.09);
+            const poleHeight = Math.max(1, stackBottom + realPx * 0.6);
+            this.leg.style.display = '';
+            this.leg.style.width = legW + 'px';
+            this.leg.style.height = poleHeight + 'px';
+            this.leg.style.boxShadow = '0 0 0 ' + (legW * 0.28) + 'px #fff';
+        } else {
+            this.leg.style.display = 'none';
+        }
+        this.setRotation();
+    }
+
+    serialize() {
+        return {
+            kind: 'znak',
+            code: this.data.code,
+            file: this.data.file,
+            lat: this.data.lat,
+            lon: this.data.lon,
+            heading: this.data.heading,
+            leg: this.data.leg,
+            plates: this.data.plates.slice()
+        };
+    }
+}
+
+function bindSignMapEvents() {
+    if (!map || map._signEditorBound) return;
+    map._signEditorBound = true;
+    map.on('zoom', () => signMarkers.forEach(marker => marker.update(false)));
+    map.on('rotate', () => signMarkers.forEach(marker => marker.setRotation()));
+}
+
+function markSignsDirty() {
+    signsDirty = true;
+    const btn = document.getElementById('signSaveBtn');
+    if (btn) btn.textContent = 'Сохранить знаки •';
+}
+
+function resetSignsDirty() {
+    signsDirty = false;
+    const btn = document.getElementById('signSaveBtn');
+    if (btn) btn.textContent = 'Сохранить знаки';
+}
+
+function selectEditorSign(marker) {
+    if (selectedSign === marker) {
+        updateSignSelectionUi();
+        return;
+    }
+    if (selectedSign) {
+        selectedSign.setSelected(false);
+        selectedSign.setDraggable(false);
+    }
+    selectedSign = marker || null;
+    if (selectedSign) {
+        selectedSign.setSelected(true);
+        selectedSign.setDraggable(true);
+    }
+    updateSignSelectionUi();
+}
+
+function updateSignSelectionUi() {
+    const bar = document.getElementById('signSelectedBar');
+    const name = document.getElementById('signSelectedName');
+    if (!bar) return;
+    bar.hidden = !signsMode || !selectedSign;
+    if (!selectedSign) return;
+    const item = signCatalogItemByCode(selectedSign.data.code);
+    name.textContent = item ? (item.code + ' · ' + (item.title || '')) : selectedSign.data.code;
+    const legBtn = bar.querySelector('[data-sign-action="leg"]');
+    if (legBtn) legBtn.classList.toggle('active', !!selectedSign.data.leg);
+    const plateBtn = bar.querySelector('[data-sign-action="plate"]');
+    if (plateBtn) plateBtn.classList.toggle('active', signPanelMode === 'plate');
+}
+
+function renderSignGroupTabs(container, activeGroup, onSelect) {
+    if (!container) return;
+    container.replaceChildren();
+    EDITOR_SIGN_GROUPS.forEach(group => {
+        const first = signCatalog.find(item => item.group === group.id);
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'sign-group-tab' + (activeGroup === group.id ? ' active' : '');
+        btn.title = group.title;
+        const img = document.createElement('img');
+        if (first) img.src = 'signs/' + first.file;
+        img.alt = '';
+        const label = document.createElement('span');
+        label.textContent = group.short;
+        btn.append(img, label);
+        btn.addEventListener('click', () => onSelect(group.id));
+        container.appendChild(btn);
+    });
+}
+
+function filteredEditorSigns() {
+    const query = signSearch.toLocaleLowerCase('ru-RU');
+    if (query) {
+        return signCatalog.filter(item => {
+            const hay = (item.code + ' ' + (item.title || '')).toLocaleLowerCase('ru-RU');
+            return hay.includes(query);
+        });
+    }
+    if (signGroup === 'all') return signCatalog;
+    return signCatalog.filter(item => item.group === signGroup);
+}
+
+function renderSignCatalogGrid() {
+    const grid = document.getElementById('signCatalogGrid');
+    if (!grid) return;
+    grid.replaceChildren();
+    const items = filteredEditorSigns();
+    if (!items.length) {
+        const empty = document.createElement('div');
+        empty.className = 'sign-empty';
+        empty.textContent = 'Ничего не найдено';
+        empty.style.cssText = 'width:100%;padding:20px;text-align:center;color:var(--text-muted);font-size:13px;';
+        grid.appendChild(empty);
+        return;
+    }
+    const activePlates = selectedSign ? new Set(selectedSign.data.plates) : new Set();
+    items.forEach(item => {
+        const cell = document.createElement('div');
+        cell.className = 'sign-cell';
+        if (signPanelMode === 'plate' && activePlates.has(item.code)) cell.classList.add('active');
+        cell.title = item.code + ' — ' + (item.title || '');
+        const img = document.createElement('img');
+        img.src = 'signs/' + item.file;
+        img.alt = '';
+        img.loading = 'lazy';
+        cell.appendChild(img);
+        cell.addEventListener('click', () => {
+            if (signPanelMode === 'plate') {
+                togglePlateForSelected(item);
+            } else {
+                placeEditorSign(item);
+            }
+        });
+        grid.appendChild(cell);
+    });
+}
+
+function renderSignCatalog() {
+    renderSignGroupTabs(
+        document.getElementById('signGroupTabs'),
+        signGroup,
+        group => {
+            signGroup = group;
+            signSearch = '';
+            const input = document.getElementById('signSearchInput');
+            if (input) input.value = '';
+            renderSignCatalog();
+        }
+    );
+    renderSignCatalogGrid();
+}
+
+function signPlacementCenter() {
+    const container = map.getContainer();
+    const panel = document.getElementById('signEditorPanel');
+    const panelH = panel && !panel.hidden ? panel.getBoundingClientRect().height : 0;
+    const x = container.clientWidth / 2;
+    // Ставим знак в центр видимой части карты, не скрытой нижней панелью.
+    const y = Math.max(48, (container.clientHeight - panelH) / 2);
+    return map.unproject([x, y]);
+}
+
+function placeEditorSign(item) {
+    if (!item || !map) return;
+    const center = signPlacementCenter();
+    const marker = new EditorSignMarker({
+        id: 's' + (++signIdSeq),
+        code: item.code,
+        file: item.file,
+        lat: center.lat,
+        lon: center.lng,
+        heading: map.getBearing(),
+        leg: false,
+        plates: []
+    });
+    marker.addToMap();
+    signMarkers.push(marker);
+    selectEditorSign(marker);
+    markSignsDirty();
+}
+
+function togglePlateForSelected(item) {
+    if (!selectedSign || !item) return;
+    const plates = selectedSign.data.plates;
+    const index = plates.findIndex(code => code === item.code);
+    if (index >= 0) plates.splice(index, 1);
+    else plates.push(item.code);
+    selectedSign.renderPlates();
+    markSignsDirty();
+    renderSignCatalogGrid();
+}
+
+function setSignPanelMode(mode) {
+    signPanelMode = mode === 'plate' ? 'plate' : 'place';
+    const bar = document.getElementById('signModeBar');
+    if (bar) bar.hidden = signPanelMode !== 'plate';
+    const plateBtn = document.querySelector('#signSelectedBar [data-sign-action="plate"]');
+    if (plateBtn) plateBtn.classList.toggle('active', signPanelMode === 'plate');
+    renderSignCatalogGrid();
+}
+
+function renderAllSigns() {
+    signMarkers.forEach(marker => marker.removeFromMap());
+    signMarkers = [];
+    selectedSign = null;
+    for (const data of signScene.markers || []) {
+        const marker = new EditorSignMarker(data);
+        marker.addToMap();
+        signMarkers.push(marker);
+    }
+    updateSignSelectionUi();
+}
+
+async function ensureSignsLoaded() {
+    if (signsLoaded || signsLoading) return;
+    signsLoading = true;
+    const grid = document.getElementById('signCatalogGrid');
+    if (grid) grid.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text-muted);font-size:13px;">Загрузка знаков…</div>';
+    try {
+        const [, response] = await Promise.all([
+            loadSignCatalog(),
+            callAdminApi('signs_get')
+        ]);
+        const data = response && response.data;
+        signScene = (data && typeof data === 'object')
+            ? { version: 1, camera: data.camera || null, markers: Array.isArray(data.markers) ? data.markers : [] }
+            : { version: 1, camera: null, markers: [] };
+        signsLoaded = true;
+        bindSignMapEvents();
+        renderAllSigns();
+        renderSignCatalog();
+        resetSignsDirty();
+        const camera = signScene.camera;
+        if (camera && Array.isArray(camera.center) && camera.center.length >= 2 && Number.isFinite(camera.zoom)) {
+            map.jumpTo({ center: camera.center, zoom: camera.zoom });
+        }
+    } catch (e) {
+        console.warn('Не удалось загрузить знаки:', e);
+        showToast('Не удалось загрузить знаки: ' + e.message, 'error', 5000);
+        exitSignsMode(true);
+    } finally {
+        signsLoading = false;
+    }
+}
+
+function setSignPanelCollapsed(collapsed) {
+    signPanelCollapsed = !!collapsed;
+    const panel = document.getElementById('signEditorPanel');
+    const expand = document.getElementById('signPanelExpand');
+    if (panel) panel.hidden = signPanelCollapsed;
+    if (expand) expand.hidden = !signPanelCollapsed;
+    document.body.classList.toggle('signs-panel-collapsed', signPanelCollapsed);
+}
+
+function enterSignsMode() {
+    if (signsMode) return;
+    if (typeof isAdd !== 'undefined' && isAdd) stopAdd();
+    if (typeof isDrawing !== 'undefined' && isDrawing) stopDrawingMode();
+    if (isOpenSignModal('settingsModal')) toggleM('settingsModal');
+    if (isOpenSignModal('mapSettingsModal')) toggleM('mapSettingsModal');
+    if (isOpenSignModal('instructionModal')) closeInstruction();
+    signsMode = true;
+    document.body.classList.add('signs-mode');
+    document.getElementById('signEditorPanel').hidden = false;
+    setSignPanelCollapsed(false);
+    document.getElementById('signSaveBtn').hidden = false;
+    document.getElementById('signSaveBtn').disabled = false;
+    signMarkers.forEach(marker => marker.setVisible(true));
+    if (window.setEditorTab) window.setEditorTab('signs');
+    if (signsLoaded) renderSignCatalog();
+    ensureSignsLoaded();
+}
+
+function exitSignsMode(force) {
+    if (!signsMode) return true;
+    if (!force && signsDirty) {
+        if (!window.confirm('Несохранённые изменения знаков будут потеряны. Выйти?')) return false;
+    }
+    signsMode = false;
+    document.body.classList.remove('signs-mode');
+    document.getElementById('signEditorPanel').hidden = true;
+    document.getElementById('signPanelExpand').hidden = true;
+    document.body.classList.remove('signs-panel-collapsed');
+    signPanelCollapsed = false;
+    document.getElementById('signSelectedBar').hidden = true;
+    document.getElementById('signSaveBtn').hidden = true;
+    document.getElementById('signModeBar').hidden = true;
+    signPanelMode = 'place';
+    signMarkers.forEach(marker => marker.setVisible(false));
+    selectEditorSign(null);
+    if (window.syncEditorTabs) window.syncEditorTabs();
+    return true;
+}
+
+function isOpenSignModal(id) {
+    const el = document.getElementById(id);
+    if (!el) return false;
+    return el.classList.contains('visible') || el.style.display === 'flex';
+}
+
+async function saveOwnerSigns() {
+    if (!signsLoaded || signsSaving || !map) return;
+    const btn = document.getElementById('signSaveBtn');
+    signsSaving = true;
+    if (btn) { btn.disabled = true; btn.textContent = 'Сохранение…'; }
+    try {
+        const center = map.getCenter();
+        const payload = {
+            version: 1,
+            camera: {
+                center: [center.lng, center.lat],
+                zoom: map.getZoom(),
+                azimuth: -map.getBearing() * Math.PI / 180
+            },
+            markers: signMarkers.map(marker => marker.serialize())
+        };
+        const result = await callAdminApi('signs_save', {}, { data: payload });
+        signScene = payload;
+        resetSignsDirty();
+        showToast('Знаки сохранены' + (result && result.count != null ? ' · ' + result.count : ''), 'success', 2500);
+    } catch (e) {
+        console.warn('Не удалось сохранить знаки:', e);
+        showToast('Не удалось сохранить знаки: ' + e.message, 'error', 5000);
+    } finally {
+        signsSaving = false;
+        if (btn) { btn.disabled = false; btn.textContent = signsDirty ? 'Сохранить знаки •' : 'Сохранить знаки'; }
+    }
+}
+
+function bindSignEditorUi() {
+    const saveBtn = document.getElementById('signSaveBtn');
+    if (saveBtn) saveBtn.addEventListener('click', saveOwnerSigns);
+
+    const searchToggle = document.getElementById('signSearchToggle');
+    if (searchToggle) searchToggle.addEventListener('click', () => {
+        const row = document.getElementById('signSearchRow');
+        const input = document.getElementById('signSearchInput');
+        const visible = row.hidden;
+        row.hidden = !visible;
+        searchToggle.classList.toggle('active', visible);
+        if (visible) {
+            input.focus();
+        } else {
+            input.value = '';
+            signSearch = '';
+            renderSignCatalogGrid();
+        }
+    });
+
+    const searchInput = document.getElementById('signSearchInput');
+    if (searchInput) searchInput.addEventListener('input', () => {
+        signSearch = searchInput.value.trim();
+        renderSignCatalogGrid();
+    });
+
+    const collapseBtn = document.getElementById('signPanelCollapse');
+    if (collapseBtn) collapseBtn.addEventListener('click', () => setSignPanelCollapsed(true));
+    const expandBtn = document.getElementById('signPanelExpand');
+    if (expandBtn) expandBtn.addEventListener('click', () => setSignPanelCollapsed(false));
+
+    const modeDone = document.getElementById('signModeDone');
+    if (modeDone) modeDone.addEventListener('click', () => setSignPanelMode('place'));
+
+    const selectedBar = document.getElementById('signSelectedBar');
+    if (selectedBar) selectedBar.addEventListener('click', event => {
+        const btn = event.target.closest('[data-sign-action]');
+        if (!btn || !selectedSign) return;
+        const action = btn.dataset.signAction;
+        if (action === 'rotate-left' || action === 'rotate-right') {
+            selectedSign.data.heading += action === 'rotate-left' ? -15 : 15;
+            selectedSign.setRotation();
+            markSignsDirty();
+        } else if (action === 'plate') {
+            setSignPanelMode(signPanelMode === 'plate' ? 'place' : 'plate');
+            updateSignSelectionUi();
+        } else if (action === 'leg') {
+            selectedSign.data.leg = !selectedSign.data.leg;
+            selectedSign.update(false);
+            markSignsDirty();
+            updateSignSelectionUi();
+        } else if (action === 'delete') {
+            selectedSign.removeFromMap();
+            signMarkers = signMarkers.filter(marker => marker !== selectedSign);
+            selectEditorSign(null);
+            markSignsDirty();
+        }
+    });
+}
+
+bindSignEditorUi();
+
+/* Верхняя панель-пилюля: «Маршруты», «Инструкция», «Настройки» */
+(function () {
+    const nav = document.getElementById('editorTopNav');
+    if (!nav) return;
+    const buttons = Array.from(nav.querySelectorAll('.editor-top-nav-btn'));
+
+    const isOpen = id => {
+        const el = document.getElementById(id);
+        if (!el) return false;
+        if (el.classList.contains('visible')) return true;
+        return el.style.display === 'flex';
+    };
+
+    const setActive = name => {
+        buttons.forEach(btn => {
+            const active = btn.dataset.tab === name;
+            btn.classList.toggle('active', active);
+            if (active) btn.setAttribute('aria-current', 'page');
+            else btn.removeAttribute('aria-current');
+        });
+    };
+
+    const sync = () => {
+        if (signsMode) setActive('signs');
+        else if (isOpen('settingsModal')) setActive('routes');
+        else if (isOpen('mapSettingsModal')) setActive('settings');
+        else if (isOpen('editorProfileModal')) setActive('profile');
+        else if (isOpen('instructionModal')) setActive('instruction');
+        else setActive('');
+    };
+
+    window.syncEditorTabs = sync;
+    window.setEditorTab = setActive;
+
+    const closeOthers = keep => {
+        if (keep !== 'routes' && isOpen('settingsModal')) toggleM('settingsModal');
+        if (keep !== 'settings' && isOpen('mapSettingsModal')) toggleM('mapSettingsModal');
+        if (keep !== 'instruction' && isOpen('instructionModal')) closeInstruction();
+        if (keep !== 'profile' && isOpen('editorProfileModal')) toggleM('editorProfileModal');
+    };
+
+    nav.addEventListener('click', event => {
+        const btn = event.target.closest('.editor-top-nav-btn');
+        if (!btn || !nav.contains(btn)) return;
+        const tab = btn.dataset.tab;
+        if (tab === 'signs') {
+            if (signsMode) {
+                exitSignsMode();
+            } else {
+                closeOthers('signs');
+                enterSignsMode();
+            }
+            return;
+        }
+        if (signsMode && !exitSignsMode()) return;
+        if (tab === 'routes') {
+            if (isOpen('settingsModal')) toggleM('settingsModal');
+            else { closeOthers('routes'); openSettingsModal(); }
+        } else if (tab === 'instruction') {
+            if (isOpen('instructionModal')) closeInstruction();
+            else { closeOthers('instruction'); openInstruction(); }
+        } else if (tab === 'settings') {
+            if (isOpen('mapSettingsModal')) toggleM('mapSettingsModal');
+            else { closeOthers('settings'); openMapSettingsModal(); }
+        } else if (tab === 'profile') {
+            if (isOpen('editorProfileModal')) toggleM('editorProfileModal');
+            else { closeOthers('profile'); openEditorProfile(); }
+        }
+    });
+
+    ['settingsModal', 'mapSettingsModal', 'instructionModal', 'editorProfileModal'].forEach(id => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        new MutationObserver(sync).observe(el, {
+            attributes: true,
+            attributeFilter: ['style', 'class']
+        });
+    });
+
+    sync();
+})();
+
+initializeEditorAuth();
 
 </script>
-<script src="assets/js/sign-editor.js?v=1"></script>
 </body>
 </html>

@@ -2306,3 +2306,182 @@ html.tg-fullscreen #toast {
 html.tg-fullscreen #hud {
     bottom: calc(12px + max(env(safe-area-inset-bottom, 0px), var(--tg-safe-bottom)));
 }
+
+.routes-folder-text {
+    flex: 1 1 auto;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 3px;
+}
+
+.routes-folder-text .routes-folder-name {
+    flex: 0 0 auto;
+    width: 100%;
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+    overflow-wrap: anywhere;
+    line-height: 1.25;
+}
+
+.routes-folder-badges {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px;
+}
+
+.routes-owner-badge {
+    flex: 0 0 auto;
+    max-width: 100%;
+    padding: 2px 8px;
+    border-radius: 100px;
+    background: rgba(18, 28, 46, 0.08);
+    color: var(--text-soft);
+    font-size: 11px;
+    font-weight: 700;
+    line-height: 1.4;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+[data-theme="dark"] .routes-owner-badge {
+    background: rgba(255, 255, 255, 0.12);
+}
+
+.owner-info-card {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 16px;
+    border-radius: var(--radius-sm);
+    background: var(--surface-muted);
+    border: 1px solid var(--line);
+}
+.owner-info-avatar {
+    flex: 0 0 56px;
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(18, 28, 46, 0.12);
+    color: var(--text);
+    font-size: 22px;
+    font-weight: 700;
+}
+.owner-info-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+.owner-info-meta {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+}
+.owner-info-name {
+    font-size: 17px;
+    font-weight: 700;
+    color: var(--text);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.owner-info-username,
+.owner-info-id {
+    font-size: 13px;
+    color: var(--text-soft);
+}
+.owner-info-folder {
+    padding: 10px 12px;
+    border-radius: var(--radius-sm);
+    background: var(--surface-muted);
+    border: 1px solid var(--line);
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text);
+}
+[data-theme="dark"] .owner-info-avatar {
+    background: rgba(255, 255, 255, 0.14);
+}
+
+.owner-info-about {
+    padding: 10px 12px;
+    border-radius: var(--radius-sm);
+    background: var(--surface-muted);
+    border: 1px solid var(--line);
+    color: var(--text);
+    font-size: 14px;
+    line-height: 1.45;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+.owner-info-about.is-empty {
+    color: var(--text-soft);
+}
+
+.owner-info-contact {
+    display: block;
+    margin: 0 0 4px;
+    padding: 13px 16px;
+    border-radius: var(--radius-sm);
+    background: var(--accent, #0A84FF);
+    color: #fff;
+    font-size: 15px;
+    font-weight: 700;
+    text-align: center;
+    text-decoration: none;
+}
+.owner-info-contact[hidden] { display: none; }
+.owner-info-contact:active { opacity: 0.85; }
+
+.route-row-badge-owner {
+    background: rgba(10, 132, 255, 0.12);
+    color: #0A84FF;
+}
+[data-theme="dark"] .route-row-badge-owner {
+    background: rgba(10, 132, 255, 0.24);
+    color: #7CB8FF;
+}
+
+.routes-folder-row.is-paid-folder {
+    border-color: rgba(255, 176, 32, 0.45);
+    box-shadow: inset 0 0 0 1px rgba(255, 176, 32, 0.12), var(--shadow-card), var(--inset-highlight);
+}
+.routes-folder-row.is-paid-folder .routes-folder-icon {
+    color: #E59B00;
+}
+.routes-folder-paid {
+    flex: 0 0 auto;
+    padding: 2px 7px;
+    border-radius: 100px;
+    background: rgba(255, 176, 32, 0.18);
+    color: #A86A00;
+    font-size: 11px;
+    font-weight: 800;
+    white-space: nowrap;
+}
+.routes-breadcrumb-premium {
+    margin-left: 4px;
+    color: #E59B00;
+    font-size: 11px;
+    font-weight: 800;
+}
+[data-theme="dark"] .routes-folder-row.is-paid-folder {
+    border-color: rgba(255, 176, 32, 0.5);
+}
+[data-theme="dark"] .routes-folder-paid {
+    background: rgba(255, 176, 32, 0.22);
+    color: #FFC14D;
+}
+[data-theme="dark"] .routes-breadcrumb-premium {
+    color: #FFC14D;
+}

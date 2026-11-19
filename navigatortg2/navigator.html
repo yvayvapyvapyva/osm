@@ -1344,6 +1344,7 @@ function closeAllSheets() {
     closeProfile();
     closeInstruction();
     closePremiumOffer();
+    hideScreen('ownerInfoModal');
     if (typeof MenuModule !== 'undefined') MenuModule.hide();
 }
 
@@ -1415,6 +1416,75 @@ function openProfile() {
 
 function closeProfile() {
     hideScreen('profileModal');
+}
+
+function openOwnerInfo(rootId) {
+    const key = String(rootId || '');
+    if (!key) return;
+    let owner = null;
+    let folderName = '';
+    try {
+        const bundle = MenuModule._ownerBundles && MenuModule._ownerBundles.get(key);
+        if (bundle && bundle.owner) {
+            owner = bundle.owner;
+            folderName = bundle.owner.name || '';
+        }
+        if (!owner && MenuModule._owners) {
+            owner = MenuModule._owners.find(entry => String(entry.folder_id) === key) || null;
+            folderName = owner && owner.name ? owner.name : '';
+        }
+    } catch (e) {}
+    if (!owner) return;
+
+    const name = owner.owner_name || owner.owner_tg_id || 'Владелец';
+    const username = owner.owner_username ? '@' + String(owner.owner_username).replace(/^@/, '') : '';
+    const tgId = owner.owner_tg_id || '';
+    const avatar = owner.owner_avatar || '';
+
+    const avatarEl = $('ownerInfoAvatar');
+    if (avatarEl) {
+        avatarEl.replaceChildren();
+        if (avatar) {
+            const img = document.createElement('img');
+            img.src = avatar;
+            img.alt = '';
+            avatarEl.appendChild(img);
+        } else {
+            avatarEl.textContent = String(name).trim().charAt(0).toUpperCase() || '?';
+        }
+    }
+    const nameEl = $('ownerInfoName');
+    if (nameEl) nameEl.textContent = name;
+    const userEl = $('ownerInfoUsername');
+    if (userEl) {
+        userEl.textContent = username;
+        userEl.hidden = !username;
+    }
+    const contactEl = $('ownerInfoContact');
+    const usernameSlug = String(owner.owner_username || '').replace(/^@/, '').trim();
+    if (contactEl) {
+        if (usernameSlug) {
+            contactEl.href = 'https://t.me/' + encodeURIComponent(usernameSlug);
+            contactEl.hidden = false;
+        } else {
+            contactEl.removeAttribute('href');
+            contactEl.hidden = true;
+        }
+    }
+
+    const info = owner.owner_info || (username ? username : '');
+    const aboutEl = $('ownerInfoAbout');
+    if (aboutEl) {
+        aboutEl.textContent = info || 'Не указана';
+        aboutEl.classList.toggle('is-empty', !info);
+    }
+    const folderEl = $('ownerInfoFolder');
+    if (folderEl) folderEl.textContent = folderName || '—';
+    $('ownerInfoModal').classList.remove('hidden');
+}
+
+function closeOwnerInfo() {
+    hideScreen('ownerInfoModal');
 }
 
 function openSettings() {
@@ -2787,6 +2857,35 @@ if (typeof maplibregl === 'undefined') {
                 </div>
             </div>
 
+        </div>
+    </div>
+</div>
+
+<div id="ownerInfoModal" class="screen-modal hidden" onclick="if(event.target===this) closeOwnerInfo()">
+    <div class="screen-panel" id="ownerInfoScreen">
+        <header class="screen-head">
+            <h1 class="screen-title">Владелец</h1>
+            <button type="button" class="screen-close" onclick="closeOwnerInfo()" aria-label="Закрыть">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+            </button>
+        </header>
+        <div class="settings-body">
+            <div class="owner-info-card">
+                <div id="ownerInfoAvatar" class="owner-info-avatar"></div>
+                <div class="owner-info-meta">
+                    <div id="ownerInfoName" class="owner-info-name"></div>
+                    <div id="ownerInfoUsername" class="owner-info-username"></div>
+                </div>
+            </div>
+            <div class="settings-group">
+                <div class="settings-label">Информация</div>
+                <div id="ownerInfoAbout" class="owner-info-about"></div>
+            </div>
+            <a id="ownerInfoContact" class="owner-info-contact" href="#" target="_blank" rel="noopener">Связаться с автором</a>
+            <div class="settings-group">
+                <div class="settings-label">Корневая папка</div>
+                <div id="ownerInfoFolder" class="owner-info-folder"></div>
+            </div>
         </div>
     </div>
 </div>

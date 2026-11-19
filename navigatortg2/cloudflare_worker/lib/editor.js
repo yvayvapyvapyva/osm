@@ -12,6 +12,8 @@ export const EDITOR_ACTIONS = new Set([
   'folder_list', 'folder_create', 'folder_rename', 'folder_delete',
   'folder_move', 'folder_settings', 'route_move',
   'signs_get', 'signs_save',
+  'root_save',
+  'owner_save',
 ]);
 
 // Удостоверение пользователя: только подпись Telegram.WebApp.initData.

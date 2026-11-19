@@ -65,3 +65,15 @@ CREATE TABLE IF NOT EXISTS owner_signs (
   data        TEXT NOT NULL,
   updated_at  INTEGER NOT NULL
 );
+
+-- Корневая папка владельца: одна на Telegram-аккаунт.
+CREATE TABLE IF NOT EXISTS owner_roots (
+  owner_tg_id TEXT PRIMARY KEY,
+  folder_id   INTEGER NOT NULL,
+  owner_name  TEXT DEFAULT '',
+  owner_avatar TEXT DEFAULT '',
+  owner_username TEXT DEFAULT '',
+  owner_info  TEXT DEFAULT '',
+  created_at  INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_owner_roots_folder ON owner_roots (folder_id);

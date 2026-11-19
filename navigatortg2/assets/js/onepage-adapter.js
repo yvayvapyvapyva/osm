@@ -75,7 +75,8 @@
                     }
                     return {
                         routes,
-                        signs: Array.isArray(payload && payload.signs) ? payload.signs : []
+                        signs: Array.isArray(payload && payload.signs) ? payload.signs : [],
+                        owner: (payload && payload.owner) || null
                     };
                 })
                 .catch((error) => {
@@ -165,10 +166,16 @@
         return top;
     }
 
+    function paramValue(params, key) {
+        if (!params) return '';
+        if (typeof params.get === 'function') return String(params.get(key) || '');
+        return String(params[key] || '');
+    }
+
     function requestedRootId(catalog, params) {
-        const owner = params && params.owner ? String(params.owner) : '';
+        const owner = paramValue(params, 'owner');
         if (owner && folderById(catalog, owner)) return owner;
-        const routeM = params && params.m ? String(params.m) : '';
+        const routeM = paramValue(params, 'm');
         if (routeM) {
             const route = (catalog.routes || []).find((item) => String(item.m) === routeM);
             const top = route ? topRootForFolder(catalog, route.folder_id) : '';
@@ -193,7 +200,8 @@
                     folder_id: folderId,
                     parent_id: ids && folderId === rootId ? '' : parentId,
                     name: folder.name || 'Папка',
-                    sort_order: Number(folder.sort_order) || 0
+                    sort_order: Number(folder.sort_order) || 0,
+                    price: Number(folder.price) || 0
                 };
             });
 
@@ -208,23 +216,26 @@
             .map((route) => {
                 const m = String(route.m);
                 const folderId = route.folder_id == null ? '' : String(route.folder_id);
+                const mine = !!(geometry && geometry.owner && geometry.owner.is_owner);
                 const lockedByShop = shop && folderId ? shop.isLocked(folderId) : false;
                 const full = geometry && geometry.routes ? geometry.routes.get(m) : null;
                 const serverLocked = full ? !!full.locked : false;
-                const locked = lockedByShop || serverLocked;
+                const premium = !!(lockedByShop || serverLocked);
+                const locked = mine ? false : premium;
                 const item = {
                     m,
                     title: route.name || route.m,
                     name: route.name || route.m,
                     folder_id: folderId,
                     description: route.description || '',
-                    premium: locked,
+                    premium: premium,
                     locked: locked,
+                    owned: mine,
                     viewed: false
                 };
                 // Пакет владельца уже содержит геометрию — меню сложит её в
                 // _routeDataCache, и превью/переходы не делают запросов.
-                if (full && Array.isArray(full.data) && !serverLocked) {
+                if (full && Array.isArray(full.data) && (mine || !serverLocked)) {
                     item.data = full.data;
                 }
                 return item;
@@ -233,7 +244,12 @@
         return {
             owner: {
                 root_folder_id: rootId,
-                name: rootFolder ? (rootFolder.name || OWNER_NAME) : OWNER_NAME
+                name: rootFolder ? (rootFolder.name || OWNER_NAME) : OWNER_NAME,
+                owner_name: rootFolder ? (rootFolder.owner_name || '') : '',
+                owner_avatar: rootFolder ? (rootFolder.owner_avatar || '') : '',
+                owner_username: rootFolder ? (rootFolder.owner_username || '') : '',
+                owner_info: rootFolder ? (rootFolder.owner_info || '') : '',
+                owner_tg_id: rootFolder ? (rootFolder.owner_tg_id || '') : ''
             },
             folders: folders,
             routes: routes,
@@ -264,6 +280,14 @@
         return false;
     }
 
+    function currentTgUserId() {
+        try {
+            const user = global.Telegram && global.Telegram.WebApp &&
+                global.Telegram.WebApp.initDataUnsafe && global.Telegram.WebApp.initDataUnsafe.user;
+            return user && user.id ? String(user.id) : '';
+        } catch (e) { return ''; }
+    }
+
     function handleOwners() {
         const shopReady = global.OnepageShop && global.OnepageShop.ready
             ? global.OnepageShop.ready
@@ -291,16 +315,28 @@
                     if (ao !== bo) return ao - bo;
                     return String(a.name || '').localeCompare(String(b.name || ''), 'ru');
                 });
-            const owners = roots.map((folder) => ({
-                root_folder_id: String(folder.id),
-                name: folder.name || OWNER_NAME,
-                routes_count: countFor(folder.id),
-                premium_count: premiumFor(folder.id)
-            }));
+            const tgUserId = currentTgUserId();
+            const owners = roots.map((folder) => {
+                const mine = !!tgUserId && String(folder.owner_tg_id || '') === tgUserId;
+                return {
+                    root_folder_id: String(folder.id),
+                    name: folder.name || OWNER_NAME,
+                    owner_name: folder.owner_name || '',
+                    owner_avatar: folder.owner_avatar || '',
+                    owner_username: folder.owner_username || '',
+                    owner_info: folder.owner_info || '',
+                    owner_tg_id: folder.owner_tg_id || '',
+                    is_owner: mine,
+                    price: Number(folder.price) || 0,
+                    routes_count: countFor(folder.id),
+                    premium_count: premiumFor(folder.id)
+                };
+            });
             if (!owners.length) {
                 owners.push({
                     root_folder_id: OWNER_ID,
                     name: OWNER_NAME,
+                    owner_name: '',
                     routes_count: routeFolders.length,
                     premium_count: (catalog.routes || []).filter((route) => isPremiumRoute(catalog, route)).length
                 });
