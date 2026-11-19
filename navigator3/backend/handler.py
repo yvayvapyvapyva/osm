@@ -514,14 +514,6 @@ def _premium_days():
     return max(1, min(value, 3650))
 
 
-def _premium_stars_price():
-    try:
-        value = int(os.getenv("PREMIUM_STARS_PRICE", "300"))
-    except (TypeError, ValueError):
-        value = 300
-    return max(1, min(value, 100000))
-
-
 def _premium_price_rub():
     raw = _text(os.getenv("PREMIUM_PRICE_RUB", "299")).replace(",", ".")
     try:
@@ -707,8 +699,6 @@ def _public_user(user):
         "display_name": _text(user.get("display_name")),
         "routes_folder_name": _text(user.get("routes_folder_name")),
         "email": _text(user.get("email")),
-        "avatar_url": _text(user.get("avatar_url")),
-        "auth_provider": _text(user.get("auth_provider")) or "yandex",
         "premium_until": until.isoformat() if until else None,
         "premium_active": _premium_active(user),
     }
@@ -769,9 +759,7 @@ def _current_user(event):
     session = store.get_session(sid)
     if not session:
         return None
-    user = store.get_user_by_user_id(session.get("user_id"))
-    if not user:
-        user = store.get_user_by_yandex_id(session.get("yandex_id"))
+    user = store.get_user_by_yandex_id(session.get("yandex_id"))
     if not user or user.get("blocked"):
         return None
     store.touch_session(session.get("sid_hash"), session.get("last_seen_at"))
@@ -1022,11 +1010,6 @@ def _auth_callback(event):
     if user.get("blocked"):
         return auth.redirect_response("/?auth_error=blocked", auth.clear_oauth_cookies())
 
-    try:
-        store.upsert_identity("yandex", user.get("yandex_id"), user.get("user_id"))
-    except Exception as exc:  # noqa: BLE001
-        print(f"[auth] identity upsert failed: {exc}")
-
     ip, user_agent = _client_meta(event)
     try:
         sid = store.create_session(
@@ -1052,64 +1035,6 @@ def _auth_callback(event):
     return auth.redirect_response(
         return_to,
         [auth.session_cookie(sid)] + auth.clear_oauth_cookies(),
-    )
-
-
-def _auth_telegram(event):
-    """Вход в Mini App по подписи Telegram.WebApp.initData."""
-    params = _query(event)
-    raw = _text(params.get("d") or params.get("init_data")).strip()
-    if not raw and _request_meta(event)[1] == "POST":
-        body = _body_json(event)
-        if isinstance(body, dict):
-            raw = _text(body.get("init_data") or body.get("d")).strip()
-    if not raw:
-        return auth.json_response(400, {"error": "missing_init_data"})
-
-    bot_token = auth.telegram_bot_token()
-    if not bot_token:
-        return auth.json_response(503, {"error": "telegram_not_configured"})
-
-    profile, error = auth.verify_telegram_init_data(raw, bot_token)
-    if error:
-        print(f"[auth] telegram rejected: {error}")
-        return auth.json_response(401, {"error": error})
-
-    try:
-        user = store.upsert_telegram_user(
-            profile["id"],
-            profile["login"],
-            profile["display_name"],
-            profile["avatar_url"],
-        )
-    except Exception as exc:  # noqa: BLE001
-        print(f"[auth] telegram user upsert failed: {exc}")
-        return auth.json_response(500, {"error": "storage_failed"})
-
-    if user.get("blocked"):
-        return auth.json_response(403, {"error": "blocked"})
-
-    ip, user_agent = _client_meta(event)
-    try:
-        sid = store.create_session(
-            user["yandex_id"], user["user_id"], user_agent, ip
-        )
-    except Exception as exc:  # noqa: BLE001
-        print(f"[auth] telegram session failed: {exc}")
-        return auth.json_response(500, {"error": "storage_failed"})
-
-    _log_activity(
-        user,
-        "login",
-        source="auth",
-        entity_type="user",
-        entity_id=_text(user.get("user_id")),
-        metadata={"provider": "telegram"},
-    )
-    return auth.json_response(
-        200,
-        {"status": "ok", "user": _public_user(user)},
-        cookies=[auth.session_cookie(sid)],
     )
 
 
@@ -1470,9 +1395,6 @@ def _premium_status_payload(user):
         "payments_available": bool(providers),
         "providers": providers,
         "logged_in": bool(user),
-        "stars_price": _premium_stars_price(),
-        "auth_provider": _text(user.get("auth_provider")) if user else "",
-        "telegram": bool(user and _text(user.get("auth_provider")) == "telegram"),
     }
 
 
@@ -1542,147 +1464,6 @@ def _api_premium_checkout(event):
             "days": days,
         },
     )
-
-
-def _api_premium_stars_checkout(event):
-    """Счёт Telegram Stars для покупки премиума в мини-аппе."""
-    user = _current_user(event)
-    if not user:
-        return auth.json_response(401, {"error": "unauthorized"})
-    if _text(user.get("auth_provider")) != "telegram":
-        return auth.json_response(403, {"error": "telegram_only"})
-    if not auth.telegram_bot_token():
-        return auth.json_response(503, {"error": "telegram_not_configured"})
-
-    stars = _premium_stars_price()
-    days = _premium_days()
-    inv_id = "stars_" + secrets.token_hex(12)
-    payload = f"stars:{_text(user.get('user_id'))}:{inv_id}"
-    title = f"Премиум на {days} дней"
-    description = "Доступ к премиум-маршрутам в навигаторе"
-
-    try:
-        response = auth.telegram_create_invoice_link(
-            title, description, payload, stars
-        )
-    except Exception as exc:  # noqa: BLE001
-        print(f"[premium] stars invoice failed: {exc}")
-        return auth.json_response(502, {"error": "payment_provider_failed"})
-
-    link = ""
-    if isinstance(response, dict) and response.get("ok"):
-        link = _text((response.get("result") or "")).strip()
-    if not link:
-        print(f"[premium] stars invoice bad response: {response}")
-        return auth.json_response(502, {"error": "payment_provider_failed"})
-
-    try:
-        store.create_payment(
-            inv_id=inv_id,
-            user_id=_text(user.get("user_id")),
-            yandex_id=_text(user.get("yandex_id")),
-            amount_kopecks=0,
-            currency="XTR",
-            payment_url=link,
-            provider="telegram_stars",
-            status="pending",
-            stars=stars,
-        )
-    except Exception as exc:  # noqa: BLE001
-        print(f"[premium] stars payment store failed: {exc}")
-        return auth.json_response(500, {"error": "payment_create_failed"})
-
-    _log_activity(
-        user,
-        "premium_checkout",
-        source="premium",
-        entity_type="payment",
-        entity_id=inv_id,
-        metadata={"stars": stars, "days": days, "provider": "telegram_stars"},
-    )
-    return auth.json_response(
-        200,
-        {
-            "invoice_url": link,
-            "payment_id": inv_id,
-            "provider": "telegram_stars",
-            "stars": stars,
-            "days": days,
-        },
-    )
-
-
-def _api_telegram_webhook(event):
-    """Вебхук бота: подтверждение оплаты и зачисление звёзд."""
-    secret = _text(os.getenv("TELEGRAM_WEBHOOK_SECRET", "")).strip()
-    if secret:
-        got = _header(event, "X-Telegram-Bot-Api-Secret-Token").strip()
-        if not hmac.compare_digest(got, secret):
-            return auth.json_response(401, {"error": "unauthorized"})
-
-    body = _body_json(event)
-    if not isinstance(body, dict):
-        return auth.json_response(400, {"error": "invalid_json_body"})
-
-    pre_checkout = body.get("pre_checkout_query")
-    if isinstance(pre_checkout, dict):
-        query_id = _text(pre_checkout.get("id"))
-        try:
-            auth.telegram_answer_pre_checkout(query_id, True)
-        except Exception as exc:  # noqa: BLE001
-            print(f"[premium] pre_checkout answer failed: {exc}")
-        return auth.json_response(200, {"ok": True})
-
-    message = body.get("message") or {}
-    payment = message.get("successful_payment") if isinstance(message, dict) else None
-    if not isinstance(payment, dict):
-        return auth.json_response(200, {"ok": True})
-
-    charge_id = _text(payment.get("telegram_payment_charge_id")).strip()
-    payload = _text(payment.get("invoice_payload")).strip()
-    amount = _int(payment.get("total_amount"))
-
-    parts = payload.split(":")
-    if len(parts) != 3 or parts[0] != "stars":
-        print(f"[premium] unknown stars payload: {payload}")
-        return auth.json_response(200, {"ok": True})
-    user_id = parts[1]
-    inv_id = parts[2]
-
-    record = store.get_payment(inv_id)
-    if not record or record.get("provider") != "telegram_stars":
-        print(f"[premium] stars payment not found: {inv_id}")
-        return auth.json_response(200, {"ok": True})
-    if record.get("status") == "succeeded":
-        return auth.json_response(200, {"ok": True})
-    if amount and record.get("stars") and amount < record["stars"]:
-        print(f"[premium] stars amount mismatch {inv_id}: {amount}")
-        return auth.json_response(200, {"ok": True})
-
-    try:
-        if charge_id:
-            store.set_payment_charge(inv_id, charge_id)
-        store.mark_payment_succeeded(inv_id)
-        until = store.extend_premium_user(user_id, _premium_days())
-        print(f"[premium] stars payment {inv_id} paid, premium until {until}")
-    except Exception as exc:  # noqa: BLE001
-        print(f"[premium] stars apply failed {inv_id}: {exc}")
-        return auth.json_response(500, {"error": "storage_failed"})
-
-    user = store.get_user_by_user_id(user_id)
-    if user:
-        _log_activity(
-            user,
-            "premium_paid",
-            source="premium",
-            entity_type="payment",
-            entity_id=inv_id,
-            metadata={
-                "stars": record.get("stars"),
-                "charge_id": charge_id,
-            },
-        )
-    return auth.json_response(200, {"ok": True})
 
 
 def _api_premium_robokassa_result(event):
@@ -2857,12 +2638,6 @@ def _handle_api(event, path, method):
     if normalized == "/api/premium/status" and method == "GET":
         return _api_premium_status(event)
 
-    if normalized == "/api/premium/stars/checkout" and method in ("GET", "POST"):
-        return _api_premium_stars_checkout(event)
-
-    if normalized == "/api/telegram/webhook" and method == "POST":
-        return _api_telegram_webhook(event)
-
     if normalized == "/api/premium/checkout" and method in ("GET", "POST"):
         return _api_premium_checkout(event)
 
@@ -2887,9 +2662,6 @@ def _handle_api(event, path, method):
 
     if normalized == "/auth/yandex/start" and method == "GET":
         return _auth_start(event)
-
-    if normalized == "/auth/telegram" and method in ("GET", "POST"):
-        return _auth_telegram(event)
 
     if normalized == "/auth/yandex/callback" and method == "GET":
         return _auth_callback(event)

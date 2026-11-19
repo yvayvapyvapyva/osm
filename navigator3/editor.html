@@ -697,45 +697,6 @@ async function callAdminApi(action, params = {}, bodyData = null, headers = {}) 
     return await response.json();
 }
 
-async function editorTelegramLogin() {
-    // В Telegram Mini App входим по подписи initData, без Яндекса.
-    const insideTelegram = /tgWebAppData/.test(window.location.hash || '')
-        || !!window.TelegramWebviewProxy
-        || !!(window.Telegram && window.Telegram.WebApp);
-    if (!insideTelegram) return false;
-
-    if (!(window.Telegram && window.Telegram.WebApp)) {
-        await new Promise((resolve) => {
-            const script = document.createElement('script');
-            script.src = 'https://telegram.org/js/telegram-web-app.js';
-            script.async = true;
-            script.onload = resolve;
-            script.onerror = resolve;
-            document.head.appendChild(script);
-            setTimeout(resolve, 3000);
-        });
-    }
-    const app = window.Telegram && window.Telegram.WebApp;
-    if (!app || !app.initData) return false;
-    try {
-        app.ready();
-        app.expand();
-    } catch (e) {}
-    try {
-        const response = await fetch(
-            '/auth/telegram?d=' + encodeURIComponent(app.initData),
-            {
-                credentials: 'same-origin',
-                headers: { Accept: 'application/json' },
-                cache: 'no-store'
-            }
-        );
-        return response.ok;
-    } catch (e) {
-        return false;
-    }
-}
-
 async function initializeEditorAuth() {
     const error = $('editorAuthError');
     const message = $('editorAuthMessage');
@@ -769,14 +730,13 @@ async function initializeEditorAuth() {
         + '&force_confirm=1';
     login.href = startUrl;
     try {
-        await editorTelegramLogin();
         const response = await fetch('/api/me', {
             credentials: 'same-origin',
             headers: { Accept: 'application/json' },
             cache: 'no-store'
         });
         if (response.status === 401) {
-            showLoginGate('Войдите, чтобы открыть редактор.');
+            showLoginGate('Войдите через Яндекс, чтобы открыть редактор.');
             return;
         }
         if (!response.ok) {

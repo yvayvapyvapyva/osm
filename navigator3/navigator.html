@@ -1402,15 +1402,12 @@ function renderPremiumUi() {
     const providers = Array.isArray(status.providers) && status.providers.length
         ? status.providers
         : (status.payments_available ? ['robokassa'] : []);
-    const telegram = !!status.telegram
-        || !!(window.AuthModule && AuthModule.isTelegram);
-    const starsPrice = status.stars_price || 300;
-    const available = telegram || providers.length > 0;
-    const primaryProvider = telegram ? 'telegram_stars' : (providers[0] || '');
-    const price = telegram ? `${starsPrice} ⭐` : (status.price || '299') + ' ₽';
+    const available = providers.length > 0;
+    const primaryProvider = providers[0] || '';
+    const price = status.price || '299';
     const days = status.days || 30;
     const until = formatPremiumDate(status.until);
-    const providerNames = { robokassa: 'Робокасса', telegram_stars: 'Telegram Stars' };
+    const providerNames = { robokassa: 'Робокасса' };
     const providerName = id => providerNames[id] || id;
 
     let text = '';
@@ -1418,15 +1415,15 @@ function renderPremiumUi() {
     let disabled = false;
 
     if (!logged) {
-        text = telegram ? 'Откройте приложение в Telegram' : 'Войдите, чтобы оформить подписку';
-        button = telegram ? 'Войти через Telegram' : 'Войти с Яндексом';
+        text = 'Войдите, чтобы оформить подписку';
+        button = 'Войти с Яндексом';
     } else if (active) {
         text = until ? `Активен до ${until}` : 'Премиум активен';
         button = `Продлить на ${days} дней`;
         disabled = !available;
     } else {
         text = `Доступ к премиум-маршрутам на ${days} дней`;
-        button = `Купить за ${price}`;
+        button = `Купить за ${price} ₽`;
         disabled = !available;
     }
     if (primaryProvider) {
@@ -1452,10 +1449,8 @@ function renderPremiumUi() {
     const offerText = $('premiumOfferText');
     if (offerText) {
         offerText.textContent = logged
-            ? `Оформите премиум на ${days} дней за ${price} и откроется доступ ко всем премиум-маршрутам.`
-            : (telegram
-                ? 'Оформите премиум в приложении Telegram.'
-                : 'Войдите через Яндекс, чтобы оформить премиум и открыть этот маршрут.');
+            ? `Оформите премиум на ${days} дней за ${price} ₽ и откроется доступ ко всем премиум-маршрутам.`
+            : 'Войдите через Яндекс, чтобы оформить премиум и открыть этот маршрут.';
     }
     const offerBtn = $('premiumOfferBtn');
     if (offerBtn) {
@@ -1506,62 +1501,12 @@ async function startPremiumCheckout() {
         if (window.AuthModule) AuthModule.login(true);
         return;
     }
-    const telegram = !!(APP.premiumStatus && APP.premiumStatus.telegram)
-        || !!(window.AuthModule && AuthModule.isTelegram);
     const buttons = [$('premiumBuyBtn'), $('premiumOfferBtn')].filter(Boolean);
     const original = buttons.map(button => button.textContent);
     buttons.forEach(button => {
         button.disabled = true;
-        button.textContent = telegram ? 'Открываем оплату…' : 'Переходим к оплате…';
+        button.textContent = 'Переходим к оплате…';
     });
-
-    if (telegram) {
-        try {
-            const response = await fetch('/api/premium/stars/checkout', {
-                credentials: 'same-origin',
-                headers: { Accept: 'application/json' },
-                cache: 'no-store'
-            });
-            const data = await response.json().catch(() => ({}));
-            if (!response.ok || !data.invoice_url) {
-                throw new Error(data.error || 'Не удалось создать счёт');
-            }
-            const open = () => {
-                buttons.forEach((button, index) => {
-                    button.disabled = false;
-                    button.textContent = original[index];
-                });
-                renderPremiumUi();
-            };
-            const app = window.Telegram && window.Telegram.WebApp;
-            if (!app || typeof app.openInvoice !== 'function') {
-                throw new Error('Оплата доступна только в Telegram');
-            }
-            app.openInvoice(data.invoice_url, (status) => {
-                open();
-                if (status === 'paid') {
-                    loadPremiumStatus().catch(() => {});
-                    if (typeof showToast === 'function') {
-                        showToast('Премиум оплачен', 'success', 4000);
-                    }
-                } else if (status !== 'cancelled' && typeof showToast === 'function') {
-                    showToast('Оплата не завершена: ' + status, 'error', 4000);
-                }
-            });
-            return;
-        } catch (error) {
-            buttons.forEach((button, index) => {
-                button.disabled = false;
-                button.textContent = original[index];
-            });
-            renderPremiumUi();
-            if (typeof showToast === 'function') {
-                showToast(error.message || 'Не удалось создать счёт', 'error', 4000);
-            }
-            return;
-        }
-    }
-
     try {
         const response = await fetch('/api/premium/checkout', {
             credentials: 'same-origin',

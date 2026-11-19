@@ -176,9 +176,6 @@ owner_user_id Utf8         -- users.user_id владельца маршрута
 | POST | `/api/admin?action=signs_get` | личная сцена знаков текущего владельца |
 | POST | `/api/admin?action=signs_save` | сохранить личную сцену знаков |
 | GET | `/api/superadmin/activity` | лента значимых действий (только `ADMIN_YANDEX_IDS`) |
-| GET | `/auth/telegram?d=<initData>` | вход в Mini App по подписи Telegram |
-| GET | `/api/premium/stars/checkout` | счёт Telegram Stars на премиум |
-| POST | `/api/telegram/webhook` | вебхук бота: подтверждение и зачисление звёзд |
 | GET | `/auth/yandex/start?return=/...&base=https://...` | 302 на Яндекс + state-cookie |
 | GET | `/auth/yandex/callback` | 302 обратно + sid-cookie |
 | GET | `/auth/logout?t=<token>&return=/...` | 302 обратно + удаление cookie |
@@ -244,9 +241,6 @@ python3 navigator3/migrations/drop_road_name.py
 | `PUBLIC_BASE_URL` | да | `https://<домен-шлюза>` |
 | `PUBLIC_ALTERNATE_URLS` | нет | дополнительные origin'ы через запятую |
 | `PUBLIC_EDITOR_URL` | нет | домен редактора, например `https://editor.ainstruktor.ru` |
-| `TELEGRAM_BOT_TOKEN` | нет | токен отдельного бота навигатора для Mini App и Stars |
-| `TELEGRAM_WEBHOOK_SECRET` | нет | секрет заголовка `X-Telegram-Bot-Api-Secret-Token` |
-| `PREMIUM_STARS_PRICE` | нет | цена премиума в звёздах, по умолчанию 300 |
 | `YANDEX_CLIENT_ID` | да | ClientID приложения OAuth |
 | `SESSION_TTL_DAYS` | нет | срок сессии, по умолчанию 30 |
 | `OAUTH_SCOPE` | нет | по умолчанию `login:info login:email` |
@@ -369,29 +363,6 @@ TTL — 180 дней, индекс `activity_created_idx` по `created_at`.
 доступен только аккаунтам из `ADMIN_YANDEX_IDS`. В админке кнопка
 «Последние действия» открывает ленту с фильтрами по источнику и типу действия
 и кнопкой «Показать ещё».
-
-## Telegram Mini App
-
-Вход в мини-апп идёт по `Telegram.WebApp.initData`:
-
-- `GET /auth/telegram?d=<initData>` проверяет HMAC-подпись токеном бота,
-  создаёт/находит аккаунт и ставит обычную сессию `osm_sid`;
-- Яндекс и Telegram — две личности одного аккаунта в таблице
-  `user_identities`; аккаунты не связываются автоматически;
-- в Telegram профиль показывает имя, `@username` и аватар из Telegram;
-- премиум в Telegram покупается за звёзды: счёт создаётся через Bot API,
-  оплата подтверждается вебхуком `POST /api/telegram/webhook`;
-- на сайте остаются Яндекс-вход и Робокасса.
-
-Миграция: `migrations/add_auth_identities.py` создаёт `user_identities`,
-добавляет `users.avatar_url`, `payments.stars` и `payments.charge_id`.
-
-Вебхук бота настраивается на служебный домен шлюза (не на apex/CDN, где
-разрешён только GET):
-
-```
-https://d5dsd5u1tsc8fm9dbsg5.s183zexc.apigw.yandexcloud.net/api/telegram/webhook
-```
 
 ## Проверка
 

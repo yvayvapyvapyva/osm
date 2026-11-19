@@ -13,7 +13,7 @@ import os
 import secrets
 from datetime import datetime, timezone
 from urllib.error import HTTPError, URLError
-from urllib.parse import parse_qsl, quote, unquote, urlencode
+from urllib.parse import quote, unquote, urlencode
 from urllib.request import Request, urlopen
 
 AUTHORIZE_URL = "https://oauth.yandex.ru/authorize"
@@ -439,110 +439,3 @@ def origin_allowed(event):
 
 def now_utc():
     return datetime.now(timezone.utc)
-
-
-# ---------------------------------------------------------------------------
-# Telegram Mini App
-# ---------------------------------------------------------------------------
-
-
-def telegram_bot_token():
-    return _env("TELEGRAM_BOT_TOKEN")
-
-
-def _telegram_api(method, payload):
-    token = telegram_bot_token()
-    if not token:
-        raise AuthConfigError("TELEGRAM_BOT_TOKEN is not configured")
-    request = Request(
-        f"https://api.telegram.org/bot{token}/{method}",
-        data=json.dumps(payload).encode("utf-8"),
-        headers={
-            "Content-Type": "application/json",
-            "Accept": "application/json",
-        },
-        method="POST",
-    )
-    with urlopen(request, timeout=15) as response:
-        return json.loads(response.read().decode("utf-8"))
-
-
-def telegram_create_invoice_link(title, description, payload, stars):
-    return _telegram_api(
-        "createInvoiceLink",
-        {
-            "title": title,
-            "description": description,
-            "payload": payload,
-            "currency": "XTR",
-            "prices": [{"label": title, "amount": int(stars)}],
-        },
-    )
-
-
-def telegram_answer_pre_checkout(query_id, ok=True, error_message=""):
-    return _telegram_api(
-        "answerPreCheckoutQuery",
-        {
-            "pre_checkout_query_id": query_id,
-            "ok": bool(ok),
-            "error_message": error_message[:200],
-        },
-    )
-
-
-def verify_telegram_init_data(init_data, bot_token, max_age_seconds=86400):
-    """Проверяет подпись Telegram.WebApp.initData.
-
-    Возвращает (user_dict, error). Подпись проверяется только здесь, на
-    сервере; данные из initDataUnsafe клиента не используются.
-    """
-    if not init_data or not bot_token:
-        return None, "missing_init_data"
-
-    try:
-        pairs = dict(parse_qsl(init_data, keep_blank_values=True))
-    except ValueError:
-        return None, "bad_init_data"
-    received_hash = pairs.pop("hash", "")
-    if not received_hash:
-        return None, "missing_hash"
-
-    check_string = "\n".join(
-        f"{key}={pairs[key]}" for key in sorted(pairs)
-    )
-    secret_key = hmac.new(
-        b"WebAppData", bot_token.encode("utf-8"), hashlib.sha256
-    ).digest()
-    expected_hash = hmac.new(
-        secret_key, check_string.encode("utf-8"), hashlib.sha256
-    ).hexdigest()
-    if not hmac.compare_digest(expected_hash, received_hash):
-        return None, "bad_signature"
-
-    try:
-        auth_date = int(pairs.get("auth_date", "0"))
-    except (TypeError, ValueError):
-        auth_date = 0
-    now_ts = int(now_utc().timestamp())
-    if not auth_date or now_ts - auth_date > max_age_seconds:
-        return None, "expired"
-    if auth_date > now_ts + 300:
-        return None, "bad_auth_date"
-
-    try:
-        user = json.loads(pairs.get("user", "{}"))
-    except ValueError:
-        return None, "bad_user"
-    if not isinstance(user, dict) or not user.get("id"):
-        return None, "bad_user"
-
-    display_name = " ".join(
-        part for part in (user.get("first_name"), user.get("last_name")) if part
-    ).strip()
-    return {
-        "id": str(user.get("id")),
-        "login": str(user.get("username") or ""),
-        "display_name": display_name or str(user.get("username") or ""),
-        "avatar_url": str(user.get("photo_url") or ""),
-    }, ""
