@@ -56,6 +56,18 @@ npx wrangler deploy --config=wrangler-api.toml
 - Миграция: `cloudflare_worker/migrations/2026-11-19-route-ownership.sql`
   добавляет колонки и закрепляет существующие данные за `7292595756`.
 
+## Дорожные знаки
+
+- `signs/catalog.json` и `signs/webp/` — каталог и картинки знаков (скопированы из `pad/znaki/`).
+- В редакторе кнопка **«Знаки»**: знак ставится в центр карты, его можно двигать,
+  поворачивать, добавлять таблички и ножку. Сохранение — «Сохранить знаки».
+- Сцена одна на Telegram-аккаунт: таблица `owner_signs` (`owner_tg_id`, `data`,
+  `updated_at`), API-экшены `signs_get` / `signs_save`.
+- Навигатор получает знаки владельца вместе с пакетом корневой папки
+  (`owner_bundle`) и рисует их слоем MapLibre. Показ можно выключить в
+  настройках («Знаки»).
+- Миграция: `cloudflare_worker/migrations/2026-11-19-owner-signs.sql`.
+
 ## Деплой
 
 ```bash

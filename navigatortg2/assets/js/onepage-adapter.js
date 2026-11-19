@@ -69,11 +69,14 @@
                     return response.json();
                 })
                 .then((payload) => {
-                    const map = new Map();
+                    const routes = new Map();
                     for (const route of (payload && payload.routes) || []) {
-                        if (route && route.m) map.set(String(route.m), route);
+                        if (route && route.m) routes.set(String(route.m), route);
                     }
-                    return map;
+                    return {
+                        routes,
+                        signs: Array.isArray(payload && payload.signs) ? payload.signs : []
+                    };
                 })
                 .catch((error) => {
                     ownerGeometries.delete(key);
@@ -206,7 +209,7 @@
                 const m = String(route.m);
                 const folderId = route.folder_id == null ? '' : String(route.folder_id);
                 const lockedByShop = shop && folderId ? shop.isLocked(folderId) : false;
-                const full = geometry ? geometry.get(m) : null;
+                const full = geometry && geometry.routes ? geometry.routes.get(m) : null;
                 const serverLocked = full ? !!full.locked : false;
                 const locked = lockedByShop || serverLocked;
                 const item = {
@@ -234,7 +237,7 @@
             },
             folders: folders,
             routes: routes,
-            signs: []
+            signs: (geometry && Array.isArray(geometry.signs)) ? geometry.signs : []
         };
     }
 

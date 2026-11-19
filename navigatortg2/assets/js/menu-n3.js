@@ -336,6 +336,17 @@ const MenuModule = {
         }
     },
 
+    // Знаки владельца маршрута. Сцена одна на корневую папку и приходит
+    // вместе с пакетом owner_bundle.
+    getSignsForRoute(routeM) {
+        const key = String(routeM || '');
+        const rootId = key
+            ? (this._routeOwners.get(key) || '')
+            : (this._activeOwnerId || '');
+        const bundle = rootId ? this._ownerBundles.get(rootId) : null;
+        return bundle && Array.isArray(bundle.signs) ? bundle.signs : [];
+    },
+
     /**
      * Плоский каталог маршрутов с деревом папок.
      *

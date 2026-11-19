@@ -58,3 +58,10 @@ CREATE INDEX IF NOT EXISTS idx_purchases_user_status ON purchases (user_id, stat
 CREATE INDEX IF NOT EXISTS idx_purchases_expires ON purchases (expires_at);
 CREATE INDEX IF NOT EXISTS idx_purchases_user_product ON purchases (user_id, product_type, product_id);
 -- charge_id уже UNIQUE в определении таблицы — отдельный индекс не нужен.
+
+-- Личная сцена дорожных знаков владельца (формат редактора/PAD).
+CREATE TABLE IF NOT EXISTS owner_signs (
+  owner_tg_id TEXT PRIMARY KEY,
+  data        TEXT NOT NULL,
+  updated_at  INTEGER NOT NULL
+);

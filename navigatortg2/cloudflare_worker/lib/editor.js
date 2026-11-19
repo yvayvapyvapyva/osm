@@ -11,6 +11,7 @@ export const EDITOR_ACTIONS = new Set([
   'save_lock', 'del_lock',
   'folder_list', 'folder_create', 'folder_rename', 'folder_delete',
   'folder_move', 'folder_settings', 'route_move',
+  'signs_get', 'signs_save',
 ]);
 
 // Сравнение строк за постоянное время (для ключа доступа).

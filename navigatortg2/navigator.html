@@ -1424,6 +1424,8 @@ function openSettings() {
     $('themeToggle').checked = document.documentElement.getAttribute('data-theme') === 'dark';
     $('themeValue').textContent = document.documentElement.getAttribute('data-theme') === 'dark' ? 'Вкл' : 'Выкл';
     $('commentToggle').checked = APP._commentEnabled;
+    const signsToggle = $('signsToggle');
+    if (signsToggle) signsToggle.checked = APP._signsEnabled !== false;
     const shockOn = APP.navConfig.SHOCK_THRESHOLD > 0 && APP._motionPermissionGranted;
     $('triggerShockToggle').checked = shockOn;
     $('triggerShock').value = shockOn ? APP.navConfig.SHOCK_THRESHOLD : 1;
@@ -1631,6 +1633,7 @@ function restoreRouteLayers() {
     if (!APP.map) return;
     ensureRouteLayers();
     updateRouteLines();
+    if (typeof ensureSignLayers === 'function') ensureSignLayers();
 }
 
 function removeRouteObjects() {
@@ -1668,6 +1671,7 @@ function updateRouteNameDisplay() {
 function clearRoute() {
     endSimulation();
     removeRouteObjects();
+    if (typeof clearSigns === 'function') clearSigns();
     APP.navPoints = [];
     APP.navCurrentIndex = 0;
     APP._routeTotalDistance = 0;
@@ -2149,6 +2153,9 @@ function navCheckTriggers() {
 async function loadRouteFromJSON(data) {
     await processRouteData(data);
     recordRouteView();
+    if (typeof loadSignsForCurrentRoute === 'function') {
+        loadSignsForCurrentRoute().catch(e => console.warn('Не удалось показать знаки:', e));
+    }
 }
 
 // Отмечает маршрут как загруженный. GET, потому что CDN на apex
@@ -2755,6 +2762,19 @@ if (typeof maplibregl === 'undefined') {
             </div>
 
             <div class="settings-group">
+                <div class="settings-label">Знаки</div>
+                <div class="trigger-setting-row">
+                    <div class="trigger-setting-header">
+                        <label class="toggle-switch">
+                            <input type="checkbox" class="toggle-input" id="signsToggle" onchange="applySignsConfig()">
+                            <span class="toggle-slider"></span>
+                        </label>
+                        <span class="label">Показывать дорожные знаки</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="settings-group">
                 <div class="settings-label">Комментарии</div>
                 <div class="trigger-setting-row">
                     <div class="trigger-setting-header">
@@ -2861,6 +2881,6 @@ if (typeof maplibregl === 'undefined') {
     sync();
 })();
 </script>
-
+<script src="assets/js/signs-view.js?v=1"></script>
 </body>
 </html>

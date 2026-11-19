@@ -51,6 +51,7 @@
     <button id="settingsBtn" onclick="openSettingsModal()">
         Маршруты
     </button>
+    <button id="signsBtn" onclick="toggleSignsMode()">Знаки</button>
     <div id="routeNameDisplay"></div>
 </div>
 <button id="layerSwitchBtn" class="circle-btn hidden-vis" onclick="toggleLayer()">
@@ -117,6 +118,33 @@
     </div>
 </div>
 
+<div class="sign-editor-panel" id="signEditorPanel" hidden>
+    <div class="sign-editor-head">
+        <div class="sign-group-tabs" id="signGroupTabs"></div>
+        <button type="button" class="sign-icon-btn" id="signSearchToggle" title="Поиск" aria-label="Поиск">🔍</button>
+    </div>
+    <div class="sign-search-row" id="signSearchRow" hidden>
+        <input id="signSearchInput" type="search" placeholder="Поиск по номеру или названию" autocomplete="off">
+    </div>
+    <div class="sign-mode-bar" id="signModeBar" hidden>
+        <span>Режим табличек: нажмите табличку в каталоге</span>
+        <button type="button" id="signModeDone">Готово</button>
+    </div>
+    <div class="sign-catalog-scroll">
+        <div class="sign-catalog-grid" id="signCatalogGrid"></div>
+    </div>
+    <div class="sign-editor-footer">
+        <button type="button" class="sign-save-btn" id="signSaveBtn">Сохранить знаки</button>
+    </div>
+</div>
+<div class="sign-selected-bar" id="signSelectedBar" hidden>
+    <span class="sign-selected-name" id="signSelectedName">Знак</span>
+    <button type="button" data-sign-action="rotate-left" title="Повернуть влево" aria-label="Повернуть влево">⟲</button>
+    <button type="button" data-sign-action="plate" title="Добавить табличку" aria-label="Табличка">＋</button>
+    <button type="button" data-sign-action="leg" title="Ножка" aria-label="Ножка">⏐</button>
+    <button type="button" data-sign-action="rotate-right" title="Повернуть вправо" aria-label="Повернуть вправо">⟳</button>
+    <button type="button" data-sign-action="delete" class="danger" title="Удалить знак" aria-label="Удалить знак">✕</button>
+</div>
 <div id="loadingSpinner"><div class="spinner-box"><div class="spinner-ring"></div><div class="spinner-text">Загрузка...</div></div></div>
 <script>
 // Грузим Telegram SDK асинхронно с таймаутом 10с.
@@ -1805,5 +1833,6 @@ window.saveFolderSettings = saveFolderSettings;
 window.deleteCurrentFolder = deleteCurrentFolder;
 
 </script>
+<script src="assets/js/sign-editor.js?v=1"></script>
 </body>
 </html>

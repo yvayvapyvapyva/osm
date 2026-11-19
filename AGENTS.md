@@ -9,6 +9,7 @@
 - Деплой: `navigatortg/deploy-pages.sh` публикует рабочий проект `avtoinstruktor` (`avtoinstruktor.pages.dev`); `navigatortg2/deploy-v2.sh` — тестовый `avtoinstruktor-v2` (`avtoinstruktor-v2.pages.dev`).
 - `navigatortg2` независим: воркер `nav-api-v2` (`https://nav-api-v2.ivan43103.workers.dev`, исходники в `navigatortg2/cloudflare_worker/`) и D1 `nav-db-v2` (`437996f6-770b-486d-a534-ae68abe7616a`). У `navigatortg` — `nav-api` и `nav-db`.
 - Маршруты и папки в `navigatortg2` привязаны к Telegram ID (`owner_tg_id`): редактор показывает только свои. Вход — подпись Telegram; ключ редактора работает от имени `EDITOR_KEY_UID`. Миграция — `cloudflare_worker/migrations/2026-11-19-route-ownership.sql`.
+- Знаки в `navigatortg2`: сцена одна на владельца (`owner_signs`, экшены `signs_get`/`signs_save`), редактор — кнопка «Знаки», навигатор получает знаки в `owner_bundle` и показывает слоем MapLibre. Ассеты — `signs/` (из `pad/znaki/`). Миграция — `2026-11-19-owner-signs.sql`.
 
 ## Деплой (справка)
 - `navigator3/deploy.sh` — функция `osmn3` (ID `d4e8ds1489g0q91dt7do`), API Gateway `osmn3` (ID `d5dsd5u1tsc8fm9dbsg5`, служебный домен `https://d5dsd5u1tsc8fm9dbsg5.s183zexc.apigw.yandexcloud.net`), статика в бакет `osmn-nav`.

@@ -82,6 +82,33 @@ function isPublicRoute(route, hidden) {
   return fid === null || fid === undefined || !hidden.has(fid);
 }
 
+// Дорожные знаки из сцены { markers: [...] } в компактном формате навигатора.
+function signsFromScene(data) {
+  if (!data || typeof data !== 'object' || !Array.isArray(data.markers)) return [];
+  const signs = [];
+  for (const marker of data.markers) {
+    if (!marker || typeof marker !== 'object' || marker.kind !== 'znak') continue;
+    const code = String(marker.code || '').trim();
+    const file = String(marker.file || '').trim();
+    if (!code || !file) continue;
+    const lat = Number(marker.lat);
+    const lon = Number(marker.lon);
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) continue;
+    signs.push({
+      code,
+      file,
+      lat,
+      lon,
+      heading: Number(marker.heading) || 0,
+      leg: !!marker.leg,
+      plates: Array.isArray(marker.plates)
+        ? marker.plates.map((plate) => String(plate || '').trim()).filter(Boolean)
+        : [],
+    });
+  }
+  return signs;
+}
+
 export default {
   async fetch(request, env, ctx) {
     if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: CORS });
@@ -221,9 +248,24 @@ export default {
           return item;
         });
 
+        let signs = [];
+        const rootOwnerId = String(root.owner_tg_id || '');
+        if (rootOwnerId) {
+          const scene = await env.DB.prepare(
+            'SELECT data FROM owner_signs WHERE owner_tg_id = ?').bind(rootOwnerId).first();
+          if (scene && scene.data) {
+            try {
+              signs = signsFromScene(JSON.parse(scene.data));
+            } catch (e) {
+              signs = [];
+            }
+          }
+        }
+
         return json({
           owner: { root_folder_id: rootId, name: root.name || '' },
           routes,
+          signs,
         }, 200, { 'Cache-Control': 'no-store, must-revalidate' });
       }
 
@@ -651,6 +693,39 @@ export default {
         await env.DB.prepare('UPDATE roads SET folder_id = ? WHERE m = ? AND owner_tg_id = ?')
           .bind(folderId, m, userUid).run();
         return json({ status: 'ok' });
+      }
+
+      // ---- Личная сцена знаков владельца ----
+      if (action === 'signs_get') {
+        const row = await env.DB.prepare(
+          'SELECT data FROM owner_signs WHERE owner_tg_id = ?').bind(userUid).first();
+        let data = null;
+        if (row && row.data) {
+          try {
+            data = JSON.parse(row.data);
+          } catch (e) {
+            data = null;
+          }
+        }
+        return json({ data });
+      }
+
+      if (action === 'signs_save') {
+        const data = bodyData.data;
+        if (!data || typeof data !== 'object' || !Array.isArray(data.markers)) {
+          return json({ error: 'invalid_signs_data' }, 400);
+        }
+        const payload = JSON.stringify(data);
+        if (payload.length > 200000) {
+          return json({ error: 'signs_too_large' }, 400);
+        }
+        await env.DB.prepare(
+          `INSERT INTO owner_signs (owner_tg_id, data, updated_at)
+           VALUES (?, ?, ?)
+           ON CONFLICT(owner_tg_id) DO UPDATE SET
+             data = excluded.data, updated_at = excluded.updated_at`)
+          .bind(userUid, payload, Date.now()).run();
+        return json({ status: 'ok', count: data.markers.length });
       }
 
       return json({ error: 'unknown_action' }, 400);

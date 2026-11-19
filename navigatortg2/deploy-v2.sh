@@ -19,6 +19,7 @@ SITE_FILES=(
   instr_editor.html
   ico.png
   assets
+  signs
 )
 
 STAGE="$(mktemp -d)"
@@ -72,6 +73,12 @@ cat > "$STAGE/_headers" <<'HEADERS'
   Cache-Control: no-store, must-revalidate
 
 /assets/*
+  Cache-Control: public, max-age=31536000, immutable
+
+/signs/catalog.json
+  Cache-Control: public, max-age=600
+
+/signs/*
   Cache-Control: public, max-age=31536000, immutable
 HEADERS
 
