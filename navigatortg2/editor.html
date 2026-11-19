@@ -36,14 +36,8 @@
 <div id="noAccessScreen" style="display:none;position:fixed;inset:0;z-index:100000;background:rgba(10,11,15,0.97);align-items:center;justify-content:center;padding:24px;">
     <div style="max-width:360px;width:100%;text-align:center;color:#f5f7fa;font-family:inherit;">
         <div style="font-size:40px;line-height:1;margin-bottom:10px;">🔒</div>
-        <div style="font-size:18px;font-weight:700;margin-bottom:8px;">Нет доступа к редактору</div>
-        <div style="font-size:14px;color:rgba(245,247,250,0.7);margin-bottom:18px;">Редактировать маршруты могут только выбранные пользователи.</div>
-        <div id="accessKeyBox" style="display:none;flex-direction:column;gap:10px;">
-            <div class="input-wrapper" style="padding:3px;border-radius:12px;">
-                <input type="password" id="accessKeyInput" placeholder="Ключ доступа" style="width:100%;padding:12px;border:none;font-size:16px;outline:none;background:transparent;color:#f5f7fa;font-family:inherit;box-sizing:border-box;">
-            </div>
-            <button class="btn-action btn-primary" onclick="submitAccessKey()">Войти</button>
-        </div>
+        <div style="font-size:18px;font-weight:700;margin-bottom:8px;">Редактор доступен только в Telegram</div>
+        <div id="noAccessText" style="font-size:14px;color:rgba(245,247,250,0.7);margin-bottom:18px;">Откройте редактор из Telegram Mini App.</div>
     </div>
 </div>
 <div id="map"></div>
@@ -421,31 +415,27 @@ function tgInitData() {
     } catch (e) { return ''; }
 }
 
-// Ключ доступа редактора для входа из браузера (вне Telegram).
-function editorKey() {
-    try { return localStorage.getItem('editor_key') || ''; } catch (e) { return ''; }
-}
-function setEditorKey(k) {
-    try { if (k) localStorage.setItem('editor_key', k); else localStorage.removeItem('editor_key'); } catch (e) {}
-}
-
-// Ключ можно передать ссылкой: /editor?key=СЕКРЕТ — запоминаем и убираем из адреса.
-(function captureKeyFromUrl() {
-    try {
-        const u = new URL(location.href);
-        const k = u.searchParams.get('key');
-        if (!k) return;
-        setEditorKey(k);
-        u.searchParams.delete('key');
-        const qs = u.searchParams.toString();
-        history.replaceState(null, '', u.pathname + (qs ? '?' + qs : '') + u.hash);
-    } catch (e) {}
-})();
-
 // Проверка прав на старте: показать редактор или экран «Нет доступа».
 async function ensureAccess() {
     const ws = document.getElementById('welcomeScreen');
     if (ws) ws.style.display = 'flex';
+
+    // Telegram SDK грузится асинхронно: до его загрузки initData пустой.
+    // Ждём его, иначе внутри Telegram покажется экран с ключом доступа.
+    if (!tgInitData()) {
+        if (window.platformReady) {
+            try {
+                await Promise.race([
+                    window.platformReady,
+                    new Promise(resolve => setTimeout(resolve, 4000))
+                ]);
+            } catch (e) {}
+        }
+        for (let i = 0; i < 20 && !tgInitData(); i++) {
+            await new Promise(resolve => setTimeout(resolve, 100));
+        }
+    }
+
     let allowed = false;
     try {
         const r = await callApi('editor_check');
@@ -457,22 +447,17 @@ async function ensureAccess() {
     if (ws) ws.style.display = 'none';
     const deny = document.getElementById('noAccessScreen');
     if (deny) {
-        // Поле для ключа — только вне Telegram (внутри доступ даёт подпись)
-        const box = document.getElementById('accessKeyBox');
-        if (box && !tgInitData()) box.style.display = 'flex';
+        const text = document.getElementById('noAccessText');
+        if (text) {
+            text.textContent = tgInitData()
+                ? 'Не удалось подтвердить Telegram-аккаунт. Закройте редактор и откройте его заново из Telegram.'
+                : 'Откройте редактор из Telegram Mini App.';
+        }
         deny.style.display = 'flex';
     } else {
-        showToast('Нет доступа к редактору', 'error', 6000);
+        showToast('Редактор доступен только в Telegram', 'error', 6000);
     }
     return false;
-}
-
-function submitAccessKey() {
-    const inp = document.getElementById('accessKeyInput');
-    const v = inp ? inp.value.trim() : '';
-    if (!v) return;
-    setEditorKey(v);
-    location.reload();
 }
 
 async function callApi(action, params = {}, bodyData = null) {
@@ -485,8 +470,6 @@ async function callApi(action, params = {}, bodyData = null) {
     const payload = Object.assign({}, bodyData || {});
     const initData = tgInitData();
     if (initData) payload.tg_init_data = initData;
-    const key = editorKey();
-    if (key) payload.editor_key = key;
 
     const options = {
         method: 'POST',

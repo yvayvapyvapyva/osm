@@ -8,7 +8,7 @@
 - `navigatortg2/` — навигатор и редактор на MapLibre (`navigator.html`, `editor.html`), вынесены из `navigatortg/`. В `navigatortg/` — рабочие `navigator.html` и `editor.html` на Яндекс.Картах.
 - Деплой: `navigatortg/deploy-pages.sh` публикует рабочий проект `avtoinstruktor` (`avtoinstruktor.pages.dev`); `navigatortg2/deploy-v2.sh` — тестовый `avtoinstruktor-v2` (`avtoinstruktor-v2.pages.dev`).
 - `navigatortg2` независим: воркер `nav-api-v2` (`https://nav-api-v2.ivan43103.workers.dev`, исходники в `navigatortg2/cloudflare_worker/`) и D1 `nav-db-v2` (`437996f6-770b-486d-a534-ae68abe7616a`). У `navigatortg` — `nav-api` и `nav-db`.
-- Маршруты и папки в `navigatortg2` привязаны к Telegram ID (`owner_tg_id`): редактор показывает только свои. Вход — подпись Telegram; ключ редактора работает от имени `EDITOR_KEY_UID`. Миграция — `cloudflare_worker/migrations/2026-11-19-route-ownership.sql`.
+- Маршруты и папки в `navigatortg2` привязаны к Telegram ID (`owner_tg_id`): редактор показывает только свои. Вход — только подпись Telegram (ключей и списков нет). Миграция — `cloudflare_worker/migrations/2026-11-19-route-ownership.sql`.
 - Знаки в `navigatortg2`: сцена одна на владельца (`owner_signs`, экшены `signs_get`/`signs_save`), редактор — кнопка «Знаки», навигатор получает знаки в `owner_bundle` и показывает слоем MapLibre. Ассеты — `signs/` (из `pad/znaki/`). Миграция — `2026-11-19-owner-signs.sql`.
 
 ## Деплой (справка)

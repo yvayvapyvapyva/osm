@@ -31,9 +31,6 @@ npx wrangler deploy --config=wrangler-api.toml
 
 Секреты воркера:
 
-- `EDITOR_ACCESS_KEY` — уже задан, значение хранится локально в
-  `navigatortg2/cloudflare_worker/.dev.vars` (файл в `.gitignore`); вход в
-  редактор — `/editor?key=<ключ>` или поле «Ключ доступа» вне Telegram;
 - `TELEGRAM_TOKEN` — нужен для входа в редактор по подписи Telegram, отчётов и
   оплаты звёздами. Задаётся вручную: `npx wrangler secret put TELEGRAM_TOKEN
   --config=wrangler-api.toml`;
@@ -48,10 +45,10 @@ npx wrangler deploy --config=wrangler-api.toml
 маршруты и папки; публичный каталог по-прежнему показывает все видимые
 маршруты.
 
-- Вход в редактор — `Telegram.WebApp.initData` (подпись проверяется токеном
-  бота). Подходит любой пользователь Telegram, никаких списков доступа нет.
-- Вход по `EDITOR_ACCESS_KEY` из браузера работает от имени `EDITOR_KEY_UID`
-  и видит маршруты этого аккаунта. Без `EDITOR_KEY_UID` ключ доступа не даёт.
+- Вход в редактор — только `Telegram.WebApp.initData` (подпись проверяется
+  токеном бота). Подходит любой пользователь Telegram, списков доступа и
+  ключей нет. Вне Telegram редактор показывает сообщение, что доступен только
+  в Telegram.
 - Новые маршруты и папки получают `owner_tg_id` текущего пользователя.
 - Миграция: `cloudflare_worker/migrations/2026-11-19-route-ownership.sql`
   добавляет колонки и закрепляет существующие данные за `7292595756`.
