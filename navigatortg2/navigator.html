@@ -281,7 +281,7 @@ function ttsCacheKey(text, voiceType) {
 
 // Редактор работает только на домене шлюза: CDN перед ainstruktor.ru
 // не пропускает POST, без которого сохранение невозможно.
-const EDITOR_URL = 'https://editor.ainstruktor.ru/editor.html';
+const EDITOR_URL = '/editor';
 
 const APP = {
     map: null, userMarker: null, lastPos: null, lastAz: 0, rawAz: 0, hasHeading: false, lastTilt: 0, lastZoom: 17, autoCenter: false, currentSpeed: 0,
