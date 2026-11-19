@@ -50,6 +50,8 @@
 - Разовый платёж на `PREMIUM_DAYS` дней (по умолчанию 30), цена `PREMIUM_PRICE_RUB` (по умолчанию 299 ₽).
 - Переменные функции: `ROBOKASSA_LOGIN`, `ROBOKASSA_PASSWORD1`, `ROBOKASSA_PASSWORD2`, `ROBOKASSA_TEST`, а также `ROBOKASSA_PASSWORD_TEST1`/`ROBOKASSA_PASSWORD_TEST2`.
 - `ROBOKASSA_TEST=1` переключает на тестовую пару паролей (если задана) и добавляет в ссылку `IsTest=1`; боевые пароли при этом остаются в `.env` рядом.
+- Боевой режим: `ROBOKASSA_TEST=0` — используются `ROBOKASSA_PASSWORD1/2`, параметр `IsTest` в ссылку не добавляется. Сейчас включён боевой режим (299 ₽ / 30 дней), проверено: `payments_available: true`, ссылка на оплату подписывается боевым паролем.
+- Result URL Робокассы на apex идёт через CDN, который пропускает только GET. Если кабинет шлёт POST, Result URL нужно указать на домен шлюза без CDN: `https://editor.ainstruktor.ru/api/premium/robokassa/result` (шлюз принимает POST).
 - `GET /api/premium/checkout` создаёт числовой `InvId`, пишет платёж в `payments` с `provider=robokassa` и отдаёт ссылку на `https://auth.robokassa.ru/Merchant/Index.aspx`. GET, потому что CDN на apex не пропускает POST.
 - Подпись ссылки: MD5 `MerchantLogin:OutSum:InvId:Пароль#1`.
 - URL в кабинете Робокассы должны быть без параметров, иначе GET не примет.
