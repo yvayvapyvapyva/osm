@@ -864,14 +864,31 @@ async function callAdminApi(action, params = {}, bodyData = null) {
             const [routeList, folderList] = await Promise.all([
                 post('list', {}, {
                     tg_avatar: (editorUser && editorUser.avatar) || '',
-                    tg_username: (editorUser && editorUser.username) || ''
+                    tg_username: (editorUser && editorUser.username) || '',
+                    tg_name: (editorUser && editorUser.display_name) || ''
                 }),
                 post('folder_list')
             ]);
-            const folders = mapEditorFolders(folderList.folders);
+            const rootId = routeList.root && routeList.root.folder_id != null
+                ? String(routeList.root.folder_id)
+                : '';
+            // Корневую папку в дереве не показываем: её содержимое — это и есть
+            // верхний уровень. Так пользователь не перепутает её с обычной
+            // папкой и не попробует удалить.
+            const rawFolders = (folderList.folders || [])
+                .filter(folder => !rootId || String(folder.id) !== rootId)
+                .map(folder => (rootId && folder.parent_id != null && String(folder.parent_id) === rootId)
+                    ? Object.assign({}, folder, { parent_id: null })
+                    : folder);
+            const rawRoutes = (routeList.routes || []).map(route => (
+                rootId && route.folder_id != null && String(route.folder_id) === rootId
+                    ? Object.assign({}, route, { folder_id: null })
+                    : route
+            ));
+            const folders = mapEditorFolders(rawFolders);
             return {
                 root: routeList.root || null,
-                routes: mapEditorRoutes(routeList.routes, folders),
+                routes: mapEditorRoutes(rawRoutes, folders),
                 folders
             };
         }
@@ -983,6 +1000,19 @@ async function waitForTelegramInitData() {
     return !!tgInitData();
 }
 
+// Профиль Telegram: initDataUnsafe.user иногда приходит неполным, поэтому
+// разбираем user из подписанного initData как запасной вариант.
+function telegramProfile() {
+    const wa = window.Telegram && window.Telegram.WebApp;
+    const direct = (wa && wa.initDataUnsafe && wa.initDataUnsafe.user) || {};
+    if (direct && (direct.first_name || direct.last_name || direct.username)) return direct;
+    try {
+        const raw = new URLSearchParams((wa && wa.initData) || '').get('user');
+        if (raw) return JSON.parse(raw);
+    } catch (e) {}
+    return direct;
+}
+
 async function initializeEditorAuth() {
     const gate = $('editorAuthGate');
     const message = $('editorAuthMessage');
@@ -1003,7 +1033,7 @@ async function initializeEditorAuth() {
             if (error) error.textContent = 'Закройте редактор и откройте его заново из Telegram.';
             return;
         }
-        const u = (Telegram.WebApp.initDataUnsafe && Telegram.WebApp.initDataUnsafe.user) || {};
+        const u = telegramProfile();
         const fullName = [u.first_name, u.last_name].filter(Boolean).join(' ');
         editorUser = {
             display_name: fullName || u.username || (u.id ? String(u.id) : 'Telegram'),

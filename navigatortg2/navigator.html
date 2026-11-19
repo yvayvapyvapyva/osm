@@ -1436,7 +1436,7 @@ function openOwnerInfo(rootId) {
     } catch (e) {}
     if (!owner) return;
 
-    const name = owner.owner_name || owner.owner_tg_id || 'Владелец';
+    const name = owner.owner_name || owner.owner_username || 'Владелец';
     const username = owner.owner_username ? '@' + String(owner.owner_username).replace(/^@/, '') : '';
     const tgId = owner.owner_tg_id || '';
     const avatar = owner.owner_avatar || '';

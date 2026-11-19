@@ -88,18 +88,35 @@ async function ensureOwnerRoot(env, uid, defaultName, profile) {
   const info = profile || {};
   const avatar = String(info.avatar || '').trim();
   const username = String(info.username || '').trim();
+  // Числовой ID вместо имени не сохраняем — это запасной вариант клиента.
+  const rawName = String(info.name || '').trim();
+  const displayName = /^\d+$/.test(rawName) ? '' : rawName;
 
-  const existing = await env.DB.prepare(
-    'SELECT r.folder_id, r.owner_name, r.owner_avatar, r.owner_username, r.owner_info, f.name FROM owner_roots r JOIN folders f ON f.id = r.folder_id WHERE r.owner_tg_id = ?')
+  const readRoot = () => env.DB.prepare(
+    'SELECT r.folder_id, r.owner_name, r.owner_avatar, r.owner_username, r.owner_info, f.name, f.parent_id FROM owner_roots r JOIN folders f ON f.id = r.folder_id WHERE r.owner_tg_id = ?')
     .bind(uid).first();
+
+  const existing = await readRoot();
   if (existing) {
-    if ((avatar && avatar !== String(existing.owner_avatar || '')) ||
-        (username && username !== String(existing.owner_username || ''))) {
+    // Корень не должен быть вложенным: чиним данные после старых гонок.
+    if (existing.parent_id !== null && existing.parent_id !== '') {
+      await env.DB.prepare('UPDATE folders SET parent_id = NULL WHERE id = ?')
+        .bind(existing.folder_id).run();
+    }
+    // Имя владельца не редактируется вручную: подставляем его из Telegram,
+    // если оно ещё не заполнено. Аватар и username обновляем всегда.
+    const nextName = String(existing.owner_name || '').trim() || displayName;
+    const nextAvatar = avatar || String(existing.owner_avatar || '');
+    const nextUsername = username || String(existing.owner_username || '');
+    if (nextName !== String(existing.owner_name || '') ||
+        nextAvatar !== String(existing.owner_avatar || '') ||
+        nextUsername !== String(existing.owner_username || '')) {
       await env.DB.prepare(
-        'UPDATE owner_roots SET owner_avatar = ?, owner_username = ? WHERE owner_tg_id = ?')
-        .bind(avatar || existing.owner_avatar || '', username || existing.owner_username || '', uid).run();
-      existing.owner_avatar = avatar || existing.owner_avatar || '';
-      existing.owner_username = username || existing.owner_username || '';
+        'UPDATE owner_roots SET owner_name = ?, owner_avatar = ?, owner_username = ? WHERE owner_tg_id = ?')
+        .bind(nextName, nextAvatar, nextUsername, uid).run();
+      existing.owner_name = nextName;
+      existing.owner_avatar = nextAvatar;
+      existing.owner_username = nextUsername;
     }
     await env.DB.prepare(
       "UPDATE roads SET folder_id = ? WHERE owner_tg_id = ? AND (folder_id IS NULL OR folder_id = '')")
@@ -108,22 +125,43 @@ async function ensureOwnerRoot(env, uid, defaultName, profile) {
   }
 
   // Для старых данных: первая папка верхнего уровня становится корневой.
-  const legacy = await env.DB.prepare(
+  let candidate = await env.DB.prepare(
     "SELECT id, name FROM folders WHERE owner_tg_id = ? AND (parent_id IS NULL OR parent_id = '') ORDER BY id LIMIT 1")
     .bind(uid).first();
-
-  let root = legacy;
-  if (!root) {
+  let createdId = null;
+  if (!candidate) {
     const name = String(defaultName || '').trim() || 'Мои маршруты';
     const res = await env.DB.prepare(
       'INSERT INTO folders (name, parent_id, visible, price, owner_tg_id) VALUES (?, NULL, 1, 0, ?)')
       .bind(name, uid).run();
-    root = { id: res.meta && res.meta.last_row_id, name };
+    createdId = res.meta && res.meta.last_row_id ? res.meta.last_row_id : null;
+    candidate = { id: createdId, name };
   }
 
+  // Корень один на владельца. Если два запроса одновременно создают папку,
+  // owner_roots достанется первому, а лишнюю пустую папку удаляем.
+  // Результат INSERT OR IGNORE в D1 не даёт надёжно понять, кто победил,
+  // поэтому после вставки всегда перечитываем owner_roots.
   await env.DB.prepare(
     'INSERT OR IGNORE INTO owner_roots (owner_tg_id, folder_id, owner_name, owner_avatar, owner_username, created_at) VALUES (?, ?, ?, ?, ?, ?)')
-    .bind(uid, root.id, '', avatar, username, Date.now()).run();
+    .bind(uid, candidate.id, displayName, avatar, username, Date.now()).run();
+  let root = candidate;
+  let rootOwnerName = displayName;
+  const winner = await readRoot();
+  if (winner) {
+    root = { id: winner.folder_id, name: winner.name };
+    rootOwnerName = String(winner.owner_name || '').trim() || displayName;
+    if (!winner.owner_name && displayName) {
+      await env.DB.prepare('UPDATE owner_roots SET owner_name = ? WHERE owner_tg_id = ?')
+        .bind(displayName, uid).run();
+    }
+    if (createdId && Number(winner.folder_id) !== Number(createdId)) {
+      await env.DB.prepare(
+        'DELETE FROM folders WHERE id = ? AND (SELECT COUNT(*) FROM roads WHERE folder_id = ?) = 0 AND (SELECT COUNT(*) FROM folders WHERE parent_id = ?) = 0')
+        .bind(createdId, createdId, createdId).run();
+    }
+  }
+
   await env.DB.prepare(
     "UPDATE folders SET parent_id = ? WHERE owner_tg_id = ? AND (parent_id IS NULL OR parent_id = '') AND id <> ?")
     .bind(root.id, uid, root.id).run();
@@ -133,7 +171,7 @@ async function ensureOwnerRoot(env, uid, defaultName, profile) {
   return {
     folder_id: root.id,
     name: root.name,
-    owner_name: '',
+    owner_name: rootOwnerName || '',
     owner_avatar: avatar,
     owner_username: username,
     owner_info: '',
@@ -278,7 +316,7 @@ export default {
             .filter((f) => !hidden.has(f.id) && !inEmptyRoot(f.id))
             .map((f) => ({
               id: f.id, name: f.name, parent_id: f.parent_id, price: f.price || 0,
-              owner_name: f.owner_name || f.owner_tg_id || '',
+              owner_name: f.owner_name || f.owner_username || '',
               owner_avatar: f.owner_avatar || '',
               owner_username: f.owner_username || '',
               owner_info: f.owner_info || '',
@@ -330,7 +368,7 @@ export default {
           'SELECT owner_name, owner_avatar, owner_username, owner_info FROM owner_roots WHERE owner_tg_id = ?')
           .bind(String(root.owner_tg_id || '')).first();
         const ownerTgId = String(root.owner_tg_id || '');
-        const ownerName = (rootMeta && rootMeta.owner_name) || ownerTgId;
+        const ownerName = (rootMeta && rootMeta.owner_name) || (rootMeta && rootMeta.owner_username) || '';
         const isAdminUser = !!uid && isAdmin(uid, env);
         const isOwner = !!uid && (ownerTgId === uid || isAdminUser);
         const isAdminAccess = isAdminUser && ownerTgId !== uid;
@@ -472,7 +510,7 @@ export default {
           self: userUid,
           owners: rows.map((row) => ({
             owner_tg_id: String(row.owner_tg_id),
-            owner_name: row.owner_name || String(row.owner_tg_id),
+            owner_name: row.owner_name || row.owner_username || '',
             owner_username: row.owner_username || '',
             owner_info: row.owner_info || '',
             root_folder_id: row.root_folder_id,
@@ -521,6 +559,7 @@ export default {
         const root = await ensureOwnerRoot(env, actingUid, '', actingUid === userUid ? {
           avatar: bodyData.tg_avatar,
           username: bodyData.tg_username,
+          name: bodyData.tg_name,
         } : {});
         const rows = (await env.DB.prepare(
           'SELECT m, name, visible, folder_id FROM roads WHERE owner_tg_id = ? ORDER BY name')
@@ -529,7 +568,7 @@ export default {
           root: {
             folder_id: root.folder_id,
             name: root.name || '',
-            owner_name: root.owner_name || actingUid,
+            owner_name: root.owner_name || root.owner_username || '',
             owner_avatar: root.owner_avatar || '',
             owner_username: root.owner_username || '',
             owner_info: root.owner_info || '',
@@ -770,7 +809,7 @@ export default {
           root: {
             folder_id: root.folder_id,
             name: root.name || '',
-            owner_name: root.owner_name || actingUid,
+            owner_name: root.owner_name || root.owner_username || '',
             owner_avatar: root.owner_avatar || '',
             owner_username: root.owner_username || '',
             owner_info: root.owner_info || '',
@@ -952,7 +991,7 @@ export default {
         return json({ status: 'ok', root: {
           folder_id: root.folder_id,
           name,
-          owner_name: root.owner_name || actingUid,
+          owner_name: root.owner_name || root.owner_username || '',
           owner_avatar: root.owner_avatar || '',
           owner_username: root.owner_username || '',
           owner_info: root.owner_info || '',
@@ -972,7 +1011,7 @@ export default {
           root: {
             folder_id: root.folder_id,
             name: root.name || '',
-            owner_name: root.owner_name || actingUid,
+            owner_name: root.owner_name || root.owner_username || '',
             owner_avatar: root.owner_avatar || '',
             owner_username: root.owner_username || '',
             owner_info: info,
