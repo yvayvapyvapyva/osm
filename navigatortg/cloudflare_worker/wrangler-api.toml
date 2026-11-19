@@ -23,6 +23,10 @@ keep_vars = true
 # Telegram user id редакторов маршрутов, через запятую.
 EDITOR_IDS = "7292595756,1053624817"
 
+# Владелец, к которому старый редактор привязывает новые маршруты и папки
+# (общая схема с nav-api-v2). Должен совпадать с owner_tg_id в owner_roots.
+DEFAULT_OWNER_TG_ID = "1053624817"
+
 # Telegram user id админов бота (команды /balance, /stats, /refund), через запятую.
 ADMIN_IDS = "7292595756"
 

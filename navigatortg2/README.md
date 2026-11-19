@@ -17,20 +17,25 @@
   `report.js`, `editor.css` скопированы из `navigatortg/`; остальные файлы
   относятся к версии на MapLibre. Правки здесь не влияют на `navigatortg/`.
 
-API общий — воркер `nav-api-v2` (`https://nav-api-v2.ivan43103.workers.dev`),
-данные в D1 `nav-db-v2`. Воркер и база свои, независимые от `navigatortg/`:
-исходники воркера лежат в `navigatortg2/cloudflare_worker/` (`api.js`, `lib/`,
-`schema.sql`, `wrangler-api.toml`), данные перенесены из `nav-db` копией таблиц
-`folders`, `roads`, `purchases`. Таблицы инструкторов удалены — функционал
-больше не используется.
+API — воркер `nav-api-v2` (`https://nav-api-v2.ivan43103.workers.dev`),
+данные — в общей D1 `nav-db`, той же, что у `navigatortg/`. Поэтому покупки,
+маршруты и папки видны обеим версиям: оплата в старой версии открывает папку
+в новой и наоборот. Исходники воркера лежат в `navigatortg2/cloudflare_worker/`
+(`api.js`, `lib/`, `schema.sql`, `wrangler-api.toml`). Старый воркер `nav-api`
+патчен под общую схему: новые маршруты и папки он привязывает к
+`DEFAULT_OWNER_TG_ID` и складывает в корневую папку владельца.
 
 ### Воркер и база
 
 ```bash
 cd navigatortg2/cloudflare_worker
-npx wrangler d1 execute nav-db-v2 --remote --file=schema.sql --config=wrangler-api.toml
+npx wrangler d1 execute nav-db --remote --file=migrations/... --config=wrangler-api.toml
 npx wrangler deploy --config=wrangler-api.toml
 ```
+
+Схема `nav-db` содержит миграции `migrations/`: `owner_tg_id` в `roads` и
+`folders`, `owner_roots`, `owner_signs`, `route_views`. Отдельная база
+`nav-db-v2` осталась от тестового этапа и рабочими воркерами не используется.
 
 Секреты воркера:
 

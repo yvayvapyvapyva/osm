@@ -96,6 +96,18 @@ const MAX_PHOTO_BYTES = 1_500_000;
 const PHOTO_KINDS = new Set(['avatar', 'car']);
 const PHOTO_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
 
+// Общая схема с nav-api-v2: маршруты и папки привязаны к owner_tg_id.
+// Старый редактор владельца не передаёт, поэтому новые данные привязываем
+// к владельцу проекта и складываем в его корневую папку.
+const DEFAULT_OWNER_TG_ID = '1053624817';
+
+async function ownerContext(env) {
+  const ownerTgId = String(env.DEFAULT_OWNER_TG_ID || DEFAULT_OWNER_TG_ID).trim();
+  const root = await env.DB.prepare(
+    'SELECT folder_id FROM owner_roots WHERE owner_tg_id = ?').bind(ownerTgId).first();
+  return { ownerTgId, rootFolderId: root ? root.folder_id : null };
+}
+
 function instructorPhotoUrl(origin, id, kind, version) {
   return `${origin}/?action=instructor_photo&id=${id}&kind=${kind}&v=${version}`;
 }
@@ -212,6 +224,42 @@ export default {
         // Скрытые в редакторе папки в приложение не попадают — ни сама папка,
         // ни маршруты внутри неё (скрытие наследуется вниз, см. hiddenFolderIds).
         const hidden = hiddenFolderIds(folders);
+        // Пустые корневые папки (без видимых маршрутов во всём поддереве) в
+        // меню не показываем: они создаются при первом входе в редактор и
+        // только засоряют каталог.
+        const parentById = new Map();
+        for (const f of folders) {
+          parentById.set(Number(f.id), f.parent_id === null || f.parent_id === '' ? null : Number(f.parent_id));
+        }
+        const rootOf = new Map();
+        const findRoot = (id) => {
+          if (rootOf.has(id)) return rootOf.get(id);
+          const chain = [];
+          let cur = id;
+          let guard = 0;
+          while (cur !== null && guard++ < 200) {
+            if (rootOf.has(cur)) { cur = rootOf.get(cur); break; }
+            chain.push(cur);
+            const parent = parentById.get(cur);
+            if (parent === undefined || parent === null) break;
+            cur = parent;
+          }
+          for (const item of chain) rootOf.set(item, cur);
+          return cur;
+        };
+        const routesByRoot = new Map();
+        for (const r of routes) {
+          if (r.folder_id === null || r.folder_id === undefined) continue;
+          const rootId = findRoot(Number(r.folder_id));
+          routesByRoot.set(rootId, (routesByRoot.get(rootId) || 0) + 1);
+        }
+        const emptyRoots = new Set();
+        for (const f of folders) {
+          const id = Number(f.id);
+          if (f.parent_id !== null && f.parent_id !== '') continue;
+          if (!routesByRoot.get(id)) emptyRoots.add(id);
+        }
+        const inEmptyRoot = (id) => emptyRoots.has(findRoot(Number(id)));
         const locks = locksFromIndex(await loadFolderIndex(env));
         // Инструкторы только видимых папок: скрытая папка не должна
         // «просвечивать» рекламой из приложения.
@@ -225,7 +273,7 @@ export default {
               folder_id: r.folder_id || null,
             })),
           folders: folders
-            .filter((f) => !hidden.has(f.id))
+            .filter((f) => !hidden.has(f.id) && !inEmptyRoot(f.id))
             .map((f) => {
               const instructors = instructorsForFolder(byFolder, f.id, versions, url.origin);
               return {
@@ -336,9 +384,12 @@ export default {
         if (!mVal) return json({ error: 'missing_route_name' }, 400);
         const m = resolveM(mVal);
         const newJson = bodyData.data || [];
+        const { ownerTgId } = await ownerContext(env);
         await env.DB.prepare(
-          'INSERT INTO roads (id, m, json) VALUES (?, ?, ?) ON CONFLICT(id, m) DO UPDATE SET json=excluded.json')
-          .bind(SHARED_ID, m, typeof newJson === 'string' ? newJson : JSON.stringify(newJson)).run();
+          `INSERT INTO roads (id, m, json, owner_tg_id) VALUES (?, ?, ?, ?)
+           ON CONFLICT(id, m) DO UPDATE SET json=excluded.json,
+             owner_tg_id=CASE WHEN COALESCE(roads.owner_tg_id,'')='' THEN excluded.owner_tg_id ELSE roads.owner_tg_id END`)
+          .bind(SHARED_ID, m, typeof newJson === 'string' ? newJson : JSON.stringify(newJson), ownerTgId).run();
         return json({ status: 'saved' });
       }
 
@@ -363,7 +414,9 @@ export default {
         const visible = bodyData.visible ? 1 : 0;
         const newM = bodyData.new_m || '';
         const creatorName = bodyData.creator_name || '';
-        const folderId = bodyData.folder_id !== undefined ? bodyData.folder_id : null;
+        const { ownerTgId, rootFolderId } = await ownerContext(env);
+        const requestedFolder = bodyData.folder_id !== undefined ? bodyData.folder_id : null;
+        const folderId = requestedFolder === null || requestedFolder === '' ? rootFolderId : requestedFolder;
         if (newM && newM !== m) {
           // Переименование: копируем json + мета под новым m, старый удаляем
           const src = await env.DB.prepare(
@@ -371,21 +424,28 @@ export default {
           if (!src) return json({ error: 'route_not_found' }, 404);
           await env.DB.batch([
             env.DB.prepare(
-              'INSERT INTO roads (id, m, json, name, description, visible, creator_name, folder_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(id, m) DO UPDATE SET json=excluded.json, name=excluded.name, description=excluded.description, visible=excluded.visible, creator_name=excluded.creator_name, folder_id=excluded.folder_id')
+              `INSERT INTO roads (id, m, json, name, description, visible, creator_name, folder_id, owner_tg_id)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+               ON CONFLICT(id, m) DO UPDATE SET json=excluded.json, name=excluded.name,
+                 description=excluded.description, visible=excluded.visible,
+                 creator_name=excluded.creator_name, folder_id=excluded.folder_id,
+                 owner_tg_id=CASE WHEN COALESCE(roads.owner_tg_id,'')='' THEN excluded.owner_tg_id ELSE roads.owner_tg_id END`)
               .bind(SHARED_ID, newM, src.json, name, description, visible,
-                creatorName || src.creator_name || '', folderId),
+                creatorName || src.creator_name || '', folderId, ownerTgId),
             env.DB.prepare('DELETE FROM roads WHERE m = ?').bind(m),
           ]);
           return json({ status: 'meta_saved', new_m: newM });
         }
         if (creatorName) {
           await env.DB.prepare(
-            'UPDATE roads SET name = ?, description = ?, visible = ?, creator_name = ?, folder_id = ? WHERE m = ?')
-            .bind(name, description, visible, creatorName, folderId, m).run();
+            `UPDATE roads SET name = ?, description = ?, visible = ?, creator_name = ?, folder_id = ?,
+               owner_tg_id = CASE WHEN COALESCE(owner_tg_id,'')='' THEN ? ELSE owner_tg_id END WHERE m = ?`)
+            .bind(name, description, visible, creatorName, folderId, ownerTgId, m).run();
         } else {
           await env.DB.prepare(
-            'UPDATE roads SET name = ?, description = ?, visible = ?, folder_id = ? WHERE m = ?')
-            .bind(name, description, visible, folderId, m).run();
+            `UPDATE roads SET name = ?, description = ?, visible = ?, folder_id = ?,
+               owner_tg_id = CASE WHEN COALESCE(owner_tg_id,'')='' THEN ? ELSE owner_tg_id END WHERE m = ?`)
+            .bind(name, description, visible, folderId, ownerTgId, m).run();
         }
         return json({ status: 'meta_saved' });
       }
@@ -536,7 +596,9 @@ export default {
       // Создать папку
       if (action === 'folder_create') {
         const name = String(bodyData.name || '').trim();
-        const parentId = bodyData.parent_id !== undefined ? bodyData.parent_id : null;
+        const { ownerTgId, rootFolderId } = await ownerContext(env);
+        const requestedParent = bodyData.parent_id !== undefined ? bodyData.parent_id : null;
+        const parentId = requestedParent === null || requestedParent === '' ? rootFolderId : requestedParent;
         const visible = bodyData.visible !== false ? 1 : 0;
         const price = Math.floor(Number(bodyData.price ?? 0));
         if (!name) return json({ error: 'missing_name' }, 400);
@@ -544,7 +606,8 @@ export default {
           return json({ error: 'bad_price' }, 400);
         }
         const res = await env.DB.prepare(
-          'INSERT INTO folders (name, parent_id, visible, price) VALUES (?, ?, ?, ?)').bind(name, parentId, visible, price).run();
+          'INSERT INTO folders (name, parent_id, visible, price, owner_tg_id) VALUES (?, ?, ?, ?, ?)')
+          .bind(name, parentId, visible, price, ownerTgId).run();
         const id = res.meta && res.meta.last_row_id ? res.meta.last_row_id : null;
         return json({ status: 'ok', id, name, parent_id: parentId, visible: visible === 1, price });
       }
@@ -585,7 +648,9 @@ export default {
       // Переместить папку (изменить parent_id). Защита от циклов.
       if (action === 'folder_move') {
         const id = Number(bodyData.id);
-        const parentId = bodyData.parent_id !== undefined ? bodyData.parent_id : null;
+        const { rootFolderId } = await ownerContext(env);
+        const requestedParent = bodyData.parent_id !== undefined ? bodyData.parent_id : null;
+        const parentId = requestedParent === null || requestedParent === '' ? rootFolderId : requestedParent;
         if (!Number.isFinite(id)) return json({ error: 'bad_params' }, 400);
         if (parentId !== null && parentId === id) return json({ error: 'cyclic_move' }, 400);
         if (parentId !== null) {
@@ -777,7 +842,9 @@ export default {
       // Переместить маршрут в папку (folder_id = null — в корень)
       if (action === 'route_move') {
         const mVal = bodyData.m || url.searchParams.get('m');
-        const folderId = bodyData.folder_id !== undefined ? bodyData.folder_id : null;
+        const { rootFolderId } = await ownerContext(env);
+        const requestedFolder = bodyData.folder_id !== undefined ? bodyData.folder_id : null;
+        const folderId = requestedFolder === null || requestedFolder === '' ? rootFolderId : requestedFolder;
         if (!mVal) return json({ error: 'missing_route_name' }, 400);
         const m = resolveM(mVal);
         const row = await env.DB.prepare('SELECT id FROM roads WHERE m = ?').bind(m).first();

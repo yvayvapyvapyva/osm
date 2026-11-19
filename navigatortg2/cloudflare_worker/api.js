@@ -229,6 +229,42 @@ export default {
         // Скрытые в редакторе папки в приложение не попадают — ни сама папка,
         // ни маршруты внутри неё (скрытие наследуется вниз, см. hiddenFolderIds).
         const hidden = hiddenFolderIds(folders);
+        // Пустые корневые папки (без видимых маршрутов во всём поддереве) в
+        // меню не показываем: они создаются при первом входе в редактор и
+        // только засоряют каталог.
+        const parentById = new Map();
+        for (const f of folders) {
+          parentById.set(Number(f.id), f.parent_id === null || f.parent_id === '' ? null : Number(f.parent_id));
+        }
+        const rootOf = new Map();
+        const findRoot = (id) => {
+          if (rootOf.has(id)) return rootOf.get(id);
+          const chain = [];
+          let cur = id;
+          let guard = 0;
+          while (cur !== null && guard++ < 200) {
+            if (rootOf.has(cur)) { cur = rootOf.get(cur); break; }
+            chain.push(cur);
+            const parent = parentById.get(cur);
+            if (parent === undefined || parent === null) break;
+            cur = parent;
+          }
+          for (const item of chain) rootOf.set(item, cur);
+          return cur;
+        };
+        const routesByRoot = new Map();
+        for (const r of routes) {
+          if (r.folder_id === null || r.folder_id === undefined) continue;
+          const rootId = findRoot(Number(r.folder_id));
+          routesByRoot.set(rootId, (routesByRoot.get(rootId) || 0) + 1);
+        }
+        const emptyRoots = new Set();
+        for (const f of folders) {
+          const id = Number(f.id);
+          if (f.parent_id !== null && f.parent_id !== '') continue;
+          if (!routesByRoot.get(id)) emptyRoots.add(id);
+        }
+        const inEmptyRoot = (id) => emptyRoots.has(findRoot(Number(id)));
         const locks = locksFromIndex(await loadFolderIndex(env));
         return json({
           routes: routes
@@ -239,7 +275,7 @@ export default {
               folder_id: r.folder_id || null,
             })),
           folders: folders
-            .filter((f) => !hidden.has(f.id))
+            .filter((f) => !hidden.has(f.id) && !inEmptyRoot(f.id))
             .map((f) => ({
               id: f.id, name: f.name, parent_id: f.parent_id, price: f.price || 0,
               owner_name: f.owner_name || f.owner_tg_id || '',
