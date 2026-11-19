@@ -76,9 +76,6 @@
                 name: folder.name || 'Папка',
                 sort_order: Number(folder.sort_order) || 0
             };
-            if (Array.isArray(folder.instructors) && folder.instructors.length) {
-                item.instructors = folder.instructors;
-            }
             return item;
         });
 

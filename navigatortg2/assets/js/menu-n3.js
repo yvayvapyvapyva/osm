@@ -554,45 +554,11 @@ const MenuModule = {
             }
             container.appendChild(folderList);
         }
-        const instructors = this._instructorsForCurrentFolder();
-        if (instructors.length) {
-            const instructorBtn = document.createElement('button');
-            instructorBtn.type = 'button';
-            instructorBtn.className = 'instructors-row';
-            instructorBtn.style.cssText = 'display:flex;align-items:center;gap:10px;width:100%;padding:12px 14px;margin:8px 0 0;border:1px solid rgba(18,28,46,0.12);border-radius:14px;background:var(--surface,#fff);color:inherit;font:inherit;cursor:pointer;text-align:left;';
-            const title = document.createElement('span');
-            title.style.cssText = 'font-weight:700;flex:1;';
-            title.textContent = 'Инструкторы по вождению';
-            const count = document.createElement('span');
-            count.style.cssText = 'color:#5B6B80;font-size:13px;';
-            count.textContent = String(instructors.length);
-            const chevron = document.createElement('span');
-            chevron.style.cssText = 'color:#5B6B80;';
-            chevron.textContent = '›';
-            instructorBtn.append(title, count, chevron);
-            instructorBtn.addEventListener('click', () => {
-                if (window.OnepageInstructors) {
-                    window.OnepageInstructors.open(
-                        instructors,
-                        this._folderMap.get(this._folderPath[this._folderPath.length - 1] || '')?.name || ''
-                    );
-                }
-            });
-            container.appendChild(instructorBtn);
-        }
-
         const frag = document.createDocumentFragment();
         for (const route of routes) frag.appendChild(this._createRouteRow(route));
         container.appendChild(frag);
         this._observeRoutePreviews(container);
         this._scrollToCurrentRoute(container);
-    },
-
-    _instructorsForCurrentFolder() {
-        const folderId = this._folderPath[this._folderPath.length - 1] || '';
-        if (!folderId) return [];
-        const folder = this._folderMap.get(folderId);
-        return folder && Array.isArray(folder.instructors) ? folder.instructors : [];
     },
 
     // Прокручивает список к загруженному маршруту, чтобы при открытии меню

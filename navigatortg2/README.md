@@ -18,8 +18,8 @@ API общий — воркер `nav-api-v2` (`https://nav-api-v2.ivan43103.work
 данные в D1 `nav-db-v2`. Воркер и база свои, независимые от `navigatortg/`:
 исходники воркера лежат в `navigatortg2/cloudflare_worker/` (`api.js`, `lib/`,
 `schema.sql`, `wrangler-api.toml`), данные перенесены из `nav-db` копией таблиц
-`folders`, `roads`, `purchases`, `folder_instructors`,
-`folder_instructor_photos`.
+`folders`, `roads`, `purchases`. Таблицы инструкторов удалены — функционал
+больше не используется.
 
 ### Воркер и база
 
