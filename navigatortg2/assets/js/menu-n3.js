@@ -1319,17 +1319,7 @@ const MenuModule = {
             }
         }
 
-        if (!routeParam) {
-            // SDK Telegram грузится асинхронно: пробуем ещё раз после его загрузки.
-            if (!this._startParamWait && window.__tgReady) {
-                this._startParamWait = true;
-                window.__tgReady.then(() => {
-                    this._startParamWait = false;
-                    this.checkUrlParam();
-                });
-            }
-            return;
-        }
+        if (!routeParam) return;
 
         this.currentRoute = routeParam;
         this.isLoaded = true;
