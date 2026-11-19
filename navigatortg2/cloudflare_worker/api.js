@@ -59,7 +59,7 @@ import {
 } from './lib/db.js';
 import { EDITOR_ACTIONS, requireUser } from './lib/editor.js';
 import { handleReport } from './lib/report.js';
-import { recordPurchase } from './lib/shop.js';
+import { recordPurchase, isAdmin } from './lib/shop.js';
 import { handleTelegramWebhook } from './lib/bot.js';
 
 // Список платных папок для клиента: id — для сопоставления, folder — для показа.
@@ -295,7 +295,9 @@ export default {
           .bind(String(root.owner_tg_id || '')).first();
         const ownerTgId = String(root.owner_tg_id || '');
         const ownerName = (rootMeta && rootMeta.owner_name) || ownerTgId;
-        const isOwner = !!uid && ownerTgId === uid;
+        const isAdminUser = !!uid && isAdmin(uid, env);
+        const isOwner = !!uid && (ownerTgId === uid || isAdminUser);
+        const isAdminAccess = isAdminUser && ownerTgId !== uid;
 
         const allFolders = (await env.DB.prepare(
           'SELECT id, parent_id, visible FROM folders').all()).results || [];
@@ -312,7 +314,7 @@ export default {
           .filter((id) => !hidden.has(id));
 
         if (!ids.length) {
-          return json({ owner: { root_folder_id: rootId, name: root.name || '', owner_name: ownerName, owner_avatar: (rootMeta && rootMeta.owner_avatar) || '', owner_username: (rootMeta && rootMeta.owner_username) || '', owner_info: (rootMeta && rootMeta.owner_info) || '', owner_tg_id: ownerTgId, is_owner: isOwner }, routes: [] },
+          return json({ owner: { root_folder_id: rootId, name: root.name || '', owner_name: ownerName, owner_avatar: (rootMeta && rootMeta.owner_avatar) || '', owner_username: (rootMeta && rootMeta.owner_username) || '', owner_info: (rootMeta && rootMeta.owner_info) || '', owner_tg_id: ownerTgId, is_owner: isOwner, is_admin: isAdminAccess }, routes: [] },
             200, { 'Cache-Control': 'no-store, must-revalidate' });
         }
 
@@ -374,6 +376,7 @@ export default {
             owner_info: (rootMeta && rootMeta.owner_info) || '',
             owner_tg_id: ownerTgId,
             is_owner: isOwner,
+            is_admin: isAdminAccess,
           },
           routes,
           signs,
@@ -418,9 +421,10 @@ export default {
           if (lock) {
             const initData = url.searchParams.get('tg_init_data') || bodyData.tg_init_data || '';
             const { uid } = await verifyTgInitData(initData, env.TELEGRAM_TOKEN);
-            // Владелец маршрута открывает свою платную папку без покупки.
+            // Владелец и админ открывают платную папку без покупки.
             const owner = String(row.owner_tg_id || '');
-            if (!(uid && owner && String(uid) === owner) &&
+            const adminAccess = !!uid && isAdmin(uid, env);
+            if (!(uid && owner && String(uid) === owner) && !adminAccess &&
                 !(uid && await hasAccess(env, uid, lock.id))) {
               return json({ error: 'locked', id: lock.id, folder: lock.folder, price: lock.price }, 403);
             }

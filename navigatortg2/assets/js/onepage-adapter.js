@@ -222,6 +222,7 @@
                 const m = String(route.m);
                 const folderId = route.folder_id == null ? '' : String(route.folder_id);
                 const mine = !!(geometry && geometry.owner && geometry.owner.is_owner);
+                const adminAccess = !!(geometry && geometry.owner && geometry.owner.is_admin);
                 const lockedByShop = shop && folderId ? shop.isLocked(folderId) : false;
                 const full = geometry && geometry.routes ? geometry.routes.get(m) : null;
                 const serverLocked = full ? !!full.locked : false;
@@ -236,6 +237,7 @@
                     premium: premium,
                     locked: locked,
                     owned: mine,
+                    admin: adminAccess,
                     viewed: !!(full && full.viewed) || !!route.viewed
                 };
                 // Пакет владельца уже содержит геометрию — меню сложит её в

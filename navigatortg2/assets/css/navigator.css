@@ -2516,3 +2516,12 @@ html.tg-fullscreen #hud {
 [data-theme="dark"] .routes-breadcrumb-purchased {
     color: #7CE495;
 }
+
+.route-row-badge-admin {
+    background: rgba(255, 149, 0, 0.14);
+    color: #B26A00;
+}
+[data-theme="dark"] .route-row-badge-admin {
+    background: rgba(255, 149, 0, 0.24);
+    color: #FFC14D;
+}

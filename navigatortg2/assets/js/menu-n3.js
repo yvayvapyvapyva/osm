@@ -204,6 +204,7 @@ const MenuModule = {
                 premium: !!route.premium,
                 locked: !!route.locked,
                 owned: !!route.owned,
+                admin: !!route.admin,
                 viewed: !!route.viewed || !!(previous && previous.viewed),
                 ownerRootId: rootId
             };
@@ -400,6 +401,7 @@ const MenuModule = {
                 premium: !!route.premium,
                 locked: !!route.locked,
                 owned: !!route.owned,
+                admin: !!route.admin,
                 viewed: !!route.viewed,
                 ...this._routeStats(route)
             });
@@ -810,8 +812,8 @@ const MenuModule = {
         }
         if (route.owned) {
             const ownerBadge = document.createElement('span');
-            ownerBadge.className = 'route-row-badge route-row-badge-owner';
-            ownerBadge.textContent = 'Владелец';
+            ownerBadge.className = 'route-row-badge ' + (route.admin ? 'route-row-badge-admin' : 'route-row-badge-owner');
+            ownerBadge.textContent = route.admin ? 'Админ' : 'Владелец';
             flags.push(ownerBadge);
         }
         if (route.viewed && !isActive) {
