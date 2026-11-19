@@ -582,7 +582,7 @@ const MenuModule = {
         if (!el) return;
         el.innerHTML = '';
         const labels = [
-            { id: '', name: this._ownersLoaded ? 'Владельцы' : 'Все маршруты' },
+            { id: '', name: this._ownersLoaded ? 'Главная' : 'Все маршруты' },
             ...this._folderPath.map(id => ({
                 id,
                 name: this._folderMap.get(id)?.name || id

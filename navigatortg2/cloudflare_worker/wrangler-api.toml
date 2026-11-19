@@ -20,8 +20,8 @@ keep_vars = true
 # (EDITOR_ACCESS_KEY, TELEGRAM_TOKEN, TG_SECRET и т.п.) здесь хранить нельзя —
 # только значения, которые не страшно показать.
 [vars]
-# Telegram user id редакторов маршрутов, через запятую.
-EDITOR_IDS = "7292595756,1053624817"
+# Telegram user id, от чьего имени работает вход по ключу из браузера.
+EDITOR_KEY_UID = "7292595756"
 
 # Telegram user id админов бота (команды /balance, /stats, /refund), через запятую.
 ADMIN_IDS = "7292595756"

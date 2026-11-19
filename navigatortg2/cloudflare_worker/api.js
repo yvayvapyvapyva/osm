@@ -4,14 +4,14 @@
 //   lib/http.js      — CORS, json(), escapeHtml()
 //   lib/telegram.js  — verifyTgInitData(), tgApi()
 //   lib/db.js        — маршруты, папки, замки платных папок, доступы покупателей
-//   lib/editor.js    — EDITOR_ACTIONS, requireEditor()
+//   lib/editor.js    — EDITOR_ACTIONS, requireUser()
 //   lib/shop.js      — покупки, баланс звёзд, возвраты, уведомления в канал
 //   lib/bot.js       — вебхук Telegram и админ-команды бота
 //   lib/report.js    — прокси отчётов в Telegram Bot API
 //
 // Упрощённая модель: общий неймспейс, без аккаунтов.
 // Читать маршруты может любой посетитель, редактировать — только редакторы
-// (см. EDITOR_IDS / EDITOR_ACCESS_KEY и requireEditor).
+// (см. requireUser: подпись Telegram или EDITOR_ACCESS_KEY).
 // Ключ маршрута — только `m` (колонка id всегда 'shared', оставлена для совместимости).
 //
 // Роуты:
@@ -37,7 +37,7 @@
 //   Замки и доступ считаются по id папки, а не по пути из имён: у двух папок
 //   может быть одинаковое имя. Маршрут в платной папке через action=get требует
 //   tg_init_data покупателя, иначе 403 {error:'locked', id, folder, price}.
-//   Редакторские экшены доступны только редакторам (см. requireEditor).
+//   Экшены редактора доступны владельцу: маршруты и папки привязаны к Telegram ID.
 //
 // Env:
 //   DB               — D1 database binding (см. schema.sql)
@@ -46,8 +46,8 @@
 //   REPORT_CHAT_ID   — чат для отчётов (переменная [vars])
 //   PURCHASE_CHANNEL_ID — канал для уведомлений о покупках и возвратах
 //                         (@username публичного или -100… приватного). Не задан — уведомления не шлются.
-//   EDITOR_IDS       — Telegram user id редакторов через запятую (чтение/правка маршрутов).
 //   EDITOR_ACCESS_KEY — ключ для входа в редактор из браузера (вне Telegram). Не задан — только через Telegram.
+//   EDITOR_KEY_UID   — Telegram user id, от чьего имени работает вход по ключу.
 //   ADMIN_IDS        — Telegram user id админов бота (команды /balance, /stats, /refund), через запятую.
 
 import { CORS, json } from './lib/http.js';
@@ -57,7 +57,7 @@ import {
   lockForFolder, loadFolderIndex, folderPathIn, findFolderIdByPath,
   hasAccess, accessExpires, hiddenFolderIds,
 } from './lib/db.js';
-import { EDITOR_ACTIONS, requireEditor, editorIdAllowed } from './lib/editor.js';
+import { EDITOR_ACTIONS, requireUser } from './lib/editor.js';
 import { handleReport } from './lib/report.js';
 import { recordPurchase } from './lib/shop.js';
 import { handleTelegramWebhook } from './lib/bot.js';
@@ -81,8 +81,6 @@ function isPublicRoute(route, hidden) {
   const fid = route.folder_id;
   return fid === null || fid === undefined || !hidden.has(fid);
 }
-
-const EDITOR_ACCESS_UNTIL = Math.floor(Date.UTC(2030, 0, 1) / 1000);
 
 export default {
   async fetch(request, env, ctx) {
@@ -155,16 +153,21 @@ export default {
         }, 200, { 'Cache-Control': 'no-cache, no-store, must-revalidate' });
       }
 
-      // ---- Проверка прав редактора (без изменений данных) ----
+      // ---- Проверка прав пользователя (без изменений данных) ----
       if (action === 'editor_check') {
-        const guard = await requireEditor(request, bodyData, env);
+        const guard = await requireUser(request, bodyData, env);
         return json({ allowed: guard.ok, via: guard.via || null, uid: guard.uid || null });
       }
 
-      // ---- Защита редакторских экшенов ----
+      // ---- Защита экшенов редактора ----
+      // Любой пользователь Telegram, но каждый видит и меняет только свои
+      // маршруты и папки (owner_tg_id).
+      let userUid = '';
       if (EDITOR_ACTIONS.has(action)) {
-        const guard = await requireEditor(request, bodyData, env);
+        const guard = await requireUser(request, bodyData, env);
         if (!guard.ok) return json({ error: 'forbidden' }, 403);
+        userUid = String(guard.uid || '');
+        if (!userUid) return json({ error: 'forbidden' }, 403);
       }
 
       // ---- Получение маршрута ----
@@ -174,6 +177,9 @@ export default {
         if (!mVal) return json({ error: 'missing_route_name' }, 400);
         const { row, m } = await findRoute(env, mVal);
         if (!row) return json({ error: 'not_found' }, 404);
+        if (action === 'get_protected' && String(row.owner_tg_id || '') !== userUid) {
+          return json({ error: 'not_found' }, 404);
+        }
         if (action === 'get') {
           // Папка маршрута — только folder_id (реальная иерархия). Замок ищем
           // по id, а не по пути из имён: у двух папок-соседей имя может совпадать.
@@ -185,15 +191,10 @@ export default {
           if (lock) {
             const initData = url.searchParams.get('tg_init_data') || bodyData.tg_init_data || '';
             const { uid } = await verifyTgInitData(initData, env.TELEGRAM_TOKEN);
-            // Редакторы (EDITOR_IDS или ключ редактора) открывают все платные
-            // папки без покупки и без срока. Проверка идёт на каждом запросе,
-            // поэтому новые платные папки им тоже доступны сразу.
-            let isEditor = !!(uid && editorIdAllowed(uid, env));
-            if (!isEditor) {
-              const guard = await requireEditor(request, bodyData, env);
-              isEditor = !!guard.ok;
-            }
-            if (!isEditor && !(uid && await hasAccess(env, uid, lock.id))) {
+            // Владелец маршрута открывает свою платную папку без покупки.
+            const owner = String(row.owner_tg_id || '');
+            if (!(uid && owner && String(uid) === owner) &&
+                !(uid && await hasAccess(env, uid, lock.id))) {
               return json({ error: 'locked', id: lock.id, folder: lock.folder, price: lock.price }, 403);
             }
           }
@@ -204,7 +205,8 @@ export default {
       // ---- Полный список (для редактора) ----
       if (action === 'list') {
         const rows = (await env.DB.prepare(
-          'SELECT m, name, visible, folder_id FROM roads ORDER BY name').all()).results || [];
+          'SELECT m, name, visible, folder_id FROM roads WHERE owner_tg_id = ? ORDER BY name')
+          .bind(userUid).all()).results || [];
         return json({
           routes: rows.map((r) => ({
             m: r.m, name: r.name || '', visible: r.visible === 1, folder_id: r.folder_id || null,
@@ -214,26 +216,40 @@ export default {
 
       if (action === 'delete') {
         if (!mVal) return json({ error: 'missing_route_name' }, 400);
-        await env.DB.prepare('DELETE FROM roads WHERE m = ?').bind(resolveM(mVal)).run();
+        const m = resolveM(mVal);
+        const own = await env.DB.prepare(
+          'SELECT owner_tg_id FROM roads WHERE m = ?').bind(m).first();
+        if (!own || String(own.owner_tg_id || '') !== userUid) {
+          return json({ error: 'route_not_found' }, 404);
+        }
+        await env.DB.prepare('DELETE FROM roads WHERE m = ? AND owner_tg_id = ?')
+          .bind(m, userUid).run();
         return json({ status: 'deleted' });
       }
 
       if (action === 'save') {
         if (!mVal) return json({ error: 'missing_route_name' }, 400);
         const m = resolveM(mVal);
+        const own = await env.DB.prepare(
+          'SELECT owner_tg_id FROM roads WHERE m = ?').bind(m).first();
+        if (own && String(own.owner_tg_id || '') !== userUid) {
+          return json({ error: 'route_not_found' }, 404);
+        }
         const newJson = bodyData.data || [];
         await env.DB.prepare(
-          'INSERT INTO roads (id, m, json) VALUES (?, ?, ?) ON CONFLICT(id, m) DO UPDATE SET json=excluded.json')
-          .bind(SHARED_ID, m, typeof newJson === 'string' ? newJson : JSON.stringify(newJson)).run();
+          'INSERT INTO roads (id, m, json, owner_tg_id) VALUES (?, ?, ?, ?) ON CONFLICT(id, m) DO UPDATE SET json=excluded.json, owner_tg_id=excluded.owner_tg_id')
+          .bind(SHARED_ID, m, typeof newJson === 'string' ? newJson : JSON.stringify(newJson), userUid).run();
         return json({ status: 'saved' });
       }
 
       if (action === 'get_meta') {
         if (!mVal) return json({ error: 'missing_route_name' }, 400);
         const row = await env.DB.prepare(
-          'SELECT name, description, visible, creator_name, folder_id FROM roads WHERE m = ?')
+          'SELECT name, description, visible, creator_name, folder_id, owner_tg_id FROM roads WHERE m = ?')
           .bind(resolveM(mVal)).first();
-        if (!row) return json({ error: 'route_not_found' }, 404);
+        if (!row || String(row.owner_tg_id || '') !== userUid) {
+          return json({ error: 'route_not_found' }, 404);
+        }
         return json({
           name: row.name || '', description: row.description || '',
           visible: row.visible === 1, creator_name: row.creator_name || '',
@@ -249,29 +265,42 @@ export default {
         const visible = bodyData.visible ? 1 : 0;
         const newM = bodyData.new_m || '';
         const creatorName = bodyData.creator_name || '';
-        const folderId = bodyData.folder_id !== undefined ? bodyData.folder_id : null;
+        const rawFolderId = bodyData.folder_id !== undefined ? bodyData.folder_id : null;
+        const folderId = rawFolderId === '' ? null : rawFolderId;
+        if (folderId !== null && folderId !== undefined) {
+          const folder = await env.DB.prepare(
+            'SELECT owner_tg_id FROM folders WHERE id = ?').bind(folderId).first();
+          if (!folder || String(folder.owner_tg_id || '') !== userUid) {
+            return json({ error: 'folder_not_found' }, 404);
+          }
+        }
+        const src = await env.DB.prepare(
+          'SELECT json, creator_name, owner_tg_id FROM roads WHERE m = ?').bind(m).first();
+        if (!src || String(src.owner_tg_id || '') !== userUid) {
+          return json({ error: 'route_not_found' }, 404);
+        }
         if (newM && newM !== m) {
-          // Переименование: копируем json + мета под новым m, старый удаляем
-          const src = await env.DB.prepare(
-            'SELECT json, creator_name FROM roads WHERE m = ?').bind(m).first();
-          if (!src) return json({ error: 'route_not_found' }, 404);
+          // Переименование: копируем json + мета под новым m, старый удаляем.
+          const busy = await env.DB.prepare(
+            'SELECT m FROM roads WHERE m = ?').bind(newM).first();
+          if (busy) return json({ error: 'route_exists' }, 409);
           await env.DB.batch([
             env.DB.prepare(
-              'INSERT INTO roads (id, m, json, name, description, visible, creator_name, folder_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(id, m) DO UPDATE SET json=excluded.json, name=excluded.name, description=excluded.description, visible=excluded.visible, creator_name=excluded.creator_name, folder_id=excluded.folder_id')
+              'INSERT INTO roads (id, m, json, name, description, visible, creator_name, folder_id, owner_tg_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)')
               .bind(SHARED_ID, newM, src.json, name, description, visible,
-                creatorName || src.creator_name || '', folderId),
-            env.DB.prepare('DELETE FROM roads WHERE m = ?').bind(m),
+                creatorName || src.creator_name || '', folderId, userUid),
+            env.DB.prepare('DELETE FROM roads WHERE m = ? AND owner_tg_id = ?').bind(m, userUid),
           ]);
           return json({ status: 'meta_saved', new_m: newM });
         }
         if (creatorName) {
           await env.DB.prepare(
-            'UPDATE roads SET name = ?, description = ?, visible = ?, creator_name = ?, folder_id = ? WHERE m = ?')
-            .bind(name, description, visible, creatorName, folderId, m).run();
+            'UPDATE roads SET name = ?, description = ?, visible = ?, creator_name = ?, folder_id = ? WHERE m = ? AND owner_tg_id = ?')
+            .bind(name, description, visible, creatorName, folderId, m, userUid).run();
         } else {
           await env.DB.prepare(
-            'UPDATE roads SET name = ?, description = ?, visible = ?, folder_id = ? WHERE m = ?')
-            .bind(name, description, visible, folderId, m).run();
+            'UPDATE roads SET name = ?, description = ?, visible = ?, folder_id = ? WHERE m = ? AND owner_tg_id = ?')
+            .bind(name, description, visible, folderId, m, userUid).run();
         }
         return json({ status: 'meta_saved' });
       }
@@ -290,6 +319,11 @@ export default {
         }
         const folderId = await findFolderIdByPath(env, folder);
         if (!folderId) return json({ error: 'folder_not_found' }, 400);
+        const owner = await env.DB.prepare(
+          'SELECT owner_tg_id FROM folders WHERE id = ?').bind(folderId).first();
+        if (!owner || String(owner.owner_tg_id || '') !== userUid) {
+          return json({ error: 'folder_not_found' }, 404);
+        }
         await env.DB.prepare('UPDATE folders SET price = ? WHERE id = ?').bind(price, folderId).run();
         return json({ status: 'ok', folder, price });
       }
@@ -299,6 +333,11 @@ export default {
         if (!folder) return json({ error: 'missing_folder' }, 400);
         const folderId = await findFolderIdByPath(env, folder);
         if (!folderId) return json({ error: 'folder_not_found' }, 400);
+        const owner = await env.DB.prepare(
+          'SELECT owner_tg_id FROM folders WHERE id = ?').bind(folderId).first();
+        if (!owner || String(owner.owner_tg_id || '') !== userUid) {
+          return json({ error: 'folder_not_found' }, 404);
+        }
         await env.DB.prepare('UPDATE folders SET price = 0 WHERE id = ?').bind(folderId).run();
         return json({ status: 'ok' });
       }
@@ -307,28 +346,8 @@ export default {
       if (action === 'my_access') {
         const initData = bodyData.initData || url.searchParams.get('tg_init_data') || '';
         const { uid, err } = await verifyTgInitData(initData, env.TELEGRAM_TOKEN);
-        const expires = uid ? await accessExpires(env, uid) : {};
-        // Редакторы видят все платные папки без покупки и без срока. В браузере
-        // вне Telegram редактор определяется по ключу (X-Editor-Key/editor_key).
-        let isEditor = !!(uid && editorIdAllowed(uid, env));
-        if (!isEditor) {
-          const guard = await requireEditor(request, bodyData, env);
-          isEditor = !!guard.ok;
-        }
-        if (isEditor) {
-          const locks = locksFromIndex(await loadFolderIndex(env));
-          // В клиенте это выглядит как обычная покупка: у всех платных папок
-          // один и тот же срок — до 2030 года.
-          const editorExpires = { ...expires };
-          for (const l of locks) editorExpires[String(l.id)] = EDITOR_ACCESS_UNTIL;
-          return json({
-            user_id: uid,
-            ids: locks.map((l) => String(l.id)),
-            expires: editorExpires,
-            unlimited: true,
-          });
-        }
         if (!uid) return json({ error: 'bad_init_data', message: err }, 401);
+        const expires = await accessExpires(env, uid);
         return json({ user_id: uid, ids: Object.keys(expires), expires });
       }
 
@@ -346,8 +365,11 @@ export default {
         }
         const lock = lockForFolder(index, folderId);
         if (!lock) return json({ error: 'not_locked' }, 400);
-        // Редактору счёт не нужен: доступ у него уже есть и не истекает.
-        if (editorIdAllowed(uid, env) || await hasAccess(env, uid, lock.id)) {
+        // Владельцу папки счёт не нужен: доступ у него уже есть.
+        const folderOwner = await env.DB.prepare(
+          'SELECT owner_tg_id FROM folders WHERE id = ?').bind(lock.id).first();
+        if ((folderOwner && String(folderOwner.owner_tg_id || '') === String(uid)) ||
+            await hasAccess(env, uid, lock.id)) {
           return json({ ok: true, owned: true, folder: lock.folder, folder_id: lock.id });
         }
         const title = (`Доступ: ${lock.folder}`).substring(0, 32);
@@ -409,9 +431,10 @@ export default {
       // Список всех папок (плоский)
       if (action === 'folder_list') {
         const rows = (await env.DB.prepare(
-          'SELECT id, name, parent_id, owner_id, visible, price FROM folders ORDER BY name').all()).results || [];
+          'SELECT id, name, parent_id, visible, price FROM folders WHERE owner_tg_id = ? ORDER BY name')
+          .bind(userUid).all()).results || [];
         return json({ folders: rows.map((r) => ({
-          id: r.id, name: r.name, parent_id: r.parent_id, owner_id: r.owner_id,
+          id: r.id, name: r.name, parent_id: r.parent_id,
           visible: r.visible === 1, price: r.price,
         })) });
       }
@@ -426,8 +449,16 @@ export default {
         if (!Number.isFinite(price) || price < 0 || price > 10000) {
           return json({ error: 'bad_price' }, 400);
         }
+        if (parentId !== null && parentId !== undefined) {
+          const parent = await env.DB.prepare(
+            'SELECT owner_tg_id FROM folders WHERE id = ?').bind(parentId).first();
+          if (!parent || String(parent.owner_tg_id || '') !== userUid) {
+            return json({ error: 'folder_not_found' }, 404);
+          }
+        }
         const res = await env.DB.prepare(
-          'INSERT INTO folders (name, parent_id, visible, price) VALUES (?, ?, ?, ?)').bind(name, parentId, visible, price).run();
+          'INSERT INTO folders (name, parent_id, visible, price, owner_tg_id) VALUES (?, ?, ?, ?, ?)')
+          .bind(name, parentId, visible, price, userUid).run();
         const id = res.meta && res.meta.last_row_id ? res.meta.last_row_id : null;
         return json({ status: 'ok', id, name, parent_id: parentId, visible: visible === 1, price });
       }
@@ -437,7 +468,13 @@ export default {
         const id = Number(bodyData.id);
         const name = String(bodyData.name || '').trim();
         if (!Number.isFinite(id) || !name) return json({ error: 'bad_params' }, 400);
-        await env.DB.prepare('UPDATE folders SET name = ? WHERE id = ?').bind(name, id).run();
+        const own = await env.DB.prepare(
+          'SELECT owner_tg_id FROM folders WHERE id = ?').bind(id).first();
+        if (!own || String(own.owner_tg_id || '') !== userUid) {
+          return json({ error: 'folder_not_found' }, 404);
+        }
+        await env.DB.prepare('UPDATE folders SET name = ? WHERE id = ? AND owner_tg_id = ?')
+          .bind(name, id, userUid).run();
         return json({ status: 'ok' });
       }
 
@@ -445,11 +482,17 @@ export default {
       if (action === 'folder_delete') {
         const id = Number(bodyData.id);
         if (!Number.isFinite(id)) return json({ error: 'bad_params' }, 400);
+        const own = await env.DB.prepare(
+          'SELECT owner_tg_id FROM folders WHERE id = ?').bind(id).first();
+        if (!own || String(own.owner_tg_id || '') !== userUid) {
+          return json({ error: 'folder_not_found' }, 404);
+        }
         const children = (await env.DB.prepare('SELECT id FROM folders WHERE parent_id = ?').bind(id).all()).results || [];
         const routes = (await env.DB.prepare('SELECT m FROM roads WHERE folder_id = ?').bind(id).all()).results || [];
         if (children.length > 0) return json({ error: 'folder_not_empty' }, 400);
         if (routes.length > 0) return json({ error: 'folder_has_routes' }, 400);
-        await env.DB.prepare('DELETE FROM folders WHERE id = ?').bind(id).run();
+        await env.DB.prepare('DELETE FROM folders WHERE id = ? AND owner_tg_id = ?')
+          .bind(id, userUid).run();
         return json({ status: 'ok' });
       }
 
@@ -458,6 +501,18 @@ export default {
         const id = Number(bodyData.id);
         const parentId = bodyData.parent_id !== undefined ? bodyData.parent_id : null;
         if (!Number.isFinite(id)) return json({ error: 'bad_params' }, 400);
+        const own = await env.DB.prepare(
+          'SELECT owner_tg_id FROM folders WHERE id = ?').bind(id).first();
+        if (!own || String(own.owner_tg_id || '') !== userUid) {
+          return json({ error: 'folder_not_found' }, 404);
+        }
+        if (parentId !== null) {
+          const parent = await env.DB.prepare(
+            'SELECT owner_tg_id FROM folders WHERE id = ?').bind(parentId).first();
+          if (!parent || String(parent.owner_tg_id || '') !== userUid) {
+            return json({ error: 'folder_not_found' }, 404);
+          }
+        }
         if (parentId !== null && parentId === id) return json({ error: 'cyclic_move' }, 400);
         if (parentId !== null) {
           let cur = parentId;
@@ -469,7 +524,8 @@ export default {
           }
           if (cyclic) return json({ error: 'cyclic_move' }, 400);
         }
-        await env.DB.prepare('UPDATE folders SET parent_id = ? WHERE id = ?').bind(parentId, id).run();
+        await env.DB.prepare('UPDATE folders SET parent_id = ? WHERE id = ? AND owner_tg_id = ?')
+          .bind(parentId, id, userUid).run();
         return json({ status: 'ok' });
       }
 
@@ -483,26 +539,43 @@ export default {
         if (price !== null && (!Number.isFinite(price) || price < 0 || price > 10000)) {
           return json({ error: 'bad_price' }, 400);
         }
+        const own = await env.DB.prepare(
+          'SELECT owner_tg_id FROM folders WHERE id = ?').bind(id).first();
+        if (!own || String(own.owner_tg_id || '') !== userUid) {
+          return json({ error: 'folder_not_found' }, 404);
+        }
         const sets = [];
         const vals = [];
         if (name !== null) { sets.push('name = ?'); vals.push(name); }
         if (visible !== null) { sets.push('visible = ?'); vals.push(visible); }
         if (price !== null) { sets.push('price = ?'); vals.push(price); }
         if (sets.length === 0) return json({ error: 'nothing_to_update' }, 400);
-        vals.push(id);
-        await env.DB.prepare(`UPDATE folders SET ${sets.join(', ')} WHERE id = ?`).bind(...vals).run();
+        vals.push(id, userUid);
+        await env.DB.prepare(`UPDATE folders SET ${sets.join(', ')} WHERE id = ? AND owner_tg_id = ?`).bind(...vals).run();
         return json({ status: 'ok' });
       }
 
       // Переместить маршрут в папку (folder_id = null — в корень)
       if (action === 'route_move') {
         const mVal = bodyData.m || url.searchParams.get('m');
-        const folderId = bodyData.folder_id !== undefined ? bodyData.folder_id : null;
+        const rawFolderId = bodyData.folder_id !== undefined ? bodyData.folder_id : null;
+        const folderId = rawFolderId === '' ? null : rawFolderId;
         if (!mVal) return json({ error: 'missing_route_name' }, 400);
         const m = resolveM(mVal);
-        const row = await env.DB.prepare('SELECT id FROM roads WHERE m = ?').bind(m).first();
-        if (!row) return json({ error: 'route_not_found' }, 404);
-        await env.DB.prepare('UPDATE roads SET folder_id = ? WHERE m = ?').bind(folderId, m).run();
+        const row = await env.DB.prepare(
+          'SELECT id, owner_tg_id FROM roads WHERE m = ?').bind(m).first();
+        if (!row || String(row.owner_tg_id || '') !== userUid) {
+          return json({ error: 'route_not_found' }, 404);
+        }
+        if (folderId !== null && folderId !== undefined) {
+          const folder = await env.DB.prepare(
+            'SELECT owner_tg_id FROM folders WHERE id = ?').bind(folderId).first();
+          if (!folder || String(folder.owner_tg_id || '') !== userUid) {
+            return json({ error: 'folder_not_found' }, 404);
+          }
+        }
+        await env.DB.prepare('UPDATE roads SET folder_id = ? WHERE m = ? AND owner_tg_id = ?')
+          .bind(folderId, m, userUid).run();
         return json({ status: 'ok' });
       }
 

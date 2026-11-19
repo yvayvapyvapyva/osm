@@ -13,12 +13,12 @@ export async function findRoute(env, mRaw) {
   if (!mRaw) return { row: null, m: '' };
   // сначала точное совпадение, затем legacy-формат ID-NAME
   let row = await env.DB.prepare(
-    'SELECT json, name, folder_id FROM roads WHERE m = ?').bind(mRaw).first();
+    'SELECT json, name, folder_id, owner_tg_id FROM roads WHERE m = ?').bind(mRaw).first();
   if (row) return { row, m: mRaw };
   if (mRaw.includes('-')) {
     const m = resolveM(mRaw);
     row = await env.DB.prepare(
-      'SELECT json, name, folder_id FROM roads WHERE m = ?').bind(m).first();
+      'SELECT json, name, folder_id, owner_tg_id FROM roads WHERE m = ?').bind(m).first();
     if (row) return { row, m };
   }
   return { row: null, m: mRaw };

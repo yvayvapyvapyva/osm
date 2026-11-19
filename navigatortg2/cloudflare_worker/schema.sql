@@ -9,7 +9,7 @@ CREATE TABLE IF NOT EXISTS folders (
   id        INTEGER PRIMARY KEY AUTOINCREMENT,
   name      TEXT NOT NULL,
   parent_id INTEGER REFERENCES folders(id),
-  owner_id  TEXT DEFAULT '',
+  owner_tg_id TEXT DEFAULT '',
   visible   INTEGER DEFAULT 1,
   price     INTEGER DEFAULT 0,
   created_at INTEGER DEFAULT (strftime('%s', 'now'))
@@ -26,12 +26,15 @@ CREATE TABLE IF NOT EXISTS roads (
   visible      INTEGER DEFAULT 0,
   creator_name TEXT DEFAULT '',
   folder_id    INTEGER REFERENCES folders(id),
+  owner_tg_id  TEXT DEFAULT '',
   PRIMARY KEY (id, m)
 );
 
+CREATE INDEX IF NOT EXISTS idx_folders_owner ON folders (owner_tg_id);
 CREATE INDEX IF NOT EXISTS idx_roads_visible ON roads (visible);
 CREATE INDEX IF NOT EXISTS idx_roads_creator ON roads (id);
 CREATE INDEX IF NOT EXISTS idx_roads_folder ON roads (folder_id);
+CREATE INDEX IF NOT EXISTS idx_roads_owner ON roads (owner_tg_id);
 
 -- Купленные доступы: user_id — Telegram user id, product_id — путь к папке/продукту.
 -- Поддерживает разные типы продуктов (folder_access, premium, donate) и полную историю покупок.
