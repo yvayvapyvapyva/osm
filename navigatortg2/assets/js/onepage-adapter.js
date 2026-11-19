@@ -39,6 +39,51 @@
         });
     }
 
+    function workerPost(action, params, body) {
+        const url = new URL(API);
+        url.searchParams.set('action', action);
+        Object.keys(params || {}).forEach((key) => {
+            url.searchParams.set(key, params[key]);
+        });
+        return originalFetch(url.toString(), {
+            method: 'POST',
+            cache: 'no-store',
+            headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+            body: JSON.stringify(body || {})
+        });
+    }
+
+    // Геометрия всех маршрутов корневой папки. Загружается один раз при входе
+    // в корневую папку владельца: превью и переходы дальше идут из кэша.
+    const ownerGeometries = new Map();
+
+    function loadOwnerGeometry(rootId) {
+        const key = String(rootId);
+        if (!ownerGeometries.has(key)) {
+            const request = workerPost('owner_bundle', { owner: key }, {
+                tg_init_data: tgInitData(),
+                editor_key: editorKey()
+            })
+                .then((response) => {
+                    if (!response.ok) throw new Error('owner_bundle HTTP ' + response.status);
+                    return response.json();
+                })
+                .then((payload) => {
+                    const map = new Map();
+                    for (const route of (payload && payload.routes) || []) {
+                        if (route && route.m) map.set(String(route.m), route);
+                    }
+                    return map;
+                })
+                .catch((error) => {
+                    ownerGeometries.delete(key);
+                    throw error;
+                });
+            ownerGeometries.set(key, request);
+        }
+        return ownerGeometries.get(key);
+    }
+
     function loadCatalog() {
         if (!catalogPromise) {
             catalogPromise = workerGet('catalog')
@@ -64,29 +109,108 @@
         global.OnepageFolders = { parents: parents, names: names };
     }
 
-    function ownerBundle(catalog) {
-        rememberFolders(catalog);
-        const folders = (catalog.folders || []).map((folder) => {
-            const parentId = folder.parent_id == null ? '' : String(folder.parent_id);
-            const item = {
-                folder_id: String(folder.id),
-                // В onepage2 у корневых папок parent_id пустой, в навигаторе3
-                // они должны быть вложены в корень владельца.
-                parent_id: parentId || OWNER_ID,
-                name: folder.name || 'Папка',
-                sort_order: Number(folder.sort_order) || 0
-            };
-            return item;
+    // Корневые папки всех владельцев: на «Главной» показываем именно их,
+    // без отдельного синтетического уровня «владелец».
+    function topFolders(catalog) {
+        return (catalog.folders || [])
+            .filter((folder) => folder.parent_id == null || folder.parent_id === '')
+            .map((folder) => String(folder.id));
+    }
+
+    function folderById(catalog, id) {
+        return (catalog.folders || []).find((folder) => String(folder.id) === String(id)) || null;
+    }
+
+    function childrenMap(catalog) {
+        const map = new Map();
+        (catalog.folders || []).forEach((folder) => {
+            const parent = folder.parent_id == null ? '' : String(folder.parent_id);
+            if (!map.has(parent)) map.set(parent, []);
+            map.get(parent).push(String(folder.id));
         });
+        return map;
+    }
+
+    // Все папки поддерева, включая саму корневую.
+    function subtreeIds(catalog, rootId) {
+        const children = childrenMap(catalog);
+        const out = [];
+        const seen = new Set();
+        const stack = [String(rootId)];
+        while (stack.length) {
+            const id = stack.pop();
+            if (!id || seen.has(id)) continue;
+            seen.add(id);
+            out.push(id);
+            for (const child of children.get(id) || []) stack.push(child);
+        }
+        return out;
+    }
+
+    // Верхнеуровневая папка, к которой относится папка маршрута.
+    function topRootForFolder(catalog, folderId) {
+        const byId = new Map((catalog.folders || []).map((folder) => [String(folder.id), folder]));
+        let current = folderId == null ? '' : String(folderId);
+        let top = '';
+        const seen = new Set();
+        while (current && byId.has(current) && !seen.has(current)) {
+            seen.add(current);
+            top = current;
+            const folder = byId.get(current);
+            current = folder.parent_id == null ? '' : String(folder.parent_id);
+        }
+        return top;
+    }
+
+    function requestedRootId(catalog, params) {
+        const owner = params && params.owner ? String(params.owner) : '';
+        if (owner && folderById(catalog, owner)) return owner;
+        const routeM = params && params.m ? String(params.m) : '';
+        if (routeM) {
+            const route = (catalog.routes || []).find((item) => String(item.m) === routeM);
+            const top = route ? topRootForFolder(catalog, route.folder_id) : '';
+            if (top) return top;
+        }
+        const tops = topFolders(catalog);
+        return tops.length ? tops[0] : OWNER_ID;
+    }
+
+    function ownerBundle(catalog, params, geometry) {
+        rememberFolders(catalog);
+        const rootId = requestedRootId(catalog, params);
+        const rootFolder = folderById(catalog, rootId);
+        const ids = rootFolder ? new Set(subtreeIds(catalog, rootId)) : null;
+
+        const folders = (catalog.folders || [])
+            .filter((folder) => !ids || ids.has(String(folder.id)))
+            .map((folder) => {
+                const folderId = String(folder.id);
+                const parentId = folder.parent_id == null ? '' : String(folder.parent_id);
+                return {
+                    folder_id: folderId,
+                    parent_id: ids && folderId === rootId ? '' : parentId,
+                    name: folder.name || 'Папка',
+                    sort_order: Number(folder.sort_order) || 0
+                };
+            });
 
         const shop = global.OnepageShop;
         const routes = (catalog.routes || [])
-            .filter((route) => route && route.m)
-            .map((route) => {
+            .filter((route) => {
+                if (!route || !route.m) return false;
+                if (!ids) return true;
                 const folderId = route.folder_id == null ? '' : String(route.folder_id);
-                const locked = shop && folderId ? shop.isLocked(folderId) : false;
-                return {
-                    m: String(route.m),
+                return ids.has(folderId);
+            })
+            .map((route) => {
+                const m = String(route.m);
+                const folderId = route.folder_id == null ? '' : String(route.folder_id);
+                const lockedByShop = shop && folderId ? shop.isLocked(folderId) : false;
+                const full = geometry ? geometry.get(m) : null;
+                const serverLocked = full ? !!full.locked : false;
+                const locked = lockedByShop || serverLocked;
+                const item = {
+                    m,
                     title: route.name || route.m,
                     name: route.name || route.m,
                     folder_id: folderId,
@@ -95,35 +219,106 @@
                     locked: locked,
                     viewed: false
                 };
+                // Пакет владельца уже содержит геометрию — меню сложит её в
+                // _routeDataCache, и превью/переходы не делают запросов.
+                if (full && Array.isArray(full.data) && !serverLocked) {
+                    item.data = full.data;
+                }
+                return item;
             });
 
         return {
-            owner: { root_folder_id: OWNER_ID, name: OWNER_NAME },
+            owner: {
+                root_folder_id: rootId,
+                name: rootFolder ? (rootFolder.name || OWNER_NAME) : OWNER_NAME
+            },
             folders: folders,
             routes: routes,
             signs: []
         };
     }
 
-    function handleOwners() {
-        return loadCatalog().then((catalog) => jsonResponse({
-            owners: [{
-                root_folder_id: OWNER_ID,
-                name: OWNER_NAME,
-                routes_count: (catalog.routes || []).length,
-                premium_count: 0
-            }]
-        }));
+    // Премиум-маршрут — тот, что лежит в платной папке (или в её подпапке),
+    // доступ к которой ещё не куплен. Считаем по locks каталога и доступам
+    // OnepageShop, чтобы счётчик совпадал с бейджами внутри папок.
+    function isPremiumRoute(catalog, route) {
+        const byId = new Map((catalog.folders || []).map((folder) => [String(folder.id), folder]));
+        const locks = new Set((catalog.locks || []).map((lock) => String(lock.id)));
+        const shop = global.OnepageShop;
+        const state = shop && shop.state;
+        const access = state && state.loaded ? state.access : null;
+        const unlimited = !!(state && state.unlimited);
+        let current = route.folder_id == null ? '' : String(route.folder_id);
+        const seen = new Set();
+        while (current && byId.has(current) && !seen.has(current)) {
+            if (locks.has(current) && !(unlimited || (access && access.has(current)))) {
+                return true;
+            }
+            seen.add(current);
+            const folder = byId.get(current);
+            current = folder.parent_id == null ? '' : String(folder.parent_id);
+        }
+        return false;
     }
 
-    function handleCatalog() {
+    function handleOwners() {
         const shopReady = global.OnepageShop && global.OnepageShop.ready
             ? global.OnepageShop.ready
             : Promise.resolve();
-        return Promise.all([loadCatalog(), shopReady])
-            .then(([catalog]) => jsonResponse(ownerBundle(catalog)));
+        return Promise.all([loadCatalog(), shopReady]).then(([catalog]) => {
+            const routeFolders = (catalog.routes || [])
+                .map((route) => (route.folder_id == null ? '' : String(route.folder_id)));
+            const countFor = (rootId) => {
+                const ids = new Set(subtreeIds(catalog, rootId));
+                return routeFolders.filter((folderId) => ids.has(folderId)).length;
+            };
+            const premiumFor = (rootId) => {
+                const ids = new Set(subtreeIds(catalog, rootId));
+                return (catalog.routes || []).filter((route) => {
+                    const folderId = route.folder_id == null ? '' : String(route.folder_id);
+                    return ids.has(folderId) && isPremiumRoute(catalog, route);
+                }).length;
+            };
+            const roots = topFolders(catalog)
+                .map((id) => folderById(catalog, id))
+                .filter(Boolean)
+                .sort((a, b) => {
+                    const ao = Number.isFinite(a.sort_order) ? a.sort_order : 0;
+                    const bo = Number.isFinite(b.sort_order) ? b.sort_order : 0;
+                    if (ao !== bo) return ao - bo;
+                    return String(a.name || '').localeCompare(String(b.name || ''), 'ru');
+                });
+            const owners = roots.map((folder) => ({
+                root_folder_id: String(folder.id),
+                name: folder.name || OWNER_NAME,
+                routes_count: countFor(folder.id),
+                premium_count: premiumFor(folder.id)
+            }));
+            if (!owners.length) {
+                owners.push({
+                    root_folder_id: OWNER_ID,
+                    name: OWNER_NAME,
+                    routes_count: routeFolders.length,
+                    premium_count: (catalog.routes || []).filter((route) => isPremiumRoute(catalog, route)).length
+                });
+            }
+            return jsonResponse({ owners });
+        });
     }
 
+    function handleCatalog(params) {
+        const shopReady = global.OnepageShop && global.OnepageShop.ready
+            ? global.OnepageShop.ready
+            : Promise.resolve();
+        return loadCatalog().then((catalog) => {
+            const rootId = requestedRootId(catalog, params);
+            // Один запрос на корневую папку. Если пакет недоступен, меню
+            // продолжит работать на метаданных и догрузит превью по одному.
+            const geometry = loadOwnerGeometry(rootId).catch(() => null);
+            return Promise.all([shopReady, geometry])
+                .then(([, data]) => jsonResponse(ownerBundle(catalog, params, data)));
+        });
+    }
     function tgInitData() {
         try {
             return (global.Telegram && global.Telegram.WebApp && global.Telegram.WebApp.initData) || '';
@@ -189,7 +384,7 @@
             case '/api/owners':
                 return handleOwners();
             case '/api/catalog':
-                return handleCatalog();
+                return handleCatalog(url.searchParams);
             case '/api/route':
                 return handleRoute(url.searchParams.get('m'));
             case '/api/signs':
@@ -212,5 +407,11 @@
             default:
                 return originalFetch(input, init);
         }
+    };
+
+    // После покупки старый пакет владельца содержит закрытые папки без
+    // геометрии — сбрасываем кэш, чтобы загрузить свежий одним запросом.
+    global.OnepageOwnerBundles = {
+        clear: function () { ownerGeometries.clear(); }
     };
 })(window);

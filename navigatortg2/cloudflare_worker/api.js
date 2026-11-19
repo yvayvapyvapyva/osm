@@ -153,6 +153,80 @@ export default {
         }, 200, { 'Cache-Control': 'no-cache, no-store, must-revalidate' });
       }
 
+      // ---- Пакет корневой папки владельца: маршруты с геометрией ----
+      // Открытие корневой папки — один запрос. Отдаём все видимые маршруты
+      // поддерева; геометрию платных папок — только владельцу или покупателю.
+      if (action === 'owner_bundle') {
+        const rawOwner = bodyData.owner || url.searchParams.get('owner');
+        const rootId = Number(rawOwner);
+        if (!Number.isFinite(rootId)) return json({ error: 'missing_owner' }, 400);
+        const root = await env.DB.prepare(
+          'SELECT id, name, owner_tg_id FROM folders WHERE id = ?').bind(rootId).first();
+        if (!root) return json({ error: 'owner_not_found' }, 404);
+
+        const guard = await requireUser(request, bodyData, env);
+        const uid = guard.ok ? String(guard.uid || '') : '';
+
+        const allFolders = (await env.DB.prepare(
+          'SELECT id, parent_id, visible FROM folders').all()).results || [];
+        const hidden = hiddenFolderIds(allFolders);
+        const subRows = (await env.DB.prepare(
+          `WITH RECURSIVE sub(id) AS (
+             SELECT id FROM folders WHERE id = ?
+             UNION ALL
+             SELECT f.id FROM folders f JOIN sub ON f.parent_id = sub.id
+           )
+           SELECT id FROM sub`).bind(rootId).all()).results || [];
+        const ids = subRows
+          .map((row) => Number(row.id))
+          .filter((id) => !hidden.has(id));
+
+        if (!ids.length) {
+          return json({ owner: { root_folder_id: rootId, name: root.name || '' }, routes: [] },
+            200, { 'Cache-Control': 'no-store, must-revalidate' });
+        }
+
+        const placeholders = ids.map(() => '?').join(',');
+        const rows = (await env.DB.prepare(
+          `SELECT m, name, description, creator_name, folder_id, json
+             FROM roads
+            WHERE visible = 1 AND name IS NOT NULL AND folder_id IN (${placeholders})
+            ORDER BY name`).bind(...ids).all()).results || [];
+
+        const index = await loadFolderIndex(env);
+        const access = uid ? await accessExpires(env, uid) : {};
+        const rootOwner = String(root.owner_tg_id || '');
+        const isOwner = !!uid && rootOwner === uid;
+
+        const routes = rows.map((row) => {
+          const folderId = row.folder_id;
+          const lock = folderId !== null && folderId !== undefined
+            ? lockForFolder(index, folderId)
+            : null;
+          const allowed = !lock || isOwner ||
+            (!!uid && Object.prototype.hasOwnProperty.call(access, String(lock.id)));
+          const item = {
+            m: row.m,
+            name: row.name || '',
+            description: row.description || '',
+            creator_name: row.creator_name || '',
+            folder_id: row.folder_id || null,
+            locked: !allowed,
+          };
+          if (allowed) {
+            item.data = parseData(row.json);
+          } else if (lock) {
+            item.lock = { id: lock.id, folder: lock.folder, price: lock.price };
+          }
+          return item;
+        });
+
+        return json({
+          owner: { root_folder_id: rootId, name: root.name || '' },
+          routes,
+        }, 200, { 'Cache-Control': 'no-store, must-revalidate' });
+      }
+
       // ---- Проверка прав пользователя (без изменений данных) ----
       if (action === 'editor_check') {
         const guard = await requireUser(request, bodyData, env);

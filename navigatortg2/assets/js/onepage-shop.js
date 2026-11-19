@@ -311,9 +311,18 @@
     }
 
     function refreshMenu() {
+        // Пакет владельца в адаптере кэширован; после покупки его нужно
+        // перезапросить, иначе купленная папка останется закрытой.
+        const bundles = global.OnepageOwnerBundles;
+        if (bundles && typeof bundles.clear === 'function') bundles.clear();
+
         const menu = global.MenuModule;
         if (!menu) return;
         try {
+            if (menu._activeOwnerId && typeof menu.reloadOwnerBundle === 'function') {
+                menu.reloadOwnerBundle();
+                return;
+            }
             if (typeof menu._resetCatalog === 'function') menu._resetCatalog();
             if (typeof menu._loadOwners === 'function') menu._loadOwners();
         } catch (e) {}

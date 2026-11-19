@@ -198,7 +198,8 @@ const MenuModule = {
 
         this._ownerBundles.set(rootId, bundle);
         this._folders = Array.isArray(bundle.folders) ? bundle.folders.slice() : [];
-        if (!this._folders.some(folder => folder.folder_id === rootId) && bundle.owner) {
+        const hasRealRoot = this._folders.some(folder => String(folder.folder_id) === rootId);
+        if (!hasRealRoot && bundle.owner) {
             this._folders.unshift({
                 folder_id: rootId,
                 parent_id: '',
@@ -234,6 +235,41 @@ const MenuModule = {
             if (typeof showToast === 'function') {
                 showToast('Ошибка загрузки: ' + e.message, 'error', 5000);
             }
+            this._showOwnersRoot();
+        } finally {
+            this._isFetchingRoutes = false;
+        }
+    },
+
+    // Перезагрузка пакета текущего владельца после покупки: один запрос на
+    // всю корневую папку, остаёмся в той же папке меню.
+    async reloadOwnerBundle() {
+        const rootId = String(this._activeOwnerId || '');
+        if (!rootId) {
+            await this._loadOwners();
+            return;
+        }
+        const savedPath = this._folderPath.slice();
+        this._ownerBundles.delete(rootId);
+        this._routeDataCache.clear();
+        this._routeRequests.clear();
+        this._isFetchingRoutes = true;
+        this._showListLoading('Обновление...');
+        try {
+            const bundle = await this._fetchOwnerBundle('owner', rootId);
+            this._applyOwnerBundle(rootId, bundle);
+            // Обновляем счётчики корневой папки на «Главной»: после покупки
+            // часть премиум-маршрутов перестаёт быть премиальной.
+            const ownerEntry = this._owners.find(entry => String(entry.folder_id) === rootId);
+            if (ownerEntry) {
+                ownerEntry.count = (bundle.routes || []).length;
+                ownerEntry.premium_count = (bundle.routes || []).filter(route => route.locked).length;
+            }
+            this._folderPath = savedPath;
+            this._buildCatalog();
+            this._buildRoutesList();
+        } catch (e) {
+            console.warn('Не удалось обновить пакет владельца:', e);
             this._showOwnersRoot();
         } finally {
             this._isFetchingRoutes = false;
@@ -521,7 +557,7 @@ const MenuModule = {
         const countLabel = `${routes.length} ${this._pluralize(routes.length, 'маршрут', 'маршрута', 'маршрутов')}`;
         const ownersRoot = !this._activeOwnerId && this._folderPath.length === 0;
         summary.textContent = ownersRoot
-            ? `${childFolders.length} ${this._pluralize(childFolders.length, 'владелец', 'владельца', 'владельцев')}`
+            ? `${childFolders.length} ${this._pluralize(childFolders.length, 'папка', 'папки', 'папок')}`
             : childFolders.length
                 ? `${childFolders.length} ${this._pluralize(childFolders.length, 'папка', 'папки', 'папок')} · ${countLabel}`
                 : countLabel;
