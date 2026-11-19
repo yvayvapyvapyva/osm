@@ -100,7 +100,10 @@ const REPORT = (() => {
     }
 
     // Формирование текста сообщения
-    function buildMessage({ m_val, i_val, report_type, route_name, user_agent }) {
+    function buildMessage({
+        m_val, i_val, report_type, route_name, user_agent,
+        signs_before, signs_after, signs_added, signs_removed, owner_name
+    }) {
         const now = new Date();
         const moscowOffset = 3 * 60 * 60 * 1000;
         const moscow = new Date(now.getTime() + moscowOffset);
@@ -136,6 +139,25 @@ const REPORT = (() => {
         }
 
         const userInfoEsc = escapeHtml(userInfoText);
+
+        if (report_type === 'signs') {
+            const before = Number(signs_before) || 0;
+            const after = Number(signs_after) || 0;
+            const added = Number(signs_added) || 0;
+            const removed = Number(signs_removed) || 0;
+            const delta = after - before;
+            const deltaText = delta === 0 ? '±0' : (delta > 0 ? '+' + delta : String(delta));
+            const ownerLine = owner_name
+                ? `\n🏷 Владелец: <b>${escapeHtml(owner_name)}</b>`
+                : '';
+            return `✏️ <b>Изменение знаков</b>${info.platformIcon}\n` +
+                `🕒 <code>${nowMoscow}</code>\n` +
+                `👤 Пользователь: ${userInfoEsc}` +
+                `${ownerLine}\n` +
+                `📊 Знаков: ${before} → ${after} (${deltaText})\n` +
+                `➕ Добавлено: ${added}   ➖ Удалено: ${removed}` +
+                `${extraLines}`;
+        }
 
         if (report_type === 'editor') {
             return `📊 <b>Загрузка маршрута в редакторе</b>${info.platformIcon}\n` +
@@ -193,14 +215,11 @@ const REPORT = (() => {
      *   user_agent: User-Agent браузера (опционально)
      */
     function send(options) {
-        const { m_val, i_val, report_type, route_name, user_agent } = options || {};
-        const message = buildMessage({
-            m_val,
-            i_val: i_val === undefined ? buildUserInfo() : i_val,
-            report_type,
-            route_name,
-            user_agent: user_agent === undefined ? buildUserAgent() : user_agent
-        });
+        const opts = options || {};
+        const message = buildMessage(Object.assign({}, opts, {
+            i_val: opts.i_val === undefined ? buildUserInfo() : opts.i_val,
+            user_agent: opts.user_agent === undefined ? buildUserAgent() : opts.user_agent
+        }));
         sendMessage(message);
     }
 

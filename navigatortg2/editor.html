@@ -3724,6 +3724,38 @@ function isOpenSignModal(id) {
     return el.classList.contains('visible') || el.style.display === 'flex';
 }
 
+function signMarkerKey(marker) {
+    if (!marker || typeof marker !== 'object') return '';
+    const plates = Array.isArray(marker.plates) ? marker.plates.join('|') : '';
+    return [
+        marker.kind || '', marker.code || '', marker.file || '',
+        marker.lat, marker.lon, marker.heading, marker.leg, plates
+    ].join('~');
+}
+
+// Точное совпадение «код + координаты + параметры». Перемещённый знак
+// считается удалённым и добавленным — стабильных ID у маркеров нет.
+function diffSignMarkers(before, after) {
+    const beforeKeys = (Array.isArray(before) ? before : []).map(signMarkerKey).filter(Boolean);
+    const afterKeys = (Array.isArray(after) ? after : []).map(signMarkerKey).filter(Boolean);
+    const left = new Map();
+    for (const key of beforeKeys) left.set(key, (left.get(key) || 0) + 1);
+    let matched = 0;
+    for (const key of afterKeys) {
+        const count = left.get(key) || 0;
+        if (count > 0) {
+            left.set(key, count - 1);
+            matched++;
+        }
+    }
+    return {
+        before: beforeKeys.length,
+        after: afterKeys.length,
+        added: afterKeys.length - matched,
+        removed: beforeKeys.length - matched
+    };
+}
+
 async function saveOwnerSigns() {
     if (!signsLoaded || signsSaving || !map) return;
     const btn = document.getElementById('signSaveBtn');
@@ -3740,9 +3772,31 @@ async function saveOwnerSigns() {
             },
             markers: signMarkers.map(marker => marker.serialize())
         };
+        const signDiff = diffSignMarkers(
+            signScene && Array.isArray(signScene.markers) ? signScene.markers : [],
+            payload.markers
+        );
         const result = await callAdminApi('signs_save', {}, { data: payload });
         signScene = payload;
         resetSignsDirty();
+
+        if (signDiff.added || signDiff.removed) {
+            try {
+                if (typeof REPORT !== 'undefined') {
+                    REPORT.send({
+                        report_type: 'signs',
+                        signs_before: signDiff.before,
+                        signs_after: signDiff.after,
+                        signs_added: signDiff.added,
+                        signs_removed: signDiff.removed,
+                        owner_name: (editorRoot && (editorRoot.owner_name || editorRoot.owner_username)) || ''
+                    });
+                }
+            } catch (re) {
+                console.warn('[report] ошибка отправки отчёта знаков:', re);
+            }
+        }
+
         showToast('Знаки сохранены' + (result && result.count != null ? ' · ' + result.count : ''), 'success', 2500);
     } catch (e) {
         console.warn('Не удалось сохранить знаки:', e);
