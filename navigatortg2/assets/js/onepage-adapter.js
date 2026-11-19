@@ -196,12 +196,17 @@
             .map((folder) => {
                 const folderId = String(folder.id);
                 const parentId = folder.parent_id == null ? '' : String(folder.parent_id);
+                const price = Number(folder.price) || 0;
+                const shopClient = global.OnepageShop;
+                const purchased = price > 0 && !!shopClient &&
+                    typeof shopClient.hasAccess === 'function' && shopClient.hasAccess(folderId);
                 return {
                     folder_id: folderId,
                     parent_id: ids && folderId === rootId ? '' : parentId,
                     name: folder.name || 'Папка',
                     sort_order: Number(folder.sort_order) || 0,
-                    price: Number(folder.price) || 0
+                    price,
+                    purchased
                 };
             });
 
@@ -231,7 +236,7 @@
                     premium: premium,
                     locked: locked,
                     owned: mine,
-                    viewed: false
+                    viewed: !!(full && full.viewed) || !!route.viewed
                 };
                 // Пакет владельца уже содержит геометрию — меню сложит её в
                 // _routeDataCache, и превью/переходы не делают запросов.
@@ -318,6 +323,10 @@
             const tgUserId = currentTgUserId();
             const owners = roots.map((folder) => {
                 const mine = !!tgUserId && String(folder.owner_tg_id || '') === tgUserId;
+                const price = Number(folder.price) || 0;
+                const shopClient = global.OnepageShop;
+                const purchased = price > 0 && !!shopClient &&
+                    typeof shopClient.hasAccess === 'function' && shopClient.hasAccess(String(folder.id));
                 return {
                     root_folder_id: String(folder.id),
                     name: folder.name || OWNER_NAME,
@@ -327,7 +336,8 @@
                     owner_info: folder.owner_info || '',
                     owner_tg_id: folder.owner_tg_id || '',
                     is_owner: mine,
-                    price: Number(folder.price) || 0,
+                    price,
+                    purchased,
                     routes_count: countFor(folder.id),
                     premium_count: premiumFor(folder.id)
                 };
@@ -429,7 +439,14 @@
             case '/api/signs':
                 return Promise.resolve(jsonResponse({ signs: [] }));
             case '/api/route/view':
-                return Promise.resolve(jsonResponse({ status: 'ok', viewed: true }));
+                return workerPost('route_view', { m: url.searchParams.get('m') || '' }, {
+                    tg_init_data: tgInitData()
+                }).then(async (response) => {
+                    let payload = null;
+                    try { payload = await response.json(); } catch (e) {}
+                    if (!response.ok) return jsonResponse(payload || { error: 'route_view_failed' }, response.status);
+                    return jsonResponse(payload || { status: 'ok', viewed: true });
+                }).catch(() => jsonResponse({ status: 'ok', viewed: true }));
             case '/api/premium/status':
                 return Promise.resolve(jsonResponse({
                     active: false,

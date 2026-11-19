@@ -252,6 +252,25 @@ export default {
         }, 200, { 'Cache-Control': 'no-cache, no-store, must-revalidate' });
       }
 
+      // ---- Отметка просмотра маршрута (хранится по пользователю) ----
+      if (action === 'route_view') {
+        const routeM = resolveM(bodyData.m || url.searchParams.get('m') || '');
+        if (!routeM) return json({ error: 'missing_route_name' }, 400);
+        const initData = bodyData.tg_init_data || url.searchParams.get('tg_init_data') || '';
+        const { uid } = await verifyTgInitData(initData, env.TELEGRAM_TOKEN);
+        if (uid) {
+          const now = Math.floor(Date.now() / 1000);
+          await env.DB.prepare(
+            `INSERT INTO route_views (user_id, m, first_viewed_at, last_viewed_at, view_count)
+             VALUES (?, ?, ?, ?, 1)
+             ON CONFLICT(user_id, m) DO UPDATE SET
+               last_viewed_at = excluded.last_viewed_at,
+               view_count = view_count + 1`)
+            .bind(String(uid), routeM, now, now).run();
+        }
+        return json({ status: 'ok', viewed: true });
+      }
+
       // ---- Пакет корневой папки владельца: маршруты с геометрией ----
       // Открытие корневой папки — один запрос. Отдаём все видимые маршруты
       // поддерева; геометрию платных папок — только владельцу или покупателю.
@@ -265,6 +284,12 @@ export default {
 
         const guard = await requireUser(request, bodyData, env);
         const uid = guard.ok ? String(guard.uid || '') : '';
+        const viewedRoutes = new Set();
+        if (uid) {
+          const viewRows = (await env.DB.prepare(
+            'SELECT m FROM route_views WHERE user_id = ?').bind(uid).all()).results || [];
+          for (const row of viewRows) viewedRoutes.add(String(row.m));
+        }
         const rootMeta = await env.DB.prepare(
           'SELECT owner_name, owner_avatar, owner_username, owner_info FROM owner_roots WHERE owner_tg_id = ?')
           .bind(String(root.owner_tg_id || '')).first();
@@ -315,6 +340,7 @@ export default {
             creator_name: row.creator_name || '',
             folder_id: row.folder_id || null,
             locked: !allowed,
+            viewed: viewedRoutes.has(String(row.m)),
           };
           if (allowed) {
             item.data = parseData(row.json);

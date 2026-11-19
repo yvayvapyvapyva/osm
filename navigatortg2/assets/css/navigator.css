@@ -2485,3 +2485,34 @@ html.tg-fullscreen #hud {
 [data-theme="dark"] .routes-breadcrumb-premium {
     color: #FFC14D;
 }
+
+.routes-folder-row.is-purchased-folder {
+    border-color: rgba(52, 199, 89, 0.45);
+    box-shadow: inset 0 0 0 1px rgba(52, 199, 89, 0.12), var(--shadow-card), var(--inset-highlight);
+}
+.routes-folder-row.is-purchased-folder .routes-folder-icon {
+    color: #2AA84A;
+}
+.routes-folder-purchased {
+    flex: 0 0 auto;
+    padding: 2px 7px;
+    border-radius: 100px;
+    background: rgba(52, 199, 89, 0.16);
+    color: #1F8A3B;
+    font-size: 11px;
+    font-weight: 800;
+    white-space: nowrap;
+}
+.routes-breadcrumb-purchased {
+    margin-left: 4px;
+    color: #2AA84A;
+    font-size: 11px;
+    font-weight: 800;
+}
+[data-theme="dark"] .routes-folder-purchased {
+    background: rgba(52, 199, 89, 0.22);
+    color: #7CE495;
+}
+[data-theme="dark"] .routes-breadcrumb-purchased {
+    color: #7CE495;
+}

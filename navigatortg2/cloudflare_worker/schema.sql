@@ -77,3 +77,14 @@ CREATE TABLE IF NOT EXISTS owner_roots (
   created_at  INTEGER NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_owner_roots_folder ON owner_roots (folder_id);
+
+-- Просмотренные маршруты пользователя (Telegram ID).
+CREATE TABLE IF NOT EXISTS route_views (
+  user_id         TEXT NOT NULL,
+  m               TEXT NOT NULL,
+  first_viewed_at INTEGER NOT NULL,
+  last_viewed_at  INTEGER NOT NULL,
+  view_count      INTEGER NOT NULL DEFAULT 1,
+  PRIMARY KEY (user_id, m)
+);
+CREATE INDEX IF NOT EXISTS idx_route_views_user ON route_views (user_id);

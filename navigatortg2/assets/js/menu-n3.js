@@ -586,7 +586,10 @@ const MenuModule = {
             for (const folder of childFolders) {
                 const button = document.createElement('button');
                 button.type = 'button';
-                button.className = 'routes-folder-row' + (Number(folder.price) > 0 ? ' is-paid-folder' : '');
+                const folderPrice = Number(folder.price) || 0;
+                const folderPurchased = !!folder.purchased;
+                button.className = 'routes-folder-row' +
+                    (folderPurchased ? ' is-purchased-folder' : (folderPrice > 0 ? ' is-paid-folder' : ''));
                 button.dataset.folderId = folder.folder_id;
                 button.dataset.folderName = folder.name;
                 if (folder.is_owner_root) button.dataset.ownerRoot = '1';
@@ -601,7 +604,9 @@ const MenuModule = {
                         <span class="routes-folder-name">${this._escape(folder.name)}</span>
                         ${(folder.owner_name || Number(folder.price) > 0) ? `<span class="routes-folder-badges">
                             ${folder.owner_name ? `<span class="routes-owner-badge" data-owner-root="${this._escape(folder.folder_id)}" role="button" tabindex="0">${this._escape(folder.owner_name)}</span>` : ''}
-                            ${Number(folder.price) > 0 ? `<span class="routes-folder-paid" title="Платная папка">★ Премиум ${folder.price}</span>` : ''}
+                            ${folderPurchased
+                                ? `<span class="routes-folder-purchased" title="Доступ куплен">✓ Куплено</span>`
+                                : (folderPrice > 0 ? `<span class="routes-folder-paid" title="Платная папка">★ Премиум ${folderPrice}</span>` : '')}
                         </span>` : ''}
                     </span>
                     <span class="routes-folder-count" aria-label="${countAria}">
@@ -650,7 +655,8 @@ const MenuModule = {
                 return {
                     id,
                     name: folder?.name || id,
-                    paid: Number(folder?.price) > 0
+                    paid: Number(folder?.price) > 0 && !folder?.purchased,
+                    purchased: !!folder?.purchased
                 };
             })
         ];
@@ -669,11 +675,13 @@ const MenuModule = {
             const isCurrent = index === labels.length - 1;
             item.className = 'routes-breadcrumb-item' + (isCurrent ? ' current' : '');
             item.textContent = label.name;
-            if (label.paid) {
-                const star = document.createElement('span');
-                star.className = 'routes-breadcrumb-premium';
-                star.textContent = '★';
-                item.appendChild(star);
+            if (label.purchased || label.paid) {
+                const mark = document.createElement('span');
+                mark.className = label.purchased
+                    ? 'routes-breadcrumb-purchased'
+                    : 'routes-breadcrumb-premium';
+                mark.textContent = label.purchased ? '✓' : '★';
+                item.appendChild(mark);
             }
             item.dataset.breadcrumbIndex = String(index);
             if (isCurrent) item.setAttribute('aria-current', 'location');
