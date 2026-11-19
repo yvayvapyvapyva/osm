@@ -1,20 +1,21 @@
 #!/bin/bash
-# Деплой сайта на Cloudflare Pages (проект avtoinstruktor-v2).
+# Деплой тестовых версий навигатора и редактора (MapLibre) на Cloudflare Pages.
 # Публикуется ТОЛЬКО перечисленное ниже (белый список) — новые файлы в
-# репозитории (секреты вроде .env, бэкапы, исходники воркеров) наружу
-# по умолчанию не попадают.
-# Использование: ./deploy-pages.sh
+# репозитории (секреты, бэкапы, исходники воркеров) наружу по умолчанию не
+# попадают.
+# Использование: ./deploy-v2.sh
+# Проект можно переопределить: PROJECT_NAME=my-test ./deploy-v2.sh
 set -e
 cd "$(dirname "$0")"
+
+PROJECT_NAME="${PROJECT_NAME:-avtoinstruktor-v2}"
 
 # Белый список: что уходит на сайт.
 SITE_FILES=(
   index.html
-  navigator.html
   navigator-v3.html
   navigator-test.html
   editor-test.html
-  editor.html
   instr.html
   instr_editor.html
   ico.png
@@ -61,13 +62,11 @@ cat > "$STAGE/_headers" <<'HEADERS'
 /
 /index.html
 /navigator
-/navigator.html
 /navigator-v3
 /navigator-v3.html
 /navigator-test
 /navigator-test.html
 /editor
-/editor.html
 /editor-test
 /editor-test.html
 /instr
@@ -82,5 +81,6 @@ cat > "$STAGE/_headers" <<'HEADERS'
 HEADERS
 
 echo "Build: $BUILD_ID"
+echo "Project: $PROJECT_NAME"
 
-wrangler pages deploy "$STAGE" --project-name=avtoinstruktor-v2 --branch=main
+wrangler pages deploy "$STAGE" --project-name="$PROJECT_NAME" --branch=main
