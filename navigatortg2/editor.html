@@ -1945,7 +1945,11 @@ function renderSettingsBreadcrumbs(byId) {
     const labels = [{ id: '', name: 'Все маршруты' }];
     for (const folderId of settingsFolderPath) {
         const folder = byId.get(folderId);
-        if (folder) labels.push({ id: folderId, name: folder.name || folderId });
+        if (folder) labels.push({
+            id: folderId,
+            name: folder.name || folderId,
+            paid: Number(folder.price) > 0
+        });
     }
     labels.forEach((label, index) => {
         if (index > 0) {
@@ -1959,7 +1963,7 @@ function renderSettingsBreadcrumbs(byId) {
         item.type = 'button';
         const isCurrent = index === labels.length - 1;
         item.className = 'routes-breadcrumb-item' + (isCurrent ? ' current' : '');
-        item.textContent = label.name;
+        item.textContent = label.name + (label.paid ? ' ★' : '');
         item.dataset.breadcrumbIndex = String(index);
         if (isCurrent) item.setAttribute('aria-current', 'location');
         item.addEventListener('click', () => {
@@ -1998,6 +2002,7 @@ function renderEditorFolderRow(folder, total) {
     header.innerHTML = `
         <span class="category-icon" aria-hidden="true">${editorIconFolder}</span>
         <span class="category-name">${escapeHtml(folder.name)}</span>
+        ${Number(folder.price) > 0 ? `<span class="category-paid-badge" title="Платная папка: ${Number(folder.price)} звёзд">★ ${Number(folder.price)}</span>` : ''}
         <span class="category-count">${total}</span>
         <span class="category-chevron" aria-hidden="true">›</span>
         <span class="route-info-btn" data-folder-settings="${escapeHtml(folderId)}" title="Настройки папки">${editorIconGear}</span>
@@ -2356,7 +2361,7 @@ const renderFolderOptions = (select, selectedId, excludeId = '') => {
             });
         for (const folder of children) {
             options.push(
-                `<option value="${escapeHtml(folder.folder_id)}">${'— '.repeat(depth)}${escapeHtml(folder.name)}</option>`
+                `<option value="${escapeHtml(folder.folder_id)}">${'— '.repeat(depth)}${escapeHtml(folder.name)}${Number(folder.price) > 0 ? ' ★' : ''}</option>`
             );
             walk(folder.folder_id, depth + 1);
         }
