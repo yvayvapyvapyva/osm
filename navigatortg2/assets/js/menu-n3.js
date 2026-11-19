@@ -77,7 +77,18 @@ const MenuModule = {
         // На старте грузим только корневые папки владельцев и счётчики.
         await this._loadOwners();
 
-        // Проверяем параметр #m=<маршрут> в адресе
+        // Ждём Telegram SDK: ?startapp=m=<маршрут> появляется только после
+        // загрузки telegram-web-app.js.
+        if (window.__tgReady) {
+            try {
+                await Promise.race([
+                    window.__tgReady,
+                    new Promise(resolve => setTimeout(resolve, 2500))
+                ]);
+            } catch (e) {}
+        }
+
+        // Проверяем #m=<маршрут> в адресе или startapp из Telegram.
         this.checkUrlParam();
     },
 
@@ -1285,9 +1296,40 @@ const MenuModule = {
     },
 
     // Проверка URL параметра
+    _telegramStartParam() {
+        try {
+            return String(
+                (window.Telegram && Telegram.WebApp && Telegram.WebApp.initDataUnsafe &&
+                 Telegram.WebApp.initDataUnsafe.start_param) || ''
+            );
+        } catch (e) { return ''; }
+    },
+
     checkUrlParam() {
-        const routeParam = this.getUrlParam('m');
-        if (!routeParam) return;
+        let routeParam = this.getUrlParam('m');
+
+        // Ссылка вида https://t.me/<бот>?startapp=m=<маршрут>.
+        if (!routeParam) {
+            const startParam = this._telegramStartParam();
+            if (startParam) {
+                try {
+                    routeParam = new URLSearchParams(startParam).get('m');
+                } catch (e) {}
+                if (!routeParam && !startParam.includes('=')) routeParam = startParam;
+            }
+        }
+
+        if (!routeParam) {
+            // SDK Telegram грузится асинхронно: пробуем ещё раз после его загрузки.
+            if (!this._startParamWait && window.__tgReady) {
+                this._startParamWait = true;
+                window.__tgReady.then(() => {
+                    this._startParamWait = false;
+                    this.checkUrlParam();
+                });
+            }
+            return;
+        }
 
         this.currentRoute = routeParam;
         this.isLoaded = true;

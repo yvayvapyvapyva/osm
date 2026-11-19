@@ -11,7 +11,7 @@ const API_CONFIG = {
   // Новый код сюда не обращается.
   TTS_URL: 'https://functions.yandexcloud.net/d4erngid6s4rf5oinnp1',
   // Бот и веб-версия — для ссылок «поделиться».
-  BOT_URL: 'https://t.me/A152Bot',
+  BOT_URL: 'https://t.me/a152testbot',
   APP_URL: 'https://avtoinstruktor-v2.pages.dev',
   // Ключ Яндекс.Карт (вставляется в <script src> страниц вручную).
   YANDEX_MAPS_V3_KEY: 'c0e28937-4e16-4d15-9b99-09a30cb8fc13'
