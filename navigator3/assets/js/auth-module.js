@@ -10,17 +10,69 @@ const AuthModule = {
     logoutToken: '',
     enabled: false,
     _initialized: false,
+    isTelegram: false,
+    _tgPromise: null,
 
     async init() {
         if (this._initialized) return;
         this._initialized = true;
         this._bind();
+        // В Telegram Mini App входим по подписи initData, без Яндекса.
+        await this._telegramLogin();
         // Сначала проверяем сессию: если вход уже состоялся, ошибку из URL
         // не показываем, а просто чистим адрес. Иначе после успешного
         // OAuth можно увидеть «сессия истекла», хотя пользователь вошёл.
         await this._load();
         this._showUrlError();
         this._showLoggedOut();
+    },
+
+    _loadTelegramSdk() {
+        if (window.Telegram && window.Telegram.WebApp) {
+            return Promise.resolve(true);
+        }
+        if (this._tgPromise) return this._tgPromise;
+        this._tgPromise = new Promise((resolve) => {
+            const script = document.createElement('script');
+            script.src = 'https://telegram.org/js/telegram-web-app.js';
+            script.async = true;
+            script.onload = () => resolve(true);
+            script.onerror = () => resolve(false);
+            document.head.appendChild(script);
+            setTimeout(() => resolve(false), 3000);
+        });
+        return this._tgPromise;
+    },
+
+    async _telegramLogin() {
+        try {
+            const launchParams = window.location.hash || '';
+            const insideTelegram = /tgWebAppData/.test(launchParams)
+                || !!window.TelegramWebviewProxy
+                || !!(window.Telegram && window.Telegram.WebApp);
+            if (!insideTelegram) return;
+            await this._loadTelegramSdk();
+            const app = window.Telegram && window.Telegram.WebApp;
+            if (!app || !app.initData) return;
+            this.isTelegram = true;
+            try {
+                app.ready();
+                app.expand();
+            } catch (e) {}
+            const response = await fetch(
+                '/auth/telegram?d=' + encodeURIComponent(app.initData),
+                {
+                    credentials: 'same-origin',
+                    headers: { Accept: 'application/json' },
+                    cache: 'no-store',
+                }
+            );
+            if (!response.ok) {
+                console.warn('[auth] telegram login failed:', response.status);
+            }
+        } catch (e) {
+            console.warn('[auth] telegram login error:', e);
+        }
     },
 
     _bind() {
@@ -65,8 +117,12 @@ const AuthModule = {
     render() {
         const loginGroup = document.getElementById('accountLoginGroup');
         const userGroup = document.getElementById('accountUserGroup');
-        if (loginGroup) loginGroup.hidden = !this.enabled || !!this.user;
-        if (userGroup) userGroup.hidden = !this.enabled || !this.user;
+        if (loginGroup) {
+            loginGroup.hidden = this.isTelegram || !this.enabled || !!this.user;
+        }
+        if (userGroup) {
+            userGroup.hidden = !this.enabled || !this.user;
+        }
 
         // Звезда премиума на иконке профиля: данные уже есть в /api/me.
         if (typeof window.updatePremiumBadge === 'function') {
@@ -81,14 +137,43 @@ const AuthModule = {
                 this.user.display_name || this.user.login || 'Пользователь';
         }
 
+        const accountRow = name ? name.closest('.auth-account-row') : null;
+        if (accountRow) {
+            let avatar = accountRow.querySelector('.auth-avatar');
+            if (!avatar) {
+                avatar = document.createElement('img');
+                avatar.className = 'auth-avatar';
+                avatar.alt = '';
+                avatar.style.cssText = 'width:40px;height:40px;border-radius:50%;object-fit:cover;flex:0 0 40px;background:#E9EEF5;';
+                accountRow.insertBefore(avatar, accountRow.firstElementChild);
+            }
+            if (this.isTelegram && this.user.avatar_url) {
+                avatar.src = this.user.avatar_url;
+                avatar.hidden = false;
+            } else {
+                avatar.hidden = true;
+            }
+        }
+
         const email = document.getElementById('accountEmail');
         if (email) {
-            email.textContent = this.user.email || '';
-            email.hidden = !this.user.email;
+            if (this.isTelegram) {
+                email.textContent = this.user.login ? '@' + this.user.login : 'Telegram';
+                email.hidden = false;
+            } else {
+                email.textContent = this.user.email || '';
+                email.hidden = !this.user.email;
+            }
         }
     },
 
     login(forceConfirm = false) {
+        if (this.isTelegram) {
+            if (typeof window.showToast === 'function') {
+                window.showToast('Вход выполняется через Telegram', 'info', 3000);
+            }
+            return;
+        }
         const returnTo =
             window.location.pathname +
             window.location.search +
