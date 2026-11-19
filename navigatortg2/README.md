@@ -14,8 +14,32 @@
   `report.js`, `editor.css` скопированы из `navigatortg/`; остальные файлы
   относятся к версии на MapLibre. Правки здесь не влияют на `navigatortg/`.
 
-API общий — воркер `nav-api` (`https://nav-api.ivan43103.workers.dev`, см.
-`assets/js/onepage-adapter.js` и `onepage-shop.js`), данные в D1 `nav-db`.
+API общий — воркер `nav-api-v2` (`https://nav-api-v2.ivan43103.workers.dev`),
+данные в D1 `nav-db-v2`. Воркер и база свои, независимые от `navigatortg/`:
+исходники воркера лежат в `navigatortg2/cloudflare_worker/` (`api.js`, `lib/`,
+`schema.sql`, `wrangler-api.toml`), данные перенесены из `nav-db` копией таблиц
+`folders`, `roads`, `purchases`, `folder_instructors`,
+`folder_instructor_photos`.
+
+### Воркер и база
+
+```bash
+cd navigatortg2/cloudflare_worker
+npx wrangler d1 execute nav-db-v2 --remote --file=schema.sql --config=wrangler-api.toml
+npx wrangler deploy --config=wrangler-api.toml
+```
+
+Секреты воркера:
+
+- `EDITOR_ACCESS_KEY` — уже задан, значение хранится локально в
+  `navigatortg2/cloudflare_worker/.dev.vars` (файл в `.gitignore`); вход в
+  редактор — `/editor?key=<ключ>` или поле «Ключ доступа» вне Telegram;
+- `TELEGRAM_TOKEN` — нужен для входа в редактор по подписи Telegram, отчётов и
+  оплаты звёздами. Задаётся вручную: `npx wrangler secret put TELEGRAM_TOKEN
+  --config=wrangler-api.toml`;
+- `TG_SECRET` — секрет вебхука Telegram. У одного бота может быть только один
+  вебхук, поэтому тестовый воркер не должен его перехватывать; для независимой
+  проверки оплат нужен отдельный тестовый бот.
 
 ## Деплой
 

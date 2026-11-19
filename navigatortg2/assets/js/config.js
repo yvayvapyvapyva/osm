@@ -1,7 +1,7 @@
 // Единая конфигурация адресов и ключей — правки только здесь.
 const API_CONFIG = {
   // API-воркер на Cloudflare (D1): каталог, маршруты, оплата, отчёты.
-  API_BASE: 'https://nav-api.ivan43103.workers.dev',
+  API_BASE: 'https://nav-api-v2.ivan43103.workers.dev',
   // TTS: Яндекс-функция синтеза + публичный бакет Object Storage с готовыми mp3.
   // Клиент сам считает SHA-256 от текста и голоса и проверяет файл по URL
   // (assets/js/tts-client.js), функция вызывается только для недостающих фраз.

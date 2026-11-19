@@ -6,7 +6,7 @@
 (function (global) {
     'use strict';
 
-    const API = 'https://nav-api.ivan43103.workers.dev';
+    const API = 'https://nav-api-v2.ivan43103.workers.dev';
 
     const state = {
         locks: {},          // folderId -> price
