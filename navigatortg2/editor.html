@@ -299,6 +299,7 @@
     <script src="assets/js/pmtiles.js?v=3.2.1"></script>
 <script src="assets/js/sortable.min.js?v=1.15.0" defer onerror="window.__sortableFailed = true;"></script>
 <script src="assets/js/config.js?v=2"></script>
+<script src="assets/js/report.js?v=4"></script>
 <script src="assets/js/tts-client.js"></script>
 <script src="assets/js/map-styles.js?v=10"></script>
 <script>
@@ -2296,6 +2297,19 @@ const loadRoute = async (routeName) => {
                 premium: false,
                 folder_id: ''
             };
+        }
+
+        // Отчёт об открытии маршрута — как в старой версии.
+        try {
+            if (typeof REPORT !== 'undefined') {
+                REPORT.send({
+                    m_val: routeName,
+                    report_type: 'editor',
+                    route_name: currentRouteMeta.title || ''
+                });
+            }
+        } catch (re) {
+            console.warn('[report] ошибка отправки отчёта редактора:', re);
         }
 
         updateVisibility();

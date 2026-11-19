@@ -1351,6 +1351,19 @@ const MenuModule = {
             // запасным путём для премиум-маршрута после оплаты.
             const data = await this._fetchRoute(routeM);
 
+            // Отчёт о запуске маршрута — как в старой версии.
+            try {
+                if (typeof REPORT !== 'undefined') {
+                    REPORT.send({
+                        m_val: routeM,
+                        report_type: 'navigator',
+                        route_name: (data && data.name) || (meta && meta.name) || ''
+                    });
+                }
+            } catch (re) {
+                console.warn('[report] ошибка отправки отчёта навигатора:', re);
+            }
+
             await this.loadRoute(data);
             this.hideSpinner();
         } catch (e) {
