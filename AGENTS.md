@@ -5,7 +5,7 @@
 - `pad/` — разбор дорожных ситуаций.
 - `tts/` — озвучка.
 - `navigatortg/` — рабочая версия (Telegram Mini App, Cloudflare Pages/Worker). Правки рабочей версии ведутся здесь.
-- `navigatortg2/` — тестовые версии onepage2 и навигатора/редактора на MapLibre (`navigator-v3.html`, `navigator-test.html`, `editor-test.html`), вынесены из `navigatortg/`. В `navigatortg/` — только рабочие `navigator.html` и `editor.html`.
+- `navigatortg2/` — навигатор и редактор на MapLibre (`navigator.html`, `editor.html`), вынесены из `navigatortg/`. В `navigatortg/` — рабочие `navigator.html` и `editor.html` на Яндекс.Картах.
 - Деплой: `navigatortg/deploy-pages.sh` публикует рабочий проект `avtoinstruktor` (`avtoinstruktor.pages.dev`); `navigatortg2/deploy-v2.sh` — тестовый `avtoinstruktor-v2` (`avtoinstruktor-v2.pages.dev`).
 
 ## Деплой (справка)

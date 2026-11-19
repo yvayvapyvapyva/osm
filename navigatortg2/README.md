@@ -1,24 +1,18 @@
-# navigatortg2 — тестовые версии навигатора и редактора
+# navigatortg2 — навигатор и редактор
 
-Отдельный проект тестовой версии Telegram Mini App, вынесенный из
-`navigatortg/`. В `navigatortg/` остались только рабочие `navigator.html` и
-`editor.html`.
+Отдельный проект, вынесенный из `navigatortg/`. Здесь тестовые версии
+навигатора и редактора на MapLibre; в `navigatortg/` — рабочая версия на
+Яндекс.Картах.
 
 ## Страницы
 
-- `navigator-v3.html` — тестовый навигатор onepage2 на MapLibre + PMTiles
-  (в рабочей версии — Яндекс.Карты).
-- `navigator-test.html` — тестовый навигатор той же логики, что и рабочий, но
-  на MapLibre, с автообновлением по `version.json`.
-- `editor-test.html` — тестовый редактор на MapLibre.
-- `index.html` — редирект на `navigator-v3.html`.
+- `navigator.html` — навигатор onepage2 на MapLibre + PMTiles.
+- `editor.html` — редактор маршрутов на MapLibre.
+- `index.html` — редирект на `navigator.html`.
 - `instr.html`, `instr_editor.html` — инструкции, подгружаются через `fetch`.
-- `assets/` — стили и скрипты. Уникальные для тестовой версии
-  (`navigator-test.css`, `navigator-v3.css`, `menu-n3.js`, `tts-n3.js`,
-  `onepage-*.js`, `map-shim.js`, `maplibre-gl.*`, `pmtiles.js`,
-  `map-styles.js`, `tg-fullscreen.js`) перенесены; общие с рабочей версией
-  (`config.js`, `tts-client.js`, `report.js`, `menu-module.js`, `editor.css`)
-  скопированы. Копии независимые: правки здесь не влияют на `navigatortg/`.
+- `assets/` — стили и скрипты проекта. `config.js`, `tts-client.js`,
+  `report.js`, `editor.css` скопированы из `navigatortg/`; остальные файлы
+  относятся к версии на MapLibre. Правки здесь не влияют на `navigatortg/`.
 
 API общий — воркер `nav-api` (`https://nav-api.ivan43103.workers.dev`, см.
 `assets/js/onepage-adapter.js` и `onepage-shop.js`), данные в D1 `nav-db`.

@@ -13,9 +13,8 @@ PROJECT_NAME="${PROJECT_NAME:-avtoinstruktor-v2}"
 # Белый список: что уходит на сайт.
 SITE_FILES=(
   index.html
-  navigator-v3.html
-  navigator-test.html
-  editor-test.html
+  navigator.html
+  editor.html
   instr.html
   instr_editor.html
   ico.png
@@ -62,13 +61,9 @@ cat > "$STAGE/_headers" <<'HEADERS'
 /
 /index.html
 /navigator
-/navigator-v3
-/navigator-v3.html
-/navigator-test
-/navigator-test.html
+/navigator.html
 /editor
-/editor-test
-/editor-test.html
+/editor.html
 /instr
 /instr.html
 /instr_editor
