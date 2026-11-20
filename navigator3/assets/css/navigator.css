@@ -475,11 +475,8 @@ button, input, select, textarea {
 #hud {
     position: absolute;
     bottom: calc(12px + env(safe-area-inset-bottom));
-    left: 50%;
-    right: auto;
-    transform: translateX(-50%);
-    width: calc(100% - 24px);
-    max-width: 640px;
+    left: 12px;
+    right: 12px;
     z-index: 9000;
     display: none;
     flex-direction: column;
@@ -2101,7 +2098,7 @@ button, input, select, textarea {
     align-items: center;
     height: 56px;
     padding: 6px 8px;
-    max-width: 640px;
+    max-width: none;
     width: 100%;
     border-radius: 26px;
     background: color-mix(in srgb, var(--surface) 75%, transparent);
