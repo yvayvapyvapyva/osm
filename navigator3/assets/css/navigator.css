@@ -156,8 +156,8 @@ button, input, select, textarea {
    ============================================ */
 .circle-btn,
 #telemetryPanel,
-.hud-cmd,
-.nav-action-btn,
+.hud-card,
+.hud-actions,
 .settings-group,
 .pl-item-row,
 .routes-folder-row,
@@ -169,7 +169,8 @@ button, input, select, textarea {
 
 .circle-btn,
 #telemetryPanel,
-.nav-action-btn {
+.hud-card,
+.hud-actions {
     box-shadow: var(--shadow-float), var(--inset-highlight);
 }
 
@@ -474,8 +475,11 @@ button, input, select, textarea {
 #hud {
     position: absolute;
     bottom: calc(12px + env(safe-area-inset-bottom));
-    left: 12px;
-    right: 12px;
+    left: 50%;
+    right: auto;
+    transform: translateX(-50%);
+    width: calc(100% - 24px);
+    max-width: 640px;
     z-index: 9000;
     display: none;
     flex-direction: column;
@@ -494,14 +498,27 @@ button, input, select, textarea {
     gap: 10px;
 }
 
-/* Панель предыдущей команды — та же вёрстка, что и основная, но приглушённая */
+/* Одна карточка на предыдущую и текущую команды */
+.hud-card {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    padding: 4px 10px;
+    border-radius: var(--radius-sm);
+    box-sizing: border-box;
+}
+
+/* Панель предыдущей команды — компактная строка внутри карточки */
 .hud-prev-header {
     width: 100%;
+    padding-bottom: 4px;
+    margin-bottom: 4px;
+    border-bottom: 1px solid var(--line-surface);
 }
 
 .hud-cmd.hud-prev {
     width: 100%;
-    opacity: 0.75;
+    opacity: 1;
 }
 
 #hudPrevCmdNum {
@@ -509,29 +526,35 @@ button, input, select, textarea {
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
-    width: 52px;
-    height: 52px;
-    padding: 4px;
+    width: 40px;
+    height: 40px;
+    padding: 2px;
     position: relative;
     cursor: pointer;
     border-radius: var(--radius-control);
     border: 1px solid var(--line);
     background: var(--surface-muted);
+    color: var(--text-muted);
     transition: transform 0.1s, opacity 0.1s;
     -webkit-tap-highlight-color: transparent;
 }
+#hudPrevCmdNum svg {
+    width: 32px;
+    height: 32px;
+}
+
 #hudPrevCmdNum::after {
     content: '';
     position: absolute;
-    right: 1px;
-    bottom: 1px;
-    width: 16px;
-    height: 16px;
+    right: 0;
+    bottom: 0;
+    width: 14px;
+    height: 14px;
     background: var(--surface);
     border: 1px solid var(--line);
-    border-radius: 8px;
+    border-radius: 7px;
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23121A28' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M11 4.702a.705.705 0 0 0-1.203-.498L6.413 7.587A1.4 1.4 0 0 1 5.416 8H3a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2.416a1.4 1.4 0 0 1 .997.413l3.383 3.384A.705.705 0 0 0 11 19.298z'/%3E%3Cpath d='M16 9a5 5 0 0 1 0 6'/%3E%3Cpath d='M19.364 18.364a9 9 0 0 0 0-12.728'/%3E%3C/svg%3E");
-    background-size: 15px 15px;
+    background-size: 13px 13px;
     background-position: center;
     background-repeat: no-repeat;
     pointer-events: none;
@@ -564,6 +587,15 @@ button, input, select, textarea {
     width: 100%;
     white-space: normal;
     word-break: break-word;
+    color: var(--text-muted);
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.hud-prev-header .hud-cmd-row {
+    min-height: 40px;
+    gap: 8px;
+    padding: 0;
 }
 
 .hud-cmd {
@@ -572,7 +604,11 @@ button, input, select, textarea {
     flex: 1;
     letter-spacing: -0.2px;
     color: var(--text);
-    border-radius: var(--radius-sm);
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+    padding: 0;
     cursor: pointer;
     transition: background 0.15s;
     touch-action: manipulation;
@@ -657,9 +693,13 @@ button, input, select, textarea {
 .hud-actions {
     width: 100%;
     display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
+    align-items: stretch;
+    justify-content: stretch;
+    gap: 0;
+    padding: 0;
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+    box-sizing: border-box;
     touch-action: manipulation;
 }
 
@@ -696,16 +736,20 @@ button, input, select, textarea {
    Навигационные кнопки (назад, симуляция, вперёд)
    ============================================ */
 .nav-action-btn {
-    flex: 0 0 auto;
+    flex: 1 1 0;
+    min-width: 0;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
     gap: 3px;
-    width: 104px;
+    width: auto;
     height: 56px;
     padding: 0;
-    border-radius: var(--radius-card);
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
     color: var(--text);
     font-family: inherit;
     font-size: 12px;
@@ -726,13 +770,17 @@ button, input, select, textarea {
     flex-shrink: 0;
 }
 
+.nav-action-btn + .nav-action-btn {
+    border-left: 1px solid var(--line-surface);
+}
+
 .nav-action-btn:active {
     background: var(--surface-muted);
-    transform: scale(0.97);
+    transform: none;
 }
 
 .nav-action-btn:disabled {
-    background: var(--surface-muted);
+    background: transparent;
     color: var(--text-disabled);
     box-shadow: none;
     cursor: not-allowed;
@@ -741,7 +789,7 @@ button, input, select, textarea {
 
 @media (max-width: 380px) {
     .nav-action-btn {
-        width: 88px;
+        width: auto;
         height: 52px;
         font-size: 10px;
         letter-spacing: 0;
@@ -2265,9 +2313,9 @@ button, input, select, textarea {
 }
 
 .circle-btn,
-.nav-action-btn,
+.hud-actions,
 #telemetryPanel,
-.hud-cmd {
+.hud-card {
     backdrop-filter: blur(8px);
     -webkit-backdrop-filter: blur(8px);
     background: color-mix(in srgb, var(--surface) 75%, transparent) !important;

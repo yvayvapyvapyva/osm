@@ -121,7 +121,6 @@ function buildLegalPage() {
 
     const price = (env.PREMIUM_PRICE_RUB || '299').trim() || '299';
     const days = (env.PREMIUM_DAYS || '30').trim() || '30';
-    const updated = new Date().toLocaleDateString('ru-RU');
 
     const replacements = {
         '{{LEGAL_NAME}}': escapeHtml(name),
@@ -131,7 +130,6 @@ function buildLegalPage() {
         '{{LEGAL_CONTACT_TELEGRAM}}': telegramHtml,
         '{{PREMIUM_PRICE_RUB}}': escapeHtml(price),
         '{{PREMIUM_DAYS}}': escapeHtml(days),
-        '{{LEGAL_UPDATED}}': escapeHtml(updated),
     };
 
     const templatePath = path.join(root, 'legal.template.html');
@@ -139,7 +137,23 @@ function buildLegalPage() {
     for (const [key, value] of Object.entries(replacements)) {
         html = html.split(key).join(value);
     }
-    fs.writeFileSync(path.join(output, 'legal.html'), html);
+
+    // Дату «Обновлено» меняем только если поменялось само содержимое
+    // юридической страницы. Иначе каждый пересбор обновлял бы дату впустую.
+    const outputPath = path.join(output, 'legal.html');
+    const datePattern = /(<div class="updated">Обновлено:\s*)([^<]*)(<\/div>)/;
+    let updated = new Date().toLocaleDateString('ru-RU');
+    if (fs.existsSync(outputPath)) {
+        const previous = fs.readFileSync(outputPath, 'utf8');
+        const previousWithoutDate = previous.replace(datePattern, '$1{{LEGAL_UPDATED}}$3');
+        if (previousWithoutDate === html) {
+            const match = previous.match(datePattern);
+            if (match && match[2].trim()) updated = match[2].trim();
+        }
+    }
+    html = html.split('{{LEGAL_UPDATED}}').join(escapeHtml(updated));
+
+    fs.writeFileSync(outputPath, html);
     console.log(`  legal.html: ${formatKb(Buffer.byteLength(html))}`);
 }
 

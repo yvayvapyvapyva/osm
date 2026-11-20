@@ -62,7 +62,7 @@
 - FailURL → помечает платёж отменённым и редиректит на `...?payment=fail`.
 - `GET /api/premium/status` — цена, срок, активность подписки, `payments_available` и список `providers`.
 - Миграция: `migrations/add_premium_subscriptions.py` (добавляет `users.premium_until` и таблицу `payments`).
-- Страница `/legal.html` генерируется при сборке из `legal.template.html` и переменных `LEGAL_NAME`, `LEGAL_INN`, `LEGAL_EMAIL`, `LEGAL_PHONE`, `LEGAL_TELEGRAM`. Без них будут заглушки «Не указано».
+- Страница `/legal.html` генерируется при сборке из `legal.template.html` и переменных `LEGAL_NAME`, `LEGAL_INN`, `LEGAL_EMAIL`, `LEGAL_PHONE`, `LEGAL_TELEGRAM`. Без них будут заглушки «Не указано». Дата «Обновлено» меняется только при изменении содержимого шаблона или реквизитов, а не на каждой пересборке.
 
 ## Админка
 - Страница: `/admin` на служебном домене шлюза (`https://d5dsd5u1tsc8fm9dbsg5.s183zexc.apigw.yandexcloud.net/admin`). Через apex/CDN не работает: CDN пропускает только GET, а действиям нужен POST.
