@@ -45,6 +45,7 @@
 - `pad/deploy.sh` — функция `pad-osm` (ID `d4esfoiand5dinv3mfth`).
 - Статика PAD: бакет `pad2`, сайт `https://pad2.website.yandexcloud.net/`.
 - `tts/navigator/deploy.sh` — функция TTS (ID `d4e3cj3q3ff36qlrhbg8`).
+- Полная синхронизация озвучки с маршрутами: `tts/navigator/sync_all.py` — читает `cmd`/`comm` из `nav-db` и YDB `navigator3`, синтезирует недостающее, чистит лишнее из `v1/manifest.json` и бакета `eia-tts`. Запуск без флагов — отчёт, с `--apply` — изменения.
 
 ## Оплата (Робокасса)
 - Разовый платёж на `PREMIUM_DAYS` дней (по умолчанию 30), цена `PREMIUM_PRICE_RUB` (по умолчанию 299 ₽).
