@@ -825,9 +825,13 @@ export default {
       // Создать папку
       if (action === 'folder_create') {
         const name = String(bodyData.name || '').trim();
-        let parentId = bodyData.parent_id !== undefined && bodyData.parent_id !== ''
-          ? Number(bodyData.parent_id)
-          : null;
+        const rawParent = bodyData.parent_id;
+        let parentId = rawParent === undefined || rawParent === null || rawParent === ''
+          ? null
+          : Number(rawParent);
+        if (parentId !== null && !Number.isFinite(parentId)) {
+          return json({ error: 'bad_params' }, 400);
+        }
         if (parentId === null) {
           const root = await ensureOwnerRoot(env, actingUid);
           parentId = root.folder_id;
@@ -890,9 +894,13 @@ export default {
       // Переместить папку (изменить parent_id). Защита от циклов.
       if (action === 'folder_move') {
         const id = Number(bodyData.id);
-        let parentId = bodyData.parent_id !== undefined && bodyData.parent_id !== ''
-          ? Number(bodyData.parent_id)
-          : null;
+        const rawParent = bodyData.parent_id;
+        let parentId = rawParent === undefined || rawParent === null || rawParent === ''
+          ? null
+          : Number(rawParent);
+        if (parentId !== null && !Number.isFinite(parentId)) {
+          return json({ error: 'bad_params' }, 400);
+        }
         if (!Number.isFinite(id)) return json({ error: 'bad_params' }, 400);
         const root = await ensureOwnerRoot(env, actingUid);
         if (id === Number(root.folder_id)) return json({ error: 'root_folder' }, 400);
