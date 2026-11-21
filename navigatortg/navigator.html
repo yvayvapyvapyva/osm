@@ -234,26 +234,6 @@ function showToast(text, type = 'info', duration = 2000) {
     toastTimer = setTimeout(() => el.classList.remove('show'), duration);
 }
 
-let _editorHoldTimer = null;
-const speedEl = document.getElementById('telemetryPanel');
-if (speedEl) {
-    speedEl.addEventListener('pointerdown', () => {
-        _editorHoldTimer = setTimeout(() => {
-            _editorHoldTimer = null;
-            window.location.href = 'editor.html';
-        }, 1000);
-    });
-    speedEl.addEventListener('pointerup', () => {
-        if (_editorHoldTimer) { clearTimeout(_editorHoldTimer); _editorHoldTimer = null; }
-    });
-    speedEl.addEventListener('pointerleave', () => {
-        if (_editorHoldTimer) { clearTimeout(_editorHoldTimer); _editorHoldTimer = null; }
-    });
-    speedEl.addEventListener('pointercancel', () => {
-        if (_editorHoldTimer) { clearTimeout(_editorHoldTimer); _editorHoldTimer = null; }
-    });
-}
-
 function updateUserMarkerRotation() {
     if (!APP._userMarkerEl || APP.lastAz === null || !APP.map) return;
     if (APP.currentSpeed < APP.navConfig.SPEED_THRESHOLD) return;

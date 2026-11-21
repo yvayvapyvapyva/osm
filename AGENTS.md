@@ -4,7 +4,7 @@
 - `navigator3/` — основная версия с Яндекс ID, API Gateway, YDB.
 - `pad/` — разбор дорожных ситуаций.
 - `tts/` — озвучка.
-- `navigatortg/` — рабочая версия (Telegram Mini App, Cloudflare Pages/Worker). Правки рабочей версии ведутся здесь.
+- `navigatortg/` — рабочая версия (Telegram Mini App, Cloudflare Pages/Worker). Правки рабочей версии ведутся здесь. Редактор отключён: `EDITOR_IDS` пуст, секрет `EDITOR_ACCESS_KEY` удалён, `/editor.html` редиректит на навигатор.
 - `navigatortg2/` — навигатор и редактор на MapLibre (`navigator.html`, `editor.html`), вынесены из `navigatortg/`. В `navigatortg/` — рабочие `navigator.html` и `editor.html` на Яндекс.Картах.
 - Деплой: `navigatortg/deploy-pages.sh` публикует рабочий проект `avtoinstruktor` (`avtoinstruktor.pages.dev`); `navigatortg2/deploy-v2.sh` — тестовый `avtoinstruktor-v2` (`avtoinstruktor-v2.pages.dev`).
 - `navigatortg2` использует общую D1 `nav-db` (та же, что у `navigatortg`), поэтому покупки, маршруты и папки общие для обеих версий. Воркер `nav-api-v2` (`https://nav-api-v2.ivan43103.workers.dev`, исходники в `navigatortg2/cloudflare_worker/`) и старый `nav-api` смотрят в одну базу. Старый редактор патчен: новые маршруты и папки получают `DEFAULT_OWNER_TG_ID` и попадают в корневую папку владельца. Тестовая `nav-db-v2` (`437996f6-770b-486d-a534-ae68abe7616a`) осталась от прежнего этапа и не используется.

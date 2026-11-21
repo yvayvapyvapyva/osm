@@ -11,11 +11,10 @@ cd "$(dirname "$0")"
 SITE_FILES=(
   index.html
   navigator.html
-  editor.html
   instr.html
-  instr_editor.html
   ico.png
   assets
+  _redirects
 )
 
 STAGE="$(mktemp -d)"
