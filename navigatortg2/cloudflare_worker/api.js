@@ -57,7 +57,7 @@ import {
   lockForFolder, loadFolderIndex, folderPathIn, findFolderIdByPath,
   hasAccess, accessExpires, hiddenFolderIds,
 } from './lib/db.js';
-import { EDITOR_ACTIONS, requireUser } from './lib/editor.js';
+import { EDITOR_ACTIONS, requireUser, editorPasswordAllowed } from './lib/editor.js';
 import { handleReport } from './lib/report.js';
 import { recordPurchase, isAdmin } from './lib/shop.js';
 import { handleTelegramWebhook } from './lib/bot.js';
@@ -458,14 +458,24 @@ export default {
       }
 
       // ---- Проверка прав пользователя (без изменений данных) ----
+      if (action === 'editor_password_check') {
+        return json({
+          ok: editorPasswordAllowed(bodyData.password, env),
+          configured: !!String(env.EDITOR_PASSWORD || ''),
+        }, 200, { 'Cache-Control': 'no-store' });
+      }
+
       if (action === 'editor_check') {
         const guard = await requireUser(request, bodyData, env);
         const uid = guard.ok ? String(guard.uid || '') : '';
+        const passwordOk = editorPasswordAllowed(bodyData.editor_password, env);
+        const allowed = guard.ok && passwordOk;
         return json({
-          allowed: guard.ok,
+          allowed,
           via: guard.via || null,
           uid: uid || null,
-          is_admin: !!uid && isAdmin(uid, env),
+          is_admin: allowed && !!uid && isAdmin(uid, env),
+          password_ok: passwordOk,
         });
       }
 
@@ -478,6 +488,9 @@ export default {
         if (!guard.ok) return json({ error: 'forbidden' }, 403);
         userUid = String(guard.uid || '');
         if (!userUid) return json({ error: 'forbidden' }, 403);
+        if (!editorPasswordAllowed(bodyData.editor_password, env)) {
+          return json({ error: 'editor_password_required' }, 403);
+        }
       }
 
       // Админ может работать от имени другого владельца: все owner-scoped

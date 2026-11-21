@@ -30,6 +30,16 @@
         <div id="editorAuthError" role="alert" style="min-height:18px;text-align:center;color:#ff6961;font-size:13px;overflow-wrap:anywhere;"></div>
     </div>
 </div>
+<div id="editorPasswordGate" style="position:fixed;inset:0;z-index:31000;display:flex;align-items:center;justify-content:center;padding:24px;background:rgba(0,0,0,0.9);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);">
+    <form id="editorPasswordForm" style="box-sizing:border-box;width:min(100%,360px);max-width:100%;display:flex;flex-direction:column;gap:14px;padding:24px;border:1px solid rgba(255,255,255,0.16);border-radius:20px;background:rgba(20,20,24,0.96);box-shadow:0 20px 60px rgba(0,0,0,0.5);">
+        <div style="text-align:center;font-size:38px;line-height:1;">🔐</div>
+        <h2 style="margin:0;text-align:center;font-size:20px;">Вход в редактор</h2>
+        <p style="margin:0;text-align:center;color:rgba(255,255,255,0.65);font-size:14px;">Введите пароль редактора</p>
+        <input id="editorPasswordInput" type="password" inputmode="text" autocomplete="current-password" placeholder="Пароль" style="width:100%;box-sizing:border-box;padding:12px 14px;border-radius:12px;border:1px solid rgba(255,255,255,0.18);background:rgba(255,255,255,0.08);color:#fff;font-size:16px;outline:none;">
+        <button id="editorPasswordSubmit" type="submit" style="width:100%;padding:13px 16px;border:none;border-radius:12px;background:#2FA8E0;color:#fff;font-size:16px;font-weight:700;cursor:pointer;">Войти</button>
+        <div id="editorPasswordError" role="alert" style="min-height:18px;text-align:center;color:#ff6961;font-size:13px;overflow-wrap:anywhere;"></div>
+    </form>
+</div>
 <div id="welcomeScreen" style="display:flex;align-items:center;justify-content:center;background:rgba(10,11,15,0.95);"><div style="display:flex;flex-direction:column;align-items:center;gap:16px;"><span style="width:32px;height:32px;border:3px solid rgba(255,255,255,0.3);border-top-color:#fff;border-radius:50%;animation:spin 1s linear infinite;"></span><div style="font-size:16px;font-weight:600;color:#fff;">Загрузка</div></div></div>
 <div id="map"></div>
 <div class="top-controls" id="uiControls" style="display:none">
@@ -839,6 +849,7 @@ async function callAdminApi(action, params = {}, bodyData = null) {
         });
         const payload = Object.assign({}, body || {});
         if (initData) payload.tg_init_data = initData;
+        if (editorPassword) payload.editor_password = editorPassword;
         if (editorIsAdmin && editorActingOwner &&
             workerAction !== 'editor_check' && workerAction !== 'admin_owners') {
             payload.owner = editorActingOwner;
@@ -1014,11 +1025,103 @@ function telegramProfile() {
     return direct;
 }
 
+let editorPassword = '';
+
+async function verifyEditorPassword(password) {
+    const url = new URL(ADMIN_API_BASE);
+    url.searchParams.set('action', 'editor_password_check');
+    const response = await fetch(url.toString(), {
+        method: 'POST',
+        cache: 'no-store',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify({ password })
+    });
+    let data = null;
+    try { data = await response.json(); } catch (e) {}
+    return {
+        ok: response.ok && !!data && data.ok === true,
+        configured: !data || data.configured !== false
+    };
+}
+
+function promptEditorPassword(errorText = '') {
+    return new Promise((resolve) => {
+        const gate = $('editorPasswordGate');
+        const input = $('editorPasswordInput');
+        const error = $('editorPasswordError');
+        const submit = $('editorPasswordSubmit');
+        if (!gate || !input || !submit) { resolve(false); return; }
+        gate.style.display = 'flex';
+        if (error) error.textContent = errorText;
+        setTimeout(() => input.focus(), 100);
+
+        const finish = (value) => {
+            gate.style.display = 'none';
+            submit.disabled = false;
+            if (error) error.textContent = '';
+            resolve(value);
+        };
+
+        const attempt = async () => {
+            const password = input.value.trim();
+            if (!password) {
+                if (error) error.textContent = 'Введите пароль';
+                return;
+            }
+            submit.disabled = true;
+            if (error) error.textContent = 'Проверяем…';
+            try {
+                const result = await verifyEditorPassword(password);
+                if (!result.configured) {
+                    if (error) error.textContent = 'Пароль редактора не настроен';
+                    submit.disabled = false;
+                    return;
+                }
+                if (!result.ok) {
+                    if (error) error.textContent = 'Неверный пароль';
+                    input.select();
+                    submit.disabled = false;
+                    return;
+                }
+                editorPassword = password;
+                finish(true);
+            } catch (e) {
+                if (error) error.textContent = 'Не удалось проверить пароль';
+                submit.disabled = false;
+            }
+        };
+
+        const form = $('editorPasswordForm');
+        if (form && !form.dataset.bound) {
+            form.dataset.bound = '1';
+            form.addEventListener('submit', (event) => {
+                event.preventDefault();
+                attempt();
+            });
+        }
+        input.onkeydown = (event) => {
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                attempt();
+            }
+        };
+    });
+}
+
+async function ensureEditorPassword() {
+    // Пароль всегда спрашиваем заново при входе в редактор.
+    editorPassword = '';
+    return promptEditorPassword();
+}
+
 async function initializeEditorAuth() {
     const gate = $('editorAuthGate');
     const message = $('editorAuthMessage');
     const error = $('editorAuthError');
     if (gate) gate.style.display = 'flex';
+
+    const passwordOk = await ensureEditorPassword();
+    if (!passwordOk) return;
 
     await waitForTelegramInitData();
     if (!tgInitData()) {

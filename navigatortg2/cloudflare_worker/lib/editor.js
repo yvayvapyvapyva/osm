@@ -17,6 +17,24 @@ export const EDITOR_ACTIONS = new Set([
   'admin_owners',
 ]);
 
+// Сравнение строк за постоянное время (для пароля редактора).
+function safeEqual(a, b) {
+  a = String(a);
+  b = String(b);
+  if (a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return diff === 0;
+}
+
+// Пароль редактора: общий секрет воркера. Если EDITOR_PASSWORD не задан,
+// доступ закрыт (fail-closed), чтобы редактор нельзя было открыть случайно.
+export function editorPasswordAllowed(password, env) {
+  const expected = String(env.EDITOR_PASSWORD || '');
+  if (!expected) return false;
+  return safeEqual(password, expected);
+}
+
 // Удостоверение пользователя: только подпись Telegram.WebApp.initData.
 // uid берётся из подписи, подделать нельзя; подходит любой пользователь
 // Telegram. Возвращает { ok, uid, via } либо { ok:false, err }.
