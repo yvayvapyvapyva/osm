@@ -14,8 +14,7 @@ import {
 } from './shop.js';
 
 // Кнопка запуска Mini App в ответ на /start.
-// «nav» — это short name приложения из BotFather (Bot Settings → Configure Mini App).
-// Меняли short name — поправьте и здесь.
+// Основной Mini App бота — nav, он указывает на новую версию (avtoinstruktor-v2).
 const MINIAPP_URL = 'https://t.me/A152Bot/nav';
 
 export async function handleTelegramWebhook(request, env, ctx) {
