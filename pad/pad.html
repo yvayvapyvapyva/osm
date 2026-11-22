@@ -600,7 +600,6 @@
     <span id="signsLayerBarLabel">Слой знаков: eliseev88888</span>
     <span id="signsLayerBarCount">0</span>
     <button id="signsLayerSave" type="button">Сохранить</button>
-    <button id="signsLayerClear" type="button" class="danger">Очистить</button>
 </div>
 <div id="pddModal">
     <div class="pdd-header">
@@ -1841,30 +1840,9 @@ async function saveSignsLayer() {
     }
 }
 
-async function clearSignsLayer() {
-    if (!signsLayerMode || signsLayerBusy) return;
-    if (!window.confirm('Удалить все опубликованные знаки этого слоя?')) return;
-    const password = await window.requestPadAdminPassword();
-    if (!password) return;
-    signsLayerBusy = true;
-    try {
-        await signsLayerApi('DELETE', undefined, password);
-        clearSignsLayerMarkers();
-        signsLayerDirty = false;
-        updateSignsLayerUi();
-        padToast('Слой знаков очищен', 'success', 2000);
-    } catch (e) {
-        padToast('Не удалось очистить слой: ' + e.message, 'error', 4000);
-    } finally {
-        signsLayerBusy = false;
-    }
-}
-
 function bindSignsLayerUi() {
     const save = document.getElementById('signsLayerSave');
     if (save) save.addEventListener('click', saveSignsLayer);
-    const clear = document.getElementById('signsLayerClear');
-    if (clear) clear.addEventListener('click', clearSignsLayer);
     updateSignsLayerUi();
 }
 
