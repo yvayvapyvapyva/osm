@@ -80,16 +80,28 @@
             box-shadow:0 0 0 2px rgba(48,209,88,0.55), 0 8px 28px rgba(48,209,88,0.35);
         }
         #eraserBtn.active { background:rgba(255,59,48,0.55); border-color:#FF453A; }
-        #drawBtn { bottom:calc(12px + env(safe-area-inset-bottom)); left:332px; border-radius:12px; transition:bottom .25s ease; }
-        #eraserBtn { bottom:calc(12px + env(safe-area-inset-bottom)); left:268px; border-radius:12px; transition:bottom .25s ease; }
-        #textBtn { bottom:calc(12px + env(safe-area-inset-bottom)); left:204px; border-radius:12px; transition:bottom .25s ease; }
+        #drawBtn { bottom:calc(12px + env(safe-area-inset-bottom)); left:204px; right:auto; border-radius:12px; transition:bottom .25s ease; }
+        #eraserBtn { bottom:calc(12px + env(safe-area-inset-bottom)); left:268px; right:auto; border-radius:12px; transition:bottom .25s ease; }
+        #textBtn { bottom:calc(12px + env(safe-area-inset-bottom)); left:140px; right:auto; border-radius:12px; transition:bottom .25s ease; }
         #addPicBtn { bottom:calc(12px + env(safe-area-inset-bottom)); left:12px; border-radius:12px; overflow:hidden; transition:bottom .25s ease; }
         #addPicBtn img { width:100%; height:100%; object-fit:contain; padding:5px; border-radius:10px; pointer-events:none; box-sizing:border-box; }
-        #addZnakBtn { bottom:calc(12px + env(safe-area-inset-bottom)); left:140px; border-radius:12px; overflow:hidden; transition:bottom .25s ease; }
+        /* Галерея знаков — в правом нижнем углу */
+        #addZnakBtn { bottom:calc(12px + env(safe-area-inset-bottom)); right:12px; left:auto; border-radius:12px; overflow:hidden; transition:bottom .25s ease; }
         #addZnakBtn img { width:100%; height:100%; object-fit:contain; padding:5px; border-radius:10px; pointer-events:none; box-sizing:border-box; }
         #locateBtn { top:calc(76px + env(safe-area-inset-top)); right:12px; }
         #locateBtn.active { background:rgba(48,209,88,0.5); border-color:#30D158; }
         #hideUiBtn { top:calc(140px + env(safe-area-inset-top)); right:12px; }
+        @media (max-width: 399px) {
+            #addPicBtn, #textBtn, #drawBtn, #eraserBtn,
+            body #addTlBtn {
+                width:48px; height:48px; border-radius:10px;
+            }
+            #addPicBtn { left:12px; }
+            body #addTlBtn { left:60px; }
+            #textBtn { left:108px; }
+            #drawBtn { left:156px; }
+            #eraserBtn { left:204px; }
+        }
         #hideUiBtn.active { background:rgba(48,209,88,0.5); border-color:#30D158; }
         #rotateBtn {
             position:fixed; top:calc(12px + env(safe-area-inset-top)); right:12px;
@@ -125,6 +137,33 @@
         }
         #pddBtn:active { transform:translateX(-50%) scale(0.92); }
         #pddBtn.active { background:rgba(48,209,88,0.5); border-color:#30D158; }
+        /* Панель режима «Слой знаков» */
+        #signsLayerBar {
+            position:fixed; top:calc(76px + env(safe-area-inset-top) + var(--tg-top)); left:50%;
+            transform:translateX(-50%); z-index:9006; display:none; align-items:center; gap:8px;
+            max-width:calc(100vw - 24px); padding:6px; border-radius:16px;
+            border:0.5px solid rgba(255,255,255,0.12); background:rgba(15,15,15,0.88); color:#fff;
+            box-shadow:0 8px 32px rgba(0,0,0,0.35); box-sizing:border-box; white-space:nowrap;
+        }
+        body.signs-layer-mode #signsLayerBar { display:flex; }
+        #signsLayerBarLabel { font-size:12px; font-weight:700; color:rgba(255,255,255,0.86); padding:0 4px; overflow:hidden; text-overflow:ellipsis; }
+        #signsLayerBarCount { font-size:12px; font-weight:700; color:#30D158; }
+        #signsLayerBar button {
+            height:34px; padding:0 10px; border-radius:10px; border:0.5px solid rgba(255,255,255,0.14);
+            background:rgba(255,255,255,0.1); color:#fff; font-size:12px; font-weight:700; cursor:pointer;
+        }
+        #signsLayerBar button:active { background:rgba(255,255,255,0.2); }
+        #signsLayerBar button.danger { color:#FF6961; }
+        #signsLayerBar button.dirty { box-shadow:0 0 0 2px rgba(255,214,10,0.5); }
+        body.signs-layer-mode #addPicBtn,
+        body.signs-layer-mode #addTlBtn,
+        body.signs-layer-mode #drawBtn,
+        body.signs-layer-mode #eraserBtn,
+        body.signs-layer-mode #textBtn,
+        body.signs-layer-mode #pddBtn,
+        body.signs-layer-mode #saveBtn,
+        body.signs-layer-mode #historyBtn { display:none !important; }
+
         /* Режим скрытия элементов управления (долгое нажатие на ПДД) */
         body.controls-hidden .fab:not(#pddBtn):not(#saveBtn):not(#hideUiBtn),
         body.controls-hidden #textBtn,
@@ -557,6 +596,12 @@
     <svg viewBox="0 0 24 24" width="22" height="22" fill="#fff"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>
 </button>
 <button id="pddBtn">ПДД</button>
+<div id="signsLayerBar" role="group" aria-label="Слой знаков">
+    <span id="signsLayerBarLabel">Слой знаков: eliseev88888</span>
+    <span id="signsLayerBarCount">0</span>
+    <button id="signsLayerSave" type="button">Сохранить</button>
+    <button id="signsLayerClear" type="button" class="danger">Очистить</button>
+</div>
 <div id="pddModal">
     <div class="pdd-header">
         <button id="pddBack" class="pdd-nav">&#8592;</button>
@@ -666,6 +711,9 @@
 <script>
 let map = null, userMarker = null, lastPos = null;
 let placedMarkers = [], selectedPic = null, drawMode = false, drawFeature = null, drawing = false;
+let mapSigns = [], signsLayerMode = false, signsLayerDirty = false, signsLayerBusy = false;
+let signsLayerOwnerLogin = 'eliseev88888';
+let signsLayerLoadPromise = null;
 let eraserMode = false, drawnLines = [], eraserDrag = false;
 let drawColor = '#000000';
 let drawWidth = 5;
@@ -800,7 +848,7 @@ function loadZnakCatalog() {
                 sprite: SIGN_SPRITE ? SIGN_SPRITE.frames[item.code] : null,
             }));
             ZNAKI_BY_CODE = new Map(ZNAKI_CATALOG.map(item => [item.code, item]));
-            placedMarkers.forEach(marker => {
+            placedMarkers.concat(mapSigns).forEach(marker => {
                 if (!marker._isZnak || !marker._code) return;
                 marker._catalogItem = znakItem(marker._code);
                 if (marker._catalogItem) {
@@ -1034,7 +1082,7 @@ function placeSignAtCenter(item) {
     closeZnakPanel();
     const marker = buildPicMarker(true, item.file, lat, lon, -mapRot, item.code);
     map.addChild(marker);
-    placedMarkers.push(marker);
+    (signsLayerMode ? mapSigns : placedMarkers).push(marker);
     setActiveCar(marker);
     setMarkerDragEnabled(marker, true);
     updateSignalBtns();
@@ -1420,6 +1468,10 @@ function restoreScene(snap) {
 
 function commit() {
     if (_restoring) return;
+    if (signsLayerMode) {
+        if (activeCar && mapSigns.indexOf(activeCar) !== -1) markSignsLayerDirty();
+        return;
+    }
     const snap = serializeScene();
     const json = JSON.stringify({ lines: snap.lines, texts: snap.texts, markers: snap.markers.map(r => ({ kind: r.kind, file: r.file, lat: r.lat, lon: r.lon, heading: r.heading, leg: r.leg })) });
     if (undoStack.length && undoStack[undoStack.length - 1]._json === json) return;
@@ -1461,6 +1513,7 @@ function updateHistoryBtns() {
 let activeCar = null;
 
 function setActiveCar(m) {
+    if (m && mapSigns.indexOf(m) !== -1 && !signsLayerMode) m = null;
     if (window.closeTextPanel) window.closeTextPanel();
     if (activeCar !== m) {
         if (activeCar && activeCar._rotWrap) {
@@ -1579,6 +1632,245 @@ function addDrawPoint(coords, screen) {
     }
 }
 
+// ---------- Отдельный слой знаков для навигатора ----------
+function signsLayerCountText() {
+    return String(mapSigns.length);
+}
+
+function updateSignsLayerUi() {
+    const count = document.getElementById('signsLayerBarCount');
+    if (count) count.textContent = signsLayerCountText();
+    const label = document.getElementById('signsLayerBarLabel');
+    if (label) label.textContent = 'Знаки: ' + signsLayerOwnerLogin;
+    const save = document.getElementById('signsLayerSave');
+    if (save) save.classList.toggle('dirty', signsLayerDirty);
+}
+
+function markSignsLayerDirty() {
+    signsLayerDirty = true;
+    updateSignsLayerUi();
+}
+
+function signsLayerApi(method, body, password) {
+    if (typeof window.padApi !== 'function') {
+        throw new Error('API редактора ещё загружается');
+    }
+    const headers = password ? { 'X-Scene-Admin-Password': password } : undefined;
+    return window.padApi(method, {
+        query: { action: 'owner_signs' },
+        body,
+        headers
+    });
+}
+
+function removeMapSign(marker) {
+    if (!marker) return;
+    if (activeCar === marker) setActiveCar(null);
+    try { map.removeChild(marker); } catch (e) {}
+    const index = mapSigns.indexOf(marker);
+    if (index !== -1) mapSigns.splice(index, 1);
+}
+
+function clearSignsLayerMarkers() {
+    mapSigns.slice().forEach(removeMapSign);
+    mapSigns = [];
+    setActiveCar(null);
+    updateSignsLayerUi();
+}
+
+// Вне режима «Слой знаков» знаки только отображаются: выделять,
+// перетаскивать и менять их нельзя.
+function disableMapSignsEditing() {
+    mapSigns.forEach(marker => {
+        marker._dragEnabled = false;
+        if (marker._rotWrap) marker._rotWrap.classList.remove('marker-drag');
+        try { marker.update({ draggable: false }); } catch (e) {}
+    });
+}
+
+function addSignFromData(data) {
+    if (!data || data.kind !== 'znak') return null;
+    const code = String(data.code || '').trim();
+    const item = znakItem(code);
+    const file = item ? item.file : String(data.file || '').trim();
+    if (!code || !file) return null;
+    const lat = Number(data.lat);
+    const lon = Number(data.lon);
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+    const heading = Number.isFinite(Number(data.heading)) ? Number(data.heading) : 0;
+    const marker = buildPicMarker(true, file, lat, lon, heading, code);
+    if (Array.isArray(data.plates) && data.plates.length) {
+        marker._plateCodes = data.plates.map(plate => String(plate || '').trim()).filter(Boolean);
+        marker._plates = marker._plateCodes.map(znakItem).filter(Boolean);
+        renderSignPlates(marker);
+    }
+    if (data.leg) {
+        const leg = document.createElement('div');
+        leg.className = 'sign-leg';
+        marker._rotWrap.appendChild(leg);
+        marker._leg = leg;
+    }
+    if (data.value !== undefined) marker._value = data.value;
+    marker._dragEnabled = false;
+    map.addChild(marker);
+    mapSigns.push(marker);
+    try { marker.update({ draggable: false }); } catch (e) {}
+    return marker;
+}
+
+async function loadSignsLayer() {
+    if (signsLayerLoadPromise) return signsLayerLoadPromise;
+    signsLayerLoadPromise = (async () => {
+        clearSignsLayerMarkers();
+        await loadZnakCatalog().catch(() => null);
+        const result = await signsLayerApi('GET');
+        const owner = (result && result.owner) || {};
+        if (owner.login) signsLayerOwnerLogin = String(owner.login);
+        const data = (result && result.data) || {};
+        const markers = Array.isArray(data.markers) ? data.markers : [];
+        markers.forEach(addSignFromData);
+        disableMapSignsEditing();
+        signsLayerDirty = false;
+        updateSignsLayerUi();
+        return markers.length;
+    })();
+    try {
+        return await signsLayerLoadPromise;
+    } finally {
+        signsLayerLoadPromise = null;
+    }
+}
+
+// Загружаем слой знаков сразу при запуске PAD и оставляем его на карте.
+async function initSignsLayerOnStart() {
+    const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
+    for (let i = 0; i < 240; i += 1) {
+        if (window.padApi && typeof map !== 'undefined' && map && typeof map.addChild === 'function') break;
+        await wait(250);
+    }
+    if (!window.padApi || typeof map === 'undefined' || !map) return;
+    try {
+        await loadSignsLayer();
+    } catch (e) {
+        console.warn('Не удалось загрузить слой знаков при запуске:', e);
+    }
+}
+
+function closeSignsLayerPanels() {
+    ['znakModal', 'picPanel', 'tlPanel'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.classList.remove('visible');
+    });
+    ['addZnakBtn', 'addPicBtn', 'addTlBtn'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.classList.remove('open');
+    });
+}
+
+async function enterSignsLayer() {
+    if (signsLayerMode) return;
+    if (drawMode) stopDraw();
+    if (eraserMode) stopEraser();
+    if (typeof textMode !== 'undefined' && textMode) stopTextMode();
+    if (typeof textEditing !== 'undefined' && textEditing) commitTextEditing();
+    closeSignsLayerPanels();
+    setActiveCar(null);
+    signsLayerMode = true;
+    document.body.classList.add('signs-layer-mode');
+    const btn = document.getElementById('signsLayerBtn');
+    if (btn) btn.classList.add('active');
+    updateSignsLayerUi();
+    try {
+        const count = await loadSignsLayer();
+        padToast('Слой знаков: ' + count + ' шт.', 'info', 1800);
+    } catch (e) {
+        padToast('Не удалось загрузить слой знаков: ' + e.message, 'error', 4000);
+    }
+}
+
+async function exitSignsLayer() {
+    if (!signsLayerMode) return;
+    if (signsLayerDirty && !window.confirm('Есть несохранённые знаки. Выйти без сохранения?')) return;
+    if (signsLayerDirty) {
+        // Возвращаем на карту сохранённую версию, а не несохранённые правки.
+        try { await loadSignsLayer(); } catch (e) {}
+    }
+    signsLayerMode = false;
+    signsLayerDirty = false;
+    document.body.classList.remove('signs-layer-mode');
+    closeSignsLayerPanels();
+    const btn = document.getElementById('signsLayerBtn');
+    if (btn) btn.classList.remove('active');
+    setActiveCar(null);
+    disableMapSignsEditing();
+}
+
+function collectSignsLayerMarkers() {
+    return mapSigns.map(marker => {
+        const item = marker._code ? znakItem(marker._code) : null;
+        const data = {
+            kind: 'znak',
+            code: marker._code || null,
+            file: item ? item.file : marker._file,
+            lat: marker._lat,
+            lon: marker._lon,
+            heading: marker._heading,
+            leg: !!marker._leg,
+            plates: (marker._plates || []).map(plate => plate.code).filter(Boolean)
+        };
+        if (marker._value !== undefined) data.value = marker._value;
+        return data;
+    }).filter(sign => !!sign.code);
+}
+
+async function saveSignsLayer() {
+    if (!signsLayerMode || signsLayerBusy) return;
+    const password = await window.requestPadAdminPassword();
+    if (!password) return;
+    signsLayerBusy = true;
+    try {
+        const markers = collectSignsLayerMarkers();
+        const result = await signsLayerApi('POST', { markers }, password);
+        signsLayerDirty = false;
+        updateSignsLayerUi();
+        padToast('Слой знаков сохранён: ' + ((result && result.count) || markers.length), 'success', 2500);
+    } catch (e) {
+        padToast('Не удалось сохранить слой: ' + e.message, 'error', 4000);
+    } finally {
+        signsLayerBusy = false;
+    }
+}
+
+async function clearSignsLayer() {
+    if (!signsLayerMode || signsLayerBusy) return;
+    if (!window.confirm('Удалить все опубликованные знаки этого слоя?')) return;
+    const password = await window.requestPadAdminPassword();
+    if (!password) return;
+    signsLayerBusy = true;
+    try {
+        await signsLayerApi('DELETE', undefined, password);
+        clearSignsLayerMarkers();
+        signsLayerDirty = false;
+        updateSignsLayerUi();
+        padToast('Слой знаков очищен', 'success', 2000);
+    } catch (e) {
+        padToast('Не удалось очистить слой: ' + e.message, 'error', 4000);
+    } finally {
+        signsLayerBusy = false;
+    }
+}
+
+function bindSignsLayerUi() {
+    const save = document.getElementById('signsLayerSave');
+    if (save) save.addEventListener('click', saveSignsLayer);
+    const clear = document.getElementById('signsLayerClear');
+    if (clear) clear.addEventListener('click', clearSignsLayer);
+    updateSignsLayerUi();
+}
+
+bindSignsLayerUi();
+initSignsLayerOnStart();
+
 // Фабрика маркера (машинка/знак): используется placePic и restoreScene
 function buildPicMarker(isZnak, file, lat, lon, headingDeg, code) {
     const el = document.createElement('div');
@@ -1669,7 +1961,7 @@ function placePic(lat, lon, moveAngle) {
         : -mapRot;
     const marker = buildPicMarker(isZnak, file, lat, lon, headingDeg, selectedPic.code || null);
     map.addChild(marker);
-    placedMarkers.push(marker);
+    ((signsLayerMode && isZnak) ? mapSigns : placedMarkers).push(marker);
     setActiveCar(marker);
     if (isZnak) { setMarkerDragEnabled(marker, true); updateSignalBtns(); }
     selectedPic = null;
@@ -1869,6 +2161,11 @@ function removeMarker(marker) {
     map.removeChild(marker);
     const idx = placedMarkers.indexOf(marker);
     if (idx !== -1) placedMarkers.splice(idx, 1);
+    const signIdx = mapSigns.indexOf(marker);
+    if (signIdx !== -1) {
+        mapSigns.splice(signIdx, 1);
+        markSignsLayerDirty();
+    }
 }
 
 function clearEverything() {
@@ -2066,6 +2363,7 @@ function updateAllPicMarkers(event) {
         // zoom изменился — пересчитываем размер всех маркеров
         _lastZoomForSize = zoom;
         placedMarkers.forEach(updatePicSize);
+        mapSigns.forEach(updatePicSize);
         // и толщину линий, нарисованных в «метровом» режиме (widthM).
         // Старые линии без widthM остаются фиксированной пиксельной толщины.
         if (drawnLines.some(l => l.widthM)) {
@@ -2080,6 +2378,7 @@ function updateAllPicMarkers(event) {
     } else {
         // zoom не менялся (перемещение/поворот) — только поворот, без пересчёта размера
         placedMarkers.forEach(updatePicTransform);
+        mapSigns.forEach(updatePicTransform);
     }
     positionAllText();
 }
@@ -2635,6 +2934,7 @@ function updateAllPicMarkers(event) {
         // а панели в этом режиме скрыты. Машинки можно двигать всегда, кроме
         // момента воспроизведения записи (играющие маркеры блокирует recplay.js).
         placedMarkers.forEach(m => m.update({ draggable: markerDraggable(m) && !m._playing }));
+        mapSigns.forEach(m => m.update({ draggable: markerDraggable(m) }));
         // при скрытии закрываем шторку и все панели
         if (hidden) {
             if (pddModal.classList.contains('visible')) togglePdd();
@@ -2781,16 +3081,18 @@ function updateAllPicMarkers(event) {
         }
     });
 
-    document.getElementById('addZnakBtn').addEventListener('click', () => {
+    document.getElementById('addZnakBtn').addEventListener('click', async () => {
         if (drawMode) stopDraw();
         if (eraserMode) stopEraser();
         if (textMode) stopTextMode();
         const modal = document.getElementById('znakModal');
-        if (modal.classList.contains('visible')) {
-            closeZnakPanel();
+        if (!signsLayerMode) {
+            await enterSignsLayer();
+            openZnakPanel('place');
             return;
         }
-        openZnakPanel('place');
+        // Повторное нажатие на галерею выходит из режима слоя знаков.
+        await exitSignsLayer();
     });
 
     const tlToggleBtn = document.getElementById('addTlBtn');
@@ -2826,7 +3128,7 @@ function updateAllPicMarkers(event) {
 <script src="padtext.js"></script>
 <script src="recplay.js"></script>
 <script src="trafficlights.js"></script>
-<script src="saveState.js?v=16"></script>
+<script src="saveState.js?v=17"></script>
 <script>
 // Deep-link сцены: startapp содержит s + постоянный ID сцены.
 // Сцены общие, привязки к аккаунту нет.

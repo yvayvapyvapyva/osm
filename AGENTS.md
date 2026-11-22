@@ -42,7 +42,7 @@
 - DNS редактора: `editor.ainstruktor.ru` — CNAME на `d5dsd5u1tsc8fm9dbsg5.s183zexc.apigw.yandexcloud.net`, DNS only (не проксируется Cloudflare).
 - OAuth: `PUBLIC_BASE_URL=https://ainstruktor.ru`, `PUBLIC_ALTERNATE_URLS=https://d5dsd5u1tsc8fm9dbsg5.s183zexc.apigw.yandexcloud.net`, `PUBLIC_EDITOR_URL=https://editor.ainstruktor.ru`. Redirect URI приложения Яндекса: apex, editor и служебный домен шлюза.
 - Статика: `node navigator3/scripts/build-static-deploy.js`, затем `yc storage s3 cp --recursive navigator3/deploy-2files/ s3://osmn-nav/`. Внешние `maplibre-gl.js`, `maplibre-gl.css`, `pmtiles.js`, `sortable.min.js` лежат в бакете отдельно и в `deploy-2files/` не попадают — при их обновлении загружать вручную.
-- `pad/deploy.sh` — функция `pad-osm` (ID `d4esfoiand5dinv3mfth`).
+- `pad/deploy.sh` — функция `pad-osm` (ID `d4esfoiand5dinv3mfth`). В PAD есть отдельный слой знаков для `navigator3`: он пишет в YDB `dbosm.owner_signs` под пользователем `SIGNS_OWNER_LOGIN` (по умолчанию `eliseev88888`), загружается сразу при запуске и всегда виден на карте; редактирование — в режиме «Слой знаков», сохранение — с паролем PAD.
 - Статика PAD: бакет `pad2`, сайт `https://pad2.website.yandexcloud.net/`.
 - `tts/navigator/deploy.sh` — функция TTS (ID `d4e3cj3q3ff36qlrhbg8`).
 - Полная синхронизация озвучки с маршрутами: `tts/navigator/sync_all.py` — читает `cmd`/`comm` из `nav-db` и YDB `navigator3`, синтезирует недостающее, чистит лишнее из `v1/manifest.json` и бакета `eia-tts`. Запуск без флагов — отчёт, с `--apply` — изменения.

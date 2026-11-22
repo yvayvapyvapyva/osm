@@ -17,6 +17,7 @@
 Деплой: см. pad/deploy.sh.
 """
 
+import datetime as _dt
 import hmac
 import json
 import os
@@ -28,8 +29,18 @@ import ydb
 import ydb.credentials
 
 
+SIGNS_OWNER_LOGIN = os.environ.get("SIGNS_OWNER_LOGIN", "").strip()
+SIGNS_OWNER_USER_ID = os.environ.get("SIGNS_OWNER_USER_ID", "").strip()
+MAX_SIGNS = 5000
+MAX_SIGNS_BYTES = 2_000_000
+
+
 def _scene_path() -> str:
     return os.environ["YDB_DATABASE"].rstrip("/") + "/scene"
+
+
+def _owner_signs_path() -> str:
+    return os.environ["YDB_DATABASE"].rstrip("/") + "/owner_signs"
 
 
 def _get_sa_token() -> dict:
@@ -85,6 +96,160 @@ def _ensure_table(session: ydb.Session) -> None:
         )
     if "id" not in cols:
         session.execute_scheme(f"ALTER TABLE `{path}` ADD COLUMN `id` Utf8;")
+
+
+def _ensure_owner_signs_table(session: ydb.Session) -> None:
+    """Таблица личной сцены знаков navigator3; PAD пишет в ту же строку."""
+    path = _owner_signs_path()
+    try:
+        session.describe_table(path)
+        return
+    except ydb.issues.SchemeError:
+        session.create_table(
+            path,
+            ydb.TableDescription()
+            .with_primary_keys("owner_user_id")
+            .with_columns(
+                ydb.Column("owner_user_id", ydb.OptionalType(ydb.PrimitiveType.Utf8)),
+                ydb.Column("data", ydb.OptionalType(ydb.PrimitiveType.Utf8)),
+                ydb.Column("updated_at", ydb.OptionalType(ydb.PrimitiveType.Timestamp)),
+            ),
+        )
+
+
+def _signs_owner(session: ydb.Session):
+    """Возвращает (user_id, login) владельца слоя знаков."""
+    if SIGNS_OWNER_USER_ID:
+        return SIGNS_OWNER_USER_ID, SIGNS_OWNER_LOGIN or SIGNS_OWNER_USER_ID
+    login = SIGNS_OWNER_LOGIN
+    if not login:
+        raise ValueError("Слой знаков не настроен: задайте SIGNS_OWNER_LOGIN или SIGNS_OWNER_USER_ID")
+    query = session.prepare(
+        "DECLARE $login AS Utf8; "
+        "SELECT user_id FROM users WHERE login = $login LIMIT 1;"
+    )
+    rows = session.transaction().execute(
+        query, parameters={"$login": login}, commit_tx=True
+    )[0].rows
+    if not rows:
+        raise ValueError(f"Пользователь {login} не найден")
+    return _ascii(rows[0].user_id), login
+
+
+def _owner_signs_doc(session: ydb.Session):
+    user_id, login = _signs_owner(session)
+    query = session.prepare(
+        "DECLARE $owner_user_id AS Utf8; "
+        "SELECT data FROM owner_signs WHERE owner_user_id = $owner_user_id;"
+    )
+    rows = session.transaction().execute(
+        query, parameters={"$owner_user_id": user_id}, commit_tx=True
+    )[0].rows
+    data = {}
+    if rows:
+        try:
+            parsed = json.loads(_ascii(rows[0].data))
+            if isinstance(parsed, dict):
+                data = parsed
+        except Exception:
+            data = {}
+    data.setdefault("version", 1)
+    data.setdefault("markers", [])
+    return user_id, login, data
+
+
+def _normalize_sign(marker):
+    if not isinstance(marker, dict) or marker.get("kind") != "znak":
+        return None
+    code = _ascii(marker.get("code") or "").strip()
+    file_name = _ascii(marker.get("file") or "").strip()
+    if not code or not file_name:
+        return None
+    try:
+        lat = float(marker.get("lat"))
+        lon = float(marker.get("lon"))
+    except (TypeError, ValueError):
+        return None
+    try:
+        heading = float(marker.get("heading") or 0)
+    except (TypeError, ValueError):
+        heading = 0.0
+    plates = [
+        _ascii(plate).strip()
+        for plate in (marker.get("plates") or [])
+        if _ascii(plate).strip()
+    ]
+    sign = {
+        "kind": "znak",
+        "code": code,
+        "file": file_name,
+        "lat": lat,
+        "lon": lon,
+        "heading": heading,
+        "leg": bool(marker.get("leg")),
+        "plates": plates,
+    }
+    if "value" in marker:
+        sign["value"] = marker.get("value")
+    return sign
+
+
+def _save_owner_signs(session: ydb.Session, markers) -> int:
+    if not isinstance(markers, list):
+        raise ValueError("Поле 'markers' должно быть массивом")
+    normalized = [sign for sign in (_normalize_sign(m) for m in markers) if sign]
+    if len(normalized) > MAX_SIGNS:
+        raise ValueError(f"Слишком много знаков: максимум {MAX_SIGNS}")
+    user_id, _login = _signs_owner(session)
+    query = session.prepare(
+        "DECLARE $owner_user_id AS Utf8; "
+        "SELECT data FROM owner_signs WHERE owner_user_id = $owner_user_id;"
+    )
+    rows = session.transaction().execute(
+        query, parameters={"$owner_user_id": user_id}, commit_tx=True
+    )[0].rows
+    data = {}
+    if rows:
+        try:
+            parsed = json.loads(_ascii(rows[0].data))
+            if isinstance(parsed, dict):
+                data = parsed
+        except Exception:
+            data = {}
+    data.setdefault("version", 1)
+    data["markers"] = normalized
+    data["savedAt"] = _dt.datetime.now(_dt.timezone.utc).isoformat()
+    payload = json.dumps(data, ensure_ascii=False)
+    if len(payload.encode("utf-8")) > MAX_SIGNS_BYTES:
+        raise ValueError("Слой знаков слишком большой")
+    write_query = session.prepare(
+        "DECLARE $owner_user_id AS Utf8; "
+        "DECLARE $data AS Utf8; "
+        "DECLARE $updated_at AS Timestamp; "
+        "UPSERT INTO owner_signs (owner_user_id, data, updated_at) "
+        "VALUES ($owner_user_id, $data, $updated_at);"
+    )
+    session.transaction().execute(
+        write_query,
+        parameters={
+            "$owner_user_id": user_id,
+            "$data": payload,
+            "$updated_at": _dt.datetime.now(_dt.timezone.utc),
+        },
+        commit_tx=True,
+    )
+    return len(normalized)
+
+
+def _delete_owner_signs(session: ydb.Session) -> None:
+    user_id, _login = _signs_owner(session)
+    query = session.prepare(
+        "DECLARE $owner_user_id AS Utf8; "
+        "DELETE FROM owner_signs WHERE owner_user_id = $owner_user_id;"
+    )
+    session.transaction().execute(
+        query, parameters={"$owner_user_id": user_id}, commit_tx=True
+    )
 
 
 def _new_scene_id() -> str:
@@ -273,10 +438,30 @@ def handler(event, context):
         driver = ydb.Driver(_driver())
         driver.wait(timeout=10)
         with ydb.SessionPool(driver, size=1) as pool:
-            def run(session):
-                _ensure_table(session)
-                return _dispatch(session, method, name, scene_id, body)
-            result = pool.retry_operation_sync(run)
+            if action == "owner_signs":
+                def run_signs(session):
+                    _ensure_owner_signs_table(session)
+                    if method == "GET":
+                        user_id, login, data = _owner_signs_doc(session)
+                        return {
+                            "ok": True,
+                            "owner": {"user_id": user_id, "login": login},
+                            "data": data,
+                        }
+                    if method in ("POST", "PUT"):
+                        markers = body.get("markers") if isinstance(body, dict) else None
+                        count = _save_owner_signs(session, markers)
+                        return {"ok": True, "saved": True, "count": count}
+                    if method == "DELETE":
+                        _delete_owner_signs(session)
+                        return {"ok": True, "deleted": True}
+                    raise ValueError("Метод не поддерживается для слоя знаков")
+                result = pool.retry_operation_sync(run_signs)
+            else:
+                def run(session):
+                    _ensure_table(session)
+                    return _dispatch(session, method, name, scene_id, body)
+                result = pool.retry_operation_sync(run)
         return _ok(result)
     except Exception as e:
         return _error(str(e))

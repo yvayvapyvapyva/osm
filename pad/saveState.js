@@ -991,6 +991,11 @@
         }
     }
 
+    // Для отдельного слоя знаков PAD использует тот же API и пароль PAD.
+    window.padApi = api;
+    window.requestPadAdminPassword = requestAdminPassword;
+    window.padToast = (text, _type, duration) => showToast(text, duration || 2200);
+
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', init);
     } else {
