@@ -17,13 +17,12 @@
   `report.js`, `editor.css` скопированы из `navigatortg/`; остальные файлы
   относятся к версии на MapLibre. Правки здесь не влияют на `navigatortg/`.
 
-API — воркер `nav-api-v2` (`https://nav-api-v2.ivan43103.workers.dev`),
-данные — в общей D1 `nav-db`, той же, что у `navigatortg/`. Поэтому покупки,
-маршруты и папки видны обеим версиям: оплата в старой версии открывает папку
-в новой и наоборот. Исходники воркера лежат в `navigatortg2/cloudflare_worker/`
-(`api.js`, `lib/`, `schema.sql`, `wrangler-api.toml`). Старый воркер `nav-api`
-патчен под общую схему: новые маршруты и папки он привязывает к
-`DEFAULT_OWNER_TG_ID` и складывает в корневую папку владельца.
+API — единственный рабочий воркер `nav-api-v2`
+(`https://nav-api-v2.ivan43103.workers.dev`), данные — в D1 `nav-db`.
+Исходники лежат в `navigatortg2/cloudflare_worker/` (`api.js`, `lib/`,
+`schema.sql`, `wrangler-api.toml`). Старый воркер `nav-api` удалён; его код
+остался в `navigatortg/cloudflare_worker/` и больше не деплоится. Вебхук
+`A152Bot` и Mini App `nav` работают через `nav-api-v2`.
 
 ### Воркер и база
 
@@ -34,8 +33,14 @@ npx wrangler deploy --config=wrangler-api.toml
 ```
 
 Схема `nav-db` содержит миграции `migrations/`: `owner_tg_id` в `roads` и
-`folders`, `owner_roots`, `owner_signs`, `route_views`. Отдельная база
-`nav-db-v2` осталась от тестового этапа и рабочими воркерами не используется.
+`folders`, `owner_roots`, `owner_signs`, `route_views`, снимок владельца
+папки в `purchases`. Отдельная база `nav-db-v2` осталась от тестового этапа
+и рабочими воркерами не используется.
+
+Покупки в `purchases` хранят снимок на момент оплаты: `owner_tg_id`,
+`owner_username`, `folder_name`, `folder_path`, `price_stars`,
+`owner_snapshot_ts`. Его заполняет `recordPurchase` в `lib/shop.js`; старые
+покупки восстановлены бэкфиллом и помечены `owner_backfilled = 1`.
 
 Секреты воркера:
 

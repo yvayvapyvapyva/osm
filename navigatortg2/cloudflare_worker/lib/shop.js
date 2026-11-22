@@ -10,6 +10,34 @@ export function isAdmin(chatId, env) {
   return adminKey.split(",").map((s) => s.trim()).filter(Boolean).includes(String(chatId));
 }
 
+// Снимок владельца и папки на момент оплаты. Нужен, чтобы будущая
+// партнёрская программа могла считать продажи даже после переименования,
+// перемещения или удаления папки. Ошибки не должны ломать запись покупки.
+async function folderSnapshot(env, folderId) {
+  const id = Number(folderId);
+  if (!Number.isFinite(id)) return null;
+  const folder = await env.DB.prepare(
+    'SELECT id, name, price, owner_tg_id FROM folders WHERE id = ?'
+  ).bind(id).first();
+  if (!folder) return null;
+  const ownerId = String(folder.owner_tg_id || '');
+  let ownerUsername = '';
+  if (ownerId) {
+    const root = await env.DB.prepare(
+      'SELECT owner_username FROM owner_roots WHERE owner_tg_id = ?'
+    ).bind(ownerId).first();
+    ownerUsername = root && root.owner_username ? String(root.owner_username) : '';
+  }
+  const folderPath = await getFolderPath(env, id);
+  return {
+    ownerId,
+    ownerUsername,
+    folderName: folder.name ? String(folder.name) : '',
+    folderPath: folderPath || '',
+    price: Number(folder.price) || 0,
+  };
+}
+
 // Единственная точка записи покупки. Используется обоими путями:
 //   1) вебхук Telegram (successful_payment) — передаёт сырой платёж (raw);
 //   2) самовосстановление shop_claim — передаёт транзакцию из getStarTransactions.
@@ -44,11 +72,22 @@ export async function recordPurchase(env, pay) {
     expiresAt = ts + 30 * 24 * 3600;
   }
 
+  let snapshot = null;
+  if (productType === 'folder_access' && /^\d+$/.test(productId)) {
+    try {
+      snapshot = await folderSnapshot(env, productId);
+    } catch (e) {
+      console.error('purchase snapshot error:', (e && e.message) || e);
+    }
+  }
+
   const res = await env.DB.prepare(
     `INSERT OR IGNORE INTO purchases
        (user_id, product_type, product_id, charge_id, payload,
-        stars, currency, status, ts, expires_at, raw_response)
-     VALUES (?, ?, ?, ?, ?, ?, 'XTR', 'active', ?, ?, ?)`
+        stars, currency, status, ts, expires_at, raw_response,
+        owner_tg_id, owner_username, folder_name, folder_path,
+        price_stars, owner_snapshot_ts, owner_backfilled)
+     VALUES (?, ?, ?, ?, ?, ?, 'XTR', 'active', ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)`
   ).bind(
     pay.userId != null ? String(pay.userId) : null,
     productType,
@@ -58,7 +97,13 @@ export async function recordPurchase(env, pay) {
     stars,
     ts,
     expiresAt,
-    pay.raw ? JSON.stringify(pay.raw) : null
+    pay.raw ? JSON.stringify(pay.raw) : null,
+    snapshot ? snapshot.ownerId : '',
+    snapshot ? snapshot.ownerUsername : '',
+    snapshot ? snapshot.folderName : '',
+    snapshot ? snapshot.folderPath : '',
+    snapshot ? snapshot.price : 0,
+    snapshot ? now : 0
   ).run();
 
   if (!(res.meta && res.meta.changes)) return { duplicate: true };
