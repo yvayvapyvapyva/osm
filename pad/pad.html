@@ -137,24 +137,30 @@
         }
         #pddBtn:active { transform:translateX(-50%) scale(0.92); }
         #pddBtn.active { background:rgba(48,209,88,0.5); border-color:#30D158; }
-        /* Панель режима «Слой знаков» */
-        #signsLayerBar {
-            position:fixed; top:calc(76px + env(safe-area-inset-top) + var(--tg-top)); left:50%;
-            transform:translateX(-50%); z-index:9006; display:none; align-items:center; gap:8px;
-            max-width:calc(100vw - 24px); padding:6px; border-radius:16px;
-            border:0.5px solid rgba(255,255,255,0.12); background:rgba(15,15,15,0.88); color:#fff;
-            box-shadow:0 8px 32px rgba(0,0,0,0.35); box-sizing:border-box; white-space:nowrap;
+        /* Диалог выхода из режима «Слой знаков» */
+        #signsExitModal {
+            position:fixed; inset:0; z-index:9450; display:none; align-items:center; justify-content:center;
+            padding:24px; background:rgba(0,0,0,0.66); box-sizing:border-box;
         }
-        body.signs-layer-mode #signsLayerBar { display:flex; }
-        #signsLayerBarLabel { font-size:12px; font-weight:700; color:rgba(255,255,255,0.86); padding:0 4px; overflow:hidden; text-overflow:ellipsis; }
-        #signsLayerBarCount { font-size:12px; font-weight:700; color:#30D158; }
-        #signsLayerBar button {
-            height:34px; padding:0 10px; border-radius:10px; border:0.5px solid rgba(255,255,255,0.14);
-            background:rgba(255,255,255,0.1); color:#fff; font-size:12px; font-weight:700; cursor:pointer;
+        #signsExitModal.visible { display:flex; }
+        #signsExitBox {
+            width:min(100%,380px); display:flex; flex-direction:column; gap:12px;
+            padding:20px; border-radius:18px; border:1px solid rgba(255,255,255,0.16);
+            background:rgba(20,20,24,0.98); box-shadow:0 20px 60px rgba(0,0,0,0.5);
+            color:#fff; box-sizing:border-box;
         }
-        #signsLayerBar button:active { background:rgba(255,255,255,0.2); }
-        #signsLayerBar button.danger { color:#FF6961; }
-        #signsLayerBar button.dirty { box-shadow:0 0 0 2px rgba(255,214,10,0.5); }
+        #signsExitTitle { margin:0; text-align:center; font-size:18px; }
+        #signsExitInfo { display:flex; flex-direction:column; gap:6px; font-size:14px; color:rgba(255,255,255,0.78); }
+        #signsExitInfo b { color:#fff; }
+        #signsExitError { min-height:18px; color:#ff6961; font-size:13px; text-align:center; overflow-wrap:anywhere; }
+        #signsExitButtons { display:flex; flex-direction:column; gap:8px; }
+        #signsExitButtons button {
+            height:44px; border-radius:12px; border:0.5px solid rgba(255,255,255,0.14);
+            background:rgba(255,255,255,0.1); color:#fff; font-size:14px; font-weight:700; cursor:pointer;
+        }
+        #signsExitButtons button.primary { background:#2FA8E0; border-color:#2FA8E0; }
+        #signsExitButtons button:active { background:rgba(255,255,255,0.2); }
+        #signsExitButtons button:disabled { opacity:0.5; }
         body.signs-layer-mode #addPicBtn,
         body.signs-layer-mode #addTlBtn,
         body.signs-layer-mode #drawBtn,
@@ -240,19 +246,54 @@
             box-sizing:border-box;
         }
         .znak-modal.visible { display:flex; }
-        .znak-modal.is-sheet {
+        /* Отдельная панель групп знаков — всегда видна в режиме знаков. */
+        #signsGroupsBar {
+            display:none; position:fixed; left:0; right:0; bottom:0; z-index:9432;
+            box-sizing:border-box; padding:6px 8px calc(6px + env(safe-area-inset-bottom));
+            background:rgba(15,15,15,0.97); border-top:0.5px solid rgba(255,255,255,0.14);
+            box-shadow:0 -8px 28px rgba(0,0,0,0.35);
+        }
+        body.signs-layer-mode #signsGroupsBar { display:block; }
+        /* В режиме знаков окно каталога прижато к панели групп знаков. */
+        .znak-modal.is-signs-window {
             align-items:flex-end; justify-content:center;
-            padding:0 0 var(--pad-sheet-bottom, calc(76px + env(safe-area-inset-bottom)));
-            background:transparent; backdrop-filter:none; -webkit-backdrop-filter:none;
-            pointer-events:none;
+            padding:0 8px var(--signs-bar-h, 67px);
         }
-        .znak-modal.is-sheet #znakPanel {
-            pointer-events:auto; width:100vw; max-width:100vw;
-            height:min(44vh, 360px); border-radius:18px 18px 0 0;
-            border-bottom:none; padding:10px 12px;
-            max-height:calc(100vh - var(--pad-sheet-bottom, calc(76px + env(safe-area-inset-bottom))) - 12px);
+        .znak-modal.is-signs-window #znakPanel {
+            width:100%; max-width:100vw;
+            height:72vh;
+            max-height:calc(100vh - var(--signs-bar-h, 67px) - env(safe-area-inset-top) - 12px);
         }
-        .znak-modal.is-sheet #znakModalTitleRow { display:none; }
+        #signsExitTop, #signsSaveTop {
+            display:none; position:fixed; top:calc(12px + env(safe-area-inset-top) + var(--tg-top));
+            height:44px; padding:0 18px; border-radius:22px; z-index:9430;
+            border:0.5px solid rgba(255,255,255,0.18); background:rgba(15,15,15,0.92); color:#fff;
+            font-size:14px; font-weight:700; cursor:pointer; align-items:center; justify-content:center;
+            box-shadow:0 8px 28px rgba(0,0,0,0.35); touch-action:manipulation;
+        }
+        #signsExitTop { right:12px; }
+        #signsSaveTop { left:50%; transform:translateX(-50%); background:#2FA8E0; border-color:#2FA8E0; }
+        #signsSaveTop .signs-save-short { display:none; }
+        @media (max-width: 360px) {
+            #signsSaveTop .signs-save-long { display:none; }
+            #signsSaveTop .signs-save-short { display:inline; }
+        }
+        #signsExitTop:active { background:rgba(255,59,48,0.45); border-color:#FF453A; }
+        #signsSaveTop:active { background:#1E90D0; }
+        body.signs-layer-mode #signsExitTop { display:flex; }
+        body.signs-layer-mode #signsSaveTop.visible { display:flex; }
+        /* В режиме знаков остаются только верхние кнопки и окно каталога. */
+        body.signs-layer-mode .fab,
+        body.signs-layer-mode #savePddGroup,
+        body.signs-layer-mode #historyBtn,
+        body.signs-layer-mode #rotateBtn,
+        body.signs-layer-mode #pddBtn,
+        body.signs-layer-mode #recAllBtn,
+        body.signs-layer-mode #telemetryPanel,
+        body.signs-layer-mode #tlMini,
+        body.signs-layer-mode #textPanel,
+        body.signs-layer-mode #colorPanel,
+        body.signs-layer-mode #widthSlider { display:none !important; }
         #znakPanel {
             position:relative; width:min(760px, 100%); height:min(70vh, 620px);
             max-width:100%; box-sizing:border-box;
@@ -261,22 +302,6 @@
             display:flex; flex-direction:column; align-items:stretch; gap:8px;
             box-shadow:0 24px 80px rgba(0,0,0,0.55);
         }
-        #znakModalTitleRow {
-            position:relative; flex-shrink:0; min-height:34px;
-            display:flex; align-items:center; justify-content:center;
-        }
-        #znakModalTitle {
-            color:#fff; font-size:16px; font-weight:700;
-            letter-spacing:-0.2px; text-align:center; padding:0 44px;
-        }
-        #znakCloseBtn {
-            position:absolute; right:0; top:50%; transform:translateY(-50%);
-            width:34px; height:34px; border-radius:10px; padding:0;
-            border:1px solid rgba(255,255,255,0.16); background:rgba(255,255,255,0.08);
-            color:#fff; cursor:pointer; display:flex; align-items:center; justify-content:center;
-            -webkit-tap-highlight-color:transparent; touch-action:manipulation;
-        }
-        #znakCloseBtn:active { background:rgba(255,59,48,0.35); border-color:#FF453A; }
         #znakPanelHead { display:flex; align-items:center; gap:8px; flex-shrink:0; min-width:0; }
         #znakTabs {
             display:flex; align-items:stretch; gap:5px; flex:1; min-width:0;
@@ -297,23 +322,24 @@
             white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%;
         }
         .znak-tab.active { background:rgba(48,209,88,0.22); border-color:#30D158; color:#fff; }
-        #znakSearchToggle {
+        #znakTopRow { display:flex; align-items:center; gap:8px; flex-shrink:0; }
+        #znakCloseBtn {
             flex-shrink:0; width:38px; height:38px; border-radius:11px;
             border:1px solid rgba(255,255,255,0.16); background:rgba(255,255,255,0.08);
             color:#fff; cursor:pointer; display:flex; align-items:center; justify-content:center; padding:0;
             -webkit-tap-highlight-color:transparent; touch-action:manipulation;
         }
-        #znakSearchToggle.active { background:rgba(48,209,88,0.22); border-color:#30D158; }
-        #znakSearchRow { flex-shrink:0; }
-        #znakSearchRow[hidden] { display:none; }
+        #znakCloseBtn:active { background:rgba(255,255,255,0.18); }
         #znakSearch {
-            width:100%; box-sizing:border-box; padding:9px 11px; border-radius:10px;
+            flex:1; min-width:0; box-sizing:border-box; padding:9px 11px; border-radius:10px;
             border:1px solid rgba(255,255,255,0.18); background:rgba(255,255,255,0.08);
             color:#fff; font:inherit; font-size:14px; outline:none;
         }
         #znakSearch::placeholder { color:rgba(255,255,255,0.45); }
         #znakSearch:focus { border-color:#30D158; }
-        #znakBody { display:flex; flex:1; min-height:0; gap:2px; }
+        #znakBody { display:flex; flex:1; min-height:0; gap:2px; order:1; }
+        /* Вкладки групп — внизу экрана, поиск — вверху окна. */
+        #znakPanelHead { order:3; }
         #znakScroll { flex:1; overflow-y:auto; overflow-x:hidden; -webkit-overflow-scrolling:touch; scrollbar-width:none; overscroll-behavior:contain; }
         #znakScroll::-webkit-scrollbar { display:none; }
         #znakScrollbar { position:relative; flex-shrink:0; width:24px; margin-left:2px; }
@@ -361,6 +387,11 @@
             z-index:9005; display:none; flex-direction:row; gap:10px;
         }
         #signalBtns.visible { display:flex; }
+        /* В режиме знаков панель действий со знаком остаётся слева сверху. */
+        body.signs-layer-mode #signalBtns {
+            top:calc(76px + env(safe-area-inset-top) + var(--tg-top));
+            left:12px; z-index:9431;
+        }
         /* Мини-светофор: панель активного светофора вместо кнопок поворотников */
         #tlMini {
             position:fixed; top:calc(76px + env(safe-area-inset-top)); left:12px;
@@ -596,10 +627,22 @@
     <svg viewBox="0 0 24 24" width="22" height="22" fill="#fff"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>
 </button>
 <button id="pddBtn">ПДД</button>
-<div id="signsLayerBar" role="group" aria-label="Слой знаков">
-    <span id="signsLayerBarLabel">Слой знаков: eliseev88888</span>
-    <span id="signsLayerBarCount">0</span>
-    <button id="signsLayerSave" type="button">Сохранить</button>
+<button id="signsExitTop" type="button">Выйти</button>
+<button id="signsSaveTop" type="button"><span class="signs-save-long">Сохранить изменения</span><span class="signs-save-short">Сохранить</span></button>
+<div id="signsExitModal" role="dialog" aria-modal="true" aria-labelledby="signsExitTitle">
+    <div id="signsExitBox">
+        <h3 id="signsExitTitle">Сохранить изменения?</h3>
+        <div id="signsExitInfo">
+            <div>Профиль: <b id="signsExitOwner">eliseev88888</b></div>
+            <div>Знаков: <b id="signsExitBefore">0</b> → <b id="signsExitAfter">0</b></div>
+        </div>
+        <div id="signsExitError" role="alert"></div>
+        <div id="signsExitButtons">
+            <button id="signsExitSave" type="button" class="primary">Сохранить</button>
+            <button id="signsExitDiscard" type="button">Не сохранять</button>
+            <button id="signsExitCancel" type="button">Отмена</button>
+        </div>
+    </div>
 </div>
 <div id="pddModal">
     <div class="pdd-header">
@@ -634,23 +677,18 @@
 <div id="picPanel" class="visible">
     <div id="picGrid"></div>
 </div>
+<div id="signsGroupsBar">
+    <div id="znakPanelHead">
+        <div id="znakTabs"></div>
+    </div>
+</div>
 <div id="znakModal" class="znak-modal" onclick="if(event.target===this) closeZnakPanel()">
-    <div id="znakPanel" role="dialog" aria-modal="true" aria-labelledby="znakModalTitle">
-        <div id="znakModalTitleRow">
-            <div id="znakModalTitle">Добавить знак</div>
-            <button id="znakCloseBtn" type="button" aria-label="Закрыть" title="Закрыть" onclick="closeZnakPanel()">
+    <div id="znakPanel" role="dialog" aria-modal="true" aria-label="Добавить знак">
+        <div id="znakTopRow">
+            <input id="znakSearch" type="search" placeholder="Поиск по всем знакам" autocomplete="off" oninput="znakSearchChanged(this.value)">
+            <button id="znakCloseBtn" type="button" aria-label="Закрыть окно" title="Закрыть" onclick="closeZnakPanel()">
                 <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
             </button>
-        </div>
-        <div id="znakPanelHead">
-            <div id="znakTabs"></div>
-            <button id="znakSearchToggle" type="button" aria-label="Поиск по знакам" aria-expanded="false" title="Поиск"
-                onclick="setZnakSearchVisible(document.getElementById('znakSearchRow').hidden)">
-                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M16.5 16.5L21 21"/></svg>
-            </button>
-        </div>
-        <div id="znakSearchRow" hidden>
-            <input id="znakSearch" type="search" placeholder="Поиск по всем знакам" autocomplete="off" oninput="znakSearchChanged(this.value)">
         </div>
         <div id="znakBody">
             <div id="znakScroll">
@@ -712,6 +750,7 @@ let map = null, userMarker = null, lastPos = null;
 let placedMarkers = [], selectedPic = null, drawMode = false, drawFeature = null, drawing = false;
 let mapSigns = [], signsLayerMode = false, signsLayerDirty = false, signsLayerBusy = false;
 let signsLayerOwnerLogin = 'eliseev88888';
+let signsLayerBaseCount = 0;
 let signsLayerLoadPromise = null;
 let eraserMode = false, drawnLines = [], eraserDrag = false;
 let drawColor = '#000000';
@@ -752,7 +791,6 @@ const SIGN_SPRITE_URL = 'znaki/sprite.webp?v=3';
 let znakCatalogPromise = null;
 let znakGroup = 'all';
 let znakSearchQuery = '';
-let znakSearchVisible = false;
 let znakScrollTop = 0;
 let znakPanelMode = 'place';
 const ZNAK_GROUPS = [
@@ -952,36 +990,11 @@ function buildZnakTabs() {
             }
             syncZnakTabActive();
             buildZnakGrid(true);
+            const modal = document.getElementById('znakModal');
+            if (modal && !modal.classList.contains('visible')) openZnakPanel('place');
         });
         tabs.appendChild(button);
     });
-}
-
-function applyZnakSearchVisibility(visible) {
-    znakSearchVisible = !!visible;
-    const row = document.getElementById('znakSearchRow');
-    const button = document.getElementById('znakSearchToggle');
-    if (row) row.hidden = !visible;
-    if (button) {
-        button.classList.toggle('active', !!visible);
-        button.setAttribute('aria-expanded', visible ? 'true' : 'false');
-    }
-}
-
-function setZnakSearchVisible(visible) {
-    const input = document.getElementById('znakSearch');
-    applyZnakSearchVisibility(visible);
-    if (!visible) {
-        if (znakSearchQuery) {
-            znakSearchQuery = '';
-            if (input) input.value = '';
-            buildZnakGrid(true);
-        }
-        if (input) input.blur();
-    } else if (input) {
-        // Фокус в том же жесте, чтобы на мобильном открылась клавиатура.
-        input.focus();
-    }
 }
 
 function filteredZnakItems() {
@@ -999,17 +1012,6 @@ function filteredZnakItems() {
     return items;
 }
 
-function updateZnakPanelHeader() {
-    const titleRow = document.getElementById('znakModalTitleRow');
-    if (titleRow) titleRow.hidden = znakPanelMode !== 'attach';
-    const title = document.getElementById('znakModalTitle');
-    if (title) {
-        title.textContent = znakPanelMode === 'attach'
-            ? 'Добавить знак на столб'
-            : 'Добавить знак';
-    }
-}
-
 function buildZnakGrid(resetScroll) {
     const grid = document.getElementById('znakGrid');
     if (!grid) return;
@@ -1019,7 +1021,6 @@ function buildZnakGrid(resetScroll) {
     }
     const scrollEl = document.getElementById('znakScroll');
     const prevTop = scrollEl ? scrollEl.scrollTop : 0;
-    updateZnakPanelHeader();
     grid.innerHTML = '';
     const items = filteredZnakItems();
     if (!items.length) {
@@ -1078,6 +1079,7 @@ function placeSignAtCenter(item) {
     if (!item || !map || !map.center) return;
     const lon = map.center[0];
     const lat = map.center[1];
+    // После выбора знака окно закрывается, чтобы не мешать карте.
     closeZnakPanel();
     const marker = buildPicMarker(true, item.file, lat, lon, -mapRot, item.code);
     map.addChild(marker);
@@ -1087,6 +1089,17 @@ function placeSignAtCenter(item) {
     updateSignalBtns();
     commit();
 }
+
+function syncSignsWindowOffset() {
+    const modal = document.getElementById('znakModal');
+    const bar = document.getElementById('signsGroupsBar');
+    if (!modal || !bar) return;
+    const height = signsLayerMode ? Math.round(bar.getBoundingClientRect().height) : 0;
+    modal.style.setProperty('--signs-bar-h', height + 'px');
+}
+window.addEventListener('resize', () => {
+    if (signsLayerMode) syncSignsWindowOffset();
+});
 
 function openZnakPanel(mode) {
     const panel = document.getElementById('znakPanel');
@@ -1098,10 +1111,11 @@ function openZnakPanel(mode) {
     }
     const search = document.getElementById('znakSearch');
     if (search) search.value = znakSearchQuery;
-    applyZnakSearchVisibility(znakSearchVisible);
     buildZnakTabs();
     const modal = document.getElementById('znakModal');
-    modal.classList.toggle('is-sheet', znakPanelMode === 'place');
+    // Галерея знаков — отдельное окно; в режиме знаков оно начинается от панели групп.
+    modal.classList.toggle('is-signs-window', !!signsLayerMode);
+    syncSignsWindowOffset();
     modal.classList.add('visible');
     document.getElementById('addZnakBtn').classList.add('open');
     const picPanel = document.getElementById('picPanel');
@@ -1632,22 +1646,14 @@ function addDrawPoint(coords, screen) {
 }
 
 // ---------- Отдельный слой знаков для навигатора ----------
-function signsLayerCountText() {
-    return String(mapSigns.length);
-}
-
-function updateSignsLayerUi() {
-    const count = document.getElementById('signsLayerBarCount');
-    if (count) count.textContent = signsLayerCountText();
-    const label = document.getElementById('signsLayerBarLabel');
-    if (label) label.textContent = 'Знаки: ' + signsLayerOwnerLogin;
-    const save = document.getElementById('signsLayerSave');
-    if (save) save.classList.toggle('dirty', signsLayerDirty);
+function updateSignsSaveTop() {
+    const btn = document.getElementById('signsSaveTop');
+    if (btn) btn.classList.toggle('visible', signsLayerMode && signsLayerDirty);
 }
 
 function markSignsLayerDirty() {
     signsLayerDirty = true;
-    updateSignsLayerUi();
+    updateSignsSaveTop();
 }
 
 function signsLayerApi(method, body, password) {
@@ -1674,7 +1680,6 @@ function clearSignsLayerMarkers() {
     mapSigns.slice().forEach(removeMapSign);
     mapSigns = [];
     setActiveCar(null);
-    updateSignsLayerUi();
 }
 
 // Вне режима «Слой знаков» знаки только отображаются: выделять,
@@ -1729,8 +1734,9 @@ async function loadSignsLayer() {
         const markers = Array.isArray(data.markers) ? data.markers : [];
         markers.forEach(addSignFromData);
         disableMapSignsEditing();
+        signsLayerBaseCount = markers.length;
         signsLayerDirty = false;
-        updateSignsLayerUi();
+        updateSignsSaveTop();
         return markers.length;
     })();
     try {
@@ -1776,32 +1782,71 @@ async function enterSignsLayer() {
     setActiveCar(null);
     signsLayerMode = true;
     document.body.classList.add('signs-layer-mode');
-    const btn = document.getElementById('signsLayerBtn');
-    if (btn) btn.classList.add('active');
-    updateSignsLayerUi();
     try {
-        const count = await loadSignsLayer();
-        padToast('Слой знаков: ' + count + ' шт.', 'info', 1800);
+        await loadSignsLayer();
     } catch (e) {
         padToast('Не удалось загрузить слой знаков: ' + e.message, 'error', 4000);
     }
 }
 
-async function exitSignsLayer() {
-    if (!signsLayerMode) return;
-    if (signsLayerDirty && !window.confirm('Есть несохранённые знаки. Выйти без сохранения?')) return;
-    if (signsLayerDirty) {
-        // Возвращаем на карту сохранённую версию, а не несохранённые правки.
-        try { await loadSignsLayer(); } catch (e) {}
-    }
+function finishExitSignsLayer() {
     signsLayerMode = false;
     signsLayerDirty = false;
     document.body.classList.remove('signs-layer-mode');
     closeSignsLayerPanels();
-    const btn = document.getElementById('signsLayerBtn');
-    if (btn) btn.classList.remove('active');
     setActiveCar(null);
     disableMapSignsEditing();
+    updateSignsSaveTop();
+}
+
+function showSignsExitDialog() {
+    return new Promise(resolve => {
+        const modal = document.getElementById('signsExitModal');
+        const save = document.getElementById('signsExitSave');
+        const discard = document.getElementById('signsExitDiscard');
+        const cancel = document.getElementById('signsExitCancel');
+        const error = document.getElementById('signsExitError');
+        if (!modal || !save || !discard || !cancel) {
+            resolve(window.confirm('Есть несохранённые знаки. Сохранить изменения?') ? 'save' : 'discard');
+            return;
+        }
+        document.getElementById('signsExitOwner').textContent = signsLayerOwnerLogin;
+        document.getElementById('signsExitBefore').textContent = String(signsLayerBaseCount);
+        document.getElementById('signsExitAfter').textContent = String(mapSigns.length);
+        if (error) error.textContent = '';
+        modal.classList.add('visible');
+        const close = value => {
+            modal.classList.remove('visible');
+            save.disabled = false;
+            resolve(value);
+        };
+        save.onclick = async () => {
+            save.disabled = true;
+            if (error) error.textContent = '';
+            const ok = await saveSignsLayer();
+            if (ok) close('save');
+            else {
+                save.disabled = false;
+                if (error) error.textContent = 'Не удалось сохранить изменения';
+            }
+        };
+        discard.onclick = () => close('discard');
+        cancel.onclick = () => close('cancel');
+    });
+}
+
+async function requestExitSignsLayer() {
+    if (!signsLayerMode) return;
+    if (!signsLayerDirty) {
+        finishExitSignsLayer();
+        return;
+    }
+    const choice = await showSignsExitDialog();
+    if (choice === 'cancel') return;
+    if (choice === 'discard') {
+        try { await loadSignsLayer(); } catch (e) {}
+    }
+    finishExitSignsLayer();
 }
 
 function collectSignsLayerMarkers() {
@@ -1823,30 +1868,35 @@ function collectSignsLayerMarkers() {
 }
 
 async function saveSignsLayer() {
-    if (!signsLayerMode || signsLayerBusy) return;
+    if (!signsLayerMode || signsLayerBusy) return false;
     const password = await window.requestPadAdminPassword();
-    if (!password) return;
+    if (!password) return false;
     signsLayerBusy = true;
     try {
         const markers = collectSignsLayerMarkers();
         const result = await signsLayerApi('POST', { markers }, password);
+        signsLayerBaseCount = markers.length;
         signsLayerDirty = false;
-        updateSignsLayerUi();
+        updateSignsSaveTop();
         padToast('Слой знаков сохранён: ' + ((result && result.count) || markers.length), 'success', 2500);
+        return true;
     } catch (e) {
         padToast('Не удалось сохранить слой: ' + e.message, 'error', 4000);
+        return false;
     } finally {
         signsLayerBusy = false;
     }
 }
 
-function bindSignsLayerUi() {
-    const save = document.getElementById('signsLayerSave');
-    if (save) save.addEventListener('click', saveSignsLayer);
-    updateSignsLayerUi();
+const signsExitTop = document.getElementById('signsExitTop');
+if (signsExitTop) {
+    signsExitTop.addEventListener('click', () => requestExitSignsLayer());
 }
-
-bindSignsLayerUi();
+const signsSaveTop = document.getElementById('signsSaveTop');
+if (signsSaveTop) {
+    signsSaveTop.addEventListener('click', () => saveSignsLayer());
+}
+updateSignsSaveTop();
 initSignsLayerOnStart();
 
 // Фабрика маркера (машинка/знак): используется placePic и restoreScene
@@ -3069,8 +3119,12 @@ function updateAllPicMarkers(event) {
             openZnakPanel('place');
             return;
         }
-        // Повторное нажатие на галерею выходит из режима слоя знаков.
-        await exitSignsLayer();
+        if (!modal.classList.contains('visible')) {
+            openZnakPanel('place');
+            return;
+        }
+        // Галерея открыта — повторное нажатие выходит из режима слоя знаков.
+        await requestExitSignsLayer();
     });
 
     const tlToggleBtn = document.getElementById('addTlBtn');
