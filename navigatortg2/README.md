@@ -1,8 +1,7 @@
 # navigatortg2 — навигатор и редактор
 
-Отдельный проект, вынесенный из `navigatortg/`. Здесь тестовые версии
-навигатора и редактора на MapLibre; в `navigatortg/` — рабочая версия на
-Яндекс.Картах.
+Основная рабочая версия: навигатор и редактор на MapLibre. `navigatortg/` —
+legacy-версия на Яндекс.Картах, она остаётся в репозитории, но не деплоится.
 
 ## Страницы
 
@@ -131,14 +130,27 @@ npx wrangler deploy --config=wrangler-api.toml
 ./navigatortg2/deploy-v2.sh
 ```
 
-Скрипт публикует проект Cloudflare Pages `avtoinstruktor-v2` (новый домен
-`https://avtoinstruktor-v2.pages.dev`), собирает staging по белому списку,
+Скрипт публикует проект Cloudflare Pages `avtoinstruktor-v2`
+(`https://avtoinstruktor-v2.pages.dev`), собирает staging по белому списку,
 подставляет `?v=<build>` в ссылки на статику и пишет `version.json` (его
-использует автообновление мини-аппа). Имя проекта можно переопределить:
+использует автообновление мини-аппа).
+
+Перед публикацией HTML и свои JS/CSS минифицируются
+(`scripts/minify-deploy.js`, зависимости в `package.json`). Исходники в
+репозитории не меняются — обрабатывается только временная стадия.
+Отключить минификацию:
 
 ```bash
-PROJECT_NAME=my-test ./navigatortg2/deploy-v2.sh
+MINIFY=0 ./navigatortg2/deploy-v2.sh
 ```
+
+Имя проекта и ветку можно переопределить:
+
+```bash
+PROJECT_NAME=my-test BRANCH=my-branch ./navigatortg2/deploy-v2.sh
+```
+
+Первый запуск без `node_modules` сам выполнит `npm ci`.
 
 ## Проверка
 

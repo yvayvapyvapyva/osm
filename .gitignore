@@ -4,3 +4,4 @@ __pycache__/
 .venv/
 venv/
 .wrangler/
+navigatortg2/node_modules/

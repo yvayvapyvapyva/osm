@@ -1,0 +1,13 @@
+{
+  "name": "navigatortg2-deploy",
+  "private": true,
+  "type": "module",
+  "description": "Сборка статики navigatortg2 для Cloudflare Pages: минификация HTML и своих JS/CSS.",
+  "scripts": {
+    "minify": "node scripts/minify-deploy.js"
+  },
+  "devDependencies": {
+    "esbuild": "0.28.2",
+    "html-minifier-terser": "7.2.0"
+  }
+}

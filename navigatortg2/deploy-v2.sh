@@ -82,7 +82,21 @@ cat > "$STAGE/_headers" <<'HEADERS'
   Cache-Control: public, max-age=31536000, immutable
 HEADERS
 
+# Минификация статики. Исходники в репозитории не меняются — обрабатывается
+# только временная стадия. Отключить: MINIFY=0 ./deploy-v2.sh
+if [ "${MINIFY:-1}" != "0" ]; then
+  if [ ! -d node_modules/esbuild ] || [ ! -d node_modules/html-minifier-terser ]; then
+    echo "Устанавливаю зависимости минификации…"
+    npm ci --no-audit --no-fund
+  fi
+  node scripts/minify-deploy.js "$STAGE"
+else
+  echo "Минификация отключена (MINIFY=0)"
+fi
+
 echo "Build: $BUILD_ID"
 echo "Project: $PROJECT_NAME"
 
-wrangler pages deploy "$STAGE" --project-name="$PROJECT_NAME" --branch=main
+BRANCH="${BRANCH:-main}"
+
+wrangler pages deploy "$STAGE" --project-name="$PROJECT_NAME" --branch="$BRANCH"
