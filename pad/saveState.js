@@ -673,7 +673,8 @@
         closeBtn.addEventListener('click', closeManager);
         const headerTitle = document.createElement('div');
         headerTitle.className = 'scene-io-header-title';
-        headerTitle.textContent = 'Сцены';
+        // Во вьювере те же сохранённые сцены называем районами.
+        headerTitle.textContent = viewOnly ? 'Районы' : 'Сцены';
         header.appendChild(closeBtn);
         header.appendChild(headerTitle);
 
@@ -844,9 +845,16 @@
         const btn = document.createElement('button');
         btn.id = 'saveBtn';
         btn.className = 'fab';
-        btn.title = 'Сцены';
-        btn.setAttribute('aria-label', 'Сцены');
-        btn.innerHTML = '<svg viewBox="0 0 24 24" width="22" height="22" fill="#fff"><path d="M5,3A2,2 0 0,0 3,5V19A2,2 0 0,0 5,21H19A2,2 0 0,0 21,19V5.5L18.5,3H17V9A1,1 0 0,1 16,10H8A1,1 0 0,1 7,9V3H5M12,4V9H15V4H12M7,12H17A1,1 0 0,1 18,13V19H6V13A1,1 0 0,1 7,12Z"/></svg>';
+        const saveBtnLabel = viewOnly ? 'Районы' : 'Сцены';
+        btn.title = saveBtnLabel;
+        btn.setAttribute('aria-label', saveBtnLabel);
+        if (viewOnly) {
+            // Во вьювере кнопка подписана «Районы» вместо иконки.
+            btn.classList.add('viewer-districts');
+            btn.textContent = saveBtnLabel;
+        } else {
+            btn.innerHTML = '<svg viewBox="0 0 24 24" width="22" height="22" fill="#fff"><path d="M5,3A2,2 0 0,0 3,5V19A2,2 0 0,0 5,21H19A2,2 0 0,0 21,19V5.5L18.5,3H17V9A1,1 0 0,1 16,10H8A1,1 0 0,1 7,9V3H5M12,4V9H15V4H12M7,12H17A1,1 0 0,1 18,13V19H6V13A1,1 0 0,1 7,12Z"/></svg>';
+        }
         let longPressTriggered = false;
         btn.addEventListener('click', () => {
             if (longPressTriggered) {
@@ -899,6 +907,7 @@
             + '#savePddGroup #pddBtn{position:static;left:auto;transform:none;height:52px;}'
             + '#savePddGroup #pddBtn:active{transform:scale(0.92);}'
             + '#saveBtn { top:auto; right:auto; position:static; height:52px; width:52px; border-radius:26px; }'
+            + '#saveBtn.viewer-districts { width:auto; min-width:52px; padding:0 18px; font-size:14px; font-weight:700; letter-spacing:0.2px; }'
             + '#saveBtn.active { background:rgba(48,209,88,0.5); border-color:#30D158; }'
             + '@keyframes sceneIoSlideUp{from{transform:translateY(100%)}to{transform:translateY(0)}}'
             + '.scene-io-modal{position:fixed;inset:0;z-index:9500;background:transparent;pointer-events:none;display:flex;align-items:flex-end;justify-content:center;padding:0;opacity:0;visibility:hidden;transition:opacity .3s ease,visibility .3s;-webkit-tap-highlight-color:transparent;}'
