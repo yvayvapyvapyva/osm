@@ -3115,8 +3115,9 @@ function updateAllPicMarkers(event) {
         if (textMode) stopTextMode();
         const modal = document.getElementById('znakModal');
         if (!signsLayerMode) {
+            // Вход в режим знаков: окно каталога изначально закрыто,
+            // его открывает вкладка группы знаков.
             await enterSignsLayer();
-            openZnakPanel('place');
             return;
         }
         if (!modal.classList.contains('visible')) {
