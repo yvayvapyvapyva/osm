@@ -48,9 +48,10 @@
     }
 
     async function buildYandexTile(params, abortController) {
-        const m = /yandexsat:\/\/sat\/(\d+)\/(\d+)\/(\d+)/.exec((params && params.url) || '');
+        const m = /yandexsat:\/\/(sat|map|skl)\/(\d+)\/(\d+)\/(\d+)/.exec((params && params.url) || '');
         if (!m) throw new Error('Некорректный URL тайла Яндекса');
-        const z = +m[1], x = +m[2], y = +m[3];
+        const layer = m[1];
+        const z = +m[2], x = +m[3], y = +m[4];
         const n = Math.pow(2, z);
         const worldPx = 256 * n;
 
@@ -63,7 +64,8 @@
         // Целочисленный сдвиг убирает видимую линию на стыке тайлов.
         const snap = Math.max(0, Math.min(255, Math.round(shiftUp)));
 
-        const base = 'https://core-sat.maps.yandex.net/tiles?l=sat&x=' + x + '&y=';
+        const host = layer === 'sat' ? 'core-sat' : 'core-renderer-tiles';
+        const base = 'https://' + host + '.maps.yandex.net/tiles?l=' + layer + '&x=' + x + '&y=';
         const signal = abortController && abortController.signal;
         const secondY = Math.min(n - 1, srcY + 1);
         const images = await Promise.all([
@@ -103,13 +105,81 @@
                     tileSize: 256,
                     minzoom: 0,
                     maxzoom: MAX_ZOOM
+                },
+                'pad-yandex-map': {
+                    type: 'raster',
+                    tiles: ['yandexsat://map/{z}/{x}/{y}'],
+                    tileSize: 256,
+                    minzoom: 0,
+                    maxzoom: MAX_ZOOM
+                },
+                'pad-yandex-skl': {
+                    type: 'raster',
+                    tiles: ['yandexsat://skl/{z}/{x}/{y}'],
+                    tileSize: 256,
+                    minzoom: 0,
+                    maxzoom: MAX_ZOOM
                 }
             },
             layers: [
-                { id: 'pad-yandex-sat', type: 'raster', source: 'pad-yandex-sat' }
+                { id: 'pad-yandex-sat', type: 'raster', source: 'pad-yandex-sat' },
+                { id: 'pad-yandex-map', type: 'raster', source: 'pad-yandex-map', layout: { visibility: 'none' } },
+                { id: 'pad-yandex-skl', type: 'raster', source: 'pad-yandex-skl', layout: { visibility: 'none' } }
             ]
         };
     }
+
+    /* ---------- Подложка ---------- */
+
+    const BASE_LAYER_KEY = 'padBaseLayer';
+    const BASE_LAYER_MODES = ['sat', 'map', 'hybrid'];
+    let baseLayerMode = 'sat';
+    let currentPadMap = null;
+
+    function isViewerMode() {
+        return document.documentElement.classList.contains('scene-viewer');
+    }
+
+    function readSavedBaseLayer() {
+        try {
+            const value = localStorage.getItem(BASE_LAYER_KEY);
+            return BASE_LAYER_MODES.indexOf(value) !== -1 ? value : 'sat';
+        } catch (e) {
+            return 'sat';
+        }
+    }
+
+    function saveBaseLayer(mode) {
+        try { localStorage.setItem(BASE_LAYER_KEY, mode); } catch (e) {}
+    }
+
+    function applyBaseLayer(map, mode) {
+        if (!map || typeof map.setLayoutProperty !== 'function') return;
+        const visibility = {
+            'pad-yandex-sat': (mode === 'sat' || mode === 'hybrid') ? 'visible' : 'none',
+            'pad-yandex-map': mode === 'map' ? 'visible' : 'none',
+            'pad-yandex-skl': mode === 'hybrid' ? 'visible' : 'none'
+        };
+        Object.keys(visibility).forEach(function (id) {
+            try {
+                if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', visibility[id]);
+            } catch (e) {}
+        });
+    }
+
+    window.padSetBaseLayer = function (mode) {
+        if (BASE_LAYER_MODES.indexOf(mode) === -1) return baseLayerMode;
+        baseLayerMode = mode;
+        saveBaseLayer(mode);
+        if (currentPadMap && currentPadMap._map && currentPadMap._ready) {
+            applyBaseLayer(currentPadMap._map, mode);
+        }
+        return baseLayerMode;
+    };
+
+    window.padGetBaseLayer = function () {
+        return baseLayerMode;
+    };
 
     /* ---------- Маркер ---------- */
 
@@ -319,6 +389,7 @@
             const zoomRange = options.zoomRange || {};
             const center = loc.center ? [loc.center[0], loc.center[1]] : [43.9968, 56.3269];
 
+            baseLayerMode = isViewerMode() ? readSavedBaseLayer() : 'sat';
             this._map = new maplibregl.Map({
                 container: container,
                 style: yandexStyle(),
@@ -335,6 +406,7 @@
                 fadeDuration: 0
             });
 
+            currentPadMap = this;
             this._children = [];
             this._pending = [];
             this._ready = false;
@@ -358,6 +430,7 @@
             const onReady = () => {
                 if (this._ready) return;
                 this._ready = true;
+                applyBaseLayer(this._map, baseLayerMode);
                 const q = this._pending;
                 this._pending = [];
                 q.forEach((fn) => { try { fn(); } catch (e) { console.error(e); } });

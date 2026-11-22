@@ -64,8 +64,67 @@
     <style>
         * { margin:0; padding:0; box-sizing:border-box; -webkit-user-select:none; user-select:none; -webkit-tap-highlight-color:transparent; }
         html, body { height:100%; width:100%; overflow:hidden; background:#000; }
-        html.scene-viewer body > :not(#map):not(#loading):not(#savePddGroup):not(.scene-io-modal):not(script):not(style) { display:none !important; }
+        html.scene-viewer body > :not(#map):not(#loading):not(#savePddGroup):not(#viewerHelpBtn):not(#viewerHelpModal):not(.scene-io-modal):not(script):not(style) { display:none !important; }
         html.scene-viewer #savePddGroup #pddBtn { display:none !important; }
+        /* Справка во вьювере: кнопка «?» справа сверху и окно с машинками. */
+        #viewerHelpBtn {
+            display:none; position:fixed;
+            top:calc(12px + env(safe-area-inset-top)); right:12px;
+            z-index:9500; width:46px; height:46px; border-radius:50%;
+            border:0.5px solid rgba(255,255,255,0.2); background:rgba(15,15,15,0.85); color:#fff;
+            font-size:22px; font-weight:700; line-height:1; cursor:pointer;
+            align-items:center; justify-content:center;
+            box-shadow:0 8px 28px rgba(0,0,0,0.35); touch-action:manipulation;
+        }
+        #viewerHelpBtn:active { background:rgba(255,255,255,0.18); }
+        html.scene-viewer #viewerHelpBtn { display:flex; }
+        #viewerHelpModal {
+            position:fixed; inset:0; z-index:9500; display:none;
+            align-items:center; justify-content:center; padding:20px;
+            background:rgba(0,0,0,0.62); backdrop-filter:blur(4px); -webkit-backdrop-filter:blur(4px);
+            box-sizing:border-box;
+        }
+        #viewerHelpModal.visible { display:flex; }
+        #viewerHelpCard {
+            width:min(100%, 400px); max-height:min(82vh, 620px); overflow-y:auto;
+            background:rgba(20,20,22,0.98); color:#fff;
+            border:0.5px solid rgba(255,255,255,0.16); border-radius:18px;
+            padding:20px 20px calc(16px + env(safe-area-inset-bottom));
+            box-shadow:0 24px 80px rgba(0,0,0,0.6); box-sizing:border-box;
+        }
+        #viewerHelpTitle { font-size:18px; font-weight:700; margin-bottom:8px; }
+        #viewerHelpText { font-size:14px; line-height:1.45; color:rgba(255,255,255,0.75); }
+        .viewer-help-row { display:flex; align-items:center; gap:12px; margin-top:14px; }
+        .viewer-help-car {
+            flex:0 0 54px; width:54px; height:auto; padding:6px 0; border-radius:12px;
+            background:rgba(255,255,255,0.06); border:0.5px solid rgba(255,255,255,0.12);
+            display:flex; align-items:center; justify-content:center;
+        }
+        .viewer-help-car img { width:44px; height:auto; display:block; }
+        .viewer-help-body { font-size:14px; line-height:1.45; color:rgba(255,255,255,0.86); }
+        .viewer-help-body b { display:block; color:#fff; margin-bottom:2px; }
+        #viewerBaseTitle {
+            margin-top:18px; font-size:13px; font-weight:700;
+            letter-spacing:0.2px; color:rgba(255,255,255,0.7);
+            text-transform:uppercase;
+        }
+        #viewerBaseButtons { display:flex; gap:8px; margin-top:8px; }
+        #viewerBaseButtons button {
+            flex:1; min-width:0; height:38px; border-radius:10px;
+            border:1px solid rgba(255,255,255,0.18);
+            background:rgba(255,255,255,0.08); color:#fff;
+            font-size:13px; font-weight:600; cursor:pointer; touch-action:manipulation;
+        }
+        #viewerBaseButtons button:active { background:rgba(255,255,255,0.18); }
+        #viewerBaseButtons button.active {
+            background:rgba(48,209,88,0.22); border-color:#30D158; color:#fff;
+        }
+        #viewerHelpClose {
+            display:block; width:100%; margin-top:18px; height:44px; border-radius:12px;
+            border:none; background:#2FA8E0; color:#fff; font-size:15px; font-weight:700;
+            cursor:pointer; touch-action:manipulation;
+        }
+        #viewerHelpClose:active { background:#1E90D0; }
         #map { position:absolute; inset:0; z-index:1; }
         .fab {
             position:fixed; z-index:9005; width:52px; height:52px; border-radius:50%; border:0.5px solid rgba(255,255,255,0.12);
@@ -742,8 +801,35 @@
     <div class="sig-fab danger" id="textDelBtn"><svg viewBox="0 0 24 24" width="20" height="20"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg></div>
 </div>
 
+<button id="viewerHelpBtn" type="button" aria-label="Что означают машинки" title="Справка">?</button>
+<div id="viewerHelpModal" role="dialog" aria-modal="true" aria-labelledby="viewerHelpTitle" onclick="if(event.target===this) closeViewerHelp()">
+    <div id="viewerHelpCard">
+        <div id="viewerHelpTitle">Машинки и манёвры</div>
+        <div id="viewerHelpText">Цвет машинки показывает, какие манёвры она выполняет.</div>
+        <div class="viewer-help-row">
+            <div class="viewer-help-car"><img src="pic/1.png" alt="Белая машинка"></div>
+            <div class="viewer-help-body"><b>Белая машинка</b>Развороты на перекрёстке.</div>
+        </div>
+        <div class="viewer-help-row">
+            <div class="viewer-help-car"><img src="pic/3.png" alt="Синяя машинка"></div>
+            <div class="viewer-help-body"><b>Синяя машинка</b>Развороты вне перекрёстка.</div>
+        </div>
+        <div class="viewer-help-row">
+            <div class="viewer-help-car"><img src="pic/2.png" alt="Жёлтая машинка"></div>
+            <div class="viewer-help-body"><b>Жёлтая машинка</b>Автодромные упражнения: параллельная парковка, гараж, разворот в ограниченном пространстве, горка.</div>
+        </div>
+        <div id="viewerBaseTitle">Подложка</div>
+        <div id="viewerBaseButtons">
+            <button type="button" data-base-layer="sat">Спутник</button>
+            <button type="button" data-base-layer="map">Схема</button>
+            <button type="button" data-base-layer="hybrid">Гибрид</button>
+        </div>
+        <button id="viewerHelpClose" type="button">Понятно</button>
+    </div>
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
-<script src="mapEngine.js?v=2"></script>
+<script src="mapEngine.js?v=3"></script>
 <script src="pdd.js"></script>
 <script>
 let map = null, userMarker = null, lastPos = null;
@@ -3237,6 +3323,41 @@ function updateAllPicMarkers(event) {
         } catch (e) { /* безвредно: ссылка с параметром не должна ломать запуск */ }
     }
     handleStartParam();
+})();
+</script>
+<script>
+// Справка вьювера: кнопка «?» открывает описание машинок и манёвров.
+(function () {
+    const btn = document.getElementById('viewerHelpBtn');
+    const modal = document.getElementById('viewerHelpModal');
+    const close = document.getElementById('viewerHelpClose');
+    if (!btn || !modal) return;
+    window.openViewerHelp = function () { modal.classList.add('visible'); };
+    window.closeViewerHelp = function () { modal.classList.remove('visible'); };
+    btn.addEventListener('click', window.openViewerHelp);
+    if (close) close.addEventListener('click', window.closeViewerHelp);
+    document.addEventListener('keydown', e => {
+        if (e.key === 'Escape') window.closeViewerHelp();
+    });
+
+    // Переключение подложки: спутник / схема / гибрид.
+    const baseButtons = Array.from(document.querySelectorAll('#viewerBaseButtons button'));
+    function syncBaseButtons(mode) {
+        baseButtons.forEach(function (b) {
+            b.classList.toggle('active', b.getAttribute('data-base-layer') === mode);
+        });
+    }
+    baseButtons.forEach(function (b) {
+        b.addEventListener('click', function () {
+            const mode = b.getAttribute('data-base-layer');
+            if (typeof window.padSetBaseLayer === 'function') {
+                syncBaseButtons(window.padSetBaseLayer(mode));
+            } else {
+                syncBaseButtons(mode);
+            }
+        });
+    });
+    syncBaseButtons(typeof window.padGetBaseLayer === 'function' ? window.padGetBaseLayer() : 'sat');
 })();
 </script>
 <script>
