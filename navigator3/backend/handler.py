@@ -587,12 +587,30 @@ def _robokassa_new_inv_id():
 def _robokassa_payment_url(inv_id, amount, description, user):
     login, password1, _, test = _robokassa_config()
     out_sum = f"{float(amount):.2f}"
+    # Номенклатура для чека: без неё Робочеки СМЗ не могут сформировать чек.
+    # Самозанятый (НПД): НДС нет, поэтому tax = none; sno не передаём.
+    receipt = {
+        "items": [{
+            "name": description,
+            "quantity": 1,
+            "sum": round(float(out_sum), 2),
+            "tax": "none",
+        }]
+    }
+    receipt_param = urllib.parse.quote(
+        json.dumps(receipt, ensure_ascii=False, separators=(",", ":")),
+        safe="",
+    )
     params = {
         "MerchantLogin": login,
         "OutSum": out_sum,
         "InvId": str(inv_id),
         "Description": description,
-        "SignatureValue": _robokassa_signature(login, out_sum, str(inv_id), password1),
+        "Receipt": receipt_param,
+        # Receipt обязательно участвует в подписи, уже URL-кодированным.
+        "SignatureValue": _robokassa_signature(
+            login, out_sum, str(inv_id), receipt_param, password1
+        ),
         "Encoding": "utf-8",
         "Culture": "ru",
     }
