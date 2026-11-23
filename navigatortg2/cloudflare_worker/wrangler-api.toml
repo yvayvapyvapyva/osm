@@ -35,6 +35,7 @@ PURCHASE_CHANNEL_ID = "-1004446137461"
 
 # Веб-версия: адрес сайта и отправитель писем для входа по email.
 # RESEND_API_KEY или binding EMAIL задаются отдельно (wrangler secret).
+# AUTH_CODE_PEPPER — опциональный секрет для HMAC 6-значных кодов (fallback: TG_SECRET).
 WEB_APP_URL = "https://avtoinstruktor-web.pages.dev"
 WEB_EMAIL_FROM = "navigator@mail.ainstruktor.ru"
 

@@ -119,6 +119,39 @@ async function sha256Hex(value) {
   return Array.from(new Uint8Array(digest)).map((b) => b.toString(16).padStart(2, '0')).join('');
 }
 
+async function hmacHex(secret, message) {
+  const key = await crypto.subtle.importKey(
+    'raw',
+    new TextEncoder().encode(String(secret)),
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign']
+  );
+  const signature = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(String(message)));
+  return Array.from(new Uint8Array(signature)).map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+function codePepper(env) {
+  return String(env.AUTH_CODE_PEPPER || env.TG_SECRET || '');
+}
+
+function generateSixDigitCode() {
+  const buf = new Uint32Array(1);
+  crypto.getRandomValues(buf);
+  return String(buf[0] % 1000000).padStart(6, '0');
+}
+
+function safeEqual(a, b) {
+  const left = String(a);
+  const right = String(b);
+  if (left.length !== right.length) return false;
+  let diff = 0;
+  for (let i = 0; i < left.length; i += 1) {
+    diff |= left.charCodeAt(i) ^ right.charCodeAt(i);
+  }
+  return diff === 0;
+}
+
 function normalizeEmail(value) {
   const email = String(value || '').trim().toLowerCase();
   if (!email || email.length > 254) return '';
@@ -178,11 +211,11 @@ async function verifyTurnstile(env, token, ip) {
   }
 }
 
-async function sendWebEmail(env, to, link) {
+async function sendWebEmail(env, to, link, code) {
   const from = String(env.WEB_EMAIL_FROM || 'navigator@ainstruktor.ru');
-  const subject = 'Вход в веб-версию навигатора';
-  const text = `Здравствуйте!\n\nСсылка для входа в веб-версию навигатора:\n${link}\n\nСсылка действует 15 минут. Если вы не запрашивали вход, просто проигнорируйте письмо.`;
-  const html = `<p>Здравствуйте!</p><p>Ссылка для входа в веб-версию навигатора:</p><p><a href="${link}">Войти в навигатор</a></p><p>Ссылка действует 15 минут. Если вы не запрашивали вход, просто проигнорируйте письмо.</p>`;
+  const subject = 'Код входа в веб-версию навигатора';
+  const text = `Здравствуйте!\n\nКод для входа: ${code}\n\nИли войдите по ссылке:\n${link}\n\nКод действует 10 минут, ссылка — 15 минут. Если вы не запрашивали вход, просто проигнорируйте письмо.`;
+  const html = `<p>Здравствуйте!</p><p>Код для входа в веб-версию навигатора:</p><p style="font-size:30px;font-weight:800;letter-spacing:7px;font-family:monospace;">${code}</p><p>Или войдите по ссылке:</p><p><a href="${link}">Войти в навигатор</a></p><p>Код действует 10 минут, ссылка — 15 минут. Если вы не запрашивали вход, просто проигнорируйте письмо.</p>`;
 
   if (env.RESEND_API_KEY) {
     const res = await fetch('https://api.resend.com/emails', {
@@ -207,6 +240,44 @@ function webRedirect(location, cookie) {
   const headers = new Headers({ Location: location, 'Cache-Control': 'no-store' });
   if (cookie) headers.append('Set-Cookie', cookie);
   return new Response(null, { status: 302, headers });
+}
+
+async function ensureWebAccount(env, email, now) {
+  let account = await env.DB.prepare(
+    'SELECT id, email, created_at FROM web_accounts WHERE email = ? LIMIT 1'
+  ).bind(email).first();
+  if (!account) {
+    const id = crypto.randomUUID();
+    await env.DB.prepare(
+      `INSERT INTO web_accounts (id, email, email_verified_at, consent_at, consent_version, created_at, status)
+       VALUES (?, ?, ?, ?, '2026-11-23', ?, 'active')`
+    ).bind(id, email, now, now, now).run();
+    account = { id, email, created_at: now };
+  } else {
+    await env.DB.prepare(
+      'UPDATE web_accounts SET email_verified_at = ? WHERE id = ?'
+    ).bind(now, account.id).run();
+  }
+  return account;
+}
+
+async function createWebSession(env, request, account, now) {
+  const sessionToken = randomToken();
+  const sessionHash = await sha256Hex(sessionToken);
+  const sessionExpires = now + WEB_SESSION_DAYS * 24 * 3600;
+  await env.DB.prepare(
+    `INSERT INTO web_sessions (id, account_id, token_hash, created_at, expires_at, ip, user_agent)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`
+  ).bind(
+    crypto.randomUUID(),
+    account.id,
+    sessionHash,
+    now,
+    sessionExpires,
+    request.headers.get('CF-Connecting-IP') || '',
+    String(request.headers.get('User-Agent') || '').slice(0, 500)
+  ).run();
+  return { token: sessionToken, maxAge: WEB_SESSION_DAYS * 24 * 3600 };
 }
 
 async function handleEmailRequest(request, env, body) {
@@ -240,21 +311,37 @@ async function handleEmailRequest(request, env, body) {
   const token = randomToken();
   const tokenHash = await sha256Hex(token);
   const expiresAt = now + WEB_TOKEN_MINUTES * 60;
+
+  const code = generateSixDigitCode();
+  const pepper = codePepper(env);
+  if (!pepper) return json({ ok: false, error: 'code_not_configured' }, 503);
+  const codeHash = await hmacHex(pepper, `${email}:${code}`);
+
+  // Новый код отменяет все предыдущие коды этого email.
+  await env.DB.prepare(
+    'UPDATE web_email_codes SET used_at = ? WHERE email = ? AND used_at IS NULL'
+  ).bind(now, email).run();
+
   await env.DB.prepare(
     `INSERT INTO web_email_tokens (token_hash, email, purpose, created_at, expires_at, ip)
      VALUES (?, ?, 'login', ?, ?, ?)`
   ).bind(tokenHash, email, now, expiresAt, ip).run();
+  await env.DB.prepare(
+    `INSERT INTO web_email_codes (id, email, code_hash, created_at, expires_at, ip)
+     VALUES (?, ?, ?, ?, ?, ?)`
+  ).bind(crypto.randomUUID(), email, codeHash, now, now + 10 * 60, ip).run();
 
   const base = String(env.WEB_APP_URL || 'https://avtoinstruktor-web.pages.dev').replace(/\/+$/, '');
   const link = `${base}/api/auth/email/verify?token=${encodeURIComponent(token)}`;
   try {
-    await sendWebEmail(env, email, link);
+    await sendWebEmail(env, email, link, code);
   } catch (e) {
     await env.DB.prepare('DELETE FROM web_email_tokens WHERE token_hash = ?').bind(tokenHash).run();
+    await env.DB.prepare('DELETE FROM web_email_codes WHERE code_hash = ?').bind(codeHash).run();
     console.error('web email send failed:', (e && e.message) || e);
     return json({ ok: false, error: 'email_not_configured' }, 503);
   }
-  return json({ ok: true });
+  return json({ ok: true, expires_in: 600 });
 }
 
 async function handleEmailVerify(request, env, url) {
@@ -273,41 +360,59 @@ async function handleEmailVerify(request, env, url) {
   const email = normalizeEmail(row.email);
   if (!email) return webRedirect(`${base}/navigator?auth=invalid`);
 
-  let account = await env.DB.prepare(
-    'SELECT id, email, created_at FROM web_accounts WHERE email = ? LIMIT 1'
-  ).bind(email).first();
-  if (!account) {
-    const id = crypto.randomUUID();
-    await env.DB.prepare(
-      `INSERT INTO web_accounts (id, email, email_verified_at, consent_at, consent_version, created_at, status)
-       VALUES (?, ?, ?, ?, '2026-11-23', ?, 'active')`
-    ).bind(id, email, now, now, now).run();
-    account = { id, email, created_at: now };
-  } else {
-    await env.DB.prepare(
-      'UPDATE web_accounts SET email_verified_at = ? WHERE id = ?'
-    ).bind(now, account.id).run();
-  }
+  const account = await ensureWebAccount(env, email, now);
   await env.DB.prepare('UPDATE web_email_tokens SET used_at = ? WHERE token_hash = ?')
     .bind(now, tokenHash).run();
 
-  const sessionToken = randomToken();
-  const sessionHash = await sha256Hex(sessionToken);
-  const sessionExpires = now + WEB_SESSION_DAYS * 24 * 3600;
-  await env.DB.prepare(
-    `INSERT INTO web_sessions (id, account_id, token_hash, created_at, expires_at, ip, user_agent)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`
-  ).bind(
-    crypto.randomUUID(),
-    account.id,
-    sessionHash,
-    now,
-    sessionExpires,
-    request.headers.get('CF-Connecting-IP') || '',
-    String(request.headers.get('User-Agent') || '').slice(0, 500)
-  ).run();
+  const session = await createWebSession(env, request, account, now);
+  return webRedirect(`${base}/navigator?auth=ok`, webCookie(session.token, session.maxAge));
+}
 
-  return webRedirect(`${base}/navigator?auth=ok`, webCookie(sessionToken, WEB_SESSION_DAYS * 24 * 3600));
+async function handleCodeVerify(request, env, body) {
+  const email = normalizeEmail(body.email);
+  const code = String(body.code || '').trim();
+  if (!email || !/^\d{6}$/.test(code)) {
+    return json({ ok: false, error: 'bad_code' }, 400);
+  }
+  const pepper = codePepper(env);
+  if (!pepper) return json({ ok: false, error: 'code_not_configured' }, 503);
+
+  const now = Math.floor(Date.now() / 1000);
+  const row = await env.DB.prepare(
+    `SELECT id, code_hash, attempts, expires_at, used_at
+       FROM web_email_codes
+      WHERE email = ? AND used_at IS NULL
+      ORDER BY created_at DESC LIMIT 1`
+  ).bind(email).first();
+  if (!row || Number(row.expires_at) <= now) {
+    return json({ ok: false, error: 'code_expired' }, 400);
+  }
+  if (Number(row.attempts) >= 5) {
+    await env.DB.prepare('UPDATE web_email_codes SET used_at = ? WHERE id = ?')
+      .bind(now, row.id).run();
+    return json({ ok: false, error: 'too_many_attempts' }, 429);
+  }
+
+  const expected = await hmacHex(pepper, `${email}:${code}`);
+  if (!safeEqual(expected, row.code_hash)) {
+    await env.DB.prepare('UPDATE web_email_codes SET attempts = attempts + 1 WHERE id = ?')
+      .bind(row.id).run();
+    return json({ ok: false, error: 'invalid_code' }, 400);
+  }
+
+  await env.DB.prepare('UPDATE web_email_codes SET used_at = ? WHERE id = ?')
+    .bind(now, row.id).run();
+  const account = await ensureWebAccount(env, email, now);
+  const session = await createWebSession(env, request, account, now);
+  return json({
+    ok: true,
+    account: {
+      id: account.id,
+      email: account.email,
+      email_verified_at: now,
+      created_at: account.created_at,
+    },
+  }, 200, { 'Set-Cookie': webCookie(session.token, session.maxAge) });
 }
 
 async function handleAuthMe(request, env) {
@@ -477,6 +582,11 @@ export default {
         }
         if (url.pathname === '/auth/email/verify' && request.method === 'GET') {
           return await handleEmailVerify(request, env, url);
+        }
+        if (url.pathname === '/auth/email/verify-code' && request.method === 'POST') {
+          let body = {};
+          try { body = await request.json(); } catch { body = {}; }
+          return await handleCodeVerify(request, env, body);
         }
         if (url.pathname === '/auth/me' && request.method === 'GET') {
           return await handleAuthMe(request, env);

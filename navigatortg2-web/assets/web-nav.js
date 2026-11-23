@@ -28,6 +28,11 @@
             '.web-auth-status{min-height:18px;font-size:13px;line-height:1.4;color:var(--text-muted,#667085);}',
             '.web-auth-status.err{color:#D92D20;}',
             '.web-auth-status.ok{color:#067647;}',
+            '.web-auth-codebox{display:none;flex-direction:column;gap:10px;margin-top:12px;padding-top:12px;border-top:1px solid var(--line,#E4E7EC);}',
+            '.web-auth-codebox.visible{display:flex;}',
+            '.web-auth-code{width:100%;height:52px;padding:0 12px;border-radius:12px;border:1px solid var(--line,#D7DEE8);background:var(--surface-muted,#fff);color:var(--text,#101828);font:700 24px/1 monospace;letter-spacing:8px;text-align:center;outline:none;box-sizing:border-box;}',
+            '.web-auth-code:focus{border-color:#2FA8E0;}',
+            '.web-auth-codelabel{font-size:13px;color:var(--text-muted,#667085);}',
             '.web-auth-email{font-size:16px;font-weight:700;color:var(--text,#101828);overflow-wrap:anywhere;}',
             '.web-auth-actions{display:flex;gap:10px;flex-wrap:wrap;}',
             '.web-auth-actions .web-auth-btn{flex:1 1 auto;}',
@@ -266,7 +271,8 @@
                             : 'Не удалось отправить ссылку. Проверьте email.', 'err');
                         return;
                     }
-                    setStatus('Ссылка отправлена на ' + email + '. Проверьте почту и папку «Спам».', 'ok');
+                    setStatus('Код и ссылка отправлены на ' + email + '. Проверьте почту и папку «Спам».', 'ok');
+                    showCodeForm(email);
                     authMessage = '';
                     cooldownLeft = 60;
                     updateCooldown();
@@ -287,7 +293,99 @@
                 });
         });
 
+        const codeBox = document.createElement('form');
+        codeBox.className = 'web-auth-codebox';
+        codeBox.style.cssText = 'display:none;';
+
+        const codeLabel = document.createElement('div');
+        codeLabel.className = 'web-auth-codelabel';
+        codeLabel.textContent = 'Или введите код из письма';
+        codeBox.appendChild(codeLabel);
+
+        const codeInput = document.createElement('input');
+        codeInput.type = 'text';
+        codeInput.className = 'web-auth-code';
+        codeInput.inputMode = 'numeric';
+        codeInput.autocomplete = 'one-time-code';
+        codeInput.maxLength = 6;
+        codeInput.placeholder = '000000';
+        codeInput.pattern = '[0-9]{6}';
+        codeInput.required = true;
+        codeBox.appendChild(codeInput);
+
+        const codeButton = document.createElement('button');
+        codeButton.type = 'submit';
+        codeButton.className = 'web-auth-btn';
+        codeButton.textContent = 'Войти по коду';
+        codeBox.appendChild(codeButton);
+
+        const codeStatus = document.createElement('div');
+        codeStatus.className = 'web-auth-status';
+        codeBox.appendChild(codeStatus);
+
+        let codeEmail = '';
+
+        function showCodeForm(email) {
+            codeEmail = email;
+            codeBox.style.display = 'flex';
+            codeInput.value = '';
+            codeStatus.textContent = '';
+            codeStatus.className = 'web-auth-status';
+            try { codeInput.focus(); } catch (e) {}
+        }
+
+        codeBox.addEventListener('submit', function (event) {
+            event.preventDefault();
+            const value = String(codeInput.value || '').replace(/\D/g, '').slice(0, 6);
+            codeInput.value = value;
+            if (!/^\d{6}$/.test(value)) {
+                codeStatus.className = 'web-auth-status err';
+                codeStatus.textContent = 'Введите 6 цифр из письма';
+                return;
+            }
+            codeButton.disabled = true;
+            codeStatus.className = 'web-auth-status';
+            codeStatus.textContent = 'Проверяем код…';
+            fetch('/api/auth/email/verify-code', {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email: codeEmail, code: value }),
+            })
+                .then(function (res) {
+                    return res.json().catch(function () { return {}; }).then(function (data) {
+                        return { res: res, data: data };
+                    });
+                })
+                .then(function (result) {
+                    if (result.res.ok && result.data && result.data.ok) {
+                        account = result.data.account;
+                        authMessage = 'Вы вошли в аккаунт.';
+                        authMessageKind = 'ok';
+                        renderProfile();
+                        return;
+                    }
+                    const error = result.data && result.data.error;
+                    if (error === 'code_expired') {
+                        codeStatus.textContent = 'Код истёк. Запросите новый.';
+                    } else if (error === 'too_many_attempts') {
+                        codeStatus.textContent = 'Слишком много попыток. Запросите новый код.';
+                    } else {
+                        codeStatus.textContent = 'Неверный код. Попробуйте ещё раз.';
+                    }
+                    codeStatus.className = 'web-auth-status err';
+                })
+                .catch(function () {
+                    codeStatus.className = 'web-auth-status err';
+                    codeStatus.textContent = 'Ошибка сети. Попробуйте ещё раз.';
+                })
+                .then(function () {
+                    codeButton.disabled = false;
+                });
+        });
+
         wrap.appendChild(form);
+        wrap.appendChild(codeBox);
         box.appendChild(wrap);
 
         if (authResult === 'invalid') {
