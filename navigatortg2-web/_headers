@@ -1,0 +1,14 @@
+/index.html
+/account.html
+/navigator.html
+/legal/*
+  Cache-Control: no-store, must-revalidate
+
+/assets/*
+  Cache-Control: public, max-age=3600
+
+/signs/catalog.json
+  Cache-Control: public, max-age=600
+
+/signs/*
+  Cache-Control: public, max-age=31536000, immutable

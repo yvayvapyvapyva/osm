@@ -35,7 +35,7 @@
     }
 
     function worker(action, body) {
-        const url = new URL(API);
+        const url = new URL(API, global.location.origin);
         url.searchParams.set('action', action);
         const options = {
             method: body ? 'POST' : 'GET',

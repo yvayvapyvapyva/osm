@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#0b0c0e">
+    <title>Автоинструктор — веб-версия</title>
+    <link rel="stylesheet" href="/assets/web.css">
+</head>
+<body>
+    <main class="hero">
+        <div class="logo"><span class="logo-dot"></span> Автоинструктор · веб-версия</div>
+        <h1>Маршруты и разборы дорожных ситуаций</h1>
+        <p class="subtitle">Войдите по email, чтобы открыть купленные материалы и сохранять прогресс.</p>
+
+        <section class="card" id="loginCard">
+            <form id="loginForm" novalidate>
+                <label for="email">Email</label>
+                <input id="email" name="email" type="email" inputmode="email" autocomplete="email" placeholder="you@example.com" required>
+                <label class="checkbox">
+                    <input id="consent" type="checkbox" required>
+                    <span>Я принимаю <a href="/legal/offer.html" target="_blank" rel="noopener">оферту</a>,
+                        <a href="/legal/privacy.html" target="_blank" rel="noopener">политику конфиденциальности</a>
+                        и даю согласие на обработку персональных данных.</span>
+                </label>
+                <div class="btn-row">
+                    <button class="btn btn-primary" id="loginBtn" type="submit">Получить ссылку для входа</button>
+                </div>
+                <div class="status" id="loginStatus" role="status"></div>
+                <p class="hint">Пароль не нужен: мы отправим одноразовую ссылку на email. Она действует 15 минут.</p>
+            </form>
+        </section>
+
+        <section class="card" id="loggedCard" hidden>
+            <p class="hint">Вы вошли как</p>
+            <div class="account-email" id="loggedEmail"></div>
+            <div class="btn-row">
+                <a class="btn btn-primary" href="/account.html">Мой аккаунт</a>
+            </div>
+            <div class="btn-row">
+                <a class="btn" href="/navigator.html">Открыть навигатор</a>
+                <button class="btn btn-danger" id="logoutBtn" type="button">Выйти</button>
+            </div>
+        </section>
+
+        <div class="links">
+            <a href="/navigator.html">Навигатор</a>
+            <a href="/legal/offer.html">Оферта</a>
+            <a href="/legal/privacy.html">Политика конфиденциальности</a>
+            <a href="/legal/refund.html">Возврат</a>
+        </div>
+
+        <footer class="footer">
+            <span>© Автоинструктор</span>
+            <span>Самозанятый, НПД. НДС не облагается.</span>
+        </footer>
+    </main>
+
+    <script>
+    (function () {
+        const form = document.getElementById('loginForm');
+        const email = document.getElementById('email');
+        const consent = document.getElementById('consent');
+        const button = document.getElementById('loginBtn');
+        const status = document.getElementById('loginStatus');
+        const loggedCard = document.getElementById('loggedCard');
+        const loginCard = document.getElementById('loginCard');
+        const loggedEmail = document.getElementById('loggedEmail');
+
+        function setStatus(text, kind) {
+            status.textContent = text || '';
+            status.className = 'status' + (kind ? ' ' + kind : '');
+        }
+
+        async function loadMe() {
+            try {
+                const res = await fetch('/api/auth/me', { credentials: 'same-origin', cache: 'no-store' });
+                if (!res.ok) return null;
+                const data = await res.json();
+                return data && data.ok ? data.account : null;
+            } catch (e) {
+                return null;
+            }
+        }
+
+        async function init() {
+            const account = await loadMe();
+            if (account) {
+                loginCard.hidden = true;
+                loggedCard.hidden = false;
+                loggedEmail.textContent = account.email;
+            }
+        }
+
+        form.addEventListener('submit', async (event) => {
+            event.preventDefault();
+            const value = String(email.value || '').trim();
+            if (!value) {
+                setStatus('Введите email', 'err');
+                return;
+            }
+            if (!consent.checked) {
+                setStatus('Подтвердите согласие с документами', 'err');
+                return;
+            }
+            button.disabled = true;
+            setStatus('Отправляем ссылку…');
+            try {
+                const res = await fetch('/api/auth/email/request', {
+                    method: 'POST',
+                    credentials: 'same-origin',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email: value, consent: true }),
+                });
+                const data = await res.json().catch(() => ({}));
+                if (res.status === 429) {
+                    setStatus('Слишком много попыток. Попробуйте через 15 минут.', 'err');
+                } else if (!res.ok) {
+                    setStatus(data.error === 'email_not_configured'
+                        ? 'Отправка писем временно недоступна. Попробуйте позже.'
+                        : 'Не удалось отправить ссылку. Проверьте email.', 'err');
+                } else {
+                    setStatus('Ссылка отправлена. Проверьте почту и папку «Спам».', 'ok');
+                }
+            } catch (e) {
+                setStatus('Ошибка сети. Попробуйте ещё раз.', 'err');
+            } finally {
+                button.disabled = false;
+            }
+        });
+
+        document.getElementById('logoutBtn').addEventListener('click', async () => {
+            try {
+                await fetch('/api/auth/logout', { method: 'POST', credentials: 'same-origin' });
+            } catch (e) {}
+            loggedCard.hidden = true;
+            loginCard.hidden = false;
+            setStatus('');
+        });
+
+        init();
+    })();
+    </script>
+</body>
+</html>

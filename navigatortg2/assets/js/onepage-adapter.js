@@ -27,7 +27,7 @@
     }
 
     function workerGet(action, params) {
-        const url = new URL(API);
+        const url = new URL(API, global.location.origin);
         url.searchParams.set('action', action);
         Object.keys(params || {}).forEach((key) => {
             url.searchParams.set(key, params[key]);
@@ -40,7 +40,7 @@
     }
 
     function workerPost(action, params, body) {
-        const url = new URL(API);
+        const url = new URL(API, global.location.origin);
         url.searchParams.set('action', action);
         Object.keys(params || {}).forEach((key) => {
             url.searchParams.set(key, params[key]);
@@ -386,7 +386,7 @@
         if (!m) return Promise.resolve(jsonResponse({ error: 'missing_route_name' }, 400));
         // POST, чтобы передать подпись Telegram или ключ редактора:
         // без них воркер считает посетителя гостем и закрывает платные папки.
-        const routeUrl = new URL(API);
+        const routeUrl = new URL(API, global.location.origin);
         routeUrl.searchParams.set('action', 'get');
         routeUrl.searchParams.set('m', m);
         return originalFetch(routeUrl.toString(), {

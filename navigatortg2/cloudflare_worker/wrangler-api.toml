@@ -33,6 +33,11 @@ REPORT_CHAT_ID = "-1003906981409"
 # деплой перезапишет значение из дашборда этим.
 PURCHASE_CHANNEL_ID = "-1004446137461"
 
+# Веб-версия: адрес сайта и отправитель писем для входа по email.
+# RESEND_API_KEY или binding EMAIL задаются отдельно (wrangler secret).
+WEB_APP_URL = "https://avtoinstruktor-web.pages.dev"
+WEB_EMAIL_FROM = "navigator@mail.ainstruktor.ru"
+
 [[d1_databases]]
 binding = "DB"
 database_name = "nav-db"

@@ -82,6 +82,257 @@ function isPublicRoute(route, hidden) {
   return fid === null || fid === undefined || !hidden.has(fid);
 }
 
+/* ---------- Веб-аккаунты и вход по email ---------- */
+
+const WEB_COOKIE = 'nav_web_session';
+const WEB_SESSION_DAYS = 30;
+const WEB_TOKEN_MINUTES = 15;
+
+function readCookie(request, name) {
+  const raw = request.headers.get('Cookie') || '';
+  for (const part of raw.split(';')) {
+    const piece = part.trim();
+    const eq = piece.indexOf('=');
+    if (eq < 0) continue;
+    if (piece.slice(0, eq) !== name) continue;
+    try {
+      return decodeURIComponent(piece.slice(eq + 1));
+    } catch {
+      return piece.slice(eq + 1);
+    }
+  }
+  return '';
+}
+
+function base64url(bytes) {
+  let binary = '';
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+function randomToken() {
+  return base64url(crypto.getRandomValues(new Uint8Array(32)));
+}
+
+async function sha256Hex(value) {
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(String(value)));
+  return Array.from(new Uint8Array(digest)).map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+function normalizeEmail(value) {
+  const email = String(value || '').trim().toLowerCase();
+  if (!email || email.length > 254) return '';
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return '';
+  return email;
+}
+
+function webCookie(token, maxAge) {
+  return `${WEB_COOKIE}=${encodeURIComponent(token)}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${maxAge}`;
+}
+
+async function readWebSession(request, env) {
+  const token = readCookie(request, WEB_COOKIE);
+  if (!token) return null;
+  const hash = await sha256Hex(token);
+  const now = Math.floor(Date.now() / 1000);
+  const row = await env.DB.prepare(
+    `SELECT s.token_hash, s.expires_at, a.id AS account_id, a.email,
+            a.email_verified_at, a.created_at
+       FROM web_sessions s
+       JOIN web_accounts a ON a.id = s.account_id
+      WHERE s.token_hash = ? AND s.revoked_at IS NULL AND s.expires_at > ?
+      LIMIT 1`
+  ).bind(hash, now).first();
+  if (!row) return null;
+  return { token, hash, account: row };
+}
+
+async function webHasAccess(env, accountId, folderId) {
+  if (!accountId) return false;
+  const now = Math.floor(Date.now() / 1000);
+  const row = await env.DB.prepare(
+    `SELECT 1 FROM purchases
+      WHERE account_id = ? AND product_type = 'folder_access' AND product_id = ?
+        AND status = 'active' AND expires_at > ?
+      LIMIT 1`
+  ).bind(String(accountId), String(folderId), now).first();
+  return !!row;
+}
+
+async function verifyTurnstile(env, token, ip) {
+  if (!env.TURNSTILE_SECRET) return true;
+  if (!token) return false;
+  try {
+    const body = new URLSearchParams();
+    body.set('secret', env.TURNSTILE_SECRET);
+    body.set('response', String(token));
+    if (ip) body.set('remoteip', ip);
+    const res = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
+      method: 'POST',
+      body,
+    });
+    const data = await res.json().catch(() => ({}));
+    return !!data.success;
+  } catch {
+    return false;
+  }
+}
+
+async function sendWebEmail(env, to, link) {
+  const from = String(env.WEB_EMAIL_FROM || 'navigator@ainstruktor.ru');
+  const subject = 'Вход в веб-версию навигатора';
+  const text = `Здравствуйте!\n\nСсылка для входа в веб-версию навигатора:\n${link}\n\nСсылка действует 15 минут. Если вы не запрашивали вход, просто проигнорируйте письмо.`;
+  const html = `<p>Здравствуйте!</p><p>Ссылка для входа в веб-версию навигатора:</p><p><a href="${link}">Войти в навигатор</a></p><p>Ссылка действует 15 минут. Если вы не запрашивали вход, просто проигнорируйте письмо.</p>`;
+
+  if (env.RESEND_API_KEY) {
+    const res = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${env.RESEND_API_KEY}`,
+      },
+      body: JSON.stringify({ from, to, subject, text, html }),
+    });
+    if (!res.ok) throw new Error('resend_failed');
+    return;
+  }
+  if (env.EMAIL && typeof env.EMAIL.send === 'function') {
+    await env.EMAIL.send({ from, to, subject, text, html });
+    return;
+  }
+  throw new Error('email_not_configured');
+}
+
+function webRedirect(location, cookie) {
+  const headers = new Headers({ Location: location, 'Cache-Control': 'no-store' });
+  if (cookie) headers.append('Set-Cookie', cookie);
+  return new Response(null, { status: 302, headers });
+}
+
+async function handleEmailRequest(request, env, body) {
+  const email = normalizeEmail(body.email);
+  if (!email) return json({ ok: false, error: 'bad_email' }, 400);
+  if (body.consent !== true && body.consent !== 'true') {
+    return json({ ok: false, error: 'consent_required' }, 400);
+  }
+  const ip = request.headers.get('CF-Connecting-IP') || '';
+  if (!(await verifyTurnstile(env, body.turnstile_token, ip))) {
+    return json({ ok: false, error: 'captcha_failed' }, 403);
+  }
+
+  const now = Math.floor(Date.now() / 1000);
+  const since = now - 15 * 60;
+  const byEmail = await env.DB.prepare(
+    'SELECT COUNT(*) AS n FROM web_email_tokens WHERE email = ? AND created_at > ?'
+  ).bind(email, since).first();
+  if (byEmail && Number(byEmail.n) >= 5) {
+    return json({ ok: false, error: 'too_many_requests' }, 429);
+  }
+  if (ip) {
+    const byIp = await env.DB.prepare(
+      'SELECT COUNT(*) AS n FROM web_email_tokens WHERE ip = ? AND created_at > ?'
+    ).bind(ip, since).first();
+    if (byIp && Number(byIp.n) >= 20) {
+      return json({ ok: false, error: 'too_many_requests' }, 429);
+    }
+  }
+
+  const token = randomToken();
+  const tokenHash = await sha256Hex(token);
+  const expiresAt = now + WEB_TOKEN_MINUTES * 60;
+  await env.DB.prepare(
+    `INSERT INTO web_email_tokens (token_hash, email, purpose, created_at, expires_at, ip)
+     VALUES (?, ?, 'login', ?, ?, ?)`
+  ).bind(tokenHash, email, now, expiresAt, ip).run();
+
+  const base = String(env.WEB_APP_URL || 'https://avtoinstruktor-web.pages.dev').replace(/\/+$/, '');
+  const link = `${base}/api/auth/email/verify?token=${encodeURIComponent(token)}`;
+  try {
+    await sendWebEmail(env, email, link);
+  } catch (e) {
+    await env.DB.prepare('DELETE FROM web_email_tokens WHERE token_hash = ?').bind(tokenHash).run();
+    console.error('web email send failed:', (e && e.message) || e);
+    return json({ ok: false, error: 'email_not_configured' }, 503);
+  }
+  return json({ ok: true });
+}
+
+async function handleEmailVerify(request, env, url) {
+  const token = url.searchParams.get('token') || '';
+  const base = String(env.WEB_APP_URL || 'https://avtoinstruktor-web.pages.dev').replace(/\/+$/, '');
+  if (!token) return webRedirect(`${base}/index.html?auth=invalid`);
+  const tokenHash = await sha256Hex(token);
+  const now = Math.floor(Date.now() / 1000);
+  const row = await env.DB.prepare(
+    `SELECT token_hash, email, expires_at, used_at FROM web_email_tokens
+      WHERE token_hash = ? LIMIT 1`
+  ).bind(tokenHash).first();
+  if (!row || row.used_at || Number(row.expires_at) <= now) {
+    return webRedirect(`${base}/index.html?auth=invalid`);
+  }
+  const email = normalizeEmail(row.email);
+  if (!email) return webRedirect(`${base}/index.html?auth=invalid`);
+
+  let account = await env.DB.prepare(
+    'SELECT id, email, created_at FROM web_accounts WHERE email = ? LIMIT 1'
+  ).bind(email).first();
+  if (!account) {
+    const id = crypto.randomUUID();
+    await env.DB.prepare(
+      `INSERT INTO web_accounts (id, email, email_verified_at, consent_at, consent_version, created_at, status)
+       VALUES (?, ?, ?, ?, '2026-11-23', ?, 'active')`
+    ).bind(id, email, now, now, now).run();
+    account = { id, email, created_at: now };
+  } else {
+    await env.DB.prepare(
+      'UPDATE web_accounts SET email_verified_at = ? WHERE id = ?'
+    ).bind(now, account.id).run();
+  }
+  await env.DB.prepare('UPDATE web_email_tokens SET used_at = ? WHERE token_hash = ?')
+    .bind(now, tokenHash).run();
+
+  const sessionToken = randomToken();
+  const sessionHash = await sha256Hex(sessionToken);
+  const sessionExpires = now + WEB_SESSION_DAYS * 24 * 3600;
+  await env.DB.prepare(
+    `INSERT INTO web_sessions (id, account_id, token_hash, created_at, expires_at, ip, user_agent)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`
+  ).bind(
+    crypto.randomUUID(),
+    account.id,
+    sessionHash,
+    now,
+    sessionExpires,
+    request.headers.get('CF-Connecting-IP') || '',
+    String(request.headers.get('User-Agent') || '').slice(0, 500)
+  ).run();
+
+  return webRedirect(`${base}/account.html?auth=ok`, webCookie(sessionToken, WEB_SESSION_DAYS * 24 * 3600));
+}
+
+async function handleAuthMe(request, env) {
+  const session = await readWebSession(request, env);
+  if (!session) return json({ ok: false, error: 'unauthorized' }, 401);
+  return json({
+    ok: true,
+    account: {
+      id: session.account.account_id,
+      email: session.account.email,
+      email_verified_at: session.account.email_verified_at,
+      created_at: session.account.created_at,
+    },
+  });
+}
+
+async function handleLogout(request, env) {
+  const session = await readWebSession(request, env);
+  if (session) {
+    await env.DB.prepare('UPDATE web_sessions SET revoked_at = ? WHERE token_hash = ?')
+      .bind(Math.floor(Date.now() / 1000), session.hash).run();
+  }
+  return json({ ok: true }, 200, { 'Set-Cookie': webCookie('', 0) });
+}
+
 // Корневая папка владельца — контейнер, в котором лежат все его папки и
 // маршруты. Одна на Telegram-аккаунт. Создаётся при первом обращении.
 async function ensureOwnerRoot(env, uid, defaultName, profile) {
@@ -216,6 +467,30 @@ export default {
 
     if (!env.DB) return json({ error: 'DB not bound' }, 500);
 
+    // ---- Веб-вход по email (страницы на Pages, запросы через прокси) ----
+    if (url.pathname.startsWith('/auth/')) {
+      try {
+        if (url.pathname === '/auth/email/request' && request.method === 'POST') {
+          let body = {};
+          try { body = await request.json(); } catch { body = {}; }
+          return await handleEmailRequest(request, env, body);
+        }
+        if (url.pathname === '/auth/email/verify' && request.method === 'GET') {
+          return await handleEmailVerify(request, env, url);
+        }
+        if (url.pathname === '/auth/me' && request.method === 'GET') {
+          return await handleAuthMe(request, env);
+        }
+        if (url.pathname === '/auth/logout' && request.method === 'POST') {
+          return await handleLogout(request, env);
+        }
+        return json({ error: 'not_found' }, 404);
+      } catch (e) {
+        console.error('web auth error:', (e && e.message) || e);
+        return json({ ok: false, error: 'auth_failed' }, 500);
+      }
+    }
+
     const action = url.searchParams.get('action') || 'get';
     const mVal = url.searchParams.get('m');
 
@@ -332,7 +607,12 @@ export default {
         if (!routeM) return json({ error: 'missing_route_name' }, 400);
         const initData = bodyData.tg_init_data || url.searchParams.get('tg_init_data') || '';
         const { uid } = await verifyTgInitData(initData, env.TELEGRAM_TOKEN);
-        if (uid) {
+        let viewerId = uid ? String(uid) : '';
+        if (!viewerId) {
+          const session = await readWebSession(request, env);
+          if (session) viewerId = `web:${session.account.account_id}`;
+        }
+        if (viewerId) {
           const now = Math.floor(Date.now() / 1000);
           await env.DB.prepare(
             `INSERT INTO route_views (user_id, m, first_viewed_at, last_viewed_at, view_count)
@@ -340,7 +620,7 @@ export default {
              ON CONFLICT(user_id, m) DO UPDATE SET
                last_viewed_at = excluded.last_viewed_at,
                view_count = view_count + 1`)
-            .bind(String(uid), routeM, now, now).run();
+            .bind(viewerId, routeM, now, now).run();
         }
         return json({ status: 'ok', viewed: true });
       }
@@ -358,10 +638,13 @@ export default {
 
         const guard = await requireUser(request, bodyData, env);
         const uid = guard.ok ? String(guard.uid || '') : '';
+        const webSession = !uid ? await readWebSession(request, env) : null;
+        const webAccountId = webSession ? String(webSession.account.account_id) : '';
+        const viewOwnerId = uid || (webAccountId ? `web:${webAccountId}` : '');
         const viewedRoutes = new Set();
-        if (uid) {
+        if (viewOwnerId) {
           const viewRows = (await env.DB.prepare(
-            'SELECT m FROM route_views WHERE user_id = ?').bind(uid).all()).results || [];
+            'SELECT m FROM route_views WHERE user_id = ?').bind(viewOwnerId).all()).results || [];
           for (const row of viewRows) viewedRoutes.add(String(row.m));
         }
         const rootMeta = await env.DB.prepare(
@@ -401,6 +684,15 @@ export default {
 
         const index = await loadFolderIndex(env);
         const access = uid ? await accessExpires(env, uid) : {};
+        if (webAccountId) {
+          const now = Math.floor(Date.now() / 1000);
+          const webRows = (await env.DB.prepare(
+            `SELECT product_id, expires_at FROM purchases
+              WHERE account_id = ? AND product_type = 'folder_access'
+                AND status = 'active' AND expires_at > ?`
+          ).bind(webAccountId, now).all()).results || [];
+          for (const row of webRows) access[String(row.product_id)] = Number(row.expires_at);
+        }
 
         const routes = rows.map((row) => {
           const folderId = row.folder_id;
@@ -408,7 +700,7 @@ export default {
             ? lockForFolder(index, folderId)
             : null;
           const allowed = !lock || isOwner ||
-            (!!uid && Object.prototype.hasOwnProperty.call(access, String(lock.id)));
+            Object.prototype.hasOwnProperty.call(access, String(lock.id));
           const item = {
             m: row.m,
             name: row.name || '',
@@ -558,8 +850,12 @@ export default {
             // Владелец и админ открывают платную папку без покупки.
             const owner = String(row.owner_tg_id || '');
             const adminAccess = !!uid && isAdmin(uid, env);
+            const webSession = !uid ? await readWebSession(request, env) : null;
+            const webAccess = webSession
+              ? await webHasAccess(env, webSession.account.account_id, lock.id)
+              : false;
             if (!(uid && owner && String(uid) === owner) && !adminAccess &&
-                !(uid && await hasAccess(env, uid, lock.id))) {
+                !(uid && await hasAccess(env, uid, lock.id)) && !webAccess) {
               return json({ error: 'locked', id: lock.id, folder: lock.folder, price: lock.price }, 403);
             }
           }
@@ -730,9 +1026,26 @@ export default {
       if (action === 'my_access') {
         const initData = bodyData.initData || url.searchParams.get('tg_init_data') || '';
         const { uid, err } = await verifyTgInitData(initData, env.TELEGRAM_TOKEN);
-        if (!uid) return json({ error: 'bad_init_data', message: err }, 401);
-        const expires = await accessExpires(env, uid);
-        return json({ user_id: uid, ids: Object.keys(expires), expires });
+        if (uid) {
+          const expires = await accessExpires(env, uid);
+          return json({ user_id: uid, ids: Object.keys(expires), expires });
+        }
+        const session = await readWebSession(request, env);
+        if (!session) return json({ error: 'bad_init_data', message: err }, 401);
+        const now = Math.floor(Date.now() / 1000);
+        const rows = (await env.DB.prepare(
+          `SELECT product_id, expires_at FROM purchases
+            WHERE account_id = ? AND product_type = 'folder_access'
+              AND status = 'active' AND expires_at > ?`
+        ).bind(String(session.account.account_id), now).all()).results || [];
+        const expires = {};
+        for (const row of rows) expires[String(row.product_id)] = Number(row.expires_at);
+        return json({
+          user_id: `web:${session.account.account_id}`,
+          email: session.account.email,
+          ids: Object.keys(expires),
+          expires,
+        });
       }
 
       // Создать счёт на папку (Telegram Stars).
