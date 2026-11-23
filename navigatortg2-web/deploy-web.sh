@@ -15,7 +15,7 @@ STAGE="$(mktemp -d)"
 trap "rm -rf $STAGE" EXIT
 
 # Свои страницы веб-версии.
-cp -R index.html account.html legal assets functions _headers _redirects "$STAGE"/
+cp -R index.html legal assets functions _headers _redirects "$STAGE"/
 
 # Навигатор и общие ассеты берём из navigatortg2, чтобы не поддерживать копию.
 cp "$SOURCE_DIR/navigator.html" "$STAGE/navigator.html"

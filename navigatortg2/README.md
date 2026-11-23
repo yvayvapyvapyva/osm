@@ -52,8 +52,8 @@ npx wrangler deploy --config=wrangler-api.toml
 
 ## Веб-версия
 
-Отдельный проект `navigatortg2-web/` — только навигатор и личный кабинет,
-вход по email (magic link). Он использует тот же `nav-api-v2` и D1 `nav-db`,
+Отдельный проект `navigatortg2-web/` — только навигатор, вход по email
+(magic link) и покупки в шторке «Профиль». Он использует тот же `nav-api-v2` и D1 `nav-db`,
 а `/api/*` проксируется через Pages Function. Редактор и Stars в веб-версию
 не входят. Подробности — в `navigatortg2-web/README.md`.
 

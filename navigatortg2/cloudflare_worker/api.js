@@ -260,7 +260,7 @@ async function handleEmailRequest(request, env, body) {
 async function handleEmailVerify(request, env, url) {
   const token = url.searchParams.get('token') || '';
   const base = String(env.WEB_APP_URL || 'https://avtoinstruktor-web.pages.dev').replace(/\/+$/, '');
-  if (!token) return webRedirect(`${base}/index.html?auth=invalid`);
+  if (!token) return webRedirect(`${base}/navigator?auth=invalid`);
   const tokenHash = await sha256Hex(token);
   const now = Math.floor(Date.now() / 1000);
   const row = await env.DB.prepare(
@@ -268,10 +268,10 @@ async function handleEmailVerify(request, env, url) {
       WHERE token_hash = ? LIMIT 1`
   ).bind(tokenHash).first();
   if (!row || row.used_at || Number(row.expires_at) <= now) {
-    return webRedirect(`${base}/index.html?auth=invalid`);
+    return webRedirect(`${base}/navigator?auth=invalid`);
   }
   const email = normalizeEmail(row.email);
-  if (!email) return webRedirect(`${base}/index.html?auth=invalid`);
+  if (!email) return webRedirect(`${base}/navigator?auth=invalid`);
 
   let account = await env.DB.prepare(
     'SELECT id, email, created_at FROM web_accounts WHERE email = ? LIMIT 1'
@@ -307,7 +307,7 @@ async function handleEmailVerify(request, env, url) {
     String(request.headers.get('User-Agent') || '').slice(0, 500)
   ).run();
 
-  return webRedirect(`${base}/account.html?auth=ok`, webCookie(sessionToken, WEB_SESSION_DAYS * 24 * 3600));
+  return webRedirect(`${base}/navigator?auth=ok`, webCookie(sessionToken, WEB_SESSION_DAYS * 24 * 3600));
 }
 
 async function handleAuthMe(request, env) {
