@@ -449,7 +449,7 @@ async function ensureOwnerRoot(env, uid, defaultName, profile) {
   const displayName = /^\d+$/.test(rawName) ? '' : rawName;
 
   const readRoot = () => env.DB.prepare(
-    'SELECT r.folder_id, r.owner_name, r.owner_avatar, r.owner_username, r.owner_info, f.name, f.parent_id FROM owner_roots r JOIN folders f ON f.id = r.folder_id WHERE r.owner_tg_id = ?')
+    'SELECT r.folder_id, r.owner_name, r.owner_avatar, r.owner_username, r.owner_info, COALESCE(r.show_badge, 1) AS show_badge, f.name, f.parent_id FROM owner_roots r JOIN folders f ON f.id = r.folder_id WHERE r.owner_tg_id = ?')
     .bind(uid).first();
 
   const existing = await readRoot();
@@ -532,6 +532,7 @@ async function ensureOwnerRoot(env, uid, defaultName, profile) {
     owner_username: username,
     owner_info: '',
     owner_tg_id: uid,
+    show_badge: winner && winner.show_badge !== undefined ? Number(winner.show_badge) : 1,
   };
 }
 
@@ -645,7 +646,8 @@ export default {
                   COALESCE(r.owner_avatar, '') AS owner_avatar,
                   COALESCE(r.owner_username, '') AS owner_username,
                   COALESCE(r.owner_info, '') AS owner_info,
-                  COALESCE(r.owner_tg_id, '') AS owner_tg_id
+                  COALESCE(r.owner_tg_id, '') AS owner_tg_id,
+                  COALESCE(r.show_badge, 1) AS show_badge
              FROM folders f
              LEFT JOIN owner_roots r ON r.folder_id = f.id
             ORDER BY f.name`).all()).results || [];
@@ -699,14 +701,17 @@ export default {
             })),
           folders: folders
             .filter((f) => !hidden.has(f.id) && !inEmptyRoot(f.id))
-            .map((f) => ({
-              id: f.id, name: f.name, parent_id: f.parent_id, price: f.price || 0,
-              owner_name: f.owner_name || f.owner_username || '',
-              owner_avatar: f.owner_avatar || '',
-              owner_username: f.owner_username || '',
-              owner_info: f.owner_info || '',
-              owner_tg_id: f.owner_tg_id || '',
-            })),
+            .map((f) => {
+              const hideOwner = Number(f.show_badge) === 0;
+              return {
+                id: f.id, name: f.name, parent_id: f.parent_id, price: f.price || 0,
+                owner_name: hideOwner ? '' : (f.owner_name || f.owner_username || ''),
+                owner_avatar: hideOwner ? '' : (f.owner_avatar || ''),
+                owner_username: hideOwner ? '' : (f.owner_username || ''),
+                owner_info: hideOwner ? '' : (f.owner_info || ''),
+                owner_tg_id: hideOwner ? '' : (f.owner_tg_id || ''),
+              };
+            }),
           locks,
         }, 200, { 'Cache-Control': 'no-cache, no-store, must-revalidate' });
       }
@@ -758,13 +763,15 @@ export default {
           for (const row of viewRows) viewedRoutes.add(String(row.m));
         }
         const rootMeta = await env.DB.prepare(
-          'SELECT owner_name, owner_avatar, owner_username, owner_info FROM owner_roots WHERE owner_tg_id = ?')
+          'SELECT owner_name, owner_avatar, owner_username, owner_info, COALESCE(show_badge, 1) AS show_badge FROM owner_roots WHERE owner_tg_id = ?')
           .bind(String(root.owner_tg_id || '')).first();
         const ownerTgId = String(root.owner_tg_id || '');
         const ownerName = (rootMeta && rootMeta.owner_name) || (rootMeta && rootMeta.owner_username) || '';
         const isAdminUser = !!uid && isAdmin(uid, env);
         const isOwner = !!uid && (ownerTgId === uid || isAdminUser);
         const isAdminAccess = isAdminUser && ownerTgId !== uid;
+        const hideOwnerFields = !isOwner && !isAdminAccess &&
+          !!rootMeta && Number(rootMeta.show_badge) === 0;
 
         const allFolders = (await env.DB.prepare(
           'SELECT id, parent_id, visible FROM folders').all()).results || [];
@@ -781,7 +788,7 @@ export default {
           .filter((id) => !hidden.has(id));
 
         if (!ids.length) {
-          return json({ owner: { root_folder_id: rootId, name: root.name || '', owner_name: ownerName, owner_avatar: (rootMeta && rootMeta.owner_avatar) || '', owner_username: (rootMeta && rootMeta.owner_username) || '', owner_info: (rootMeta && rootMeta.owner_info) || '', owner_tg_id: ownerTgId, is_owner: isOwner, is_admin: isAdminAccess }, routes: [] },
+          return json({ owner: { root_folder_id: rootId, name: root.name || '', owner_name: hideOwnerFields ? '' : ownerName, owner_avatar: hideOwnerFields ? '' : ((rootMeta && rootMeta.owner_avatar) || ''), owner_username: hideOwnerFields ? '' : ((rootMeta && rootMeta.owner_username) || ''), owner_info: hideOwnerFields ? '' : ((rootMeta && rootMeta.owner_info) || ''), owner_tg_id: hideOwnerFields ? '' : ownerTgId, is_owner: isOwner, is_admin: isAdminAccess }, routes: [] },
             200, { 'Cache-Control': 'no-store, must-revalidate' });
         }
 
@@ -846,11 +853,11 @@ export default {
           owner: {
             root_folder_id: rootId,
             name: root.name || '',
-            owner_name: ownerName,
-            owner_avatar: (rootMeta && rootMeta.owner_avatar) || '',
-            owner_username: (rootMeta && rootMeta.owner_username) || '',
-            owner_info: (rootMeta && rootMeta.owner_info) || '',
-            owner_tg_id: ownerTgId,
+            owner_name: hideOwnerFields ? '' : ownerName,
+            owner_avatar: hideOwnerFields ? '' : ((rootMeta && rootMeta.owner_avatar) || ''),
+            owner_username: hideOwnerFields ? '' : ((rootMeta && rootMeta.owner_username) || ''),
+            owner_info: hideOwnerFields ? '' : ((rootMeta && rootMeta.owner_info) || ''),
+            owner_tg_id: hideOwnerFields ? '' : ownerTgId,
             is_owner: isOwner,
             is_admin: isAdminAccess,
           },
@@ -992,6 +999,7 @@ export default {
             owner_username: root.owner_username || '',
             owner_info: root.owner_info || '',
             owner_tg_id: actingUid,
+            show_badge: root.show_badge === undefined ? 1 : Number(root.show_badge),
           },
           routes: rows.map((r) => ({
             m: r.m, name: r.name || '', visible: r.visible === 1, folder_id: r.folder_id || null,
@@ -1250,6 +1258,7 @@ export default {
             owner_username: root.owner_username || '',
             owner_info: root.owner_info || '',
             owner_tg_id: actingUid,
+            show_badge: root.show_badge === undefined ? 1 : Number(root.show_badge),
           },
           folders: rows.map((r) => ({
             id: r.id, name: r.name, parent_id: r.parent_id,
@@ -1440,6 +1449,25 @@ export default {
           owner_username: root.owner_username || '',
           owner_info: root.owner_info || '',
           owner_tg_id: actingUid,
+          show_badge: root.show_badge === undefined ? 1 : Number(root.show_badge),
+        } });
+      }
+
+      // ---- Видимость бейджа владельца ----
+      if (action === 'badge_save') {
+        const show = bodyData.show === true || bodyData.show === 1 || bodyData.show === '1';
+        const root = await ensureOwnerRoot(env, actingUid);
+        await env.DB.prepare('UPDATE owner_roots SET show_badge = ? WHERE owner_tg_id = ?')
+          .bind(show ? 1 : 0, actingUid).run();
+        return json({ status: 'ok', root: {
+          folder_id: root.folder_id,
+          name: root.name || '',
+          owner_name: root.owner_name || root.owner_username || '',
+          owner_avatar: root.owner_avatar || '',
+          owner_username: root.owner_username || '',
+          owner_info: root.owner_info || '',
+          owner_tg_id: actingUid,
+          show_badge: show ? 1 : 0,
         } });
       }
 
@@ -1460,6 +1488,7 @@ export default {
             owner_username: root.owner_username || '',
             owner_info: info,
             owner_tg_id: actingUid,
+            show_badge: root.show_badge === undefined ? 1 : Number(root.show_badge),
           },
         });
       }

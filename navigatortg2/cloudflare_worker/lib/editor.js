@@ -14,6 +14,7 @@ export const EDITOR_ACTIONS = new Set([
   'signs_get', 'signs_save',
   'root_save',
   'owner_save',
+  'badge_save',
   'admin_owners',
 ]);
 

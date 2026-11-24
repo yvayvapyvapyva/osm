@@ -188,6 +188,17 @@
                 </div>
                 <div class="settings-name-hint">Так корневая папка называется в навигаторе.</div>
             </div>
+            <div class="settings-card">
+                <div class="settings-card-title">Приватность</div>
+                <label class="theme-row">
+                    <span class="theme-row-label">Показывать мой бейдж в навигаторе</span>
+                    <span class="theme-switch">
+                        <input type="checkbox" id="ownerBadgeToggle" onchange="saveOwnerBadge()">
+                        <span class="theme-switch-track"><span class="theme-switch-thumb"></span></span>
+                    </span>
+                </label>
+                <div class="settings-name-hint">Если выключить, имя, аватар и username не показываются на корневой папке.</div>
+            </div>
         </div>
         <div class="modal-actions-sm"><button class="btn-action flex-1" onclick="toggleM('editorProfileModal')">Готово</button></div>
     </div>
@@ -1538,6 +1549,30 @@ function renderRootFolderName() {
     }
 }
 
+function renderOwnerBadgeToggle() {
+    const toggle = $('ownerBadgeToggle');
+    if (!toggle) return;
+    toggle.checked = !(editorRoot && Number(editorRoot.show_badge) === 0);
+}
+
+async function saveOwnerBadge() {
+    const toggle = $('ownerBadgeToggle');
+    if (!toggle) return;
+    const show = !!toggle.checked;
+    toggle.disabled = true;
+    try {
+        const result = await callAdminApi('badge_save', {}, { show });
+        editorRoot = result.root || editorRoot;
+        renderOwnerBadgeToggle();
+        showToast(show ? 'Бейдж будет показываться' : 'Бейдж скрыт', 'success', 2500);
+    } catch (e) {
+        toggle.checked = !show;
+        showToast('Не удалось сохранить настройку', 'error', 4000);
+    } finally {
+        toggle.disabled = false;
+    }
+}
+
 async function saveRootFolderName() {
     const input = $('rootFolderNameInput');
     const btn = $('rootFolderNameSave');
@@ -1599,6 +1634,7 @@ function renderEditorProfileScreen() {
     }
     renderAdminOwnerCard();
     renderRootFolderName();
+    renderOwnerBadgeToggle();
 }
 
 function renderAdminOwnerCard() {
